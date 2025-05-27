@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "personal-agent"
+version = "0.1.0"
+description = "Personal AI agent with MCP and Weaviate"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+langchain = "^0.3.0"
+langchain-ollama = "^0.3.3"
+langchain-community = "^0.3.0"
+weaviate-client = "^4.8.1"
+flask = "^3.0.3"
+hypercorn = "^0.17.3"
+requests = "^2.32.3"
+langchain-weaviate = "^0.0.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
