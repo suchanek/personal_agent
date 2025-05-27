@@ -1,0 +1,15 @@
+services:
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    restart: always
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/Users/egs/data'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-ollama'
+      ENABLE_MODULES: 'text2vec-ollama'
+      TEXT2VEC_OLLAMA_OllamaURL: 'http://host.docker.internal:11434'
+      TEXT2VEC_OLLAMA_Model: 'qwen2.5:7b'
+      CLUSTER_HOSTNAME: 'weaveiate1'
