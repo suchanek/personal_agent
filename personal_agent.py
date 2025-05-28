@@ -1,6 +1,9 @@
-import json
+# pylint: disable=C0301,C0116
+# ,C0115,W0613,E0611,C0413,E0401,W0601,W0621,C0302,E1101,C0103,W0718
+
 import logging
 import time
+import warnings
 from datetime import datetime
 from typing import List
 
@@ -11,16 +14,26 @@ from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from rich.logging import RichHandler
 from urllib3.util import parse_url
 from weaviate import WeaviateClient
 from weaviate.connect import ConnectionParams
 from weaviate.util import generate_uuid5
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+# Suppress Pydantic deprecation warnings from Ollama
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
+warnings.filterwarnings(
+    "ignore", message=".*model_fields.*", category=DeprecationWarning
 )
-logger = logging.getLogger(__name__)
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
+logger: logging.Logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Reduce httpx logging verbosity to WARNING to reduce noise
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 # Configuration
 WEAVIATE_URL = "http://localhost:8080"
@@ -38,19 +51,22 @@ if USE_WEAVIATE:
         # Verify Weaviate is running with retries
         for attempt in range(5):
             logger.info(
-                f"Attempting to connect to Weaviate at {WEAVIATE_URL} (attempt {attempt + 1}/5)"
+                "Attempting to connect to Weaviate at %s (attempt %d/5)",
+                WEAVIATE_URL,
+                attempt + 1,
             )
             response = requests.get(f"{WEAVIATE_URL}/v1/.well-known/ready", timeout=10)
             if response.status_code == 200:
                 logger.info("Weaviate is ready")
                 break
             else:
-                raise Exception(f"Weaviate returned status {response.status_code}")
-    except Exception as e:
-        logger.error(f"Attempt {attempt + 1}/5: Error connecting to Weaviate: {e}")
+                raise RuntimeError(f"Weaviate returned status {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logger.error("Attempt %d/5: Error connecting to Weaviate: %s", attempt + 1, e)
         if attempt == 4:
             logger.error(
-                f"Cannot connect to Weaviate at {WEAVIATE_URL}, proceeding without Weaviate"
+                "Cannot connect to Weaviate at %s, proceeding without Weaviate",
+                WEAVIATE_URL,
             )
             USE_WEAVIATE = False
         time.sleep(10)
@@ -75,7 +91,7 @@ if USE_WEAVIATE:
 
             # Create Weaviate collection if it doesn't exist
             if not weaviate_client.collections.exists(collection_name):
-                logger.info(f"Creating Weaviate collection: {collection_name}")
+                logger.info("Creating Weaviate collection: %s", collection_name)
                 weaviate_client.collections.create(
                     name=collection_name,
                     properties=[
@@ -85,8 +101,20 @@ if USE_WEAVIATE:
                     ],
                     vectorizer_config=wvc.Configure.Vectorizer.none(),
                 )
+        except ImportError as e:
+            logger.error(
+                "Import error initializing Weaviate client or collection: %s", e
+            )
+            USE_WEAVIATE = False
+        except AttributeError as e:
+            logger.error(
+                "Attribute error initializing Weaviate client or collection: %s", e
+            )
+            USE_WEAVIATE = False
         except Exception as e:
-            logger.error(f"Error initializing Weaviate client or collection: {e}")
+            logger.error(
+                "Unexpected error initializing Weaviate client or collection: %s", e
+            )
             USE_WEAVIATE = False
 
         if USE_WEAVIATE:
@@ -116,16 +144,16 @@ def store_interaction(text: str, topic: str = "general") -> str:
         return "Weaviate is disabled, interaction not stored."
     try:
         # Format timestamp as RFC3339 (with 'Z' for UTC)
-        timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         vector_store.add_texts(
             texts=[text],
             metadatas=[{"timestamp": timestamp, "topic": topic}],
             ids=[generate_uuid5(text)],
         )
-        logger.info(f"Stored interaction: {text[:50]}...")
+        logger.info("Stored interaction: %s...", text[:50])
         return "Interaction stored successfully."
     except Exception as e:
-        logger.error(f"Error storing interaction: {str(e)}")
+        logger.error("Error storing interaction: %s", str(e))
         return f"Error storing interaction: {str(e)}"
 
 
@@ -137,42 +165,50 @@ def query_knowledge_base(query: str, limit: int = 5) -> List[str]:
         return ["Weaviate is disabled, no context available."]
     try:
         results = vector_store.similarity_search(query, k=limit)
-        logger.info(f"Queried knowledge base with: {query[:50]}...")
+        logger.info("Queried knowledge base with: %s...", query[:50])
         return (
             [doc.page_content for doc in results]
             if results
             else ["No relevant context found."]
         )
     except Exception as e:
-        logger.error(f"Error querying knowledge base: {str(e)}")
+        logger.error("Error querying knowledge base: %s", str(e))
         return [f"Error querying knowledge base: {str(e)}"]
 
 
 # Define system prompt for the agent
 system_prompt = PromptTemplate(
-    template="""You are a personal assistant that learns about the user and provides context-aware responses.
+    template="""You are a helpful personal assistant named "Personal Agent" that learns about the user and provides context-aware responses.
 
-Available tools:
+You have access to these tools:
 {tools}
 
 Tool names: {tool_names}
 
-Context from knowledge base: {context}
+IMPORTANT INSTRUCTIONS:
+1. ALWAYS respond to the user's current question/request first
+2. Use the context from knowledge base to enhance your response when relevant
+3. Store important interactions for future reference
+4. Be conversational and helpful
 
-Answer the user's query concisely and professionally, incorporating relevant context. Use tools only when explicitly needed.
+Current context from knowledge base: {context}
 
-When you need to use a tool, follow this exact format:
-Thought: [your reasoning]
-Action: [tool name]
-Action Input: [tool input]
-Observation: [tool result]
+User's current input: {input}
 
-When you have enough information to answer, respond with:
-Thought: [your reasoning]
-Final Answer: [your complete answer]
+To use a tool, follow this exact format:
+Thought: I need to [reason for using tool]
+Action: [exact tool name from: {tool_names}]
+Action Input: {{"param": "value"}}
+Observation: [tool result will appear here]
+
+When you have enough information, provide your final answer:
+Thought: I can now answer the user's question
+Final Answer: [your complete response to the user's current input]
+
+Remember: Answer the user's CURRENT question first, then optionally use context to enhance your response.
 
 {agent_scratchpad}""",
-    input_variables=["context", "tool_names", "tools", "agent_scratchpad"],
+    input_variables=["input", "context", "tool_names", "tools", "agent_scratchpad"],
 )
 
 # Initialize ReAct agent
@@ -199,7 +235,8 @@ def index():
         if user_input:
             # Query knowledge base for context
             try:
-                context = query_knowledge_base.invoke({"query": user_input})
+                # Call the function directly with proper parameters
+                context = query_knowledge_base.invoke({"query": user_input, "limit": 5})
                 context_str = (
                     "\n".join(context) if context else "No relevant context found."
                 )
@@ -211,14 +248,16 @@ def index():
                     response = result.get("output", "No response generated.")
                 else:
                     response = str(result)
-                # Store interaction
-                interaction_text = f"Query: {user_input} | Response: {response}"
+                # Store interaction AFTER getting response
+                interaction_text = f"User: {user_input}\nAssistant: {response}"
                 store_interaction.invoke({"text": interaction_text, "topic": topic})
             except Exception as e:
-                logger.error(f"Error processing query: {str(e)}")
+                logger.error("Error processing query: %s", str(e))
                 response = f"Error processing query: {str(e)}"
             logger.info(
-                f"Received query: {user_input[:50]}..., Response: {response[:50]}..."
+                "Received query: %s..., Response: %s...",
+                user_input[:50],
+                response[:50],
             )
     return render_template_string(
         """
@@ -230,7 +269,8 @@ def index():
                     h1 { color: #333; }
                     textarea, input[type="text"] { width: 100%; max-width: 600px; }
                     input[type="submit"] { margin-top: 10px; padding: 10px 20px; }
-                    .response, .context { margin-top: 20px; }
+                    .response, .context { margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+                    .context { background-color: #f9f9f9; }
                     .context ul { list-style-type: none; padding: 0; }
                 </style>
             </head>
@@ -238,23 +278,23 @@ def index():
                 <h1>Personal AI Agent</h1>
                 <form method="post">
                     <label for="query">Query:</label><br>
-                    <textarea name="query" rows="5" cols="50"></textarea><br>
+                    <textarea name="query" rows="5" cols="50" placeholder="Ask me anything..."></textarea><br>
                     <label for="topic">Topic:</label><br>
-                    <input type="text" name="topic" value="general"><br>
+                    <input type="text" name="topic" value="general" placeholder="e.g., programming, personal, etc."><br>
                     <input type="submit" value="Submit">
                 </form>
                 {% if response %}
                     <div class="response">
                         <h2>Response:</h2>
-                        <p>{{ response }}</p>
+                        <p style="white-space: pre-wrap;">{{ response }}</p>
                     </div>
                 {% endif %}
-                {% if context %}
+                {% if context and context != ['No relevant context found.'] %}
                     <div class="context">
                         <h2>Context Used:</h2>
                         <ul>
                         {% for item in context %}
-                            <li>{{ item }}</li>
+                            <li style="margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;">{{ item }}</li>
                         {% endfor %}
                         </ul>
                     </div>
@@ -275,11 +315,12 @@ def cleanup():
             weaviate_client.close()
             logger.info("Weaviate client closed successfully")
         except Exception as e:
-            logger.error(f"Error closing Weaviate client: {e}")
+            logger.error("Error closing Weaviate client: %s", e)
 
 
 if __name__ == "__main__":
     import atexit
+
     atexit.register(cleanup)
     try:
         app.run(host="127.0.0.1", port=5000, debug=True)
