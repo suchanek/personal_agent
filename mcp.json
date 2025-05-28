@@ -1,7 +1,11 @@
 {
   "mcpServers": {
-    "filesystem": {
+    "filesystem-home": {
       "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs"]
+    },
+    "filesystem-data": {
+      "command": "npx", 
       "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs/data"]
     }
   }
