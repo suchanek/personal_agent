@@ -7,6 +7,10 @@
     "filesystem-data": {
       "command": "npx", 
       "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs/data"]
+    },
+    "filesystem-root": {
+      "command": "npx", 
+      "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"]
     }
   }
 }

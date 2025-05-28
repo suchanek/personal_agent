@@ -1,5 +1,5 @@
 # pylint: disable=C0301,C0116
-# ,C0115,W0613,E0611,C0413,E0401,W0601,W0621,C0302,E1101,C0103,W0718
+# pylint: disable=C0301,C0116,C0115,W0613,E0611,C0413,E0401,W0601,W0621,C0302,E1101,C0103,W0718
 
 import atexit
 import json
@@ -44,17 +44,26 @@ OLLAMA_URL = "http://localhost:11434"
 USE_WEAVIATE = True  # Set to False to bypass Weaviate for testing
 USE_MCP = True  # Set to False to bypass MCP for testing
 
+ROOT_DIR = "/Users/egs"  # Root directory for MCP filesystem server
+DATA_DIR = "/Users/egs/data"  # Data directory for vector database
+LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
+
 # MCP Server configurations
 MCP_SERVERS = {
     "filesystem-home": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs"],
+        "args": ["--yes", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
         "description": "Access home directory filesystem operations",
     },
     "filesystem-data": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs/data"],
+        "args": ["--yes", "@modelcontextprotocol/server-filesystem", DATA_DIR],
         "description": "Access data directory for vector database",
+    },
+    "filesystem-root": {
+        "command": "npx",
+        "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"],
+        "description": "Access root directory filesystem operations",
     },
 }
 
@@ -82,9 +91,9 @@ class SimpleMCPClient:
             # Set working directory based on the server root path
             cwd = None
             if server_name == "filesystem-home":
-                cwd = "/Users/egs"
+                cwd = ROOT_DIR
             elif server_name == "filesystem-data":
-                cwd = "/Users/egs/data"
+                cwd = DATA_DIR
 
             process = subprocess.Popen(
                 [config["command"]] + config["args"],
@@ -299,7 +308,7 @@ if USE_WEAVIATE:
             )
 
 # Initialize Ollama LLM
-llm = ChatOllama(model="qwen2.5:7b-instruct", temperature=0.7, base_url=OLLAMA_URL)
+llm = ChatOllama(model=LLM_MODEL, temperature=0.7, base_url=OLLAMA_URL)
 
 
 # Define tools
@@ -434,10 +443,10 @@ def mcp_read_file(file_path: str) -> str:
 
         # Convert absolute paths to relative paths for the restricted root
         # The server root is /Users/egs, so we need to make paths relative to that
-        if file_path == "/Users/egs":
+        if file_path == ROOT_DIR:
             file_path = "."  # Root directory (though reading a directory as file will likely fail)
         elif file_path.startswith("/Users/egs/"):
-            file_path = file_path[10:]  # Remove "/Users/egs" prefix
+            file_path = file_path[10:]  # Remove ROOT_DIR prefix
         elif file_path.startswith("~/"):
             file_path = file_path[2:]  # Remove "~/" prefix
         elif file_path.startswith("/"):
@@ -504,10 +513,10 @@ def mcp_write_file(file_path: str, content: str) -> str:
         # Convert absolute paths to relative paths for the restricted root
         if server_name == "filesystem-home":
             # The server root is /Users/egs
-            if file_path == "/Users/egs":
+            if file_path == ROOT_DIR:
                 return "Error: Cannot write to root directory as a file"
             elif file_path.startswith("/Users/egs/"):
-                file_path = file_path[10:]  # Remove "/Users/egs" prefix
+                file_path = file_path[10:]  # Remove ROOT_DIR prefix
             elif file_path.startswith("~/"):
                 file_path = file_path[2:]  # Remove "~/" prefix
             elif file_path.startswith("/"):
@@ -581,10 +590,10 @@ def mcp_list_directory(directory_path: str) -> str:
         original_path = directory_path  # Keep for logging
         if server_name == "filesystem-home":
             # The server root is /Users/egs
-            if directory_path == "/Users/egs":
+            if directory_path == ROOT_DIR:
                 directory_path = "."  # Root directory
             elif directory_path.startswith("/Users/egs/"):
-                directory_path = directory_path[10:]  # Remove "/Users/egs" prefix
+                directory_path = directory_path[10:]  # Remove ROOT_DIR prefix
             elif directory_path.startswith("~/"):
                 directory_path = directory_path[2:]  # Remove "~/" prefix
             elif directory_path.startswith("/"):
@@ -696,6 +705,11 @@ IMPORTANT INSTRUCTIONS:
 4. Be conversational and helpful
 5. Use MCP filesystem tools to read, write, and analyze files when requested
 6. Combine file operations with memory storage for enhanced context
+7. When the user asks to reset knowledge, clear the knowledge base and inform them
+8. When the user asks to remember something, store it in the knowledge base
+9. When the user asks to clear the context, clear the current context but not the knowledge base
+10. Never clear the knowledge base unless explicitly requested by the user
+
 
 CAPABILITIES:
 - Memory: Store and query interactions using Weaviate vector database
@@ -716,6 +730,8 @@ Observation: [tool result will appear here]
 When you have enough information, provide your final answer:
 Thought: I can now answer the user's question
 Final Answer: [your complete response to the user's current input]
+
+CRITICAL: Once you write "Final Answer:", you MUST stop immediately. Do NOT add any more thoughts, actions, or text after the Final Answer.
 
 Remember: Answer the user's CURRENT question first, then optionally use context to enhance your response.
 
