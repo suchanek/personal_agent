@@ -65,6 +65,28 @@ MCP_SERVERS = {
         "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"],
         "description": "Access root directory filesystem operations",
     },
+    "github": {
+        "command": "npx",
+        "args": ["--yes", "@modelcontextprotocol/server-github"],
+        "description": "GitHub repository operations and code search",
+        "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": ""},  # Set your token here
+    },
+    "brave-search": {
+        "command": "npx",
+        "args": ["--yes", "@modelcontextprotocol/server-brave-search"],
+        "description": "Web search for research and technical information",
+        "env": {"BRAVE_API_KEY": ""},  # Set your API key here
+    },
+    "shell": {
+        "command": "npx",
+        "args": ["--yes", "@modelcontextprotocol/server-shell"],
+        "description": "Execute shell commands and scripts",
+    },
+    "fetch": {
+        "command": "npx",
+        "args": ["--yes", "@modelcontextprotocol/server-fetch"],
+        "description": "Fetch web content and APIs for data collection",
+    },
 }
 
 
@@ -689,6 +711,264 @@ def intelligent_file_search(search_query: str, directory: str = "/") -> str:
         return f"Error searching files: {str(e)}"
 
 
+@tool
+def mcp_github_search(query: str, repo: str = "") -> str:
+    """Search GitHub repositories or specific repo for code, issues, or documentation."""
+    # Handle case where parameters might be JSON strings from LangChain
+    if isinstance(query, str) and query.startswith("{"):
+        try:
+            params = json.loads(query)
+            query = params.get("query", query)
+            repo = params.get("repo", repo)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not USE_MCP or mcp_client is None:
+        return "MCP is disabled, cannot search GitHub."
+
+    try:
+        server_name = "github"
+
+        # Start GitHub server if not already running
+        if server_name not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync(server_name)
+            if not start_result:
+                return "Failed to start MCP GitHub server. Make sure GITHUB_PERSONAL_ACCESS_TOKEN is set."
+
+        # Prepare parameters for GitHub search
+        params = {"query": query}
+        if repo:
+            params["repo"] = repo
+
+        # Call GitHub search tool
+        result = mcp_client.call_tool_sync(server_name, "search_repositories", params)
+
+        # Store the GitHub search operation in memory for context
+        if USE_WEAVIATE and vector_store is not None:
+            interaction_text = (
+                f"GitHub search: {query}"
+                + (f" in {repo}" if repo else "")
+                + f"\nResults: {result[:300]}..."
+            )
+            store_interaction.invoke(
+                {"text": interaction_text, "topic": "github_search"}
+            )
+
+        logger.info("GitHub search completed: %s", query)
+        return result
+
+    except Exception as e:
+        logger.error("Error searching GitHub via MCP: %s", str(e))
+        return f"Error searching GitHub: {str(e)}"
+
+
+@tool
+def mcp_brave_search(query: str, count: int = 5) -> str:
+    """Search the web using Brave Search for research and technical information."""
+    # Handle case where parameters might be JSON strings from LangChain
+    if isinstance(query, str) and query.startswith("{"):
+        try:
+            params = json.loads(query)
+            query = params.get("query", query)
+            count = params.get("count", count)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not USE_MCP or mcp_client is None:
+        return "MCP is disabled, cannot search web."
+
+    try:
+        server_name = "brave-search"
+
+        # Start Brave Search server if not already running
+        if server_name not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync(server_name)
+            if not start_result:
+                return "Failed to start MCP Brave Search server. Make sure BRAVE_API_KEY is set."
+
+        # Call Brave search tool
+        result = mcp_client.call_tool_sync(
+            server_name, "brave_web_search", {"query": query, "count": count}
+        )
+
+        # Store the web search operation in memory for context
+        if USE_WEAVIATE and vector_store is not None:
+            interaction_text = (
+                f"Web search: {query}\nResults preview: {result[:300]}..."
+            )
+            store_interaction.invoke({"text": interaction_text, "topic": "web_search"})
+
+        logger.info("Web search completed: %s", query)
+        return result
+
+    except Exception as e:
+        logger.error("Error searching web via MCP: %s", str(e))
+        return f"Error searching web: {str(e)}"
+
+
+@tool
+def mcp_shell_command(command: str, timeout: int = 30) -> str:
+    """Execute shell commands safely using MCP shell server."""
+    # Handle case where parameters might be JSON strings from LangChain
+    if isinstance(command, str) and command.startswith("{"):
+        try:
+            params = json.loads(command)
+            command = params.get("command", command)
+            timeout = params.get("timeout", timeout)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not USE_MCP or mcp_client is None:
+        return "MCP is disabled, cannot execute shell commands."
+
+    try:
+        server_name = "shell"
+
+        # Start shell server if not already running
+        if server_name not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync(server_name)
+            if not start_result:
+                return "Failed to start MCP shell server."
+
+        # Call shell execution tool
+        result = mcp_client.call_tool_sync(
+            server_name, "run_command", {"command": command, "timeout": timeout}
+        )
+
+        # Store the shell command operation in memory for context
+        if USE_WEAVIATE and vector_store is not None:
+            interaction_text = f"Shell command: {command}\nOutput: {result[:300]}..."
+            store_interaction.invoke(
+                {"text": interaction_text, "topic": "shell_commands"}
+            )
+
+        logger.info("Shell command executed: %s", command)
+        return result
+
+    except Exception as e:
+        logger.error("Error executing shell command via MCP: %s", str(e))
+        return f"Error executing shell command: {str(e)}"
+
+
+@tool
+def mcp_fetch_url(url: str, method: str = "GET") -> str:
+    """Fetch content from web URLs and APIs using MCP fetch server."""
+    # Handle case where parameters might be JSON strings from LangChain
+    if isinstance(url, str) and url.startswith("{"):
+        try:
+            params = json.loads(url)
+            url = params.get("url", url)
+            method = params.get("method", method)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not USE_MCP or mcp_client is None:
+        return "MCP is disabled, cannot fetch URLs."
+
+    try:
+        server_name = "fetch"
+
+        # Start fetch server if not already running
+        if server_name not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync(server_name)
+            if not start_result:
+                return "Failed to start MCP fetch server."
+
+        # Call fetch tool
+        result = mcp_client.call_tool_sync(
+            server_name, "fetch", {"url": url, "method": method}
+        )
+
+        # Store the fetch operation in memory for context
+        if USE_WEAVIATE and vector_store is not None:
+            interaction_text = f"Fetched URL: {url}\nContent preview: {result[:300]}..."
+            store_interaction.invoke({"text": interaction_text, "topic": "web_fetch"})
+
+        logger.info("Fetched URL: %s", url)
+        return result
+
+    except Exception as e:
+        logger.error("Error fetching URL via MCP: %s", str(e))
+        return f"Error fetching URL: {str(e)}"
+
+
+@tool
+def comprehensive_research(topic: str, max_results: int = 10) -> str:
+    """Perform comprehensive research combining memory, web search, GitHub, and file operations."""
+    # Handle case where parameters might be JSON strings from LangChain
+    if isinstance(topic, str) and topic.startswith("{"):
+        try:
+            params = json.loads(topic)
+            topic = params.get("topic", topic)
+            max_results = params.get("max_results", max_results)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not USE_MCP or mcp_client is None:
+        return "MCP is disabled, cannot perform comprehensive research."
+
+    try:
+        research_results = []
+
+        # 1. Search memory for existing knowledge
+        if USE_WEAVIATE and vector_store is not None:
+            memory_results = query_knowledge_base.invoke({"query": topic, "limit": 5})
+            if memory_results and memory_results != ["No relevant context found."]:
+                research_results.append("=== MEMORY CONTEXT ===")
+                research_results.extend(memory_results)
+
+        # 2. Web search for current information
+        try:
+            web_results = mcp_brave_search.invoke(
+                {"query": topic, "count": min(5, max_results)}
+            )
+            research_results.append("=== WEB SEARCH RESULTS ===")
+            research_results.append(web_results)
+        except Exception as e:
+            research_results.append(f"Web search failed: {str(e)}")
+
+        # 3. GitHub search for code and technical documentation
+        try:
+            github_results = mcp_github_search.invoke({"query": topic})
+            research_results.append("=== GITHUB SEARCH RESULTS ===")
+            research_results.append(github_results)
+        except Exception as e:
+            research_results.append(f"GitHub search failed: {str(e)}")
+
+        # 4. Search local files for relevant information
+        try:
+            file_search_results = intelligent_file_search.invoke(
+                {"search_query": topic, "directory": "."}
+            )
+            research_results.append("=== LOCAL FILE SEARCH ===")
+            research_results.append(file_search_results)
+        except Exception as e:
+            research_results.append(f"File search failed: {str(e)}")
+
+        # Combine all results
+        comprehensive_result = "\n\n".join(research_results)
+
+        # Store the comprehensive research in memory
+        if USE_WEAVIATE and vector_store is not None:
+            interaction_text = f"Comprehensive research on: {topic}\nSummary: Combined memory, web, GitHub, and file search results"
+            store_interaction.invoke({"text": interaction_text, "topic": "research"})
+
+            # Also store the research results for future reference
+            store_interaction.invoke(
+                {
+                    "text": comprehensive_result[:2000],
+                    "topic": f"research_{topic.replace(' ', '_')}",
+                }
+            )
+
+        logger.info("Comprehensive research completed for: %s", topic)
+        return comprehensive_result
+
+    except Exception as e:
+        logger.error("Error in comprehensive research: %s", str(e))
+        return f"Error performing comprehensive research: {str(e)}"
+
+
 # Define system prompt for the agent
 system_prompt = PromptTemplate(
     template="""You are a helpful personal assistant named "Personal Agent" that learns about the user and provides context-aware responses.
@@ -748,6 +1028,11 @@ tools = [
     mcp_write_file,
     mcp_list_directory,
     intelligent_file_search,
+    mcp_github_search,
+    mcp_brave_search,
+    mcp_shell_command,
+    mcp_fetch_url,
+    comprehensive_research,
 ]
 agent = create_react_agent(llm=llm, tools=tools, prompt=system_prompt)
 agent_executor = AgentExecutor(
@@ -928,6 +1213,6 @@ def cleanup():
 if __name__ == "__main__":
     atexit.register(cleanup)
     try:
-        app.run(host="127.0.0.1", port=5000, debug=True)
+        app.run(host="127.0.0.1", port=5001, debug=True)
     except KeyboardInterrupt:
         cleanup()

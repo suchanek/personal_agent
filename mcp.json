@@ -11,6 +11,28 @@
     "filesystem-root": {
       "command": "npx", 
       "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": ""
+      }
+    },
+    "shell": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-shell"]
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-fetch"]
     }
   }
 }
