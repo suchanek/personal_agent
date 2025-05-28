@@ -1,16 +1,19 @@
 # Personal AI Agent
 
-A sophisticated personal assistant that learns about you and provides context-aware responses using Ollama, Weaviate vector database, and LangChain.
+A sophisticated personal assistant that learns about you and provides context-aware responses using Ollama, Weaviate vector database, LangChain, and Model Context Protocol (MCP) integration.
 
 ## Features
 
 - 🧠 **Persistent Memory**: Uses Weaviate vector database for semantic memory storage
 - 🤖 **Local AI**: Powered by Ollama (qwen2.5:7b-instruct model)
 - 🔍 **Semantic Search**: Finds relevant context from past interactions
-- 🌐 **Web Interface**: Clean Flask-based web UI
+- 🌐 **Web Interface**: Clean Flask-based web UI with knowledge base management
 - 📊 **Topic Organization**: Categorize memories by topic
-- 🔧 **MCP Compatible**: Includes Model Context Protocol configuration
-- 🎯 **ReAct Agent**: Uses LangChain's ReAct framework for tool usage
+- 📁 **File Operations**: MCP filesystem integration for reading, writing, and analyzing files
+- 🔧 **MCP Integration**: Model Context Protocol for extensible tool ecosystem
+- 🎯 **ReAct Agent**: Uses LangChain's ReAct framework for intelligent tool usage
+- 🚀 **Hybrid Architecture**: Combines persistent memory with file system operations
+- 🗑️ **Memory Management**: Clear knowledge base functionality
 
 ## Architecture
 
@@ -20,10 +23,19 @@ A sophisticated personal assistant that learns about you and provides context-aw
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                │
                                ▼
-                       ┌─────────────────┐
-                       │ Weaviate Vector │
-                       │    Database     │
-                       └─────────────────┘
+                   ┌─────────────────────────────┐
+                   │     Enhanced Capabilities   │
+                   │                             │
+                   │  ┌─────────────────┐        │
+                   │  │ Weaviate Vector │        │
+                   │  │    Database     │        │
+                   │  └─────────────────┘        │
+                   │                             │
+                   │  ┌─────────────────┐        │
+                   │  │  MCP Filesystem │        │
+                   │  │     Server      │        │
+                   │  └─────────────────┘        │
+                   └─────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -32,6 +44,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - **Poetry**: For dependency management
 - **Docker**: For Weaviate database
 - **Ollama**: For local LLM inference
+- **Node.js**: For MCP filesystem server
 
 ## Installation
 
@@ -50,6 +63,9 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 # Install project dependencies
 poetry install
+
+# Install MCP filesystem server
+npm install -g @modelcontextprotocol/server-filesystem
 ```
 
 ### 3. Install and Setup Ollama

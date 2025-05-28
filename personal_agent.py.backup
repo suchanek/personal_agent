@@ -1,12 +1,13 @@
 # pylint: disable=C0301,C0116
 # ,C0115,W0613,E0611,C0413,E0401,W0601,W0621,C0302,E1101,C0103,W0718
 
-import atexit
+import asyncio
 import json
 import logging
 import subprocess
 import time
 import warnings
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -46,75 +47,76 @@ USE_MCP = True  # Set to False to bypass MCP for testing
 
 # MCP Server configurations
 MCP_SERVERS = {
-    "filesystem-home": {
+    "filesystem": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs"],
-        "description": "Access home directory filesystem operations",
-    },
-    "filesystem-data": {
-        "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs/data"],
-        "description": "Access data directory for vector database",
-    },
+        "args": ["@modelcontextprotocol/server-filesystem", "/Users/egs/repos"],
+        "description": "Access filesystem operations",
+    }
 }
 
 
-class SimpleMCPClient:
-    """Simple MCP client based on the working test_mcp.py implementation."""
+class MCPClient:
+    """Thread-safe client for communicating with MCP servers."""
 
     def __init__(self, server_configs: Dict[str, Dict[str, Any]]):
         self.server_configs = server_configs
         self.active_servers = {}
+        self.available_tools = {}
+        self._loop = None
+        self._thread = None
+        self._start_thread()
 
-    def start_server_sync(self, server_name: str) -> bool:
-        """Start an MCP server process synchronously."""
+    def _start_thread(self):
+        """Start the async event loop in a separate thread."""
+        def run_loop():
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_forever()
+        
+        self._thread = threading.Thread(target=run_loop, daemon=True)
+        self._thread.start()
+        
+        # Wait for loop to be ready
+        while self._loop is None:
+            time.sleep(0.01)
+
+    def _run_async(self, coro):
+        """Run an async function in the dedicated thread."""
+        if self._loop is None:
+            raise RuntimeError("Event loop not ready")
+        
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result(timeout=30)  # 30 second timeout
+
+    async def start_server(self, server_name: str) -> bool:
+        """Start an MCP server process."""
         if server_name not in self.server_configs:
             logger.error("Unknown MCP server: %s", server_name)
             return False
 
-        if server_name in self.active_servers:
-            logger.info("MCP server %s already running", server_name)
-            return True
-
         config = self.server_configs[server_name]
         try:
             # Start the MCP server process
-            # Set working directory based on the server root path
-            cwd = None
-            if server_name == "filesystem-home":
-                cwd = "/Users/egs"
-            elif server_name == "filesystem-data":
-                cwd = "/Users/egs/data"
-
-            process = subprocess.Popen(
-                [config["command"]] + config["args"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=0,
-                cwd=cwd,
+            process = await asyncio.create_subprocess_exec(
+                *([config["command"]] + config["args"]),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
             self.active_servers[server_name] = {"process": process, "config": config}
 
-            # Wait a moment for server to start
-            time.sleep(1)
-
-            # Initialize the server
-            if self._initialize_server_sync(server_name):
-                logger.info("Started MCP server: %s", server_name)
-                return True
-            else:
-                logger.error("Failed to initialize MCP server: %s", server_name)
-                return False
+            # Initialize and get available tools
+            await self._initialize_server(server_name)
+            logger.info("Started MCP server: %s", server_name)
+            return True
 
         except Exception as e:
             logger.error("Failed to start MCP server %s: %s", server_name, e)
             return False
 
-    def _initialize_server_sync(self, server_name: str) -> bool:
-        """Initialize server synchronously."""
+    async def _initialize_server(self, server_name: str):
+        """Initialize server and get available tools."""
         try:
             # Send initialize request
             init_request = {
@@ -128,20 +130,29 @@ class SimpleMCPClient:
                 },
             }
 
-            response = self._send_request_sync(server_name, init_request)
+            response = await self._send_request(server_name, init_request)
             if response and response.get("result"):
-                logger.info("Initialized MCP server: %s", server_name)
-                return True
+                # Get available tools
+                tools_request = {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
+
+                tools_response = await self._send_request(server_name, tools_request)
+                if tools_response and tools_response.get("result"):
+                    self.available_tools[server_name] = tools_response["result"].get(
+                        "tools", []
+                    )
+                    logger.info(
+                        "Initialized MCP server %s with %d tools",
+                        server_name,
+                        len(self.available_tools[server_name]),
+                    )
 
         except Exception as e:
             logger.error("Failed to initialize MCP server %s: %s", server_name, e)
 
-        return False
-
-    def _send_request_sync(
+    async def _send_request(
         self, server_name: str, request: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Send a JSON-RPC request to an MCP server synchronously."""
+        """Send a JSON-RPC request to an MCP server."""
         if server_name not in self.active_servers:
             return None
 
@@ -150,23 +161,23 @@ class SimpleMCPClient:
             request_json = json.dumps(request) + "\n"
 
             # Send request
-            process.stdin.write(request_json)
-            process.stdin.flush()
+            process.stdin.write(request_json.encode())
+            await process.stdin.drain()
 
             # Read response
-            response_line = process.stdout.readline()
+            response_line = await process.stdout.readline()
             if response_line:
-                return json.loads(response_line.strip())
+                return json.loads(response_line.decode().strip())
 
         except Exception as e:
             logger.error("Error sending request to MCP server %s: %s", server_name, e)
 
         return None
 
-    def call_tool_sync(
+    async def call_tool(
         self, server_name: str, tool_name: str, arguments: Dict[str, Any]
     ) -> str:
-        """Call a tool on an MCP server synchronously."""
+        """Call a tool on an MCP server."""
         try:
             request = {
                 "jsonrpc": "2.0",
@@ -175,7 +186,7 @@ class SimpleMCPClient:
                 "params": {"name": tool_name, "arguments": arguments},
             }
 
-            response = self._send_request_sync(server_name, request)
+            response = await self._send_request(server_name, request)
             if response and response.get("result"):
                 content = response["result"].get("content", [])
                 if content and len(content) > 0:
@@ -188,24 +199,43 @@ class SimpleMCPClient:
 
         return f"Error calling tool {tool_name}"
 
+    def call_tool_sync(self, server_name: str, tool_name: str, arguments: Dict[str, Any]) -> str:
+        """Synchronous wrapper for calling MCP tools."""
+        try:
+            return self._run_async(self.call_tool(server_name, tool_name, arguments))
+        except Exception as e:
+            logger.error("Error in sync tool call: %s", e)
+            return f"Error calling tool {tool_name}: {e}"
+
+    def start_server_sync(self, server_name: str) -> bool:
+        """Synchronous wrapper for starting MCP servers."""
+        try:
+            return self._run_async(self.start_server(server_name))
+        except Exception as e:
+            logger.error("Error starting server: %s", e)
+            return False
+
     def stop_all_servers(self):
         """Stop all active MCP servers."""
         for server_name, server_info in self.active_servers.items():
             try:
                 process = server_info["process"]
                 process.terminate()
-                process.wait(timeout=5)  # Wait up to 5 seconds
                 logger.info("Stopped MCP server: %s", server_name)
             except Exception as e:
                 logger.error("Error stopping MCP server %s: %s", server_name, e)
 
         self.active_servers.clear()
+        
+        # Stop the event loop
+        if self._loop:
+            self._loop.call_soon_threadsafe(self._loop.stop)
 
 
 # Initialize MCP client
 mcp_client = None
 if USE_MCP:
-    mcp_client = SimpleMCPClient(MCP_SERVERS)
+    mcp_client = MCPClient(MCP_SERVERS)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -411,51 +441,22 @@ def clear_knowledge_base() -> str:
 @tool
 def mcp_read_file(file_path: str) -> str:
     """Read file content using MCP filesystem server."""
-    # Handle case where file_path might be a JSON string from LangChain
-    if isinstance(file_path, str) and file_path.startswith("{"):
-        try:
-            params = json.loads(file_path)
-            file_path = params.get("file_path", file_path)
-        except (json.JSONDecodeError, TypeError):
-            pass  # Use original value if parsing fails
-
     if not USE_MCP or mcp_client is None:
         return "MCP is disabled, cannot read file."
 
     try:
-        # Determine which server to use based on path
-        server_name = "filesystem-home"
-
         # Start filesystem server if not already running
-        if server_name not in mcp_client.active_servers:
-            start_result = mcp_client.start_server_sync(server_name)
+        if "filesystem" not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync("filesystem")
             if not start_result:
                 return "Failed to start MCP filesystem server."
 
-        # Convert absolute paths to relative paths for the restricted root
-        # The server root is /Users/egs, so we need to make paths relative to that
-        if file_path == "/Users/egs":
-            file_path = "."  # Root directory (though reading a directory as file will likely fail)
-        elif file_path.startswith("/Users/egs/"):
-            file_path = file_path[10:]  # Remove "/Users/egs" prefix
-        elif file_path.startswith("~/"):
-            file_path = file_path[2:]  # Remove "~/" prefix
-        elif file_path.startswith("/"):
-            # If it's an absolute path outside home, we can't access it
-            return f"Error: Path {file_path} is outside the accessible directory (/Users/egs)"
-
-        # Ensure path doesn't start with / for relative paths
-        if file_path.startswith("/"):
-            file_path = file_path[1:]
-
-        logger.debug(
-            "Calling read_file with path: %s on server: %s", file_path, server_name
-        )
-
+        # Expand home directory path
+        if file_path.startswith("~/"):
+            file_path = file_path.replace("~/", "/Users/egs/")
+        
         # Call read_file tool with correct parameter name
-        result = mcp_client.call_tool_sync(
-            server_name, "read_file", {"path": file_path}
-        )
+        result = mcp_client.call_tool_sync("filesystem", "read_file", {"path": file_path})
 
         # Store the file read operation in memory for context
         if USE_WEAVIATE and vector_store is not None:
@@ -477,59 +478,23 @@ def mcp_read_file(file_path: str) -> str:
 @tool
 def mcp_write_file(file_path: str, content: str) -> str:
     """Write content to file using MCP filesystem server."""
-    # Handle case where parameters might be JSON strings from LangChain
-    if isinstance(file_path, str) and file_path.startswith("{"):
-        try:
-            params = json.loads(file_path)
-            file_path = params.get("file_path", file_path)
-            content = params.get("content", content)
-        except (json.JSONDecodeError, TypeError):
-            pass  # Use original values if parsing fails
-
     if not USE_MCP or mcp_client is None:
         return "MCP is disabled, cannot write file."
 
     try:
-        # Determine which server to use based on path
-        server_name = "filesystem-home"
-        if file_path.startswith("/Users/egs/data/") or file_path.startswith("data/"):
-            server_name = "filesystem-data"
-
         # Start filesystem server if not already running
-        if server_name not in mcp_client.active_servers:
-            start_result = mcp_client.start_server_sync(server_name)
+        if "filesystem" not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync("filesystem")
             if not start_result:
                 return "Failed to start MCP filesystem server."
 
-        # Convert absolute paths to relative paths for the restricted root
-        if server_name == "filesystem-home":
-            # The server root is /Users/egs
-            if file_path == "/Users/egs":
-                return "Error: Cannot write to root directory as a file"
-            elif file_path.startswith("/Users/egs/"):
-                file_path = file_path[10:]  # Remove "/Users/egs" prefix
-            elif file_path.startswith("~/"):
-                file_path = file_path[2:]  # Remove "~/" prefix
-            elif file_path.startswith("/"):
-                return f"Error: Path {file_path} is outside the accessible directory (/Users/egs)"
-        else:  # filesystem-data
-            # The server root is /Users/egs/data
-            if file_path.startswith("/Users/egs/data/"):
-                file_path = file_path[16:]  # Remove "/Users/egs/data/" prefix
-            elif file_path.startswith("data/"):
-                file_path = file_path[5:]  # Remove "data/" prefix
-
-        # Ensure path doesn't start with / for relative paths
-        if file_path.startswith("/"):
-            file_path = file_path[1:]
-
-        logger.debug(
-            "Calling write_file with path: %s on server: %s", file_path, server_name
-        )
-
+        # Expand home directory path
+        if file_path.startswith("~/"):
+            file_path = file_path.replace("~/", "/Users/egs/")
+        
         # Call write_file tool with correct parameter name
         result = mcp_client.call_tool_sync(
-            server_name, "write_file", {"path": file_path, "contents": content}
+            "filesystem", "write_file", {"path": file_path, "contents": content}
         )
 
         # Store the file write operation in memory for context
@@ -552,80 +517,35 @@ def mcp_write_file(file_path: str, content: str) -> str:
 @tool
 def mcp_list_directory(directory_path: str) -> str:
     """List directory contents using MCP filesystem server."""
-    # Handle case where directory_path might be a JSON string from LangChain
-    if isinstance(directory_path, str) and directory_path.startswith("{"):
-        try:
-            params = json.loads(directory_path)
-            directory_path = params.get("directory_path", directory_path)
-        except (json.JSONDecodeError, TypeError):
-            pass  # Use original value if parsing fails
-
     if not USE_MCP or mcp_client is None:
         return "MCP is disabled, cannot list directory."
 
     try:
-        # Determine which server to use based on path
-        server_name = "filesystem-home"
-        if directory_path.startswith("/Users/egs/data/") or directory_path.startswith(
-            "data/"
-        ):
-            server_name = "filesystem-data"
-
         # Start filesystem server if not already running
-        if server_name not in mcp_client.active_servers:
-            start_result = mcp_client.start_server_sync(server_name)
+        if "filesystem" not in mcp_client.active_servers:
+            start_result = mcp_client.start_server_sync("filesystem")
             if not start_result:
                 return "Failed to start MCP filesystem server."
 
-        # Convert absolute paths to relative paths for the restricted root
-        original_path = directory_path  # Keep for logging
-        if server_name == "filesystem-home":
-            # The server root is /Users/egs
-            if directory_path == "/Users/egs":
-                directory_path = "."  # Root directory
-            elif directory_path.startswith("/Users/egs/"):
-                directory_path = directory_path[10:]  # Remove "/Users/egs" prefix
-            elif directory_path.startswith("~/"):
-                directory_path = directory_path[2:]  # Remove "~/" prefix
-            elif directory_path.startswith("/"):
-                return f"Error: Path {directory_path} is outside the accessible directory (/Users/egs)"
-        else:  # filesystem-data
-            # The server root is /Users/egs/data
-            if directory_path.startswith("/Users/egs/data/"):
-                directory_path = directory_path[16:]  # Remove "/Users/egs/data/" prefix
-            elif directory_path.startswith("data/"):
-                directory_path = directory_path[5:]  # Remove "data/" prefix
-
-        # Ensure path doesn't start with / for relative paths, but handle root directory
-        if directory_path.startswith("/"):
-            directory_path = directory_path[1:]
-
-        # If path is empty after processing, it means we want the root directory
-        if not directory_path:
-            directory_path = "."
-
-        logger.debug(
-            "Original path: %s, Converted path: %s, Server: %s",
-            original_path,
-            directory_path,
-            server_name,
-        )
-
-        # Call list_directory tool with the correct path
+        # Expand home directory path
+        if directory_path.startswith("~/"):
+            directory_path = directory_path.replace("~/", "/Users/egs/")
+        
+        # Call list_directory tool
         result = mcp_client.call_tool_sync(
-            server_name, "list_directory", {"path": directory_path}
+            "filesystem", "list_directory", {"path": directory_path}
         )
 
         # Store the directory listing operation in memory for context
         if USE_WEAVIATE and vector_store is not None:
             interaction_text = (
-                f"Listed directory: {original_path}\nResult: {result[:300]}..."
+                f"Listed directory: {directory_path}\nResult: {result[:300]}..."
             )
             store_interaction.invoke(
                 {"text": interaction_text, "topic": "file_operations"}
             )
 
-        logger.info("Listed directory via MCP: %s -> %s", original_path, directory_path)
+        logger.info("Listed directory via MCP: %s", directory_path)
         return result
 
     except Exception as e:
@@ -634,7 +554,9 @@ def mcp_list_directory(directory_path: str) -> str:
 
 
 @tool
-def intelligent_file_search(search_query: str, directory: str = "/") -> str:
+def intelligent_file_search(
+    search_query: str, directory: str = "/Users/egs/repos"
+) -> str:
     """Search for files and enhance results with memory context."""
     if not USE_MCP or mcp_client is None:
         return "MCP is disabled, cannot search files."
@@ -910,6 +832,8 @@ def cleanup():
 
 
 if __name__ == "__main__":
+    import atexit
+
     atexit.register(cleanup)
     try:
         app.run(host="127.0.0.1", port=5000, debug=True)
