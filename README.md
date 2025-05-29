@@ -142,19 +142,47 @@ ollama pull nomic-embed-text
 
 ### 5. Configure API Keys (Optional but Recommended)
 
-For full functionality, add your API keys to your environment or create a `.env` file:
+For full functionality, set up your API keys using environment variables:
 
-**GitHub Personal Access Token** (for repository search):
+**Method 1: Using .env file (Recommended)**
 
-1. Go to GitHub → Settings → Developer settings → Personal access tokens
-2. Generate a token with 'repo' and 'read:org' permissions
-3. Set environment variable: `export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"`
+1. Copy the example environment file:
 
-**Brave Search API Key** (for web search):
+   ```bash
+   cp .env.example .env
+   ```
 
-1. Visit <https://api.search.brave.com/app/keys>
-2. Create an account and generate an API key
-3. Set environment variable: `export BRAVE_API_KEY="your_api_key_here"`
+2. Edit `.env` file and add your actual API keys:
+
+   ```bash
+   # GitHub Personal Access Token
+   # Get from: https://github.com/settings/tokens
+   GITHUB_PERSONAL_ACCESS_TOKEN=your_github_token_here
+   
+   # Brave Search API Key  
+   # Get from: https://api.search.brave.com/app/keys
+   BRAVE_API_KEY=your_brave_api_key_here
+   ```
+
+**Method 2: Export environment variables**
+
+```bash
+# GitHub Personal Access Token (for repository search)
+export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
+
+# Brave Search API Key (for web search)  
+export BRAVE_API_KEY="your_api_key_here"
+```
+
+**Getting API Keys:**
+
+- **GitHub Personal Access Token**:
+  1. Go to GitHub → Settings → Developer settings → Personal access tokens
+  2. Generate a token with 'repo' and 'read:org' permissions
+
+- **Brave Search API Key**:
+  1. Visit <https://api.search.brave.com/app/keys>
+  2. Create an account and generate an API key
 
 ### 6. Start Weaviate Database
 
@@ -351,13 +379,23 @@ personal_agent/
 ├── test_mcp_availability.py # MCP server testing script
 ├── pyproject.toml           # Poetry dependencies & scripts
 ├── docker-compose.yml       # Weaviate setup
-├── mcp.json                # MCP server configurations
+├── mcp.json                # MCP server configurations (with env vars)
+├── mcp.json.template       # Template without sensitive data
+├── .env.example            # Example environment variables
+├── .env                    # Your actual API keys (excluded from git)
 ├── README.md               # This documentation
 ├── scripts/                # Installation and utility scripts
 │   ├── __init__.py        
 │   └── install_mcp.py     # Automated MCP server installation
 └── .venv/                 # Virtual environment
 ```
+
+### Security Notes
+
+- `mcp.json` contains environment variable placeholders (e.g., `${GITHUB_PERSONAL_ACCESS_TOKEN}`)
+- `mcp.json.template` is the safe template version for sharing
+- `.env` contains your actual API keys and is excluded from git
+- `.env.example` shows what environment variables are needed
 
 ## 📦 Dependencies
 
