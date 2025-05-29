@@ -54,35 +54,6 @@ A sophisticated personal assistant that learns about you and provides context-aw
                    └─────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
-
-```bash
-# 1. Clone and setup
-git clone <repository-url>
-cd personal_agent
-
-# 2. Install dependencies and MCP servers
-poetry install
-poetry run python scripts/install_mcp.py
-
-# 3. Setup Ollama (if not already installed)
-brew install ollama
-ollama serve
-ollama pull qwen2.5:7b-instruct
-ollama pull nomic-embed-text
-
-# 4. Start Weaviate database
-docker-compose up -d
-
-# 5. Test everything works
-poetry run test-tools
-
-# 6. Run the agent
-poetry run agent
-```
-
-Then open `http://127.0.0.1:5001` in your browser and start chatting!
-
 ## 📋 Prerequisites
 
 - **Python**: 3.11 or higher
@@ -108,25 +79,12 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 # Install project dependencies
 poetry install
+
+# Install MCP filesystem server
+npm install -g @modelcontextprotocol/server-filesystem
 ```
 
-### 3. Install MCP Servers
-
-Use our automated installation script to install all required MCP servers:
-
-```bash
-# Run the automated MCP server installation script
-poetry run python scripts/install_mcp.py
-```
-
-This script will automatically install:
-
-- **@modelcontextprotocol/server-filesystem**: File operations (read, write, list directories)
-- **@modelcontextprotocol/server-github**: GitHub repository search and code analysis
-- **@modelcontextprotocol/server-brave-search**: Web search for real-time information
-- **@modelcontextprotocol/server-puppeteer**: Browser automation and web content fetching
-
-### 4. Install and Setup Ollama
+### 3. Install and Setup Ollama
 
 ```bash
 # Install Ollama (macOS)
@@ -140,21 +98,31 @@ ollama pull qwen2.5:7b-instruct
 ollama pull nomic-embed-text
 ```
 
+### 4. Install Additional MCP Servers
+
+```bash
+# Install additional MCP servers for enhanced capabilities
+npm install -g @modelcontextprotocol/server-github
+npm install -g @modelcontextprotocol/server-brave-search
+npm install -g @modelcontextprotocol/server-shell
+npm install -g @modelcontextprotocol/server-fetch
+```
+
 ### 5. Configure API Keys (Optional but Recommended)
 
-For full functionality, add your API keys to your environment or create a `.env` file:
+For full functionality, add your API keys to `mcp.json`:
 
 **GitHub Personal Access Token** (for repository search):
 
 1. Go to GitHub → Settings → Developer settings → Personal access tokens
 2. Generate a token with 'repo' and 'read:org' permissions
-3. Set environment variable: `export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"`
+3. Add to `mcp.json` under `github.env.GITHUB_PERSONAL_ACCESS_TOKEN`
 
 **Brave Search API Key** (for web search):
 
 1. Visit <https://api.search.brave.com/app/keys>
 2. Create an account and generate an API key
-3. Set environment variable: `export BRAVE_API_KEY="your_api_key_here"`
+3. Add to `mcp.json` under `brave-search.env.BRAVE_API_KEY`
 
 ### 6. Start Weaviate Database
 
@@ -170,29 +138,12 @@ curl http://localhost:8080/v1/.well-known/ready
 
 ### 1. Start the Personal Agent
 
-You can run the agent using Poetry scripts:
-
 ```bash
-# Run the main agent
-poetry run agent
-
-# Alternative: Run directly with Python
+# Activate virtual environment and run
 poetry run python personal_agent.py
 ```
 
-### 2. Test Tool Functionality
-
-Verify all 12 tools are working correctly:
-
-```bash
-# Test all tool imports and descriptions
-poetry run test-tools
-
-# Test MCP server availability (optional)
-python test_mcp_availability.py
-```
-
-### 3. Access Web Interface
+### 2. Access Web Interface
 
 Open your browser and navigate to: `http://127.0.0.1:5001`
 
@@ -346,17 +297,14 @@ mcphost -m ollama:qwen2.5 --config mcp.json
 
 ```text
 personal_agent/
-├── personal_agent.py         # Main application with 12 integrated tools
-├── test_tools.py            # Tool verification script  
-├── test_mcp_availability.py # MCP server testing script
-├── pyproject.toml           # Poetry dependencies & scripts
-├── docker-compose.yml       # Weaviate setup
-├── mcp.json                # MCP server configurations
-├── README.md               # This documentation
-├── scripts/                # Installation and utility scripts
-│   ├── __init__.py        
-│   └── install_mcp.py     # Automated MCP server installation
-└── .venv/                 # Virtual environment
+├── personal_agent.py      # Main application with 12 integrated tools
+├── test_tools.py         # Tool verification script
+├── test_mcp.py          # MCP server testing script
+├── pyproject.toml       # Poetry dependencies
+├── docker-compose.yml   # Weaviate setup
+├── mcp.json            # MCP server configurations (7 servers)
+├── README.md           # This documentation
+└── .venv/              # Virtual environment
 ```
 
 ## 📦 Dependencies
@@ -431,24 +379,10 @@ personal_agent/
 
    ```bash
    # Test MCP servers
-   python test_mcp_availability.py
+   python test_mcp.py
    
    # Verify all tools are loaded
-   poetry run test-tools
-   
-   # Reinstall MCP servers if needed
-   poetry run python scripts/install_mcp.py
-   ```
-
-5. **Poetry Script Issues**
-
-   ```bash
-   # If Poetry scripts don't work, run directly
-   python personal_agent.py
    python test_tools.py
-   
-   # Ensure Poetry is properly installed
-   poetry install
    ```
 
 ### Logs and Debugging
@@ -499,11 +433,7 @@ Weaviate collection structure:
 
 ## 📄 License
 
-BSD 3-Clause License
-
-Copyright (c) 2025, Eric G. Suchanek, Ph.D.
-
-See LICENSE file for full details.
+BSD 3-Clause License - see LICENSE file for details.
 
 ## 🤝 Contributing
 
@@ -515,45 +445,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 # Clone and setup
 git clone <repository-url>
 cd personal_agent
-
-# Install dependencies
 poetry install
 
-# Install MCP servers
-poetry run python scripts/install_mcp.py
-
 # Test the setup
-poetry run test-tools
-python test_mcp_availability.py
+python test_tools.py
+python test_mcp.py
 ```
 
 ---
-
-## 🌟 What Makes This Special
-
-### Comprehensive Integration
-
-Unlike basic chatbots, this personal agent combines:
-
-- **Persistent Memory**: Never forgets your preferences and past interactions
-- **Real-time Web Access**: Always has current information via Brave Search
-- **Code Intelligence**: GitHub integration for technical questions and examples
-- **File System Awareness**: Can read, write, and analyze your local files
-- **Shell Access**: Execute commands safely within controlled environment
-
-### Production Ready
-
-- **Robust Error Handling**: Graceful degradation when services are unavailable
-- **Extensible Architecture**: Easy to add new MCP servers and capabilities
-- **Security Conscious**: Sandboxed execution and path restrictions
-- **Performance Optimized**: Efficient vector search and caching
-
-### Current Status: ✅ Fully Operational
-
-- All 12 tools verified and working
-- MCP integration stable and tested
-- Web interface responsive and user-friendly
-- Memory system storing and retrieving context effectively
-- Ready for daily use with optional API key enhancement
 
 **Personal AI Agent** - A comprehensive, MCP-powered personal assistant that learns, remembers, and grows with you. 🚀
