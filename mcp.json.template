@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "filesystem-home": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs"]
+    },
+    "filesystem-data": {
+      "command": "npx", 
+      "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs/data"]
+    },
+    "filesystem-root": {
+      "command": "npx", 
+      "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      }
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["--yes", "@modelcontextprotocol/server-puppeteer"]
+    }
+  }
+}

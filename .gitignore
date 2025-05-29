@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+mcp.json
+
 # Distribution / packaging
 .Python
 build/

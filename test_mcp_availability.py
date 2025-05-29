@@ -2,10 +2,38 @@
 """Test script to check availability of all MCP servers."""
 
 import json
+import os
 import subprocess
 import sys
 import time
 from typing import Dict, List, Tuple
+
+
+# Load environment variables from .env file if it exists
+def load_env_file():
+    """Load environment variables from .env file."""
+    env_file = ".env"
+    if os.path.exists(env_file):
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    os.environ[key.strip()] = value.strip()
+
+
+def load_mcp_config() -> Dict[str, Dict]:
+    """Load MCP server configurations from mcp.json."""
+    try:
+        with open("mcp.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+            return config.get("mcpServers", {})
+    except FileNotFoundError:
+        print("❌ mcp.json file not found")
+        return {}
+    except json.JSONDecodeError:
+        print("❌ Invalid JSON in mcp.json")
+        return {}
 
 
 def test_mcp_server(
@@ -88,60 +116,129 @@ def main():
     print("🔍 Testing MCP Server Availability")
     print("=" * 50)
 
-    # Define servers that can be tested without API tokens
-    servers = {
-        "filesystem-home": {
-            "command": "npx",
-            "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/Users/egs"],
-            "description": "Access home directory filesystem operations",
-        },
-        "filesystem-data": {
-            "command": "npx",
-            "args": [
-                "--yes",
-                "@modelcontextprotocol/server-filesystem",
-                "/Users/egs/data",
-            ],
-            "description": "Access data directory for vector database",
-        },
-        "filesystem-root": {
-            "command": "npx",
-            "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"],
-            "description": "Access root directory filesystem operations",
-        },
-        "puppeteer": {
-            "command": "npx",
-            "args": ["--yes", "@modelcontextprotocol/server-puppeteer"],
-            "description": "Browser automation and web content fetching",
-        },
-    }
+    # Load environment variables from .env file
+    load_env_file()
 
-    # Servers that require API tokens (not tested)
-    api_servers = {
-        "github": "GitHub repository operations (requires GITHUB_PERSONAL_ACCESS_TOKEN)",
-        "brave-search": "Web search operations (requires BRAVE_API_KEY)",
-    }
+    # Load server configurations from mcp.json
+    mcp_configs = load_mcp_config()
+
+    if not mcp_configs:
+        print("❌ No MCP server configurations found")
+        return 1
+
+    # Separate servers by whether they need API tokens
+    no_token_servers = [
+        "filesystem-home",
+        "filesystem-data",
+        "filesystem-root",
+        "puppeteer",
+    ]
+    api_servers = ["github", "brave-search"]
 
     results = []
     available_count = 0
+    total_tested = 0
 
-    for server_name, config in servers.items():
-        env = config.get("env", None)
+    print("Testing servers without API requirements...")
+    print("-" * 30)
+
+    # Test servers that don't require API tokens
+    for server_name in no_token_servers:
+        if server_name not in mcp_configs:
+            print(f"❌ {server_name}: Not found in mcp.json")
+            continue
+
+        config = mcp_configs[server_name]
+        total_tested += 1
+
+        # Add description based on server type
+        descriptions = {
+            "filesystem-home": "Access home directory filesystem operations",
+            "filesystem-data": "Access data directory for vector database",
+            "filesystem-root": "Access root directory filesystem operations",
+            "puppeteer": "Browser automation and web content fetching",
+        }
+
+        env = config.get("env")
+        if env:
+            # Convert env dict to proper environment variables
+            test_env = os.environ.copy()
+            test_env.update(env)
+        else:
+            test_env = None
+
         success, message = test_mcp_server(
-            server_name, config["command"], config["args"], env
+            server_name, config["command"], config["args"], test_env
         )
 
-        results.append((server_name, success, message, config["description"]))
+        results.append(
+            (server_name, success, message, descriptions.get(server_name, "Unknown"))
+        )
         if success:
             available_count += 1
 
         print(message)
-        print(f"   📝 {config['description']}")
+        print(f"   📝 {descriptions.get(server_name, 'Unknown')}")
+        print()
+
+    print("\nTesting API-required servers...")
+    print("-" * 30)
+
+    # Test API servers with their configured tokens
+    for server_name in api_servers:
+        if server_name not in mcp_configs:
+            print(f"❌ {server_name}: Not found in mcp.json")
+            continue
+
+        config = mcp_configs[server_name]
+        total_tested += 1
+
+        # Add description based on server type
+        descriptions = {
+            "github": "GitHub repository operations",
+            "brave-search": "Web search operations",
+        }
+
+        # Check if API keys are configured
+        env_vars = config.get("env", {})
+        missing_keys = []
+
+        if server_name == "github" and not env_vars.get("GITHUB_PERSONAL_ACCESS_TOKEN"):
+            missing_keys.append("GITHUB_PERSONAL_ACCESS_TOKEN")
+        elif server_name == "brave-search" and not env_vars.get("BRAVE_API_KEY"):
+            missing_keys.append("BRAVE_API_KEY")
+
+        if missing_keys:
+            message = f"❌ {server_name}: Missing API key(s): {', '.join(missing_keys)}"
+            results.append(
+                (server_name, False, message, descriptions.get(server_name, "Unknown"))
+            )
+            print(message)
+            print(f"   📝 {descriptions.get(server_name, 'Unknown')}")
+            print()
+            continue
+
+        # Test with configured environment
+        test_env = os.environ.copy()
+        test_env.update(env_vars)
+
+        success, message = test_mcp_server(
+            server_name, config["command"], config["args"], test_env
+        )
+
+        results.append(
+            (server_name, success, message, descriptions.get(server_name, "Unknown"))
+        )
+        if success:
+            available_count += 1
+
+        print(message)
+        print(f"   📝 {descriptions.get(server_name, 'Unknown')}")
         print()
 
     # Summary
     print("=" * 50)
-    print(f"📊 Summary: {available_count}/{len(servers)} testable servers available")
+    print(f"📊 Summary: {available_count}/{total_tested} servers available and working")
     print()
 
     # Available servers
@@ -161,28 +258,23 @@ def main():
             print(f"     Error: {message}")
         print()
 
-    # API servers (not tested but available)
-    print("🔑 API-Required Servers (installed but need tokens):")
-    for server_name, description in api_servers.items():
-        print(f"   • {server_name}: {description}")
-    print()
-
     if unavailable_servers:
         print("💡 To install missing servers:")
+        print("   npm install -g @modelcontextprotocol/server-filesystem")
         print("   npm install -g @modelcontextprotocol/server-github")
         print("   npm install -g @modelcontextprotocol/server-brave-search")
         print("   npm install -g @modelcontextprotocol/server-puppeteer")
         print()
 
-    print("🔑 To enable API servers, configure these in your environment:")
-    print("   • GitHub: Set GITHUB_PERSONAL_ACCESS_TOKEN")
-    print("   • Brave Search: Set BRAVE_API_KEY")
+    print("🔑 API Key Configuration:")
+    print("   • GitHub: Configure GITHUB_PERSONAL_ACCESS_TOKEN in mcp.json")
+    print("   • Brave Search: Configure BRAVE_API_KEY in mcp.json")
 
-    if available_count == len(servers):
+    if available_count == total_tested:
         print("🎉 All MCP servers are available and working!")
         return 0
     else:
-        print(f"⚠️  {len(servers) - available_count} servers need attention")
+        print(f"⚠️  {total_tested - available_count} servers need attention")
         return 1
 
 
