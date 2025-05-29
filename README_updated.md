@@ -104,8 +104,7 @@ ollama pull nomic-embed-text
 # Install additional MCP servers for enhanced capabilities
 npm install -g @modelcontextprotocol/server-github
 npm install -g @modelcontextprotocol/server-brave-search
-npm install -g @modelcontextprotocol/server-shell
-npm install -g @modelcontextprotocol/server-fetch
+npm install -g @modelcontextprotocol/server-puppeteer
 ```
 
 ### 5. Configure API Keys (Optional but Recommended)
