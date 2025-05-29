@@ -26,13 +26,9 @@
         "BRAVE_API_KEY": ""
       }
     },
-    "shell": {
+    "puppeteer": {
       "command": "npx",
-      "args": ["--yes", "@modelcontextprotocol/server-shell"]
-    },
-    "fetch": {
-      "command": "npx",
-      "args": ["--yes", "@modelcontextprotocol/server-fetch"]
+      "args": ["--yes", "@modelcontextprotocol/server-puppeteer"]
     }
   }
 }

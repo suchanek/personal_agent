@@ -27,7 +27,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 ### Enhanced Architecture
 
 - 🔧 **MCP Integration**: Model Context Protocol for extensible tool ecosystem  
-- 🚀 **Multi-Server Architecture**: 7 MCP servers (filesystem, GitHub, web, shell, fetch)
+- 🚀 **Multi-Server Architecture**: 6 MCP servers (filesystem, github, brave-search, puppeteer)
 - 🔗 **Hybrid Intelligence**: Combines persistent memory with external data sources
 - 📡 **Real-time Capabilities**: Live web search and GitHub integration
 
@@ -44,12 +44,12 @@ A sophisticated personal assistant that learns about you and provides context-aw
                    │                                         │
                    │  ┌─────────────────┐  ┌───────────────┐ │
                    │  │ Weaviate Vector │  │ MCP Servers   │ │
-                   │  │    Database     │  │ (7 total)     │ │
+                   │  │    Database     │  │ (6 total)     │ │
                    │  └─────────────────┘  └───────────────┘ │
                    │                                         │
                    │  📁 File System    🐙 GitHub            │
-                   │  🌍 Web Search     💻 Shell             │
-                   │  🌐 URL Fetch      🔬 Research          │
+                   │  🌍 Web Search     🌐 Puppeteer         │
+                   │  💻 Shell Commands 🔬 Research          │
                    │  🔍 Smart Search                        │
                    └─────────────────────────────────────────┘
 ```
@@ -89,7 +89,7 @@ Then open `http://127.0.0.1:5001` in your browser and start chatting!
 - **Poetry**: For dependency management
 - **Docker**: For Weaviate database
 - **Ollama**: For local LLM inference
-- **Node.js**: For MCP filesystem server
+- **Node.js**: For MCP servers (filesystem, github, brave-search, puppeteer)
 
 ## 🚀 Installation
 

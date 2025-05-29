@@ -9,7 +9,7 @@ A comprehensive Personal AI Agent with **12 integrated tools** powered by:
 - **LangChain ReAct Agent Framework**
 - **Ollama Local LLM** (qwen2.5:7b-instruct)
 - **Weaviate Vector Database** for persistent memory
-- **Model Context Protocol (MCP)** integration with 7 servers
+- **Model Context Protocol (MCP)** integration with 6 servers
 - **Flask Web Interface** for easy interaction
 
 ### 🛠️ Complete Tool Arsenal (12 Tools)
@@ -40,7 +40,7 @@ A comprehensive Personal AI Agent with **12 integrated tools** powered by:
 
 ### 🏗️ Architecture Highlights
 
-- **7 MCP Servers**: filesystem (3), github, brave-search, shell, fetch
+- **6 MCP Servers**: filesystem (3), github, brave-search, puppeteer
 - **Hybrid Intelligence**: Local memory + external data sources
 - **Security**: Sandboxed execution, path restrictions
 - **Resilience**: Graceful degradation when services unavailable
@@ -67,7 +67,7 @@ A comprehensive Personal AI Agent with **12 integrated tools** powered by:
 
 #### Enhanced Capabilities
 
-- ✅ **Complete MCP Integration**: All 7 servers working properly
+- ✅ **Complete MCP Integration**: All 6 servers working properly
 - ✅ **Robust Error Handling**: Network failures, API limits, service outages
 - ✅ **Memory Integration**: All tools auto-store important operations
 - ✅ **Multi-Source Research**: Comprehensive intelligence gathering

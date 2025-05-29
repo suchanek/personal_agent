@@ -5,6 +5,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 ## Features
 
 ### Core Capabilities
+
 - 🧠 **Persistent Memory**: Uses Weaviate vector database for semantic memory storage
 - 🤖 **Local AI**: Powered by Ollama (qwen2.5:7b-instruct model)
 - 🔍 **Semantic Search**: Finds relevant context from past interactions
@@ -14,6 +15,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 🗑️ **Memory Management**: Clear knowledge base functionality
 
 ### MCP-Powered Tools (12 Total)
+
 - 📁 **File Operations**: Read, write, and list directory contents
 - 🔎 **Intelligent File Search**: Combine file exploration with memory context
 - 🐙 **GitHub Integration**: Search repositories, code, issues, and documentation
@@ -23,6 +25,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 🔬 **Comprehensive Research**: Multi-source research combining memory, web, GitHub, and files
 
 ### Enhanced Architecture
+
 - 🔧 **MCP Integration**: Model Context Protocol for extensible tool ecosystem  
 - 🚀 **Multi-Server Architecture**: 7 MCP servers (filesystem, GitHub, web, shell, fetch)
 - 🔗 **Hybrid Intelligence**: Combines persistent memory with external data sources
@@ -101,8 +104,7 @@ ollama pull nomic-embed-text
 # Install additional MCP servers for enhanced capabilities
 npm install -g @modelcontextprotocol/server-github
 npm install -g @modelcontextprotocol/server-brave-search
-npm install -g @modelcontextprotocol/server-shell
-npm install -g @modelcontextprotocol/server-fetch
+npm install -g @modelcontextprotocol/server-puppeteer
 ```
 
 ### 5. Configure API Keys (Optional but Recommended)
@@ -154,6 +156,7 @@ Open your browser and navigate to: `http://127.0.0.1:5001`
 ### Example Interactions
 
 **Basic Memory:**
+
 ```text
 User: My name is Eric and I enjoy Python programming
 Agent: Nice to meet you, Eric! I've noted that you enjoy Python programming. 
@@ -164,6 +167,7 @@ Agent: Based on our previous conversation, you enjoy Python programming!
 ```
 
 **File Operations:**
+
 ```text
 User: Create a Python script at ~/test.py that prints "Hello World"
 Agent: I'll create that file for you...
@@ -175,6 +179,7 @@ Agent: Let me list the contents of your home directory...
 ```
 
 **Research & Web Search:**
+
 ```text
 User: Research the latest developments in Python 3.12
 Agent: I'll conduct comprehensive research for you...
@@ -186,6 +191,7 @@ Agent: Searching GitHub repositories for Python tutorials...
 ```
 
 **Shell Commands:**
+
 ```text
 User: Check the current system time and date
 Agent: I'll run the date command for you...
@@ -290,23 +296,27 @@ personal_agent/
 ## Complete Tool Reference
 
 ### 🧠 Memory & Knowledge Management
+
 1. **`store_interaction`**: Store conversations and interactions in vector database
 2. **`query_knowledge_base`**: Semantic search through stored memories
 3. **`clear_knowledge_base`**: Reset all stored knowledge (admin function)
 
 ### 📁 File System Operations  
+
 4. **`mcp_read_file`**: Read content from any file in accessible directories
 5. **`mcp_write_file`**: Create or update files with new content
 6. **`mcp_list_directory`**: Browse directory contents and file structure
 7. **`intelligent_file_search`**: Smart file discovery with memory integration
 
 ### 🌐 External Data Sources
+
 8. **`mcp_github_search`**: Search GitHub repositories, code, issues, documentation
 9. **`mcp_brave_search`**: Web search using Brave Search API for real-time information
 10. **`mcp_fetch_url`**: Retrieve content from web URLs and APIs
 11. **`mcp_shell_command`**: Execute system commands safely within controlled environment
 
 ### 🔬 Advanced Research
+
 12. **`comprehensive_research`**: Multi-source research combining all available tools
 
 Each tool integrates with the memory system to provide context-aware results and automatically stores important operations for future reference.
