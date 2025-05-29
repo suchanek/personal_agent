@@ -75,7 +75,7 @@ ollama pull nomic-embed-text
 docker-compose up -d
 
 # 5. Test everything works
-poetry run test-tools
+source .venv/bin/activate && poetry run test-tools
 
 # 6. Run the agent
 poetry run agent
@@ -217,8 +217,47 @@ Verify all 12 tools are working correctly:
 poetry run test-tools
 
 # Test MCP server availability (optional)
-python test_mcp_availability.py
+source .venv/bin/activate && python tests/test_mcp_availability.py
+
+# Test comprehensive research functionality
+source .venv/bin/activate && python tests/test_comprehensive_research.py
+
+# Test cleanup and resource management
+source .venv/bin/activate && python tests/test_cleanup_improved.py
 ```
+
+## 🧪 Comprehensive Testing Suite
+
+The project includes a comprehensive test suite in the `tests/` directory:
+
+### Available Tests
+
+- **`test_tools.py`**: Validates all 12 tool imports and descriptions
+- **`test_mcp_availability.py`**: Tests MCP server availability and connectivity
+- **`test_comprehensive_research.py`**: Validates research functionality with real results
+- **`test_cleanup_improved.py`**: Tests enhanced resource management and cleanup
+- **`test_cleanup.py`**: Basic cleanup functionality validation
+- **`test_mcp.py`**: Low-level MCP communication testing
+
+### Running Individual Tests
+
+```bash
+# Test specific functionality
+source .venv/bin/activate && python tests/test_comprehensive_research.py
+source .venv/bin/activate && python tests/test_mcp_availability.py
+source .venv/bin/activate && python tests/test_cleanup_improved.py
+
+# Run all tool validations
+poetry run test-tools
+```
+
+### Test Results Overview
+
+All tests provide detailed output including:
+- ✅ Success indicators with result details
+- ❌ Failure indicators with error explanations  
+- 📊 Performance metrics (character counts, timing)
+- 🔧 Configuration validation
 
 ### 3. Access Web Interface
 
@@ -375,8 +414,14 @@ mcphost -m ollama:qwen2.5 --config mcp.json
 ```text
 personal_agent/
 ├── personal_agent.py         # Main application with 12 integrated tools
-├── test_tools.py            # Tool verification script  
-├── test_mcp_availability.py # MCP server testing script
+├── tests/                    # Comprehensive test suite
+│   ├── __init__.py          # Test package initializer
+│   ├── test_tools.py        # Tool verification script  
+│   ├── test_mcp_availability.py # MCP server testing script
+│   ├── test_comprehensive_research.py # Research functionality tests
+│   ├── test_cleanup_improved.py # Enhanced cleanup tests
+│   ├── test_cleanup.py      # Basic cleanup tests
+│   └── test_mcp.py          # MCP communication tests
 ├── pyproject.toml           # Poetry dependencies & scripts
 ├── docker-compose.yml       # Weaviate setup
 ├── mcp.json                # MCP server configurations (with env vars)
@@ -384,6 +429,7 @@ personal_agent/
 ├── .env.example            # Example environment variables
 ├── .env                    # Your actual API keys (excluded from git)
 ├── README.md               # This documentation
+├── FIX_SUMMARY.md          # Comprehensive fix documentation
 ├── scripts/                # Installation and utility scripts
 │   ├── __init__.py        
 │   └── install_mcp.py     # Automated MCP server installation
@@ -469,10 +515,13 @@ personal_agent/
 
    ```bash
    # Test MCP servers
-   python test_mcp_availability.py
+   source .venv/bin/activate && python tests/test_mcp_availability.py
    
    # Verify all tools are loaded
    poetry run test-tools
+   
+   # Test comprehensive research
+   source .venv/bin/activate && python tests/test_comprehensive_research.py
    
    # Reinstall MCP servers if needed
    poetry run python scripts/install_mcp.py
@@ -561,8 +610,8 @@ poetry install
 poetry run python scripts/install_mcp.py
 
 # Test the setup
-poetry run test-tools
-python test_mcp_availability.py
+source .venv/bin/activate && poetry run test-tools
+source .venv/bin/activate && python tests/test_mcp_availability.py
 ```
 
 ---
