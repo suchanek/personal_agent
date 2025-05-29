@@ -77,15 +77,10 @@ MCP_SERVERS = {
         "description": "Web search for research and technical information",
         "env": {"BRAVE_API_KEY": ""},  # Set your API key here
     },
-    "shell": {
+    "puppeteer": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-shell"],
-        "description": "Execute shell commands and scripts",
-    },
-    "fetch": {
-        "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-fetch"],
-        "description": "Fetch web content and APIs for data collection",
+        "args": ["--yes", "@modelcontextprotocol/server-puppeteer"],
+        "description": "Browser automation and web content fetching",
     },
 }
 
@@ -808,7 +803,7 @@ def mcp_brave_search(query: str, count: int = 5) -> str:
 
 @tool
 def mcp_shell_command(command: str, timeout: int = 30) -> str:
-    """Execute shell commands safely using MCP shell server."""
+    """Execute shell commands safely using subprocess (MCP shell server unavailable)."""
     # Handle case where parameters might be JSON strings from LangChain
     if isinstance(command, str) and command.startswith("{"):
         try:
@@ -818,41 +813,38 @@ def mcp_shell_command(command: str, timeout: int = 30) -> str:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    if not USE_MCP or mcp_client is None:
-        return "MCP is disabled, cannot execute shell commands."
-
     try:
-        server_name = "shell"
+        # Use subprocess for safe shell command execution
+        import subprocess
 
-        # Start shell server if not already running
-        if server_name not in mcp_client.active_servers:
-            start_result = mcp_client.start_server_sync(server_name)
-            if not start_result:
-                return "Failed to start MCP shell server."
-
-        # Call shell execution tool
-        result = mcp_client.call_tool_sync(
-            server_name, "run_command", {"command": command, "timeout": timeout}
+        result = subprocess.run(
+            command, shell=True, capture_output=True, text=True, timeout=timeout
         )
+
+        output = f"Command: {command}\nReturn code: {result.returncode}\nStdout: {result.stdout}\nStderr: {result.stderr}"
 
         # Store the shell command operation in memory for context
         if USE_WEAVIATE and vector_store is not None:
-            interaction_text = f"Shell command: {command}\nOutput: {result[:300]}..."
+            interaction_text = f"Shell command: {command}\nOutput: {output[:300]}..."
             store_interaction.invoke(
                 {"text": interaction_text, "topic": "shell_commands"}
             )
 
         logger.info("Shell command executed: %s", command)
-        return result
+        return output
 
+    except subprocess.TimeoutExpired:
+        error_msg = f"Command timed out after {timeout} seconds"
+        logger.error("Shell command timeout: %s", command)
+        return error_msg
     except Exception as e:
-        logger.error("Error executing shell command via MCP: %s", str(e))
+        logger.error("Error executing shell command: %s", str(e))
         return f"Error executing shell command: {str(e)}"
 
 
 @tool
 def mcp_fetch_url(url: str, method: str = "GET") -> str:
-    """Fetch content from web URLs and APIs using MCP fetch server."""
+    """Fetch content from web URLs using MCP puppeteer server for browser automation."""
     # Handle case where parameters might be JSON strings from LangChain
     if isinstance(url, str) and url.startswith("{"):
         try:
@@ -866,18 +858,16 @@ def mcp_fetch_url(url: str, method: str = "GET") -> str:
         return "MCP is disabled, cannot fetch URLs."
 
     try:
-        server_name = "fetch"
+        server_name = "puppeteer"
 
-        # Start fetch server if not already running
+        # Start puppeteer server if not already running
         if server_name not in mcp_client.active_servers:
             start_result = mcp_client.start_server_sync(server_name)
             if not start_result:
-                return "Failed to start MCP fetch server."
+                return "Failed to start MCP puppeteer server."
 
-        # Call fetch tool
-        result = mcp_client.call_tool_sync(
-            server_name, "fetch", {"url": url, "method": method}
-        )
+        # Call puppeteer goto tool to fetch page content
+        result = mcp_client.call_tool_sync(server_name, "puppeteer_goto", {"url": url})
 
         # Store the fetch operation in memory for context
         if USE_WEAVIATE and vector_store is not None:
@@ -888,7 +878,7 @@ def mcp_fetch_url(url: str, method: str = "GET") -> str:
         return result
 
     except Exception as e:
-        logger.error("Error fetching URL via MCP: %s", str(e))
+        logger.error("Error fetching URL via MCP puppeteer: %s", str(e))
         return f"Error fetching URL: {str(e)}"
 
 
@@ -1210,9 +1200,14 @@ def cleanup():
             logger.error("Error closing Weaviate client: %s", e)
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the Personal AI Agent."""
     atexit.register(cleanup)
     try:
         app.run(host="127.0.0.1", port=5001, debug=True)
     except KeyboardInterrupt:
         cleanup()
+
+
+if __name__ == "__main__":
+    main()

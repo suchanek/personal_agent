@@ -2,10 +2,9 @@
 
 A sophisticated personal assistant that learns about you and provides context-aware responses using Ollama, Weaviate vector database, LangChain, and Model Context Protocol (MCP) integration.
 
-## 🌟 Features
+## Features
 
 ### Core Capabilities
-
 - 🧠 **Persistent Memory**: Uses Weaviate vector database for semantic memory storage
 - 🤖 **Local AI**: Powered by Ollama (qwen2.5:7b-instruct model)
 - 🔍 **Semantic Search**: Finds relevant context from past interactions
@@ -15,7 +14,6 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 🗑️ **Memory Management**: Clear knowledge base functionality
 
 ### MCP-Powered Tools (12 Total)
-
 - 📁 **File Operations**: Read, write, and list directory contents
 - 🔎 **Intelligent File Search**: Combine file exploration with memory context
 - 🐙 **GitHub Integration**: Search repositories, code, issues, and documentation
@@ -25,15 +23,14 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 🔬 **Comprehensive Research**: Multi-source research combining memory, web, GitHub, and files
 
 ### Enhanced Architecture
-
 - 🔧 **MCP Integration**: Model Context Protocol for extensible tool ecosystem  
 - 🚀 **Multi-Server Architecture**: 7 MCP servers (filesystem, GitHub, web, shell, fetch)
 - 🔗 **Hybrid Intelligence**: Combines persistent memory with external data sources
 - 📡 **Real-time Capabilities**: Live web search and GitHub integration
 
-## 🏗️ Architecture
+## Architecture
 
-```text
+```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Flask Web UI  │───▶│  Personal Agent │───▶│   Ollama LLM    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
@@ -54,36 +51,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
                    └─────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
-
-```bash
-# 1. Clone and setup
-git clone <repository-url>
-cd personal_agent
-
-# 2. Install dependencies and MCP servers
-poetry install
-poetry run python scripts/install_mcp.py
-
-# 3. Setup Ollama (if not already installed)
-brew install ollama
-ollama serve
-ollama pull qwen2.5:7b-instruct
-ollama pull nomic-embed-text
-
-# 4. Start Weaviate database
-docker-compose up -d
-
-# 5. Test everything works
-poetry run test-tools
-
-# 6. Run the agent
-poetry run agent
-```
-
-Then open `http://127.0.0.1:5001` in your browser and start chatting!
-
-## 📋 Prerequisites
+## Prerequisites
 
 - **Python**: 3.11 or higher
 - **Poetry**: For dependency management
@@ -91,7 +59,7 @@ Then open `http://127.0.0.1:5001` in your browser and start chatting!
 - **Ollama**: For local LLM inference
 - **Node.js**: For MCP filesystem server
 
-## 🚀 Installation
+## Installation
 
 ### 1. Clone the Repository
 
@@ -108,25 +76,12 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 # Install project dependencies
 poetry install
+
+# Install MCP filesystem server
+npm install -g @modelcontextprotocol/server-filesystem
 ```
 
-### 3. Install MCP Servers
-
-Use our automated installation script to install all required MCP servers:
-
-```bash
-# Run the automated MCP server installation script
-poetry run python scripts/install_mcp.py
-```
-
-This script will automatically install:
-
-- **@modelcontextprotocol/server-filesystem**: File operations (read, write, list directories)
-- **@modelcontextprotocol/server-github**: GitHub repository search and code analysis
-- **@modelcontextprotocol/server-brave-search**: Web search for real-time information
-- **@modelcontextprotocol/server-puppeteer**: Browser automation and web content fetching
-
-### 4. Install and Setup Ollama
+### 3. Install and Setup Ollama
 
 ```bash
 # Install Ollama (macOS)
@@ -140,21 +95,31 @@ ollama pull qwen2.5:7b-instruct
 ollama pull nomic-embed-text
 ```
 
+### 4. Install Additional MCP Servers
+
+```bash
+# Install additional MCP servers for enhanced capabilities
+npm install -g @modelcontextprotocol/server-github
+npm install -g @modelcontextprotocol/server-brave-search
+npm install -g @modelcontextprotocol/server-shell
+npm install -g @modelcontextprotocol/server-fetch
+```
+
 ### 5. Configure API Keys (Optional but Recommended)
 
-For full functionality, add your API keys to your environment or create a `.env` file:
+For full functionality, add your API keys to `mcp.json`:
 
-**GitHub Personal Access Token** (for repository search):
+```bash
+# GitHub Personal Access Token (for repository search)
+# 1. Go to GitHub → Settings → Developer settings → Personal access tokens
+# 2. Generate a token with 'repo' and 'read:org' permissions
+# 3. Add to mcp.json under github.env.GITHUB_PERSONAL_ACCESS_TOKEN
 
-1. Go to GitHub → Settings → Developer settings → Personal access tokens
-2. Generate a token with 'repo' and 'read:org' permissions
-3. Set environment variable: `export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"`
-
-**Brave Search API Key** (for web search):
-
-1. Visit <https://api.search.brave.com/app/keys>
-2. Create an account and generate an API key
-3. Set environment variable: `export BRAVE_API_KEY="your_api_key_here"`
+# Brave Search API Key (for web search)
+# 1. Visit https://api.search.brave.com/app/keys
+# 2. Create an account and generate an API key
+# 3. Add to mcp.json under brave-search.env.BRAVE_API_KEY
+```
 
 ### 6. Start Weaviate Database
 
@@ -166,33 +131,16 @@ docker-compose up -d
 curl http://localhost:8080/v1/.well-known/ready
 ```
 
-## 💻 Usage
+## Usage
 
 ### 1. Start the Personal Agent
 
-You can run the agent using Poetry scripts:
-
 ```bash
-# Run the main agent
-poetry run agent
-
-# Alternative: Run directly with Python
-poetry run python personal_agent.py
+# Activate virtual environment and run
+poetry run personal_agent.py
 ```
 
-### 2. Test Tool Functionality
-
-Verify all 12 tools are working correctly:
-
-```bash
-# Test all tool imports and descriptions
-poetry run test-tools
-
-# Test MCP server availability (optional)
-python test_mcp_availability.py
-```
-
-### 3. Access Web Interface
+### 2. Access Web Interface
 
 Open your browser and navigate to: `http://127.0.0.1:5001`
 
@@ -203,10 +151,9 @@ Open your browser and navigate to: `http://127.0.0.1:5001`
 - **Get help**: "Write a PyVista script to display a cube"
 - **Categorize topics**: Use the topic field to organize memories
 
-## 🎯 Example Interactions
+### Example Interactions
 
-### Basic Memory Operations
-
+**Basic Memory:**
 ```text
 User: My name is Eric and I enjoy Python programming
 Agent: Nice to meet you, Eric! I've noted that you enjoy Python programming. 
@@ -216,8 +163,7 @@ User: What programming languages do I like?
 Agent: Based on our previous conversation, you enjoy Python programming!
 ```
 
-### File Operations
-
+**File Operations:**
 ```text
 User: Create a Python script at ~/test.py that prints "Hello World"
 Agent: I'll create that file for you...
@@ -228,8 +174,7 @@ Agent: Let me list the contents of your home directory...
 [Agent uses mcp_list_directory to show files]
 ```
 
-### Research & Web Search
-
+**Research & Web Search:**
 ```text
 User: Research the latest developments in Python 3.12
 Agent: I'll conduct comprehensive research for you...
@@ -240,17 +185,16 @@ Agent: Searching GitHub repositories for Python tutorials...
 [Agent uses mcp_github_search to find relevant repositories]
 ```
 
-### Shell Commands
-
+**Shell Commands:**
 ```text
 User: Check the current system time and date
 Agent: I'll run the date command for you...
 [Agent uses mcp_shell_command to execute system commands]
 ```
 
-## 🔧 Advanced Features
+## Advanced Features
 
-### Multi-Modal Tool Integration
+### 🔧 Multi-Modal Tool Integration
 
 The agent seamlessly combines multiple data sources:
 
@@ -258,25 +202,25 @@ The agent seamlessly combines multiple data sources:
 - **Web + GitHub**: "Find the latest Flask documentation and examples" searches both web and GitHub repositories
 - **Local + Remote**: "Compare my local Python scripts with popular GitHub examples" analyzes local files and searches GitHub
 
-### Intelligent Context Switching
+### 🧠 Intelligent Context Switching
 
 - **Automatic Tool Selection**: Agent chooses appropriate tools based on query type
 - **Progressive Enhancement**: Starts with memory, adds web search, includes file operations as needed
 - **Cross-Reference Validation**: Compares information across multiple sources for accuracy
 
-### Persistent Learning Loop
+### 🔄 Persistent Learning Loop
 
 - **Auto-Storage**: Important operations automatically stored in vector database
 - **Context Enrichment**: Each interaction enhances future responses
 - **Topic Categorization**: Organizes knowledge by subject area for better retrieval
 
-### Safe Execution Environment
+### 🛡️ Safe Execution Environment
 
 - **Sandboxed Shell**: MCP shell server provides controlled command execution
 - **Path Restrictions**: File operations limited to user directory for security
 - **Error Handling**: Graceful degradation when services are unavailable
 
-### Real-Time Research Capabilities
+### 📊 Real-Time Research Capabilities
 
 The `comprehensive_research` tool provides multi-source intelligence:
 
@@ -286,35 +230,7 @@ The `comprehensive_research` tool provides multi-source intelligence:
 4. **File Analysis**: Searches local files for relevant content
 5. **Synthesis**: Combines all sources into coherent response
 
-## 🛠️ Complete Tool Reference
-
-### Memory & Knowledge Management
-
-1. **`store_interaction`**: Store conversations and interactions in vector database
-2. **`query_knowledge_base`**: Semantic search through stored memories
-3. **`clear_knowledge_base`**: Reset all stored knowledge (admin function)
-
-### File System Operations  
-
-4. **`mcp_read_file`**: Read content from any file in accessible directories
-5. **`mcp_write_file`**: Create or update files with new content
-6. **`mcp_list_directory`**: Browse directory contents and file structure
-7. **`intelligent_file_search`**: Smart file discovery with memory integration
-
-### External Data Sources
-
-8. **`mcp_github_search`**: Search GitHub repositories, code, issues, documentation
-9. **`mcp_brave_search`**: Web search using Brave Search API for real-time information
-10. **`mcp_fetch_url`**: Retrieve content from web URLs and APIs
-11. **`mcp_shell_command`**: Execute system commands safely within controlled environment
-
-### Advanced Research
-
-12. **`comprehensive_research`**: Multi-source research combining all available tools
-
-Each tool integrates with the memory system to provide context-aware results and automatically stores important operations for future reference.
-
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -342,24 +258,19 @@ Included MCP configuration for filesystem access:
 mcphost -m ollama:qwen2.5 --config mcp.json
 ```
 
-## 📁 Project Structure
+## Project Structure
 
-```text
+```
 personal_agent/
-├── personal_agent.py         # Main application with 12 integrated tools
-├── test_tools.py            # Tool verification script  
-├── test_mcp_availability.py # MCP server testing script
-├── pyproject.toml           # Poetry dependencies & scripts
-├── docker-compose.yml       # Weaviate setup
-├── mcp.json                # MCP server configurations
-├── README.md               # This documentation
-├── scripts/                # Installation and utility scripts
-│   ├── __init__.py        
-│   └── install_mcp.py     # Automated MCP server installation
-└── .venv/                 # Virtual environment
+├── personal_agent.py      # Main application
+├── pyproject.toml        # Poetry dependencies
+├── docker-compose.yml    # Weaviate setup
+├── mcp.json             # MCP configuration
+├── README.md            # This file
+└── .venv/               # Virtual environment
 ```
 
-## 📦 Dependencies
+## Dependencies
 
 ### Core Dependencies
 
@@ -376,9 +287,29 @@ personal_agent/
 - **qwen2.5:7b-instruct**: Main conversation model
 - **nomic-embed-text**: Text embedding model
 
-## 🔍 Features in Detail
+## Complete Tool Reference
 
-### Memory System
+### 🧠 Memory & Knowledge Management
+1. **`store_interaction`**: Store conversations and interactions in vector database
+2. **`query_knowledge_base`**: Semantic search through stored memories
+3. **`clear_knowledge_base`**: Reset all stored knowledge (admin function)
+
+### 📁 File System Operations  
+4. **`mcp_read_file`**: Read content from any file in accessible directories
+5. **`mcp_write_file`**: Create or update files with new content
+6. **`mcp_list_directory`**: Browse directory contents and file structure
+7. **`intelligent_file_search`**: Smart file discovery with memory integration
+
+### 🌐 External Data Sources
+8. **`mcp_github_search`**: Search GitHub repositories, code, issues, documentation
+9. **`mcp_brave_search`**: Web search using Brave Search API for real-time information
+10. **`mcp_fetch_url`**: Retrieve content from web URLs and APIs
+11. **`mcp_shell_command`**: Execute system commands safely within controlled environment
+
+### 🔬 Advanced Research
+12. **`comprehensive_research`**: Multi-source research combining all available tools
+
+Each tool integrates with the memory system to provide context-aware results and automatically stores important operations for future reference.
 
 - **Vector Storage**: All interactions stored as embeddings
 - **Semantic Search**: Find related memories using similarity
@@ -399,7 +330,7 @@ personal_agent/
 - **Topic Organization**: Categorize conversations
 - **Real-time**: Immediate responses
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -422,33 +353,9 @@ personal_agent/
 3. **Port Already in Use**
 
    ```bash
-   # Check what's using port 5001
-   lsof -i :5001
+   # Check what's using port 5000
+   lsof -i :5000
    # Kill the process or change port in personal_agent.py
-   ```
-
-4. **MCP Server Issues**
-
-   ```bash
-   # Test MCP servers
-   python test_mcp_availability.py
-   
-   # Verify all tools are loaded
-   poetry run test-tools
-   
-   # Reinstall MCP servers if needed
-   poetry run python scripts/install_mcp.py
-   ```
-
-5. **Poetry Script Issues**
-
-   ```bash
-   # If Poetry scripts don't work, run directly
-   python personal_agent.py
-   python test_tools.py
-   
-   # Ensure Poetry is properly installed
-   poetry install
    ```
 
 ### Logs and Debugging
@@ -456,9 +363,8 @@ personal_agent/
 - **Agent Logs**: Check terminal output for detailed logs
 - **Weaviate Logs**: `docker-compose logs weaviate`
 - **Debug Mode**: Flask runs in debug mode by default
-- **MCP Server Logs**: Check stderr output in terminal
 
-## 🔨 Development
+## Development
 
 ### Adding New Tools
 
@@ -469,13 +375,8 @@ def my_custom_tool(param: str) -> str:
     # Tool implementation
     return "Tool result"
 
-# Add to tools list in personal_agent.py
-tools = [
-    store_interaction, 
-    query_knowledge_base, 
-    my_custom_tool,  # Add your new tool here
-    # ...existing tools...
-]
+# Add to tools list
+tools = [store_interaction, query_knowledge_base, my_custom_tool]
 ```
 
 ### Customizing Prompts
@@ -490,70 +391,10 @@ Weaviate collection structure:
 - **timestamp**: When stored (RFC3339)
 - **topic**: Category/topic
 
-### Adding New MCP Servers
+## License
 
-1. Install the MCP server: `npm install -g @modelcontextprotocol/server-<name>`
-2. Add configuration to `mcp.json`
-3. Create corresponding `@tool` function in `personal_agent.py`
-4. Add tool to the tools list
+[Add your license here]
 
-## 📄 License
+## Contributing
 
-BSD 3-Clause License
-
-Copyright (c) 2025, Eric G. Suchanek, Ph.D.
-
-See LICENSE file for full details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Setup
-
-```bash
-# Clone and setup
-git clone <repository-url>
-cd personal_agent
-
-# Install dependencies
-poetry install
-
-# Install MCP servers
-poetry run python scripts/install_mcp.py
-
-# Test the setup
-poetry run test-tools
-python test_mcp_availability.py
-```
-
----
-
-## 🌟 What Makes This Special
-
-### Comprehensive Integration
-
-Unlike basic chatbots, this personal agent combines:
-
-- **Persistent Memory**: Never forgets your preferences and past interactions
-- **Real-time Web Access**: Always has current information via Brave Search
-- **Code Intelligence**: GitHub integration for technical questions and examples
-- **File System Awareness**: Can read, write, and analyze your local files
-- **Shell Access**: Execute commands safely within controlled environment
-
-### Production Ready
-
-- **Robust Error Handling**: Graceful degradation when services are unavailable
-- **Extensible Architecture**: Easy to add new MCP servers and capabilities
-- **Security Conscious**: Sandboxed execution and path restrictions
-- **Performance Optimized**: Efficient vector search and caching
-
-### Current Status: ✅ Fully Operational
-
-- All 12 tools verified and working
-- MCP integration stable and tested
-- Web interface responsive and user-friendly
-- Memory system storing and retrieving context effectively
-- Ready for daily use with optional API key enhancement
-
-**Personal AI Agent** - A comprehensive, MCP-powered personal assistant that learns, remembers, and grows with you. 🚀
+[Add contribution guidelines here]

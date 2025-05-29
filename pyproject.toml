@@ -16,6 +16,12 @@ requests = "^2.32.3"
 langchain-weaviate = "^0.0.4"
 rich = "^14.0.0"
 
+[tool.poetry.scripts]
+personal-agent = "personal_agent:main"
+install-mcp-servers = "scripts.install_mcp:main"
+test-mcp-servers = "test_mcp_availability:main"
+test-tools = "test_tools:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
