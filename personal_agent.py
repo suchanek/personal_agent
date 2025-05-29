@@ -4,7 +4,9 @@
 import atexit
 import json
 import logging
+import signal
 import subprocess
+import sys
 import time
 import warnings
 from datetime import datetime
@@ -28,6 +30,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
 warnings.filterwarnings(
     "ignore", message=".*model_fields.*", category=DeprecationWarning
 )
+# Suppress resource warnings for unclosed sockets (common with MCP servers)
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
+warnings.filterwarnings("ignore", category=ResourceWarning, message=".*subprocess.*")
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
@@ -213,6 +218,36 @@ class SimpleMCPClient:
             )
 
         return f"Error calling tool {tool_name}"
+
+    def stop_server_sync(self, server_name: str) -> bool:
+        """Stop a specific MCP server."""
+        if server_name not in self.active_servers:
+            logger.debug("MCP server %s not running", server_name)
+            return True
+
+        try:
+            server_info = self.active_servers[server_name]
+            process = server_info["process"]
+
+            # Terminate the process
+            process.terminate()
+
+            # Wait for it to exit gracefully
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                # Force kill if it doesn't exit gracefully
+                process.kill()
+                process.wait()
+
+            # Remove from active servers
+            del self.active_servers[server_name]
+            logger.info("Stopped MCP server: %s", server_name)
+            return True
+
+        except Exception as e:
+            logger.error("Error stopping MCP server %s: %s", server_name, e)
+            return False
 
     def stop_all_servers(self):
         """Stop all active MCP servers."""
@@ -679,7 +714,7 @@ def intelligent_file_search(search_query: str, directory: str = "/") -> str:
             )
 
         # Use MCP to list directory contents and search for relevant files
-        directory_listing = mcp_list_directory(directory)
+        directory_listing = mcp_list_directory.invoke({"directory_path": directory})
 
         # Use LLM to analyze which files might be relevant based on the search query
         analysis_prompt = f"""
@@ -979,6 +1014,8 @@ IMPORTANT INSTRUCTIONS:
 8. When the user asks to remember something, store it in the knowledge base
 9. When the user asks to clear the context, clear the current context but not the knowledge base
 10. Never clear the knowledge base unless explicitly requested by the user
+11. For comprehensive research requests, use the 'comprehensive_research' tool which combines multiple sources
+12. Always format your final response properly and use 'Final Answer:' to conclude
 
 
 CAPABILITIES:
@@ -1030,7 +1067,7 @@ agent_executor = AgentExecutor(
     tools=tools,
     verbose=True,
     handle_parsing_errors=True,
-    max_iterations=3,
+    max_iterations=10,  # Increased from 3 to 10 for complex research tasks
 )
 
 
@@ -1181,32 +1218,100 @@ def clear_kb():
 
 def cleanup():
     """Clean up resources on shutdown."""
-    global weaviate_client, mcp_client
+    global weaviate_client, mcp_client, vector_store
+
+    logger.info("Starting cleanup process...")
 
     # Clean up MCP servers
     if mcp_client:
         try:
+            # Stop all active servers
+            active_servers = (
+                list(mcp_client.active_servers.keys())
+                if hasattr(mcp_client, "active_servers")
+                else []
+            )
+            for server_name in active_servers:
+                try:
+                    mcp_client.stop_server_sync(server_name)
+                    logger.debug("Stopped MCP server: %s", server_name)
+                except Exception as e:
+                    logger.warning("Error stopping MCP server %s: %s", server_name, e)
+
+            # Stop all servers via stop_all_servers method
             mcp_client.stop_all_servers()
             logger.info("MCP servers stopped successfully")
+
+            # Give servers time to shutdown properly
+            time.sleep(1)
+
         except Exception as e:
             logger.error("Error stopping MCP servers: %s", e)
 
-    # Clean up Weaviate client
+    # Clean up Weaviate vector store and client
+    if vector_store:
+        try:
+            # Clean up the vector store first
+            if hasattr(vector_store, "client") and vector_store.client:
+                vector_store.client.close()
+                logger.debug("Vector store client closed")
+            vector_store = None
+        except Exception as e:
+            logger.error("Error closing vector store: %s", e)
+
     if weaviate_client:
         try:
-            weaviate_client.close()
-            logger.info("Weaviate client closed successfully")
+            # Ensure the client is properly disconnected
+            if (
+                hasattr(weaviate_client, "is_connected")
+                and weaviate_client.is_connected()
+            ):
+                weaviate_client.close()
+                logger.info("Weaviate client closed successfully")
+            elif hasattr(weaviate_client, "close"):
+                weaviate_client.close()
+                logger.info("Weaviate client closed successfully")
+            weaviate_client = None
         except Exception as e:
             logger.error("Error closing Weaviate client: %s", e)
+
+    # Force garbage collection to help with cleanup
+    import gc
+
+    gc.collect()
+
+    logger.info("Cleanup process completed")
+
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    logger.info("Received signal %d, shutting down gracefully...", signum)
+    cleanup()
+    sys.exit(0)
 
 
 def main():
     """Main entry point for the Personal AI Agent."""
+    # Register cleanup function for normal exit
     atexit.register(cleanup)
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    logger.info("Starting Personal AI Agent...")
+    logger.info("Web interface will be available at: http://127.0.0.1:5001")
+
     try:
-        app.run(host="127.0.0.1", port=5001, debug=True)
+        # Disable Flask's reloader in production to avoid resource leaks
+        app.run(host="127.0.0.1", port=5001, debug=True, use_reloader=False)
     except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt")
         cleanup()
+    except Exception as e:
+        logger.error("Error running Flask app: %s", e)
+        cleanup()
+        raise
 
 
 if __name__ == "__main__":
