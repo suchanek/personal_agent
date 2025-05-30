@@ -18,7 +18,7 @@ rich = "^14.0.0"
 python-dotenv = "^1.1.0"
 
 [tool.poetry.scripts]
-personal-agent = "personal_agent:main"
+personal-agent = "src.personal_agent.main:main"
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"

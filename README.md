@@ -14,11 +14,11 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 🎯 **ReAct Agent**: Uses LangChain's ReAct framework for intelligent tool usage
 - 🗑️ **Memory Management**: Clear knowledge base functionality
 
-### MCP-Powered Tools (12 Total)
+### MCP-Powered Tools (13 Total)
 
 - 📁 **File Operations**: Read, write, and list directory contents
 - 🔎 **Intelligent File Search**: Combine file exploration with memory context
-- 🐙 **GitHub Integration**: Search repositories, code, issues, and documentation
+- 🐙 **GitHub Integration**: Search repositories, code, issues, and documentation (with OUTPUT_PARSING_FAILURE fix)
 - 🌍 **Web Search**: Brave Search API integration for real-time research
 - 💻 **Shell Commands**: Safe execution of terminal commands
 - 🌐 **Web Fetching**: Retrieve content from URLs and APIs
@@ -219,85 +219,87 @@ curl http://localhost:8080/v1/.well-known/ready
 
 ### 1. Start the Personal Agent
 
-You can run the agent using Poetry scripts:
+Launch the agent using the Poetry endpoint:
 
 ```bash
-# Run the main agent
+# Launch the agent
 poetry run personal-agent
-
-# Alternative: Run directly with Python
-poetry run python personal_agent.py
 ```
 
 ### 2. Test Tool Functionality
 
-Verify all 12 tools are working correctly:
+Verify all 13 tools are working correctly:
 
 ```bash
 # Test all tool imports and descriptions
 poetry run test-tools
 
+# Test the system
+poetry run personal-agent --help
+
 # Test MCP server availability (optional)
 poetry run test-mcp-servers
 
 # Test comprehensive research functionality
-poetry run python tests/test_comprehensive_research.py
+python tests/test_comprehensive_research.py
 
 # Test cleanup and resource management
-poetry run python tests/test_cleanup_improved.py
+python tests/test_cleanup_improved.py
+
+# Run the complete test suite
+python tests/run_tests.py --category all
 ```
 
 ## 🧪 Comprehensive Testing Suite
 
-The project includes a comprehensive test suite in the `tests/` directory:
+The project includes a comprehensive test suite in the `tests/` directory with organized categories:
 
-### Available Tests
+### Test Categories
 
-- **`test_tools.py`**: Validates all 12 tool imports and descriptions
-- **`test_mcp_availability.py`**: Tests MCP server availability and connectivity
-- **`test_comprehensive_research.py`**: Validates research functionality with real results
-- **`test_cleanup_improved.py`**: Tests enhanced resource management and cleanup
-- **`test_cleanup.py`**: Basic cleanup functionality validation
-- **`test_mcp.py`**: Low-level MCP communication testing
-- **`test_github.py`**: Comprehensive GitHub MCP tool functionality testing (7 test functions)
+- **Config Tests**: `test_config_extraction.py`, `test_env_vars.py` - Configuration and environment setup
+- **Core Tests**: `test_agent_init.py`, `test_refactored_system.py`, `test_main_fix.py` - System initialization
+- **Tool Tests**: `test_tools.py`, `test_github.py`, `test_logger_injection.py` - Individual tool functionality  
+- **Web Tests**: `test_web_interface.py`, `test_web_detailed.py` - Web interface validation
+- **Integration Tests**: `test_comprehensive_research.py`, `test_cleanup_improved.py` - Full system testing
+- **Debug Scripts**: `debug_github_tools.py`, `debug_globals.py` - Troubleshooting utilities
 
-### Debug Scripts (moved to tests/)
-
-- **`debug_github_direct.py`**: Direct GitHub API testing and validation
-- **`debug_github_tools.py`**: GitHub MCP server tool discovery (26 available tools)
-- **`debug_tool_call.py`**: General MCP tool call debugging
-
-### Running Individual Tests
+### Running Tests
 
 ```bash
-# Test specific functionality
-source .venv/bin/activate && python tests/test_comprehensive_research.py
-source .venv/bin/activate && python tests/test_mcp_availability.py
-source .venv/bin/activate && python tests/test_cleanup_improved.py
+# Run all tests
+python tests/run_tests.py --category all
 
-# Test GitHub tool functionality (comprehensive)
-source .venv/bin/activate && python tests/test_github.py
+# Run specific category
+python tests/run_tests.py --category core
+python tests/run_tests.py --category tools
 
-# Run all tool validations
+# Run individual test
+python tests/run_tests.py --test test_agent_init
+
+# List all available tests
+python tests/run_tests.py --list
+
+# Legacy poetry commands (still work for some tests)
 poetry run test-tools
-
-# Run debug scripts for troubleshooting
-source .venv/bin/activate && python tests/debug_github_tools.py
-source .venv/bin/activate && python tests/debug_github_direct.py
+poetry run test-mcp-servers
 ```
 
-### Test Results Overview
-
-All tests provide detailed output including:
-
-- ✅ Success indicators with result details
-- ❌ Failure indicators with error explanations  
-- 📊 Performance metrics (character counts, timing)
-- 🔧 Configuration validation
-- 🐙 GitHub authentication and tool availability testing
-- 🌍 Web search and external service integration validation
-
 ### 3. Access Web Interface
+
+After launching the agent, open your browser to:
+
+**🌐 <http://127.0.0.1:5001>**
+
+The web interface provides:
+
+- 💬 **Interactive Chat**: Direct conversation with the AI agent
+- 🧠 **Memory Display**: Shows retrieved context from past interactions  
+- 🏷️ **Topic Organization**: Categorized memory storage for better organization
+- 🗑️ **Knowledge Management**: Clear/reset knowledge base functionality
+- 📊 **System Status**: Real-time indication of MCP server status and tool availability
+- 🔧 **Debugging Info**: Tool call logs and response details for troubleshooting
+
+### 4. Example Usage
 
 Open your browser and navigate to: `http://127.0.0.1:5001`
 
@@ -557,31 +559,42 @@ personal_agent/
    ollama pull nomic-embed-text
    ```
 
-3. **Port Already in Use**
+3. **Agent Won't Start**
+
+   ```bash
+   # Use the Poetry endpoint (recommended)
+   poetry run personal-agent
+   
+   # If that fails, check if dependencies are installed
+   poetry install
+   
+   # For manual testing, activate environment first
+   source .venv/bin/activate
+   # Then run any commands or tests
+   ```
+
+4. **Port Already in Use**
 
    ```bash
    # Check what's using port 5001
    lsof -i :5001
-   # Kill the process or change port in personal_agent.py
+   # Kill the process or change port in main.py
    ```
 
-4. **MCP Server Issues**
+5. **MCP Server Issues**
 
    ```bash
    # Test MCP servers
-   source .venv/bin/activate && python tests/test_mcp_availability.py
+   python tests/test_mcp_availability.py
    
    # Verify all tools are loaded
    poetry run test-tools
    
-   # Test comprehensive research
-   source .venv/bin/activate && python tests/test_comprehensive_research.py
+   # Test system initialization
+   python tests/test_agent_init.py
    
-   # Test GitHub functionality specifically
-   source .venv/bin/activate && python tests/test_github.py
-   
-   # Discover available GitHub tools
-   source .venv/bin/activate && python tests/debug_github_tools.py
+   # Run complete test suite
+   python tests/run_tests.py --category all
    
    # Reinstall MCP servers if needed
    poetry run python scripts/install_mcp.py
@@ -739,7 +752,7 @@ Unlike basic chatbots, this personal agent combines:
 
 ### Current Status: ✅ Fully Operational
 
-- All 12 tools verified and working
+- All 13 tools verified and working
 - MCP integration stable and tested
 - Web interface responsive and user-friendly
 - Memory system storing and retrieving context effectively
@@ -748,4 +761,45 @@ Unlike basic chatbots, this personal agent combines:
 - Debug infrastructure properly organized
 - Ready for daily use with optional API key enhancement
 
-**Personal AI Agent** - A comprehensive, MCP-powered personal assistant that learns, remembers, and grows with you. 🚀
+---
+
+## 🚀 Latest Updates & Changes
+
+### Recent Major Improvements (December 2024)
+
+#### ✅ GitHub OUTPUT_PARSING_FAILURE Resolution
+
+- **Problem**: LangChain ReAct agent was unable to parse large JSON responses from GitHub API, causing `OUTPUT_PARSING_FAILURE` errors
+- **Solution**: Added `_sanitize_github_output()` function that parses GitHub responses and creates concise, formatted summaries
+- **Impact**: GitHub search now works reliably without parsing errors
+
+#### ✅ Modular Architecture Migration  
+
+- **Before**: Monolithic `personal_agent.py` file with 1000+ lines
+- **After**: Organized modular structure under `src/personal_agent/` with clear separation of concerns
+- **Benefits**: Better maintainability, testing, and development experience
+
+#### ✅ Enhanced Launch Instructions
+
+- **Current Method**: `poetry run personal-agent`
+- **Why**: Uses the Poetry endpoint for the latest refactored codebase with all recent fixes
+- **Note**: Clean and simple launch method via Poetry script configuration
+
+#### ✅ Comprehensive Testing Infrastructure
+
+- **Added**: 20+ test files organized by category in `tests/` directory
+- **Features**: Test runner with categories, debug scripts, system validation
+- **Coverage**: All components from core initialization to GitHub integration
+
+### System Architecture Updates
+
+The agent now features:
+
+- **Modular Design**: Clean separation between config, core, tools, web, and utils
+- **Dependency Injection**: Proper logger and component injection throughout
+- **Resource Management**: Enhanced cleanup and error handling
+- **Test Organization**: Categorized test suite with dedicated runner
+
+---
+
+**Personal AI Agent** - A comprehensive, MCP-powered personal assistant with 13 integrated tools that learns, remembers, and grows with you. 🚀
