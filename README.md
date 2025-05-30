@@ -215,6 +215,14 @@ docker-compose up -d
 curl http://localhost:8080/v1/.well-known/ready
 ```
 
+**Note**: Weaviate will store its data in the `~/weaviate_data/` directory in your home folder. This directory will be created automatically when Weaviate starts.
+
+**Cleanup**: If you have an old `./weaviate_data/` directory in your project root from a previous setup, you can safely remove it:
+
+```bash
+rm -rf ./weaviate_data/
+```
+
 ## 💻 Usage
 
 ### 1. Start the Personal Agent
