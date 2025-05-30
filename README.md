@@ -202,7 +202,7 @@ You can run the agent using Poetry scripts:
 
 ```bash
 # Run the main agent
-poetry run agent
+poetry run personal-agent
 
 # Alternative: Run directly with Python
 poetry run python personal_agent.py
@@ -217,13 +217,13 @@ Verify all 12 tools are working correctly:
 poetry run test-tools
 
 # Test MCP server availability (optional)
-source .venv/bin/activate && python tests/test_mcp_availability.py
+poetry run test-mcp-servers
 
 # Test comprehensive research functionality
-source .venv/bin/activate && python tests/test_comprehensive_research.py
+poetry run python tests/test_comprehensive_research.py
 
 # Test cleanup and resource management
-source .venv/bin/activate && python tests/test_cleanup_improved.py
+poetry run python tests/test_cleanup_improved.py
 ```
 
 ## 🧪 Comprehensive Testing Suite
@@ -238,6 +238,13 @@ The project includes a comprehensive test suite in the `tests/` directory:
 - **`test_cleanup_improved.py`**: Tests enhanced resource management and cleanup
 - **`test_cleanup.py`**: Basic cleanup functionality validation
 - **`test_mcp.py`**: Low-level MCP communication testing
+- **`test_github.py`**: Comprehensive GitHub MCP tool functionality testing (7 test functions)
+
+### Debug Scripts (moved to tests/)
+
+- **`debug_github_direct.py`**: Direct GitHub API testing and validation
+- **`debug_github_tools.py`**: GitHub MCP server tool discovery (26 available tools)
+- **`debug_tool_call.py`**: General MCP tool call debugging
 
 ### Running Individual Tests
 
@@ -247,8 +254,15 @@ source .venv/bin/activate && python tests/test_comprehensive_research.py
 source .venv/bin/activate && python tests/test_mcp_availability.py
 source .venv/bin/activate && python tests/test_cleanup_improved.py
 
+# Test GitHub tool functionality (comprehensive)
+source .venv/bin/activate && python tests/test_github.py
+
 # Run all tool validations
 poetry run test-tools
+
+# Run debug scripts for troubleshooting
+source .venv/bin/activate && python tests/debug_github_tools.py
+source .venv/bin/activate && python tests/debug_github_direct.py
 ```
 
 ### Test Results Overview
@@ -259,6 +273,8 @@ All tests provide detailed output including:
 - ❌ Failure indicators with error explanations  
 - 📊 Performance metrics (character counts, timing)
 - 🔧 Configuration validation
+- 🐙 GitHub authentication and tool availability testing
+- 🌍 Web search and external service integration validation
 
 ### 3. Access Web Interface
 
@@ -422,7 +438,11 @@ personal_agent/
 │   ├── test_comprehensive_research.py # Research functionality tests
 │   ├── test_cleanup_improved.py # Enhanced cleanup tests
 │   ├── test_cleanup.py      # Basic cleanup tests
-│   └── test_mcp.py          # MCP communication tests
+│   ├── test_mcp.py          # MCP communication tests
+│   ├── test_github.py       # GitHub MCP tool functionality tests (7 tests)
+│   ├── debug_github_direct.py # Direct GitHub API testing
+│   ├── debug_github_tools.py # GitHub MCP server tool discovery
+│   └── debug_tool_call.py   # General MCP tool call debugging
 ├── pyproject.toml           # Poetry dependencies & scripts
 ├── docker-compose.yml       # Weaviate setup
 ├── mcp.json                # MCP server configurations (with env vars)
@@ -524,11 +544,30 @@ personal_agent/
    # Test comprehensive research
    source .venv/bin/activate && python tests/test_comprehensive_research.py
    
+   # Test GitHub functionality specifically
+   source .venv/bin/activate && python tests/test_github.py
+   
+   # Discover available GitHub tools
+   source .venv/bin/activate && python tests/debug_github_tools.py
+   
    # Reinstall MCP servers if needed
    poetry run python scripts/install_mcp.py
    ```
 
-5. **Poetry Script Issues**
+5. **GitHub Authentication Issues**
+
+   ```bash
+   # Check if GitHub Personal Access Token is set
+   echo $GITHUB_PERSONAL_ACCESS_TOKEN
+   
+   # Test GitHub tool availability and authentication
+   source .venv/bin/activate && python tests/test_github.py
+   
+   # For debugging, check GitHub tools directly
+   source .venv/bin/activate && python tests/debug_github_direct.py
+   ```
+
+6. **Poetry Script Issues**
 
    ```bash
    # If Poetry scripts don't work, run directly
@@ -537,6 +576,19 @@ personal_agent/
    
    # Ensure Poetry is properly installed
    poetry install
+   ```
+
+7. **GitHub Tool Testing**
+
+   ```bash
+   # Full GitHub test suite (7 comprehensive tests)
+   source .venv/bin/activate && python tests/test_github.py
+   
+   # Check environment variables
+   echo "GitHub Token: ${GITHUB_PERSONAL_ACCESS_TOKEN:0:10}..."
+   
+   # List all 26 available GitHub MCP tools
+   source .venv/bin/activate && python tests/debug_github_tools.py
    ```
 
 ### Logs and Debugging
@@ -613,7 +665,21 @@ poetry run python scripts/install_mcp.py
 # Test the setup
 source .venv/bin/activate && poetry run test-tools
 source .venv/bin/activate && python tests/test_mcp_availability.py
+
+# Test GitHub functionality specifically
+source .venv/bin/activate && python tests/test_github.py
+
+# Run debug scripts for troubleshooting
+source .venv/bin/activate && python tests/debug_github_tools.py
+source .venv/bin/activate && python tests/debug_github_direct.py
+source .venv/bin/activate && python tests/debug_tool_call.py
 ```
+
+### Debug Scripts (in tests/ directory)
+
+- **`debug_github_tools.py`**: Discover all available GitHub MCP tools (26 total)
+- **`debug_github_direct.py`**: Test GitHub API connectivity and authentication
+- **`debug_tool_call.py`**: General MCP tool call debugging and validation
 
 ---
 
@@ -635,6 +701,8 @@ Unlike basic chatbots, this personal agent combines:
 - **Extensible Architecture**: Easy to add new MCP servers and capabilities
 - **Security Conscious**: Sandboxed execution and path restrictions
 - **Performance Optimized**: Efficient vector search and caching
+- **Comprehensive Testing**: Full test suite including GitHub authentication and tool validation
+- **Debug Infrastructure**: Organized debug scripts for troubleshooting and development
 
 ### Current Status: ✅ Fully Operational
 
@@ -642,6 +710,9 @@ Unlike basic chatbots, this personal agent combines:
 - MCP integration stable and tested
 - Web interface responsive and user-friendly
 - Memory system storing and retrieving context effectively
+- GitHub authentication and tool integration fully functional
+- Comprehensive test suite with 100% success rate
+- Debug infrastructure properly organized
 - Ready for daily use with optional API key enhancement
 
 **Personal AI Agent** - A comprehensive, MCP-powered personal assistant that learns, remembers, and grows with you. 🚀

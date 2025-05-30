@@ -110,7 +110,10 @@ if __name__ == "__main__":
 
         # Dynamically determine the project directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        sys.path.append(current_dir)
+        project_dir = os.path.dirname(
+            current_dir
+        )  # Go up one level from tests/ to project root
+        sys.path.append(project_dir)
 
         try:
             from personal_agent import USE_MCP, mcp_client, mcp_write_file
