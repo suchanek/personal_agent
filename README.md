@@ -152,7 +152,7 @@ For full functionality, set up your API keys using environment variables:
    cp .env.example .env
    ```
 
-2. Edit `.env` file and add your actual API keys:
+2. Edit `.env` file and configure your settings:
 
    ```bash
    # GitHub Personal Access Token
@@ -162,6 +162,13 @@ For full functionality, set up your API keys using environment variables:
    # Brave Search API Key  
    # Get from: https://api.search.brave.com/app/keys
    BRAVE_API_KEY=your_brave_api_key_here
+   
+   # Customize directories for your system
+   # ROOT_DIR: Your home directory (used by filesystem MCP server)
+   ROOT_DIR=/Users/your_username
+   
+   # DATA_DIR: Directory for vector database storage
+   DATA_DIR=/Users/your_username/data
    ```
 
 **Method 2: Export environment variables**
@@ -172,6 +179,10 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 
 # Brave Search API Key (for web search)  
 export BRAVE_API_KEY="your_api_key_here"
+
+# Customize directories for your system
+export ROOT_DIR="/Users/your_username"
+export DATA_DIR="/Users/your_username/data"
 ```
 
 **Getting API Keys:**
@@ -183,6 +194,11 @@ export BRAVE_API_KEY="your_api_key_here"
 - **Brave Search API Key**:
   1. Visit <https://api.search.brave.com/app/keys>
   2. Create an account and generate an API key
+
+**Directory Configuration:**
+
+- **ROOT_DIR**: Set this to your home directory (e.g., `/Users/your_username` on macOS, `/home/your_username` on Linux). This is where the filesystem MCP server will have access.
+- **DATA_DIR**: Set this to where you want the vector database data stored (e.g., `/Users/your_username/data`). This directory will be created automatically if it doesn't exist.
 
 ### 6. Start Weaviate Database
 

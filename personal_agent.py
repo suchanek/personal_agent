@@ -1,7 +1,68 @@
 # pylint: disable=C0301,C0116
 # pylint: disable=C0301,C0116,C0115,W0613,E0611,C0413,E0401,W0601,W0621,C0302,E1101,C0103,W0718
 
+"""
+Personal Agent - An AI-powered assistant with multi-modal capabilities.
+
+This module implements a personal AI agent that combines multiple technologies to provide
+comprehensive assistance with file operations, knowledge management, web search, and
+GitHub integration. The agent uses Model Context Protocol (MCP) servers for external
+tool access and maintains a persistent knowledge base using Weaviate vector database.
+
+Key Features:
+    - File System Operations: Read, write, and list files through MCP filesystem servers
+    - Knowledge Base: Store and query interactions using Weaviate vector database
+    - GitHub Integration: Search repositories and perform GitHub operations
+    - Web Search: Access web content through Brave Search and Puppeteer
+    - LLM Integration: Uses Ollama for local language model inference
+    - Environment Configuration: Configurable through environment variables
+
+Architecture:
+    - MCP Client: Manages connections to multiple MCP servers for tool access
+    - Vector Store: Weaviate-based persistent memory for context and learning
+    - LLM Backend: Ollama integration for language model capabilities
+    - Tool Framework: LangChain-based tool system for structured operations
+    - Web Interface: Flask-based web interface for user interactions
+
+Environment Variables:
+    - ROOT_DIR: Root directory for MCP filesystem operations (default: /Users/egs)
+    - DATA_DIR: Data directory for vector database (default: /Users/egs/data)
+    - GITHUB_PERSONAL_ACCESS_TOKEN: GitHub API access token
+    - BRAVE_API_KEY: Brave Search API key
+    - WEAVIATE_URL: Weaviate database URL (default: http://localhost:8080)
+    - OLLAMA_URL: Ollama service URL (default: http://localhost:11434)
+
+MCP Servers:
+    - filesystem-home: Access to user's home directory
+    - filesystem-data: Access to data directory for vector operations
+    - filesystem-root: System-wide file access (use with caution)
+    - github: GitHub repository operations and code search
+    - brave-search: Web search capabilities
+    - puppeteer: Browser automation and web content extraction
+
+Usage:
+    The agent can be run as a standalone script or imported as a module.
+    Configuration is handled through environment variables loaded from .env file.
+
+    Example:
+        $ poetry run personal-agent
+
+Dependencies:
+    - python-dotenv: Environment variable management
+    - langchain: LLM framework and tool orchestration
+    - weaviate-client: Vector database operations
+    - ollama: Local LLM inference
+    - flask: Web interface
+    - rich: Enhanced logging and console output
+
+Author: Eric G. Suchanek, PhD
+Version: 0.1.0
+License: See LICENSE file
+Last Revision: 2025-05-29 23:54:58
+"""
+
 import atexit
+import gc
 import json
 import logging
 import os
@@ -28,7 +89,25 @@ from weaviate.connect import ConnectionParams
 from weaviate.util import generate_uuid5
 
 # Load environment variables from .env file
-load_dotenv()
+dotenv_loaded = load_dotenv()
+
+# Store loaded environment variables if dotenv succeeded
+_env_vars = {}
+if dotenv_loaded:
+    # Load all variables from .env file into a cache
+    import dotenv
+
+    _env_vars = dotenv.dotenv_values()
+
+
+# Helper function to get environment variables with fallback
+def get_env_var(key: str, fallback: str = "") -> str:
+    """Get environment variable from dotenv cache first, then os.environ as fallback."""
+    if dotenv_loaded and key in _env_vars:
+        return _env_vars[key] or fallback
+    else:
+        # If dotenv failed or key not in .env, try os.getenv as fallback
+        return os.getenv(key, fallback)
 
 
 # Suppress Pydantic deprecation warnings from Ollama
@@ -55,8 +134,9 @@ OLLAMA_URL = "http://localhost:11434"
 USE_WEAVIATE = True  # Set to False to bypass Weaviate for testing
 USE_MCP = True  # Set to False to bypass MCP for testing
 
-ROOT_DIR = "/Users/egs"  # Root directory for MCP filesystem server
-DATA_DIR = "/Users/egs/data"  # Data directory for vector database
+ROOT_DIR = get_env_var("ROOT_DIR", ".")  # Root directory for MCP filesystem server
+DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
+
 LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
 
 # MCP Server configurations
@@ -81,7 +161,7 @@ MCP_SERVERS = {
         "args": ["--yes", "@modelcontextprotocol/server-github"],
         "description": "GitHub repository operations and code search",
         "env": {
-            "GITHUB_PERSONAL_ACCESS_TOKEN": os.getenv(
+            "GITHUB_PERSONAL_ACCESS_TOKEN": get_env_var(
                 "GITHUB_PERSONAL_ACCESS_TOKEN", ""
             )
         },
@@ -91,7 +171,7 @@ MCP_SERVERS = {
         "args": ["--yes", "@modelcontextprotocol/server-brave-search"],
         "description": "Web search for research and technical information",
         "env": {
-            "BRAVE_API_KEY": os.getenv("BRAVE_API_KEY", "")
+            "BRAVE_API_KEY": get_env_var("BRAVE_API_KEY", "")
         },  # Set your API key here
     },
     "puppeteer": {
@@ -1986,27 +2066,20 @@ def clear_kb():
 
 def cleanup():
     """Clean up resources on shutdown."""
-    global weaviate_client, mcp_client, vector_store
+    global weaviate_client, vector_store
+
+    # Prevent multiple cleanup calls
+    if hasattr(cleanup, "called") and cleanup.called:
+        logger.debug("Cleanup already called, skipping...")
+        return
+    cleanup.called = True
 
     logger.info("Starting cleanup process...")
 
     # Clean up MCP servers
     if mcp_client:
         try:
-            # Stop all active servers
-            active_servers = (
-                list(mcp_client.active_servers.keys())
-                if hasattr(mcp_client, "active_servers")
-                else []
-            )
-            for server_name in active_servers:
-                try:
-                    mcp_client.stop_server_sync(server_name)
-                    logger.debug("Stopped MCP server: %s", server_name)
-                except Exception as e:
-                    logger.warning("Error stopping MCP server %s: %s", server_name, e)
-
-            # Stop all servers via stop_all_servers method
+            # Use stop_all_servers method (no need for individual stops)
             mcp_client.stop_all_servers()
             logger.info("MCP servers stopped successfully")
 
@@ -2044,7 +2117,6 @@ def cleanup():
             logger.error("Error closing Weaviate client: %s", e)
 
     # Force garbage collection to help with cleanup
-    import gc
 
     gc.collect()
 
@@ -2072,10 +2144,10 @@ def main():
 
     try:
         # Disable Flask's reloader in production to avoid resource leaks
-        app.run(host="127.0.0.1", port=5001, debug=True, use_reloader=False)
+        app.run(host="127.0.0.1", port=5001, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
-        cleanup()
+        # cleanup() will be called by atexit, no need to call here
     except Exception as e:
         logger.error("Error running Flask app: %s", e)
         cleanup()
@@ -2084,3 +2156,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# end of personal_agent.py
