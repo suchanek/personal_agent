@@ -8,23 +8,19 @@ configuration, core services, tools, and web interface.
 from typing import Optional
 
 # Import configuration
-from personal_agent.config import USE_MCP, USE_WEAVIATE, get_mcp_servers
+from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
 
 # Import core components
-from personal_agent.core import SimpleMCPClient, create_agent_executor, setup_weaviate
+from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
 
 # Import tools
-from personal_agent.tools import get_all_tools
+from .tools import get_all_tools
 
 # Import utilities
-from personal_agent.utils import (
-    inject_dependencies,
-    register_cleanup_handlers,
-    setup_logging,
-)
+from .utils import inject_dependencies, register_cleanup_handlers, setup_logging
 
 # Import web interface
-from personal_agent.web import create_app, register_routes
+from .web import create_app, register_routes
 
 # Global variables for cleanup
 agent_executor: Optional[object] = None
@@ -62,7 +58,7 @@ def initialize_system():
     # Get all tools with injected dependencies
     logger.info("Setting up tools...")
     # Import globals directly from memory module to get updated values
-    from personal_agent.core.memory import vector_store, weaviate_client
+    from .core.memory import vector_store, weaviate_client
 
     tools = get_all_tools(mcp_client, weaviate_client, vector_store, logger)
     logger.info("Loaded %d tools successfully", len(tools))
@@ -137,7 +133,7 @@ def main():
         # cleanup() will be called by atexit, no need to call here
     except Exception as e:
         logger_instance.error("Error running Flask app: %s", e)
-        from personal_agent.utils.cleanup import cleanup
+        from .utils.cleanup import cleanup
 
         cleanup()
         raise
