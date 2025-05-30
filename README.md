@@ -75,10 +75,10 @@ ollama pull nomic-embed-text
 docker-compose up -d
 
 # 5. Test everything works
-source .venv/bin/activate && poetry run test-tools
+poetry run test-tools
 
 # 6. Run the agent
-poetry run agent
+poetry run personal-agent
 ```
 
 Then open `http://127.0.0.1:5001` in your browser and start chatting!
@@ -254,6 +254,7 @@ poetry run test-tools
 ### Test Results Overview
 
 All tests provide detailed output including:
+
 - ✅ Success indicators with result details
 - ❌ Failure indicators with error explanations  
 - 📊 Performance metrics (character counts, timing)

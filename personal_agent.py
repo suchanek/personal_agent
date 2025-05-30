@@ -4,6 +4,7 @@
 import atexit
 import json
 import logging
+import os
 import signal
 import subprocess
 import sys
@@ -444,8 +445,6 @@ def clear_knowledge_base() -> str:
                 try:
                     weaviate_client.collections.delete(collection_name)
                     # Recreate the collection
-                    import weaviate.classes.config as wvc
-
                     weaviate_client.collections.create(
                         name=collection_name,
                         properties=[
@@ -494,16 +493,16 @@ def mcp_read_file(file_path: str) -> str:
                 return "Failed to start MCP filesystem server."
 
         # Convert absolute paths to relative paths for the restricted root
-        # The server root is /Users/egs, so we need to make paths relative to that
+        # The server root is ROOT_DIR, so we need to make paths relative to that
         if file_path == ROOT_DIR:
             file_path = "."  # Root directory (though reading a directory as file will likely fail)
-        elif file_path.startswith("/Users/egs/"):
-            file_path = file_path[10:]  # Remove ROOT_DIR prefix
+        elif file_path.startswith(ROOT_DIR + "/"):
+            file_path = file_path[len(ROOT_DIR) + 1 :]  # Remove ROOT_DIR prefix
         elif file_path.startswith("~/"):
             file_path = file_path[2:]  # Remove "~/" prefix
         elif file_path.startswith("/"):
             # If it's an absolute path outside home, we can't access it
-            return f"Error: Path {file_path} is outside the accessible directory (/Users/egs)"
+            return f"Error: Path {file_path} is outside the accessible directory ({ROOT_DIR})"
 
         # Ensure path doesn't start with / for relative paths
         if file_path.startswith("/"):
@@ -536,24 +535,69 @@ def mcp_read_file(file_path: str) -> str:
 
 
 @tool
-def mcp_write_file(file_path: str, content: str) -> str:
+def mcp_write_file(file_path: str, content: str = None) -> str:
     """Write content to file using MCP filesystem server."""
-    # Handle case where parameters might be JSON strings from LangChain
-    if isinstance(file_path, str) and file_path.startswith("{"):
+    # Log the raw inputs for debugging
+    logger.debug(
+        "mcp_write_file called with file_path: %r, content: %r", file_path, content
+    )
+    logger.debug("file_path type: %s, content type: %s", type(file_path), type(content))
+
+    # Handle case where LangChain incorrectly passes the entire JSON as file_path
+    if (
+        isinstance(file_path, str)
+        and file_path.startswith("{")
+        and file_path.endswith("}")
+    ):
         try:
+            # This is the case where LangChain passes the entire JSON string as file_path
+            logger.debug("Detected JSON string in file_path, attempting to parse...")
             params = json.loads(file_path)
-            file_path = params.get("file_path", file_path)
-            content = params.get("content", content)
-        except (json.JSONDecodeError, TypeError):
-            pass  # Use original values if parsing fails
+            logger.debug("Successfully parsed JSON: %s", params)
+
+            # Extract the actual parameters
+            if "file_path" in params and "content" in params:
+                file_path = params["file_path"]
+                content = params["content"]
+                logger.debug(
+                    "Extracted parameters: file_path=%r, content=%r", file_path, content
+                )
+            else:
+                logger.warning(
+                    "JSON missing required keys. Available keys: %s",
+                    list(params.keys()),
+                )
+                return "Error: JSON parameters missing required 'file_path' or 'content' keys"
+
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse JSON from file_path parameter: %s", e)
+            return f"Error: Invalid JSON in parameters: {e}"
+        except Exception as e:
+            logger.error("Unexpected error parsing parameters: %s", e)
+            return f"Error parsing parameters: {e}"
+
+    # Validate that we have both required parameters
+    if not file_path:
+        logger.error("file_path is empty or None")
+        return "Error: file_path parameter is required"
+    if content is None or content == "":
+        logger.error("content is None or empty")
+        return "Error: content parameter is required"
 
     if not USE_MCP or mcp_client is None:
         return "MCP is disabled, cannot write file."
 
     try:
+        # Store original path for logging
+        original_path = file_path
+
+        # Expand ~ to actual path first
+        if file_path.startswith("~/"):
+            file_path = os.path.expanduser(file_path)
+
         # Determine which server to use based on path
         server_name = "filesystem-home"
-        if file_path.startswith("/Users/egs/data/") or file_path.startswith("data/"):
+        if file_path.startswith(DATA_DIR + "/") or file_path.startswith("data/"):
             server_name = "filesystem-data"
 
         # Start filesystem server if not already running
@@ -564,19 +608,19 @@ def mcp_write_file(file_path: str, content: str) -> str:
 
         # Convert absolute paths to relative paths for the restricted root
         if server_name == "filesystem-home":
-            # The server root is /Users/egs
+            # The server root is ROOT_DIR
             if file_path == ROOT_DIR:
                 return "Error: Cannot write to root directory as a file"
-            elif file_path.startswith("/Users/egs/"):
-                file_path = file_path[10:]  # Remove ROOT_DIR prefix
-            elif file_path.startswith("~/"):
-                file_path = file_path[2:]  # Remove "~/" prefix
+            elif file_path.startswith(ROOT_DIR + "/"):
+                file_path = file_path[
+                    len(ROOT_DIR + "/") :
+                ]  # Remove ROOT_DIR prefix properly
             elif file_path.startswith("/"):
-                return f"Error: Path {file_path} is outside the accessible directory (/Users/egs)"
+                return f"Error: Path {file_path} is outside the accessible directory ({ROOT_DIR})"
         else:  # filesystem-data
-            # The server root is /Users/egs/data
-            if file_path.startswith("/Users/egs/data/"):
-                file_path = file_path[16:]  # Remove "/Users/egs/data/" prefix
+            # The server root is DATA_DIR
+            if file_path.startswith(DATA_DIR + "/"):
+                file_path = file_path[len(DATA_DIR + "/") :]  # Remove data dir prefix
             elif file_path.startswith("data/"):
                 file_path = file_path[5:]  # Remove "data/" prefix
 
@@ -584,25 +628,41 @@ def mcp_write_file(file_path: str, content: str) -> str:
         if file_path.startswith("/"):
             file_path = file_path[1:]
 
+        # Create directory structure if it doesn't exist
+        dir_path = os.path.dirname(file_path)
+        if dir_path:
+            full_dir_path = os.path.join(
+                ROOT_DIR if server_name == "filesystem-home" else DATA_DIR, dir_path
+            )
+            if not os.path.exists(full_dir_path):
+                try:
+                    os.makedirs(full_dir_path, exist_ok=True)
+                    logger.info("Created directory structure: %s", full_dir_path)
+                except Exception as e:
+                    logger.warning(
+                        "Could not create directory %s: %s", full_dir_path, e
+                    )
+
         logger.debug(
-            "Calling write_file with path: %s on server: %s", file_path, server_name
+            "Calling write_file with original path: %s, converted path: %s on server: %s",
+            original_path,
+            file_path,
+            server_name,
         )
 
         # Call write_file tool with correct parameter name
         result = mcp_client.call_tool_sync(
-            server_name, "write_file", {"path": file_path, "contents": content}
+            server_name, "write_file", {"path": file_path, "content": content}
         )
 
         # Store the file write operation in memory for context
         if USE_WEAVIATE and vector_store is not None:
-            interaction_text = (
-                f"Wrote file: {file_path}\nContent length: {len(content)} characters"
-            )
+            interaction_text = f"Wrote file: {original_path}\nContent length: {len(content)} characters"
             store_interaction.invoke(
                 {"text": interaction_text, "topic": "file_operations"}
             )
 
-        logger.info("Wrote file via MCP: %s", file_path)
+        logger.info("Wrote file via MCP: %s -> %s", original_path, file_path)
         return result
 
     except Exception as e:
@@ -627,7 +687,7 @@ def mcp_list_directory(directory_path: str) -> str:
     try:
         # Determine which server to use based on path
         server_name = "filesystem-home"
-        if directory_path.startswith("/Users/egs/data/") or directory_path.startswith(
+        if directory_path.startswith(DATA_DIR + "/") or directory_path.startswith(
             "data/"
         ):
             server_name = "filesystem-data"
@@ -640,20 +700,29 @@ def mcp_list_directory(directory_path: str) -> str:
 
         # Convert absolute paths to relative paths for the restricted root
         original_path = directory_path  # Keep for logging
+
         if server_name == "filesystem-home":
-            # The server root is /Users/egs
-            if directory_path == ROOT_DIR:
+            # The server root is ROOT_DIR
+            if directory_path in [ROOT_DIR, ROOT_DIR, "~", "$HOME"]:
                 directory_path = "."  # Root directory
-            elif directory_path.startswith("/Users/egs/"):
-                directory_path = directory_path[10:]  # Remove ROOT_DIR prefix
+            elif directory_path.startswith(ROOT_DIR + "/"):
+                directory_path = directory_path[
+                    len(ROOT_DIR + "/") :
+                ]  # Remove ROOT_DIR prefix
+                if not directory_path:  # If empty after removing prefix
+                    directory_path = "."
             elif directory_path.startswith("~/"):
                 directory_path = directory_path[2:]  # Remove "~/" prefix
             elif directory_path.startswith("/"):
-                return f"Error: Path {directory_path} is outside the accessible directory (/Users/egs)"
+                return f"Error: Path {directory_path} is outside the accessible directory ({ROOT_DIR})"
         else:  # filesystem-data
-            # The server root is /Users/egs/data
-            if directory_path.startswith("/Users/egs/data/"):
-                directory_path = directory_path[16:]  # Remove "/Users/egs/data/" prefix
+            # The server root is DATA_DIR
+            if directory_path.startswith(DATA_DIR + "/"):
+                directory_path = directory_path[
+                    len(DATA_DIR + "/") :
+                ]  # Remove data dir prefix
+                if not directory_path:  # If empty after removing prefix
+                    directory_path = "."
             elif directory_path.startswith("data/"):
                 directory_path = directory_path[5:]  # Remove "data/" prefix
 
@@ -850,10 +919,13 @@ def mcp_shell_command(command: str, timeout: int = 30) -> str:
 
     try:
         # Use subprocess for safe shell command execution
-        import subprocess
-
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=timeout
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
         )
 
         output = f"Command: {command}\nReturn code: {result.returncode}\nStdout: {result.stdout}\nStderr: {result.stderr}"
@@ -994,6 +1066,59 @@ def comprehensive_research(topic: str, max_results: int = 10) -> str:
         return f"Error performing comprehensive research: {str(e)}"
 
 
+@tool
+def create_and_save_file(file_path: str, content: str, create_dirs: bool = True) -> str:
+    """Create directories if needed and save file content. This is the preferred tool for creating new files."""
+    # Handle case where parameters might be JSON strings from LangChain
+    if isinstance(file_path, str) and file_path.startswith("{"):
+        try:
+            params = json.loads(file_path)
+            file_path = params.get("file_path", file_path)
+            content = params.get("content", content)
+            create_dirs = params.get("create_dirs", create_dirs)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not USE_MCP or mcp_client is None:
+        return "MCP is disabled, cannot create file."
+
+    try:
+        # Store original path for logging
+        original_path = file_path
+
+        # Expand ~ to actual home directory
+        if file_path.startswith("~/"):
+            file_path = os.path.expanduser(file_path)
+
+        # Get directory path
+        dir_path = os.path.dirname(file_path)
+
+        # Create directories if they don't exist and create_dirs is True
+        if create_dirs and dir_path and not os.path.exists(dir_path):
+            try:
+                os.makedirs(dir_path, exist_ok=True)
+                logger.info("Created directory: %s", dir_path)
+            except Exception as e:
+                return f"Error creating directory {dir_path}: {str(e)}"
+
+        # Now use the existing mcp_write_file tool
+        result = mcp_write_file.invoke({"file_path": original_path, "content": content})
+
+        # Store the file creation operation in memory
+        if USE_WEAVIATE and vector_store is not None:
+            interaction_text = f"Created file: {original_path}\nContent length: {len(content)} characters\nDirectory created: {create_dirs}"
+            store_interaction.invoke(
+                {"text": interaction_text, "topic": "file_creation"}
+            )
+
+        logger.info("Created and saved file: %s", original_path)
+        return f"Successfully created file: {original_path}\n{result}"
+
+    except Exception as e:
+        logger.error("Error creating and saving file: %s", str(e))
+        return f"Error creating file: {str(e)}"
+
+
 # Define system prompt for the agent
 system_prompt = PromptTemplate(
     template="""You are a helpful personal assistant named "Personal Agent" that learns about the user and provides context-aware responses.
@@ -1060,6 +1185,7 @@ tools = [
     mcp_shell_command,
     mcp_fetch_url,
     comprehensive_research,
+    create_and_save_file,
 ]
 agent = create_react_agent(llm=llm, tools=tools, prompt=system_prompt)
 agent_executor = AgentExecutor(
@@ -1076,31 +1202,176 @@ agent_executor = AgentExecutor(
 def index():
     response = None
     context = None
+    agent_thoughts = []
     if request.method == "POST":
         user_input = request.form.get("query", "")
         topic = request.form.get("topic", "general")
         if user_input:
+            # Add initial thinking state
+            agent_thoughts = [
+                "🤔 Thinking about your request...",
+                "🔍 Searching memory for context...",
+            ]
+
             # Query knowledge base for context
             try:
                 # Call the function directly with proper parameters
-                context = query_knowledge_base.invoke({"query": user_input, "limit": 5})
+                context = query_knowledge_base.invoke(
+                    {"query": user_input, "limit": 3}
+                )  # Reduced from 5 to 3
                 context_str = (
                     "\n".join(context) if context else "No relevant context found."
                 )
-                # Generate response
-                result = agent_executor.invoke(
-                    {"input": user_input, "context": context_str}
-                )
+
+                # Update thoughts after context search
+                if (
+                    context
+                    and context != ["No relevant context found."]
+                    and context != ["Weaviate is disabled, no context available."]
+                ):
+                    agent_thoughts.append("✅ Found relevant context in memory")
+                else:
+                    agent_thoughts.append("📝 No previous context found")
+
+                agent_thoughts.append("🧠 Starting reasoning process...")
+
+                # Generate response and capture verbose output to extract thoughts
+                import io
+                from contextlib import redirect_stderr, redirect_stdout
+
+                # Capture verbose output
+                stdout_capture = io.StringIO()
+                stderr_capture = io.StringIO()
+
+                try:
+                    with redirect_stdout(stdout_capture), redirect_stderr(
+                        stderr_capture
+                    ):
+                        result = agent_executor.invoke(
+                            {"input": user_input, "context": context_str}
+                        )
+
+                    # Parse verbose output for thoughts with better parsing
+                    verbose_output = stdout_capture.getvalue()
+
+                    # Extract thoughts from verbose output with enhanced logic
+                    lines = verbose_output.split("\n")
+                    thought_count = 0
+                    action_count = 0
+                    last_action = None
+
+                    for line in lines:
+                        line = line.strip()
+                        if line.startswith("Thought:"):
+                            thought = line[8:].strip()  # Remove "Thought:" prefix
+                            if thought:
+                                thought_count += 1
+                                # Filter out common generic thoughts but keep meaningful ones
+                                skip_phrases = [
+                                    "i can now",
+                                    "i need to",
+                                    "let me",
+                                    "i'll",
+                                    "i should",
+                                    "i will",
+                                ]
+                                if not any(
+                                    skip in thought.lower() for skip in skip_phrases
+                                ):
+                                    if thought_count <= 4:  # Limit to prevent spam
+                                        agent_thoughts.append(f"💭 {thought}")
+
+                        elif "Action:" in line and not line.startswith("Action Input:"):
+                            action = line.split("Action:")[-1].strip()
+                            if action and action != last_action:  # Avoid duplicates
+                                action_count += 1
+                                last_action = action
+                                # Make tool names more user-friendly
+                                tool_names = {
+                                    "query_knowledge_base": "Searching memory database",
+                                    "mcp_brave_search": "Searching the web",
+                                    "mcp_github_search": "Searching GitHub repositories",
+                                    "mcp_read_file": "Reading file content",
+                                    "mcp_write_file": "Writing to file",
+                                    "mcp_list_directory": "Exploring directory",
+                                    "comprehensive_research": "Conducting comprehensive research",
+                                    "intelligent_file_search": "Smart file analysis",
+                                    "store_interaction": "Saving to memory",
+                                    "mcp_shell_command": "Executing system command",
+                                    "mcp_fetch_url": "Fetching web content",
+                                }
+                                friendly_name = tool_names.get(action, action)
+                                agent_thoughts.append(f"🔧 {friendly_name}")
+
+                        elif "Observation:" in line and action_count > 0:
+                            # Only add completion for actual tool executions
+                            if last_action and not any(
+                                "completed" in thought
+                                for thought in agent_thoughts[-2:]
+                            ):
+                                agent_thoughts.append("✅ Tool execution completed")
+
+                    # Add processing thoughts if we didn't capture much from verbose output
+                    if (
+                        len(
+                            [
+                                t
+                                for t in agent_thoughts
+                                if not t.startswith(("🤔", "🔍", "✅", "📝"))
+                            ]
+                        )
+                        < 3
+                    ):
+                        additional_thoughts = [
+                            "⚡ Processing with AI reasoning",
+                            "🧩 Analyzing problem components",
+                            "📊 Synthesizing information",
+                        ]
+                        for thought in additional_thoughts:
+                            if thought not in agent_thoughts:
+                                agent_thoughts.append(thought)
+
+                    # Add final processing thought
+                    if not any(
+                        "final" in thought.lower() for thought in agent_thoughts
+                    ):
+                        agent_thoughts.append("🎯 Finalizing response")
+
+                except Exception as e:
+                    # Fallback if capture fails
+                    result = agent_executor.invoke(
+                        {"input": user_input, "context": context_str}
+                    )
+                    agent_thoughts.extend(
+                        [
+                            "🔄 Processing your request",
+                            "🛠️ Using available tools",
+                            "⚡ Generating response",
+                        ]
+                    )
+
                 if isinstance(result, dict):
                     response = result.get("output", "No response generated.")
                 else:
                     response = str(result)
+
+                # Remove duplicate final thoughts and add completion
+                agent_thoughts = list(
+                    dict.fromkeys(agent_thoughts)
+                )  # Remove duplicates while preserving order
+                if not any(
+                    "complete" in thought.lower() or "final" in thought.lower()
+                    for thought in agent_thoughts
+                ):
+                    agent_thoughts.append("✨ Response generated successfully")
+
                 # Store interaction AFTER getting response
                 interaction_text = f"User: {user_input}\nAssistant: {response}"
                 store_interaction.invoke({"text": interaction_text, "topic": topic})
             except Exception as e:
                 logger.error("Error processing query: %s", str(e))
                 response = f"Error processing query: {str(e)}"
+                agent_thoughts = [f"❌ Error occurred: {str(e)}"]
             logger.info(
                 "Received query: %s..., Response: %s...",
                 user_input[:50],
@@ -1108,53 +1379,349 @@ def index():
             )
     return render_template_string(
         """
-        <html>
+        <!DOCTYPE html>
+        <html lang="en">
             <head>
-                <title>Personal AI Agent</title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>🤖 Personal AI Agent</title>
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1 { color: #333; }
-                    textarea, input[type="text"] { width: 100%; max-width: 600px; }
-                    input[type="submit"] { margin-top: 10px; padding: 10px 20px; }
-                    .reset-btn { margin-left: 10px; padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; }
-                    .reset-btn:hover { background-color: #c82333; }
-                    .response, .context { margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-                    .context { background-color: #f9f9f9; }
-                    .context ul { list-style-type: none; padding: 0; }
-                    .success-message { margin-top: 20px; padding: 10px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724; }
+                    * { box-sizing: border-box; }
+                    body { 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        margin: 0; 
+                        padding: 20px; 
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        min-height: 100vh;
+                        color: #333;
+                    }
+                    .container {
+                        max-width: 1200px;
+                        margin: 0 auto;
+                        background: white;
+                        border-radius: 15px;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                        overflow: hidden;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                        color: white;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    .header h1 {
+                        margin: 0;
+                        font-size: 2rem;
+                        font-weight: 300;
+                    }
+                    .content {
+                        display: grid;
+                        grid-template-columns: 1fr 400px;
+                        gap: 0;
+                        min-height: 600px;
+                    }
+                    .main-panel {
+                        padding: 30px;
+                    }
+                    .thoughts-panel {
+                        background: #f8f9fa;
+                        border-left: 3px solid #4facfe;
+                        padding: 20px;
+                        overflow-y: auto;
+                        max-height: 600px;
+                    }
+                    .form-group {
+                        margin-bottom: 20px;
+                    }
+                    label {
+                        display: block;
+                        font-weight: 600;
+                        margin-bottom: 5px;
+                        color: #555;
+                    }
+                    textarea, input[type="text"] {
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e1e8ed;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        font-family: inherit;
+                        transition: border-color 0.3s ease;
+                    }
+                    textarea:focus, input[type="text"]:focus {
+                        outline: none;
+                        border-color: #4facfe;
+                        box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+                    }
+                    .button-group {
+                        display: flex;
+                        gap: 10px;
+                        margin-top: 20px;
+                    }
+                    .btn {
+                        padding: 12px 24px;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-size: 14px;
+                        text-decoration: none;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .btn-primary {
+                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                        color: white;
+                    }
+                    .btn-primary:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+                    }
+                    .btn-danger {
+                        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+                        color: white;
+                    }
+                    .btn-danger:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 5px 15px rgba(238, 90, 82, 0.4);
+                    }
+                    .response-section {
+                        margin-top: 30px;
+                        padding: 20px;
+                        background: #f8f9fa;
+                        border-radius: 10px;
+                        border-left: 4px solid #28a745;
+                    }
+                    .response-section h2 {
+                        margin: 0 0 15px 0;
+                        color: #28a745;
+                        font-size: 1.2rem;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .response-content {
+                        white-space: pre-wrap;
+                        line-height: 1.6;
+                        background: white;
+                        padding: 15px;
+                        border-radius: 8px;
+                        border: 1px solid #e1e8ed;
+                    }
+                    .context-section {
+                        margin-top: 20px;
+                        padding: 15px;
+                        background: #e3f2fd;
+                        border-radius: 10px;
+                        border-left: 4px solid #2196f3;
+                    }
+                    .context-section h3 {
+                        margin: 0 0 10px 0;
+                        color: #1976d2;
+                        font-size: 1rem;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .context-item {
+                        background: white;
+                        padding: 10px;
+                        margin: 5px 0;
+                        border-radius: 6px;
+                        border-left: 3px solid #2196f3;
+                        font-size: 0.9rem;
+                        line-height: 1.4;
+                    }
+                    .thoughts-header {
+                        font-weight: 600;
+                        color: #666;
+                        margin-bottom: 15px;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-size: 1.1rem;
+                    }
+                    .thought-item {
+                        background: white;
+                        padding: 10px 15px;
+                        margin: 8px 0;
+                        border-radius: 8px;
+                        border-left: 3px solid #4facfe;
+                        font-size: 0.9rem;
+                        line-height: 1.4;
+                        animation: slideIn 0.3s ease-out;
+                    }
+                    @keyframes slideIn {
+                        from { opacity: 0; transform: translateX(-10px); }
+                        to { opacity: 1; transform: translateX(0); }
+                    }
+                    .empty-thoughts {
+                        text-align: center;
+                        color: #999;
+                        font-style: italic;
+                        padding: 40px 20px;
+                    }
+                    @media (max-width: 768px) {
+                        .content {
+                            grid-template-columns: 1fr;
+                        }
+                        .thoughts-panel {
+                            border-left: none;
+                            border-top: 3px solid #4facfe;
+                            max-height: 300px;
+                        }
+                        body { padding: 10px; }
+                    }
+                    .context-preview {
+                        max-height: 150px;
+                        overflow-y: auto;
+                    }
+                    .context-item-short {
+                        display: -webkit-box;
+                        -webkit-line-clamp: 2;
+                        -webkit-box-orient: vertical;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    .loading-spinner {
+                        display: none;
+                        border: 3px solid #f3f3f3;
+                        border-top: 3px solid #4facfe;
+                        border-radius: 50%;
+                        width: 20px;
+                        height: 20px;
+                        animation: spin 1s linear infinite;
+                        margin-right: 8px;
+                    }
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    .processing-thoughts {
+                        display: none;
+                    }
+                    .btn:disabled {
+                        opacity: 0.6;
+                        cursor: not-allowed;
+                        transform: none !important;
+                    }
                 </style>
+                <script>
+                    function showProgress() {
+                        // Show loading spinner on button
+                        const submitBtn = document.querySelector('.btn-primary');
+                        const spinner = document.querySelector('.loading-spinner');
+                        
+                        if (submitBtn && spinner) {
+                            submitBtn.disabled = true;
+                            spinner.style.display = 'inline-block';
+                            submitBtn.innerHTML = '<div class="loading-spinner" style="display: inline-block;"></div>Processing...';
+                        }
+                        
+                        // Show processing thoughts immediately
+                        const thoughtsPanel = document.querySelector('.thoughts-panel');
+                        if (thoughtsPanel) {
+                            const processingThoughts = [
+                                '🚀 Starting to process your request...',
+                                '🔄 Initializing AI reasoning...',
+                                '📊 Preparing tools and memory access...'
+                            ];
+                            
+                            // Clear existing thoughts
+                            const thoughtsContainer = thoughtsPanel.querySelector('.thoughts-header').parentNode;
+                            const existingThoughts = thoughtsContainer.querySelectorAll('.thought-item, .empty-thoughts');
+                            existingThoughts.forEach(item => item.remove());
+                            
+                            // Add processing thoughts
+                            processingThoughts.forEach((thought, index) => {
+                                setTimeout(() => {
+                                    const thoughtItem = document.createElement('div');
+                                    thoughtItem.className = 'thought-item';
+                                    thoughtItem.textContent = thought;
+                                    thoughtsContainer.appendChild(thoughtItem);
+                                }, index * 500); // Stagger the thoughts
+                            });
+                        }
+                        
+                        return true; // Allow form to submit
+                    }
+                </script>
             </head>
             <body>
-                <h1>Personal AI Agent</h1>
-                <form method="post">
-                    <label for="query">Query:</label><br>
-                    <textarea name="query" rows="5" cols="50" placeholder="Ask me anything..."></textarea><br>
-                    <label for="topic">Topic:</label><br>
-                    <input type="text" name="topic" value="general" placeholder="e.g., programming, personal, etc."><br>
-                    <input type="submit" value="Submit">
-                    <button type="button" class="reset-btn" onclick="if(confirm('Are you sure you want to clear all stored knowledge? This action cannot be undone.')) { window.location.href='/clear'; }">Reset Knowledge Base</button>
-                </form>
-                {% if response %}
-                    <div class="response">
-                        <h2>Response:</h2>
-                        <p style="white-space: pre-wrap;">{{ response }}</p>
+                <div class="container">
+                    <div class="header">
+                        <h1>🤖 Personal AI Agent</h1>
+                        <p style="margin: 5px 0 0 0; opacity: 0.9;">Your intelligent assistant with memory, research, and reasoning capabilities</p>
                     </div>
-                {% endif %}
-                {% if context and context != ['No relevant context found.'] %}
-                    <div class="context">
-                        <h2>Context Used:</h2>
-                        <ul>
-                        {% for item in context %}
-                            <li style="margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;">{{ item }}</li>
-                        {% endfor %}
-                        </ul>
+                    
+                    <div class="content">
+                        <div class="main-panel">
+                            <form method="post" onsubmit="return showProgress()">
+                                <div class="form-group">
+                                    <label for="query">💬 Ask me anything:</label>
+                                    <textarea name="query" id="query" rows="4" placeholder="e.g., Research Python 3.12 features, help me write a script, remember my preferences..."></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="topic">🏷️ Topic Category:</label>
+                                    <input type="text" name="topic" id="topic" value="general" placeholder="e.g., programming, personal, research, etc.">
+                                </div>
+                                
+                                <div class="button-group">
+                                    <button type="submit" class="btn btn-primary">
+                                        <div class="loading-spinner"></div>
+                                        🚀 Ask Agent
+                                    </button>
+                                    <button type="button" class="btn btn-danger" onclick="if(confirm('⚠️ Are you sure you want to clear all stored knowledge? This action cannot be undone.')) { window.location.href='/clear'; }">
+                                        🗑️ Reset Knowledge
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            {% if response %}
+                                <div class="response-section">
+                                    <h2>🎯 Agent Response</h2>
+                                    <div class="response-content">{{ response }}</div>
+                                </div>
+                            {% endif %}
+                            
+                            {% if context and context != ['No relevant context found.'] and context != ['Weaviate is disabled, no context available.'] %}
+                                <div class="context-section">
+                                    <h3>🧠 Memory Context Used</h3>
+                                    <div class="context-preview">
+                                        {% for item in context %}
+                                            <div class="context-item context-item-short">{{ item }}</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="thoughts-panel">
+                            <div class="thoughts-header">
+                                🧠 Agent Thoughts
+                            </div>
+                            
+                            {% if agent_thoughts %}
+                                {% for thought in agent_thoughts %}
+                                    <div class="thought-item">{{ thought }}</div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="empty-thoughts">
+                                    💭 Agent thoughts will appear here during processing...
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
-                {% endif %}
+                </div>
             </body>
         </html>
         """,
         response=response,
         context=context,
+        agent_thoughts=agent_thoughts,
     )
 
 
@@ -1166,23 +1733,87 @@ def clear_kb():
         logger.info("Knowledge base cleared via web interface: %s", result)
         return render_template_string(
             """
-            <html>
+            <!DOCTYPE html>
+            <html lang="en">
                 <head>
-                    <title>Personal AI Agent - Knowledge Base Cleared</title>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>🤖 Personal AI Agent - Knowledge Cleared</title>
                     <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        h1 { color: #333; }
-                        .success-message { margin-top: 20px; padding: 10px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724; }
-                        .back-btn { margin-top: 20px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; display: inline-block; }
-                        .back-btn:hover { background-color: #0056b3; }
+                        * { box-sizing: border-box; }
+                        body { 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            margin: 0; 
+                            padding: 20px; 
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            min-height: 100vh;
+                            color: #333;
+                        }
+                        .container {
+                            max-width: 600px;
+                            margin: 50px auto;
+                            background: white;
+                            border-radius: 15px;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                            overflow: hidden;
+                            text-align: center;
+                        }
+                        .header {
+                            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                            color: white;
+                            padding: 30px;
+                        }
+                        .header h1 {
+                            margin: 0;
+                            font-size: 1.8rem;
+                            font-weight: 300;
+                        }
+                        .content {
+                            padding: 40px 30px;
+                        }
+                        .success-icon {
+                            font-size: 4rem;
+                            margin-bottom: 20px;
+                        }
+                        .success-message {
+                            background: #d4edda;
+                            border: 2px solid #c3e6cb;
+                            border-radius: 10px;
+                            padding: 20px;
+                            margin: 20px 0;
+                            color: #155724;
+                            font-weight: 500;
+                        }
+                        .btn {
+                            display: inline-block;
+                            padding: 12px 24px;
+                            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                            color: white;
+                            text-decoration: none;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            transition: all 0.3s ease;
+                            margin-top: 20px;
+                        }
+                        .btn:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+                        }
                     </style>
                 </head>
                 <body>
-                    <h1>Personal AI Agent</h1>
-                    <div class="success-message">
-                        <strong>Success!</strong> {{ result }}
+                    <div class="container">
+                        <div class="header">
+                            <h1>🗑️ Knowledge Base Cleared</h1>
+                        </div>
+                        <div class="content">
+                            <div class="success-icon">✅</div>
+                            <div class="success-message">
+                                <strong>Success!</strong> {{ result }}
+                            </div>
+                            <a href="/" class="btn">🏠 Back to Agent</a>
+                        </div>
                     </div>
-                    <a href="/" class="back-btn">Back to Agent</a>
                 </body>
             </html>
             """,
@@ -1192,23 +1823,87 @@ def clear_kb():
         logger.error("Error clearing knowledge base via web interface: %s", str(e))
         return render_template_string(
             """
-            <html>
+            <!DOCTYPE html>
+            <html lang="en">
                 <head>
-                    <title>Personal AI Agent - Error</title>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>🤖 Personal AI Agent - Error</title>
                     <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        h1 { color: #333; }
-                        .error-message { margin-top: 20px; padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; color: #721c24; }
-                        .back-btn { margin-top: 20px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; display: inline-block; }
-                        .back-btn:hover { background-color: #0056b3; }
+                        * { box-sizing: border-box; }
+                        body { 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            margin: 0; 
+                            padding: 20px; 
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            min-height: 100vh;
+                            color: #333;
+                        }
+                        .container {
+                            max-width: 600px;
+                            margin: 50px auto;
+                            background: white;
+                            border-radius: 15px;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                            overflow: hidden;
+                            text-align: center;
+                        }
+                        .header {
+                            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+                            color: white;
+                            padding: 30px;
+                        }
+                        .header h1 {
+                            margin: 0;
+                            font-size: 1.8rem;
+                            font-weight: 300;
+                        }
+                        .content {
+                            padding: 40px 30px;
+                        }
+                        .error-icon {
+                            font-size: 4rem;
+                            margin-bottom: 20px;
+                        }
+                        .error-message {
+                            background: #f8d7da;
+                            border: 2px solid #f5c6cb;
+                            border-radius: 10px;
+                            padding: 20px;
+                            margin: 20px 0;
+                            color: #721c24;
+                            font-weight: 500;
+                        }
+                        .btn {
+                            display: inline-block;
+                            padding: 12px 24px;
+                            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                            color: white;
+                            text-decoration: none;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            transition: all 0.3s ease;
+                            margin-top: 20px;
+                        }
+                        .btn:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+                        }
                     </style>
                 </head>
                 <body>
-                    <h1>Personal AI Agent</h1>
-                    <div class="error-message">
-                        <strong>Error!</strong> Failed to clear knowledge base: {{ error }}
+                    <div class="container">
+                        <div class="header">
+                            <h1>❌ Error Occurred</h1>
+                        </div>
+                        <div class="content">
+                            <div class="error-icon">⚠️</div>
+                            <div class="error-message">
+                                <strong>Error!</strong> Failed to clear knowledge base: {{ error }}
+                            </div>
+                            <a href="/" class="btn">🏠 Back to Agent</a>
+                        </div>
                     </div>
-                    <a href="/" class="back-btn">Back to Agent</a>
                 </body>
             </html>
             """,
