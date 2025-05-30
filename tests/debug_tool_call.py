@@ -3,9 +3,12 @@
 Debug script to understand what's happening with tool calls.
 """
 
+import os
 import sys
 
-sys.path.append(".")
+# Add parent directory to path to import personal_agent
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_dir)
 
 from personal_agent import agent_executor, llm, mcp_write_file
 

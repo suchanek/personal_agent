@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 import weaviate.classes.config as wvc
+from dotenv import load_dotenv
 from flask import Flask, render_template_string, request
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import PromptTemplate
@@ -25,6 +26,10 @@ from urllib3.util import parse_url
 from weaviate import WeaviateClient
 from weaviate.connect import ConnectionParams
 from weaviate.util import generate_uuid5
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 # Suppress Pydantic deprecation warnings from Ollama
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
@@ -75,13 +80,19 @@ MCP_SERVERS = {
         "command": "npx",
         "args": ["--yes", "@modelcontextprotocol/server-github"],
         "description": "GitHub repository operations and code search",
-        "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": ""},  # Set your token here
+        "env": {
+            "GITHUB_PERSONAL_ACCESS_TOKEN": os.getenv(
+                "GITHUB_PERSONAL_ACCESS_TOKEN", ""
+            )
+        },
     },
     "brave-search": {
         "command": "npx",
         "args": ["--yes", "@modelcontextprotocol/server-brave-search"],
         "description": "Web search for research and technical information",
-        "env": {"BRAVE_API_KEY": ""},  # Set your API key here
+        "env": {
+            "BRAVE_API_KEY": os.getenv("BRAVE_API_KEY", "")
+        },  # Set your API key here
     },
     "puppeteer": {
         "command": "npx",
@@ -118,6 +129,11 @@ class SimpleMCPClient:
             elif server_name == "filesystem-data":
                 cwd = DATA_DIR
 
+            # Prepare environment variables
+            env = os.environ.copy()  # Start with current environment
+            if "env" in config:
+                env.update(config["env"])  # Add server-specific env vars
+
             process = subprocess.Popen(
                 [config["command"]] + config["args"],
                 stdin=subprocess.PIPE,
@@ -126,6 +142,7 @@ class SimpleMCPClient:
                 text=True,
                 bufsize=0,
                 cwd=cwd,
+                env=env,  # Pass environment variables
             )
 
             self.active_servers[server_name] = {"process": process, "config": config}
@@ -219,6 +236,26 @@ class SimpleMCPClient:
             )
 
         return f"Error calling tool {tool_name}"
+
+    def list_tools_sync(self, server_name: str) -> List[Dict[str, Any]]:
+        """List available tools on an MCP server synchronously."""
+        try:
+            request = {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
+
+            response = self._send_request_sync(server_name, request)
+            if response and response.get("result"):
+                tools = response["result"].get("tools", [])
+                logger.debug(
+                    "Available tools on %s: %s",
+                    server_name,
+                    [tool.get("name") for tool in tools],
+                )
+                return tools
+
+        except Exception as e:
+            logger.error("Error listing tools on server %s: %s", server_name, e)
+
+        return []
 
     def stop_server_sync(self, server_name: str) -> bool:
         """Stop a specific MCP server."""
@@ -834,13 +871,49 @@ def mcp_github_search(query: str, repo: str = "") -> str:
             if not start_result:
                 return "Failed to start MCP GitHub server. Make sure GITHUB_PERSONAL_ACCESS_TOKEN is set."
 
-        # Prepare parameters for GitHub search
-        params = {"query": query}
-        if repo:
-            params["repo"] = repo
+        # Determine which search tool to use based on query characteristics
+        tool_name = "search_repositories"  # Default
+        params = {}
 
-        # Call GitHub search tool
-        result = mcp_client.call_tool_sync(server_name, "search_repositories", params)
+        # If searching within a specific repo, use search_code for code-specific queries
+        if repo and any(
+            keyword in query.lower()
+            for keyword in [
+                "language:",
+                "def ",
+                "class ",
+                "function",
+                "import ",
+                "const ",
+                "var ",
+            ]
+        ):
+            tool_name = "search_code"
+            # For search_code, we need to format the query differently
+            if repo:
+                params = {"q": f"repo:{repo} {query}"}
+            else:
+                params = {"q": query}
+        elif any(
+            keyword in query.lower()
+            for keyword in ["issue", "bug", "feature", "pull request", "pr"]
+        ):
+            tool_name = "search_issues"
+            if repo:
+                params = {"q": f"repo:{repo} {query}"}
+            else:
+                params = {"q": query}
+        else:
+            # Default repository search
+            if repo:
+                params = {"query": f"repo:{repo} {query}"}
+            else:
+                params = {"query": query}
+
+        logger.debug("Using GitHub tool: %s with params: %s", tool_name, params)
+
+        # Call the appropriate GitHub search tool
+        result = mcp_client.call_tool_sync(server_name, tool_name, params)
 
         # Store the GitHub search operation in memory for context
         if USE_WEAVIATE and vector_store is not None:
