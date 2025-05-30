@@ -140,9 +140,9 @@ ollama pull qwen2.5:7b-instruct
 ollama pull nomic-embed-text
 ```
 
-### 5. Configure API Keys (Optional but Recommended)
+### 5. Configure Environment Variables (Required)
 
-For full functionality, set up your API keys using environment variables:
+For proper operation, you **must** configure filesystem paths and optionally set up API keys for enhanced functionality:
 
 **Method 1: Using .env file (Recommended)**
 
@@ -155,6 +155,14 @@ For full functionality, set up your API keys using environment variables:
 2. Edit `.env` file and configure your settings:
 
    ```bash
+   # REQUIRED: Filesystem path configuration
+   # ROOT_DIR: Your home directory (used by filesystem MCP server)
+   ROOT_DIR=/Users/your_username
+   
+   # DATA_DIR: Directory for vector database storage
+   DATA_DIR=/Users/your_username/data
+   
+   # OPTIONAL: API keys for enhanced functionality
    # GitHub Personal Access Token
    # Get from: https://github.com/settings/tokens
    GITHUB_PERSONAL_ACCESS_TOKEN=your_github_token_here
@@ -162,27 +170,24 @@ For full functionality, set up your API keys using environment variables:
    # Brave Search API Key  
    # Get from: https://api.search.brave.com/app/keys
    BRAVE_API_KEY=your_brave_api_key_here
-   
-   # Customize directories for your system
-   # ROOT_DIR: Your home directory (used by filesystem MCP server)
-   ROOT_DIR=/Users/your_username
-   
-   # DATA_DIR: Directory for vector database storage
-   DATA_DIR=/Users/your_username/data
    ```
 
 **Method 2: Export environment variables**
 
 ```bash
+# REQUIRED: Filesystem path configuration
+# ROOT_DIR: Your home directory (used by filesystem MCP server)
+export ROOT_DIR="/Users/your_username"
+
+# DATA_DIR: Directory for vector database storage
+export DATA_DIR="/Users/your_username/data"
+
+# OPTIONAL: API keys for enhanced functionality
 # GitHub Personal Access Token (for repository search)
 export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 
 # Brave Search API Key (for web search)  
 export BRAVE_API_KEY="your_api_key_here"
-
-# Customize directories for your system
-export ROOT_DIR="/Users/your_username"
-export DATA_DIR="/Users/your_username/data"
 ```
 
 **Getting API Keys:**
@@ -195,10 +200,10 @@ export DATA_DIR="/Users/your_username/data"
   1. Visit <https://api.search.brave.com/app/keys>
   2. Create an account and generate an API key
 
-**Directory Configuration:**
+**Directory Configuration (REQUIRED):**
 
-- **ROOT_DIR**: Set this to your home directory (e.g., `/Users/your_username` on macOS, `/home/your_username` on Linux). This is where the filesystem MCP server will have access.
-- **DATA_DIR**: Set this to where you want the vector database data stored (e.g., `/Users/your_username/data`). This directory will be created automatically if it doesn't exist.
+- **ROOT_DIR**: **REQUIRED** - Set this to your home directory (e.g., `/Users/your_username` on macOS, `/home/your_username` on Linux). This is where the filesystem MCP server will have access. The personal agent will not function properly without this configuration.
+- **DATA_DIR**: **REQUIRED** - Set this to where you want the vector database data stored (e.g., `/Users/your_username/data`). This directory will be created automatically if it doesn't exist.
 
 ### 6. Start Weaviate Database
 
@@ -416,12 +421,24 @@ Each tool integrates with the memory system to provide context-aware results and
 
 ## ⚙️ Configuration
 
-### Environment Variables
+### Required Environment Variables
 
 ```bash
-# Optional: Override default configurations
+# REQUIRED: Filesystem paths - must be configured in .env file
+ROOT_DIR="/Users/your_username"        # Your home directory
+DATA_DIR="/Users/your_username/data"   # Vector database storage
+```
+
+### Optional Environment Variables
+
+```bash
+# Optional: Override default service URLs
 export WEAVIATE_URL="http://localhost:8080"
 export OLLAMA_URL="http://localhost:11434"
+
+# Optional: API keys for enhanced functionality  
+export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
+export BRAVE_API_KEY="your_api_key_here"
 ```
 
 ### Memory Management
