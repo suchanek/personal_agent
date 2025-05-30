@@ -465,30 +465,58 @@ mcphost -m ollama:qwen2.5 --config mcp.json
 
 ```text
 personal_agent/
-├── personal_agent.py         # Main application with 12 integrated tools
-├── tests/                    # Comprehensive test suite
-│   ├── __init__.py          # Test package initializer
+├── src/                      # Source code directory
+│   └── personal_agent/       # Main package
+│       ├── __init__.py
+│       ├── main.py          # Application entry point
+│       ├── config/          # Configuration modules
+│       │   ├── __init__.py
+│       │   ├── mcp_servers.py # MCP server configurations
+│       │   └── settings.py   # Application settings
+│       ├── core/            # Core functionality
+│       │   ├── __init__.py
+│       │   ├── agent.py     # LangChain agent setup
+│       │   ├── mcp_client.py # MCP client implementation
+│       │   └── memory.py    # Weaviate memory management
+│       ├── tools/           # Tool implementations
+│       │   ├── __init__.py
+│       │   ├── filesystem.py # File system operations
+│       │   ├── memory_tools.py # Knowledge base tools
+│       │   ├── research.py  # Comprehensive research tool
+│       │   ├── system.py    # Shell command execution
+│       │   └── web.py       # Web search and GitHub tools
+│       ├── utils/           # Utility modules
+│       │   ├── __init__.py
+│       │   └── cleanup.py   # Resource cleanup and logging
+│       └── web/             # Web interface
+│           ├── __init__.py
+│           └── interface.py # Flask web application
+├── tests/                   # Comprehensive test suite (20+ files)
+│   ├── __init__.py
+│   ├── run_tests.py         # Test runner with categories
 │   ├── test_tools.py        # Tool verification script  
-│   ├── test_mcp_availability.py # MCP server testing script
-│   ├── test_comprehensive_research.py # Research functionality tests
-│   ├── test_cleanup_improved.py # Enhanced cleanup tests
-│   ├── test_cleanup.py      # Basic cleanup tests
-│   ├── test_mcp.py          # MCP communication tests
-│   ├── test_github.py       # GitHub MCP tool functionality tests (7 tests)
+│   ├── test_mcp_availability.py # MCP server testing
+│   ├── test_github.py       # GitHub integration tests (7 tests)
+│   ├── test_comprehensive_research.py # Research functionality
+│   ├── test_agent_init.py   # System initialization tests
+│   ├── test_refactored_system.py # Modular architecture tests
+│   ├── debug_github_tools.py # GitHub MCP tool discovery
 │   ├── debug_github_direct.py # Direct GitHub API testing
-│   ├── debug_github_tools.py # GitHub MCP server tool discovery
-│   └── debug_tool_call.py   # General MCP tool call debugging
-├── pyproject.toml           # Poetry dependencies & scripts
-├── docker-compose.yml       # Weaviate setup
-├── mcp.json                # MCP server configurations (with env vars)
-├── mcp.json.template       # Template without sensitive data
-├── .env.example            # Example environment variables
-├── .env                    # Your actual API keys (excluded from git)
-├── README.md               # This documentation
-├── FIX_SUMMARY.md          # Comprehensive fix documentation
-├── scripts/                # Installation and utility scripts
+│   └── debug_tool_call.py   # General MCP debugging
+├── scripts/                 # Installation and utility scripts
 │   ├── __init__.py        
-│   └── install_mcp.py     # Automated MCP server installation
+│   └── install_mcp.py      # Automated MCP server installation
+├── old/                     # Legacy code (archived)
+│   └── personal_agent.py   # Original monolithic version
+├── pyproject.toml          # Poetry dependencies & scripts
+├── docker-compose.yml      # Weaviate database setup
+├── mcp.json               # MCP server configurations (with env vars)
+├── mcp.json.template      # Template without sensitive data
+├── .env.example           # Example environment variables
+├── .env                   # Your actual API keys (excluded from git)
+├── README.md              # This documentation
+├── PROJECT_SUMMARY.md     # Project overview and status
+├── FIX_SUMMARY.md         # Comprehensive fix documentation
 └── .venv/                 # Virtual environment
 ```
 
@@ -616,9 +644,12 @@ personal_agent/
 6. **Poetry Script Issues**
 
    ```bash
-   # If Poetry scripts don't work, run directly
-   python personal_agent.py
-   python test_tools.py
+   # If Poetry scripts don't work, run directly using Python module
+   cd /Users/egs/repos/personal_agent && source .venv/bin/activate
+   python -m src.personal_agent.main
+   
+   # Or run test tools directly
+   python tests/test_tools.py
    
    # Ensure Poetry is properly installed
    poetry install
@@ -655,18 +686,14 @@ def my_custom_tool(param: str) -> str:
     # Tool implementation
     return "Tool result"
 
-# Add to tools list in personal_agent.py
-tools = [
-    store_interaction, 
-    query_knowledge_base, 
-    my_custom_tool,  # Add your new tool here
-    # ...existing tools...
-]
+# Add to the appropriate tools module in src/personal_agent/tools/
+# For example, in src/personal_agent/tools/web.py for web-related tools
+# Then update src/personal_agent/tools/__init__.py to include it
 ```
 
 ### Customizing Prompts
 
-Edit the `system_prompt` in `personal_agent.py` to modify agent behavior.
+Edit the `system_prompt` in `src/personal_agent/core/agent.py` to modify agent behavior.
 
 ### Database Schema
 
@@ -680,8 +707,8 @@ Weaviate collection structure:
 
 1. Install the MCP server: `npm install -g @modelcontextprotocol/server-<name>`
 2. Add configuration to `mcp.json`
-3. Create corresponding `@tool` function in `personal_agent.py`
-4. Add tool to the tools list
+3. Create corresponding `@tool` function in the appropriate module under `src/personal_agent/tools/`
+4. Update `src/personal_agent/tools/__init__.py` to include the new tool
 
 ## 📄 License
 
