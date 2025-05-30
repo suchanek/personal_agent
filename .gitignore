@@ -10,7 +10,6 @@ __pycache__/
 .env
 .env.local
 .env.*.local
-mcp.json
 
 # Distribution / packaging
 .Python

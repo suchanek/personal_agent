@@ -51,7 +51,10 @@ personal_agent/
 │   └── test_tools.py         # General tools tests
 ├── FIX_SUMMARY.md            # This documentation
 ├── README.md                 # Project documentation
-├── mcp.json.template         # MCP server configuration template
+├── old/                      # Legacy files
+│   ├── mcp.json             # Legacy MCP server configuration
+│   ├── mcp.json.template    # Legacy MCP server configuration template
+│   └── personal_agent.py    # Original monolithic version
 └── .env.example             # Environment variables template
 ```
 

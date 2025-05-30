@@ -99,12 +99,13 @@ def print_summary(results: Dict[str, bool]) -> None:
     if len(successful) == len(results):
         print("\n🎉 All MCP servers installed successfully!")
         print(
-            "\n🔑 Optional: Configure API keys in mcp.json for enhanced functionality:"
+            "\n🔑 Optional: Configure API keys in .env file for enhanced functionality:"
         )
-        print("   • GitHub Personal Access Token (for repository search)")
-        print("   • Brave Search API Key (for web search)")
+        print("   • GITHUB_PERSONAL_ACCESS_TOKEN (for repository search)")
+        print("   • BRAVE_API_KEY (for web search)")
+        print("   • See .env.example for complete configuration options")
         print("\n🧪 Test your installation:")
-        print("   poetry run test-mcp-servers")
+        print("   poetry run test-tools")
     else:
         print(f"\n⚠️  {len(failed)}/{len(results)} servers failed to install")
 
