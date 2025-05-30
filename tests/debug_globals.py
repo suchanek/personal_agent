@@ -6,7 +6,7 @@ import os
 import sys
 
 # Add the src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from personal_agent.config import USE_MCP, USE_WEAVIATE, get_mcp_servers
 from personal_agent.core import SimpleMCPClient, setup_weaviate

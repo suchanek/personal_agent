@@ -19,6 +19,69 @@ store_interaction = None
 logger = None
 
 
+def _sanitize_github_output(result: str) -> str:
+    """Sanitize GitHub search output to prevent LangChain parsing issues."""
+    if not result:
+        return result
+
+    try:
+        # If it's valid JSON, parse and summarize to prevent large output issues
+        if result.strip().startswith("{") and result.strip().endswith("}"):
+            import json
+
+            parsed = json.loads(result)
+
+            # Create a more concise summary for LangChain
+            if isinstance(parsed, dict) and "items" in parsed:
+                total_count = parsed.get("total_count", 0)
+                items = parsed.get("items", [])
+
+                summary = {"total_count": total_count, "found_repositories": []}
+
+                # Limit to first 5 results to prevent output size issues
+                for item in items[:5]:
+                    repo_info = {
+                        "name": item.get("full_name", item.get("name", "Unknown")),
+                        "description": (
+                            item.get("description", "")[:200]
+                            if item.get("description")
+                            else ""
+                        ),
+                        "url": item.get("html_url", item.get("url", "")),
+                        "stars": item.get("stargazers_count", 0),
+                        "language": item.get("language", ""),
+                        "updated": item.get("updated_at", ""),
+                    }
+                    summary["found_repositories"].append(repo_info)
+
+                # Return formatted summary instead of raw JSON
+                result_text = f"Found {total_count} repositories:\n\n"
+                for repo in summary["found_repositories"]:
+                    result_text += f"• {repo['name']}\n"
+                    if repo["description"]:
+                        result_text += f"  Description: {repo['description']}\n"
+                    if repo["stars"]:
+                        result_text += f"  Stars: {repo['stars']}\n"
+                    if repo["language"]:
+                        result_text += f"  Language: {repo['language']}\n"
+                    result_text += f"  URL: {repo['url']}\n\n"
+
+                return result_text.strip()
+
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        if logger:
+            logger.debug(f"Could not parse GitHub result as JSON: {e}")
+
+    # Fallback: truncate if too long and remove problematic characters
+    if len(result) > 10000:
+        result = result[:10000] + "... (truncated)"
+
+    # Remove or escape problematic characters that might confuse LangChain
+    result = result.replace("\r\n", "\n").replace("\r", "\n")
+
+    return result
+
+
 @tool
 def mcp_github_search(query: str, repo: str = "") -> str:
     """Search GitHub repositories or specific repo for code, issues, or documentation."""
@@ -86,6 +149,9 @@ def mcp_github_search(query: str, repo: str = "") -> str:
 
         # Call the appropriate GitHub search tool
         result = mcp_client.call_tool_sync(server_name, tool_name, params)
+
+        # Sanitize the result to prevent LangChain parsing issues
+        result = _sanitize_github_output(result)
 
         # Store the GitHub search operation in memory for context
         if USE_WEAVIATE and vector_store is not None:

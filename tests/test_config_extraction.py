@@ -2,8 +2,9 @@
 """Test the new configuration structure."""
 
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/Users/egs/repos/personal_agent/src")
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent.config import (
     DATA_DIR,
