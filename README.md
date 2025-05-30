@@ -465,8 +465,8 @@ The agent automatically:
 Included MCP configuration for filesystem access:
 
 ```bash
-# Use with MCP-compatible tools
-mcphost -m ollama:qwen2.5 --config mcp.json
+# MCP servers are configured internally in src/personal_agent/config/mcp_servers.py
+# Configure API keys in .env file for enhanced functionality
 ```
 
 ## 📁 Project Structure
@@ -515,11 +515,11 @@ personal_agent/
 │   ├── __init__.py        
 │   └── install_mcp.py      # Automated MCP server installation
 ├── old/                     # Legacy code (archived)
-│   └── personal_agent.py   # Original monolithic version
+│   ├── personal_agent.py   # Original monolithic version
+│   ├── mcp.json            # Legacy MCP configuration
+│   └── mcp.json.template   # Legacy MCP template
 ├── pyproject.toml          # Poetry dependencies & scripts
 ├── docker-compose.yml      # Weaviate database setup
-├── mcp.json               # MCP server configurations (with env vars)
-├── mcp.json.template      # Template without sensitive data
 ├── .env.example           # Example environment variables
 ├── .env                   # Your actual API keys (excluded from git)
 ├── README.md              # This documentation
@@ -528,12 +528,12 @@ personal_agent/
 └── .venv/                 # Virtual environment
 ```
 
-### Security Notes
+### Configuration Notes
 
-- `mcp.json` contains environment variable placeholders (e.g., `${GITHUB_PERSONAL_ACCESS_TOKEN}`)
-- `mcp.json.template` is the safe template version for sharing
-- `.env` contains your actual API keys and is excluded from git
+- MCP servers are configured internally in `src/personal_agent/config/mcp_servers.py`
+- Environment variables (API keys) are loaded from `.env` file
 - `.env.example` shows what environment variables are needed
+- Legacy `mcp.json` files are archived in `old/` directory
 
 ## 📦 Dependencies
 
@@ -714,7 +714,7 @@ Weaviate collection structure:
 ### Adding New MCP Servers
 
 1. Install the MCP server: `npm install -g @modelcontextprotocol/server-<name>`
-2. Add configuration to `mcp.json`
+2. Add configuration to `src/personal_agent/config/mcp_servers.py` in the `MCP_SERVERS` dictionary
 3. Create corresponding `@tool` function in the appropriate module under `src/personal_agent/tools/`
 4. Update `src/personal_agent/tools/__init__.py` to include the new tool
 

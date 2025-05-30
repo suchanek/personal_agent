@@ -6,7 +6,18 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Dict, List, Tuple
+
+# Add src to path so we can import from personal_agent
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+try:
+    from personal_agent.config.mcp_servers import MCP_SERVERS
+except ImportError as e:
+    print(f"❌ Failed to import MCP server configurations: {e}")
+    print("Make sure you're running this from the project root directory")
+    sys.exit(1)
 
 
 # Load environment variables from .env file if it exists
@@ -23,17 +34,8 @@ def load_env_file():
 
 
 def load_mcp_config() -> Dict[str, Dict]:
-    """Load MCP server configurations from mcp.json."""
-    try:
-        with open("mcp.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-            return config.get("mcpServers", {})
-    except FileNotFoundError:
-        print("❌ mcp.json file not found")
-        return {}
-    except json.JSONDecodeError:
-        print("❌ Invalid JSON in mcp.json")
-        return {}
+    """Load MCP server configurations from mcp_servers.py."""
+    return MCP_SERVERS
 
 
 def test_mcp_server(
@@ -119,7 +121,7 @@ def main():
     # Load environment variables from .env file
     load_env_file()
 
-    # Load server configurations from mcp.json
+    # Load server configurations from mcp_servers.py
     mcp_configs = load_mcp_config()
 
     if not mcp_configs:
@@ -145,7 +147,7 @@ def main():
     # Test servers that don't require API tokens
     for server_name in no_token_servers:
         if server_name not in mcp_configs:
-            print(f"❌ {server_name}: Not found in mcp.json")
+            print(f"❌ {server_name}: Not found in MCP configuration")
             continue
 
         config = mcp_configs[server_name]
@@ -187,7 +189,7 @@ def main():
     # Test API servers with their configured tokens
     for server_name in api_servers:
         if server_name not in mcp_configs:
-            print(f"❌ {server_name}: Not found in mcp.json")
+            print(f"❌ {server_name}: Not found in MCP configuration")
             continue
 
         config = mcp_configs[server_name]
@@ -267,8 +269,8 @@ def main():
         print()
 
     print("🔑 API Key Configuration:")
-    print("   • GitHub: Configure GITHUB_PERSONAL_ACCESS_TOKEN in mcp.json")
-    print("   • Brave Search: Configure BRAVE_API_KEY in mcp.json")
+    print("   • GitHub: Configure GITHUB_PERSONAL_ACCESS_TOKEN in .env file")
+    print("   • Brave Search: Configure BRAVE_API_KEY in .env file")
 
     if available_count == total_tested:
         print("🎉 All MCP servers are available and working!")
