@@ -1,6 +1,7 @@
 """Memory and vector store operations."""
 
 import logging
+import os
 import time
 from typing import Optional
 
@@ -72,9 +73,17 @@ def setup_weaviate() -> bool:
         grpc_secure=parsed_url.scheme == "https",
     )
 
-    # Initialize Weaviate client
+    # Initialize Weaviate client !!!
     try:
-        weaviate_client = WeaviateClient(connection_params, skip_init_checks=True)
+        weaviate_client = WeaviateClient(
+            connection_params,
+            skip_init_checks=True,
+            additional_headers={
+                "X-OpenAI-Api-Key": os.environ[
+                    "OPENAI_API_KEY"
+                ]  # Add inference API keys as needed
+            },
+        )
         weaviate_client.connect()  # Explicitly connect
         collection_name = "UserKnowledgeBase"
 
@@ -88,7 +97,10 @@ def setup_weaviate() -> bool:
                     wvc.Property(name="timestamp", data_type=wvc.DataType.DATE),
                     wvc.Property(name="topic", data_type=wvc.DataType.TEXT),
                 ],
-                vectorizer_config=wvc.Configure.Vectorizer.none(),
+                vectorizer_config=wvc.Configure.Vectorizer.text2vec_ollama(
+                    api_endpoint="http://host.docker.internal:11434",
+                    model="nomic-embed-text",
+                ),
             )
     except ImportError as e:
         logger.error("Import error initializing Weaviate client or collection: %s", e)

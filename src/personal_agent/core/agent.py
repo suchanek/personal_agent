@@ -30,11 +30,15 @@ Use the following format:
 Question: the input question you must answer
 Thought: you should always think about what to do
 Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
+Action Input: the input to the action as valid JSON (e.g., {{"param1": "value1", "param2": "value2"}})
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
 Final Answer: the final answer to the original input question
+
+IMPORTANT: Action Input must be valid JSON format. For example:
+- Correct: {{"file_path": "~/test.txt", "content": "Hello world"}}
+- Incorrect: file_path = '~/test.txt', content = '''Hello world'''
 
 When storing information, always use a relevant topic to categorize it for better retrieval.
 When working with files, prefer using absolute paths and be careful about file permissions.

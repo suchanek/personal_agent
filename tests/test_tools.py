@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# pylint: disable=C0415
+
 """Test script to check if all tools are properly loaded."""
 
 import os

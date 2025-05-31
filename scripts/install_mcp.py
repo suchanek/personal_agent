@@ -3,7 +3,7 @@
 
 import subprocess
 import sys
-from typing import Any, Dict, List
+from typing import Dict, List
 
 
 def run_command(command: List[str], description: str) -> bool:
