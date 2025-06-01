@@ -18,6 +18,7 @@ rich = "^14.0.0"
 python-dotenv = "^1.1.0"
 smolagents = "^1.17.0"
 litellm = "^1.71.3"
+markdownify = "^1.1.0"
 
 [tool.poetry.scripts]
 personal-agent = "src.personal_agent.main:main"
