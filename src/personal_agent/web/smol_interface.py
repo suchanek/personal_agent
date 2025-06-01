@@ -5,9 +5,16 @@ This module provides a Flask-based web interface that works with smolagents
 instead of LangChain, maintaining the same UI and functionality.
 """
 
+import json
+import logging
+import queue
+import threading
+import time
+from datetime import datetime
+from io import StringIO
 from typing import TYPE_CHECKING, Optional
 
-from flask import Flask, render_template_string, request
+from flask import Flask, Response, render_template_string, request, stream_template
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -24,6 +31,15 @@ query_knowledge_base_func = None
 store_interaction_func = None
 clear_knowledge_base_func = None
 
+# Streaming thoughts management
+thoughts_queue = queue.Queue()
+active_sessions = set()
+pending_thoughts = {}  # Buffer thoughts until session is active
+
+# Logger capture setup
+log_capture_string = StringIO()
+log_handler = None
+
 
 def create_app() -> Flask:
     """
@@ -33,6 +49,118 @@ def create_app() -> Flask:
     """
     flask_app = Flask(__name__)
     return flask_app
+
+
+def setup_log_capture():
+    """Setup log capture for streaming to web interface."""
+    global log_handler, log_capture_string
+
+    if log_handler is not None:
+        return  # Already set up
+
+    log_capture_string = StringIO()
+    log_handler = logging.StreamHandler(log_capture_string)
+    log_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    log_handler.setFormatter(formatter)
+
+    # Add to root logger to capture all logs
+    root_logger = logging.getLogger()
+    root_logger.addHandler(log_handler)
+
+
+def add_thought(thought: str, session_id: str = "default"):
+    """Add a thought to the streaming queue."""
+    thought_data = {
+        "session_id": session_id,
+        "thought": thought,
+        "timestamp": datetime.now().isoformat() + "Z",
+    }
+
+    # If session is active, add directly to queue
+    if session_id in active_sessions:
+        thoughts_queue.put(thought_data)
+        if logger:
+            logger.info(f"Added thought for active session {session_id}: {thought}")
+    else:
+        # Buffer thoughts for inactive sessions
+        if session_id not in pending_thoughts:
+            pending_thoughts[session_id] = []
+        pending_thoughts[session_id].append(thought_data)
+        if logger:
+            logger.info(
+                f"Buffered thought for inactive session {session_id}: {thought}"
+            )
+
+
+def stream_thoughts(session_id: str = "default"):
+    """Generator for streaming thoughts."""
+    active_sessions.add(session_id)
+    if logger:
+        logger.info(f"Started streaming for session: {session_id}")
+
+    try:
+        # Send initial connection confirmation
+        yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
+
+        # Flush any pending thoughts for this session
+        if session_id in pending_thoughts:
+            for thought_data in pending_thoughts[session_id]:
+                if logger:
+                    logger.info(
+                        f"Flushing buffered thought for {session_id}: {thought_data['thought']}"
+                    )
+                yield f"data: {json.dumps(thought_data)}\n\n"
+            del pending_thoughts[session_id]
+
+        while session_id in active_sessions:
+            try:
+                # Check for new thoughts
+                thought_data = thoughts_queue.get(timeout=1.0)
+                if thought_data["session_id"] == session_id:
+                    if logger:
+                        logger.info(
+                            f"Streaming thought for {session_id}: {thought_data['thought']}"
+                        )
+                    yield f"data: {json.dumps(thought_data)}\n\n"
+                else:
+                    # Put back thoughts for other sessions
+                    thoughts_queue.put(thought_data)
+            except queue.Empty:
+                # Send keep-alive
+                yield f"data: {json.dumps({'type': 'keep-alive'})}\n\n"
+    finally:
+        active_sessions.discard(session_id)
+        if logger:
+            logger.info(f"Stopped streaming for session: {session_id}")
+        if logger:
+            logger.info(f"Stopped streaming for session: {session_id}")
+
+
+def stream_logs():
+    """Generator for streaming log output."""
+    global log_capture_string
+
+    last_position = 0
+    while True:
+        try:
+            current_content = log_capture_string.getvalue()
+            if len(current_content) > last_position:
+                new_content = current_content[last_position:]
+                last_position = len(current_content)
+
+                for line in new_content.strip().split("\n"):
+                    if line.strip():
+                        # Format timestamp as ISO string for JavaScript Date parsing
+                        timestamp = datetime.now().isoformat() + "Z"
+                        yield f"data: {json.dumps({'log': line, 'timestamp': timestamp})}\n\n"
+
+            time.sleep(0.5)  # Poll every 500ms
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            break
 
 
 def register_routes(
@@ -68,9 +196,15 @@ def register_routes(
     # Store fallback agent if provided
     app.config["FALLBACK_AGENT"] = fallback_agent
 
+    # Setup log capture for streaming
+    setup_log_capture()
+
     app.add_url_rule("/", "index", index, methods=["GET", "POST"])
     app.add_url_rule("/clear", "clear_kb", clear_kb_route)
     app.add_url_rule("/agent_info", "agent_info", agent_info_route)
+    app.add_url_rule("/stream_thoughts", "stream_thoughts", stream_thoughts_route)
+    app.add_url_rule("/stream_logs", "stream_logs", stream_logs_route)
+    app.add_url_rule("/logger", "logger", logger_route)
 
 
 def index():
@@ -86,13 +220,30 @@ def index():
     if request.method == "POST":
         user_input = request.form.get("query", "")
         topic = request.form.get("topic", "general")
+        session_id = request.form.get("session_id", "default")
 
         if user_input:
-            # Add initial thinking state
-            agent_thoughts = [
-                "🤔 Thinking about your request...",
-                "🔍 Searching memory for context...",
-            ]
+            # Clear any existing thoughts for this session from the queue
+            # (We'll let the stream handler manage active_sessions)
+            temp_queue = queue.Queue()
+            while not thoughts_queue.empty():
+                try:
+                    item = thoughts_queue.get_nowait()
+                    if item["session_id"] != session_id:
+                        temp_queue.put(item)
+                except queue.Empty:
+                    break
+
+            # Put back non-matching items
+            while not temp_queue.empty():
+                try:
+                    thoughts_queue.put(temp_queue.get_nowait())
+                except queue.Empty:
+                    break
+
+            # Start streaming thoughts (these will be buffered until stream connects)
+            add_thought("🤔 Thinking about your request...", session_id)
+            add_thought("🔍 Searching memory for context...", session_id)
 
             try:
                 # Query knowledge base for context using direct function call
@@ -126,20 +277,16 @@ def index():
                     and context != ["No relevant context found."]
                     and context != ["Memory not available."]
                 ):
-                    agent_thoughts.append("✅ Found relevant context in memory")
+                    add_thought("✅ Found relevant context in memory", session_id)
                 else:
-                    agent_thoughts.append(
-                        "📝 No previous context found, starting fresh"
+                    add_thought(
+                        "📝 No previous context found, starting fresh", session_id
                     )
 
                 # Add processing thoughts
-                agent_thoughts.extend(
-                    [
-                        "🧠 Analyzing request with AI reasoning",
-                        "🔧 Preparing tools and capabilities",
-                        "⚡ Processing with smolagents framework",
-                    ]
-                )
+                add_thought("🧠 Analyzing request with AI reasoning", session_id)
+                add_thought("🔧 Preparing tools and capabilities", session_id)
+                add_thought("⚡ Processing with smolagents framework", session_id)
 
                 # Prepare context string for agent
                 context_str = (
@@ -154,24 +301,79 @@ User Request: {user_input}
 
 Please help the user with their request. Use available tools as needed and provide a helpful, comprehensive response."""
 
-                # Execute smolagents agent
+                # Execute smolagents agent in a separate thread for real-time thoughts
                 try:
-                    # Use smolagents .run() method
-                    response = smolagents_agent.run(enhanced_prompt)
+                    # Add more detailed processing thoughts
+                    add_thought("🔍 Examining available tools", session_id)
+                    add_thought("📊 Processing information patterns", session_id)
+                    add_thought("💡 Formulating response strategy", session_id)
+                    add_thought("🎯 Executing chosen approach", session_id)
 
-                    # Add realistic processing thoughts
-                    additional_thoughts = [
-                        "🔍 Examining available tools",
-                        "📊 Processing information patterns",
-                        "💡 Formulating response strategy",
-                        "🎯 Executing chosen approach",
-                        "✨ Response generated successfully",
+                    # Container for the response and any error from the thread
+                    result_container = {"response": None, "error": None, "done": False}
+
+                    def agent_worker():
+                        """Worker function to run agent in separate thread."""
+                        try:
+                            # Add periodic thoughts during processing
+                            add_thought("🤖 Agent is thinking...", session_id)
+                            time.sleep(0.5)  # Small delay to show the thought
+
+                            add_thought("🔧 Analyzing with AI tools", session_id)
+                            time.sleep(0.5)
+
+                            # Use smolagents .run() method
+                            agent_response = smolagents_agent.run(enhanced_prompt)
+                            result_container["response"] = agent_response
+
+                            add_thought(
+                                "✨ Response generated successfully", session_id
+                            )
+
+                        except Exception as e:
+                            result_container["error"] = e
+                            add_thought(
+                                f"❌ Error during processing: {str(e)}", session_id
+                            )
+                        finally:
+                            result_container["done"] = True
+
+                    # Start the agent in a separate thread
+                    agent_thread = threading.Thread(target=agent_worker)
+                    agent_thread.daemon = True
+                    agent_thread.start()
+
+                    # Add progressive thoughts while waiting
+                    thought_counter = 0
+                    progress_thoughts = [
+                        "🧠 Deep thinking in progress...",
+                        "🔍 Exploring possible solutions...",
+                        "📝 Gathering relevant information...",
+                        "⚙️ Processing with advanced reasoning...",
+                        "🎯 Refining the approach...",
+                        "💭 Almost there...",
                     ]
 
-                    # Add thoughts that aren't already present
-                    for thought in additional_thoughts:
-                        if thought not in agent_thoughts:
-                            agent_thoughts.append(thought)
+                    # Wait for the agent to complete, adding thoughts periodically
+                    while not result_container["done"]:
+                        time.sleep(2.0)  # Wait 2 seconds between thoughts
+                        if not result_container["done"] and thought_counter < len(
+                            progress_thoughts
+                        ):
+                            add_thought(progress_thoughts[thought_counter], session_id)
+                            thought_counter += 1
+
+                    # Wait for thread to complete and get the result
+                    agent_thread.join(timeout=30)  # Max 30 seconds wait
+
+                    if result_container["error"]:
+                        raise result_container["error"]
+
+                    response = result_container["response"]
+                    if response is None:
+                        raise Exception(
+                            "Agent execution timed out or returned no response"
+                        )
 
                     # Store interaction AFTER getting response
                     if store_interaction_func:
@@ -180,18 +382,19 @@ Please help the user with their request. Use available tools as needed and provi
                                 f"User: {user_input}\nAssistant: {response}"
                             )
                             store_interaction_func(interaction_text, topic)
+                            add_thought("💾 Interaction stored in memory", session_id)
                         except Exception as e:
                             logger.warning("Could not store interaction: %s", e)
 
                 except Exception as e:
                     logger.error("Error with smolagents execution: %s", str(e))
                     response = f"Error processing request: {str(e)}"
-                    agent_thoughts = [f"❌ Error occurred: {str(e)}"]
+                    add_thought(f"❌ Error occurred: {str(e)}", session_id)
 
             except Exception as e:
                 logger.error("Error processing query: %s", str(e))
                 response = f"Error processing query: {str(e)}"
-                agent_thoughts = [f"❌ Error occurred: {str(e)}"]
+                add_thought(f"❌ Error occurred: {str(e)}", session_id)
 
             logger.info(
                 "Received query: %s..., Response: %s...",
@@ -290,6 +493,52 @@ def agent_info_route():
             available_tools=[],
             fallback_agent=None,
         )
+
+
+def stream_thoughts_route():
+    """
+    SSE route for streaming agent thoughts in real-time.
+
+    :return: Server-sent events stream
+    """
+    session_id = request.args.get("session_id", "default")
+
+    def generate():
+        for thought_data in stream_thoughts(session_id):
+            yield thought_data
+
+    response = Response(generate(), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+def stream_logs_route():
+    """
+    SSE route for streaming logger output in real-time.
+
+    :return: Server-sent events stream
+    """
+
+    def generate():
+        for log_data in stream_logs():
+            yield log_data
+
+    response = Response(generate(), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
+def logger_route():
+    """
+    Route to display the logger output window.
+
+    :return: Rendered logger template
+    """
+    return render_template_string(get_logger_template())
 
 
 def get_main_template():
@@ -665,6 +914,15 @@ def get_main_template():
                 font-size: 0.875rem;
             }
 
+            .connection-status {
+                margin-left: auto;
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+            }
+
             .thought-item {
                 background: linear-gradient(135deg, #f8fafc, #e2e8f0);
                 padding: 1rem;
@@ -814,6 +1072,10 @@ def get_main_template():
                     <i class=\"fas fa-info-circle\"></i>
                     <span>Agent Info</span>
                 </a>
+                <a href=\"/logger\" class=\"nav-button\">
+                    <i class=\"fas fa-terminal\"></i>
+                    <span>Logger</span>
+                </a>
                 <a href=\"/clear\" class=\"nav-button\">
                     <i class=\"fas fa-trash-alt\"></i>
                     <span>Clear</span>
@@ -842,6 +1104,7 @@ def get_main_template():
                             Ask me anything
                         </div>
                         <form method=\"post\" id=\"query-form\">
+                            <input type=\"hidden\" id=\"session_id\" name=\"session_id\" value=\"default\">
                             <div class=\"query-container\">
                                 <i class=\"fas fa-pen query-icon\"></i>
                                 <textarea 
@@ -888,19 +1151,19 @@ def get_main_template():
                             <i class=\"fas fa-cogs\"></i>
                         </div>
                         Agent Thoughts
+                        <div class=\"connection-status\" id=\"connection-status\">
+                            <i class=\"fas fa-circle\" style=\"color: #22c55e; font-size: 0.5rem;\"></i>
+                            <span style=\"font-size: 0.8rem; color: var(--text-secondary);\">Connected</span>
+                        </div>
                     </div>
-                    {% if agent_thoughts %}
-                        {% for thought in agent_thoughts %}
-                        <div class=\"thought-item\">{{ thought }}</div>
-                        {% endfor %}
-                    {% else %}
+                    <div id=\"thoughts-container\">
                         <div class=\"empty-thoughts\">
                             <div class=\"empty-icon\">
                                 <i class=\"fas fa-lightbulb\"></i>
                             </div>
                             <span>Agent thoughts and reasoning will appear here during processing...</span>
                         </div>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -965,6 +1228,121 @@ def get_main_template():
                     document.getElementById('query').focus();
                 }
             });
+
+            // Real-time thoughts streaming
+            let eventSource = null;
+            let sessionId = 'default';
+            
+            function startThoughtsStream() {
+                console.log('Starting thoughts stream for session:', sessionId);
+                
+                if (eventSource) {
+                    eventSource.close();
+                }
+                
+                eventSource = new EventSource('/stream_thoughts?session_id=' + sessionId);
+                const connectionStatus = document.getElementById('connection-status');
+                const thoughtsContainer = document.getElementById('thoughts-container');
+                
+                eventSource.onopen = function() {
+                    console.log('EventSource connection opened for session:', sessionId);
+                    if (connectionStatus) {
+                        connectionStatus.innerHTML = '<i class=\"fas fa-circle\" style=\"color: #22c55e; font-size: 0.5rem;\"></i><span style=\"font-size: 0.8rem; color: var(--text-secondary);\">Connected</span>';
+                    }
+                };
+                
+                eventSource.onmessage = function(event) {
+                    console.log('Received SSE message:', event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('Parsed SSE data:', data);
+                        
+                        // Handle connection confirmation
+                        if (data.type === 'connected') {
+                            console.log('Stream connection confirmed for session:', data.session_id);
+                            return;
+                        }
+                        
+                        // Handle keep-alive messages
+                        if (data.type === 'keep-alive') {
+                            console.log('Received keep-alive');
+                            return;
+                        }
+                        
+                        // Handle thought messages (they have 'thought' field)
+                        if (data.thought) {
+                            console.log('Processing thought:', data.thought);
+                            // Clear empty thoughts if it's the first real thought
+                            const emptyThoughts = thoughtsContainer.querySelector('.empty-thoughts');
+                            if (emptyThoughts) {
+                                console.log('Removing empty thoughts placeholder');
+                                emptyThoughts.remove();
+                            }
+                            
+                            // Add new thought
+                            const thoughtElement = document.createElement('div');
+                            thoughtElement.className = 'thought-item';
+                            thoughtElement.textContent = data.thought;
+                            thoughtsContainer.appendChild(thoughtElement);
+                            console.log('Added thought element to container');
+                            
+                            // Auto-scroll to bottom
+                            thoughtsContainer.parentElement.scrollTop = thoughtsContainer.parentElement.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing thought data:', e, 'Raw data:', event.data);
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    console.error('EventSource error:', error);
+                    if (connectionStatus) {
+                        connectionStatus.innerHTML = '<i class=\"fas fa-circle\" style=\"color: #ef4444; font-size: 0.5rem;\"></i><span style=\"font-size: 0.8rem; color: var(--text-secondary);\">Disconnected</span>';
+                    }
+                    
+                    // Retry connection after 3 seconds
+                    setTimeout(() => {
+                        if (eventSource.readyState === EventSource.CLOSED) {
+                            console.log('Retrying EventSource connection...');
+                            startThoughtsStream();
+                        }
+                    }, 3000);
+                };
+            }
+            
+            // Enhanced form handling with session management
+            form.addEventListener('submit', function(e) {
+                // Generate new session ID for this interaction
+                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                console.log('Form submitted, new session ID:', sessionId);
+                
+                // Update hidden form field
+                document.getElementById('session_id').value = sessionId;
+                console.log('Updated hidden session_id field to:', sessionId);
+                
+                // Restart thoughts stream with new session ID
+                console.log('Restarting thoughts stream with new session ID');
+                startThoughtsStream();
+                
+                // Clear previous thoughts
+                const thoughtsContainer = document.getElementById('thoughts-container');
+                thoughtsContainer.innerHTML = '<div class=\"empty-thoughts\"><div class=\"empty-icon\"><i class=\"fas fa-lightbulb\"></i></div><span>Processing your request...</span></div>';
+                console.log('Cleared thoughts container');
+                
+                // Start new stream for this session
+                console.log('Starting new stream for session:', sessionId);
+                startThoughtsStream();
+                
+                processing.classList.add('active');
+                
+                // Auto-focus query input after response
+                setTimeout(() => {
+                    document.getElementById('query').focus();
+                }, 100);
+            });
+            
+            // Start initial stream
+            startThoughtsStream();
         </script>
     </body>
     </html>
@@ -1377,6 +1755,530 @@ def get_agent_info_template():
             <p>Personal AI Agent • Multi-Agent Coordination System • Smolagents Framework</p>
         </div>
     </div>
+</body>
+</html>
+"""
+
+
+def get_logger_template():
+    """
+    Get the logger output window template.
+
+    :return: HTML template string for logger window
+    """
+    return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logger Output - Personal AI Agent</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success-color: #059669;
+            --warning-color: #f59e0b;
+            --danger-color: #dc2626;
+            --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --surface: #ffffff;
+            --surface-alt: #f8fafc;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .header-icon {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .navigation-bar {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .logger-panel {
+            background: var(--surface);
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            min-height: 70vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logger-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logger-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .logger-content {
+            flex: 1;
+            background: #1a1a1a;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow: auto;
+            padding: 0;
+        }
+
+        .log-entry {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            transition: background-color 0.2s;
+        }
+
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .log-timestamp {
+            color: #64748b;
+            font-size: 0.8rem;
+            min-width: 180px;
+            flex-shrink: 0;
+        }
+
+        .log-level {
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .log-level.INFO {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .log-level.WARNING {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .log-level.ERROR {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .log-level.DEBUG {
+            background: rgba(148, 163, 184, 0.2);
+            color: #94a3b8;
+        }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .log-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: #64748b;
+            text-align: center;
+            gap: 1rem;
+        }
+
+        .log-placeholder i {
+            font-size: 3rem;
+            opacity: 0.5;
+        }
+
+        /* Scrollbar styling */
+        .logger-content::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        .logger-content::-webkit-scrollbar-track {
+            background: #2a2a2a;
+        }
+
+        .logger-content::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 6px;
+        }
+
+        .logger-content::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem 0.5rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .navigation-bar {
+                gap: 0.5rem;
+            }
+
+            .btn {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+
+            .controls {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .log-entry {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .log-timestamp {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <div class="header-icon">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                Logger Output
+            </h1>
+            <p>Real-time system logs and debug information</p>
+        </div>
+
+        <div class="navigation-bar">
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-home"></i>
+                Back to Chat
+            </a>
+            <a href="/agent_info" class="btn">
+                <i class="fas fa-info-circle"></i>
+                Agent Info
+            </a>
+            <a href="/clear" class="btn">
+                <i class="fas fa-trash-alt"></i>
+                Clear Memory
+            </a>
+        </div>
+
+        <div class="logger-panel">
+            <div class="logger-header">
+                <div class="logger-title">
+                    <i class="fas fa-stream"></i>
+                    Live Log Stream
+                </div>
+                <div class="controls">
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <span>Connected</span>
+                    </div>
+                    <button class="control-btn" onclick="clearLogs()">
+                        <i class="fas fa-eraser"></i>
+                        Clear
+                    </button>
+                    <button class="control-btn" onclick="toggleAutoScroll()" id="scroll-btn">
+                        <i class="fas fa-arrow-down"></i>
+                        Auto-scroll
+                    </button>
+                </div>
+            </div>
+            <div class="logger-content" id="logger-content">
+                <div class="log-placeholder">
+                    <i class="fas fa-hourglass-half"></i>
+                    <div>
+                        <p><strong>Waiting for log output...</strong></p>
+                        <p>Log entries will appear here in real-time</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoScroll = true;
+        let logCount = 0;
+        const maxLogs = 1000; // Limit to prevent memory issues
+
+        // Connect to log stream
+        const logEventSource = new EventSource('/stream_logs');
+        
+        logEventSource.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.error) {
+                    addLogEntry('ERROR', 'Stream Error', data.error);
+                    return;
+                }
+                
+                if (data.log) {
+                    parseAndAddLogEntry(data.log);
+                }
+            } catch (e) {
+                console.error('Error parsing log data:', e);
+            }
+        };
+
+        logEventSource.onerror = function(event) {
+            addLogEntry('ERROR', 'Connection Error', 'Lost connection to log stream. Attempting to reconnect...');
+        };
+
+        function parseAndAddLogEntry(logLine) {
+            // Parse log format: timestamp - logger - level - message
+            const parts = logLine.split(' - ');
+            if (parts.length >= 4) {
+                const timestamp = parts[0];
+                const logger = parts[1];
+                const level = parts[2];
+                const message = parts.slice(3).join(' - ');
+                addLogEntry(level, timestamp, `[${logger}] ${message}`);
+            } else {
+                // Fallback for unparsed logs
+                addLogEntry('INFO', new Date().toISOString(), logLine);
+            }
+        }
+
+        function addLogEntry(level, timestamp, message) {
+            const logContent = document.getElementById('logger-content');
+            
+            // Remove placeholder if it exists
+            const placeholder = logContent.querySelector('.log-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+
+            // Create log entry
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            logEntry.innerHTML = `
+                <div class="log-timestamp">${formatTimestamp(timestamp)}</div>
+                <div class="log-level ${level.toUpperCase()}">${level.toUpperCase()}</div>
+                <div class="log-message">${escapeHtml(message)}</div>
+            `;
+
+            logContent.appendChild(logEntry);
+            logCount++;
+
+            // Limit number of log entries
+            if (logCount > maxLogs) {
+                const firstEntry = logContent.querySelector('.log-entry');
+                if (firstEntry) {
+                    firstEntry.remove();
+                    logCount--;
+                }
+            }
+
+            // Auto-scroll to bottom
+            if (autoScroll) {
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+        }
+
+        function formatTimestamp(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString('en-US', { 
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
+            } catch (e) {
+                return timestamp;
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function clearLogs() {
+            const logContent = document.getElementById('logger-content');
+            logContent.innerHTML = `
+                <div class="log-placeholder">
+                    <i class="fas fa-hourglass-half"></i>
+                    <div>
+                        <p><strong>Logs cleared</strong></p>
+                        <p>New log entries will appear here</p>
+                    </div>
+                </div>
+            `;
+            logCount = 0;
+        }
+
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            const btn = document.getElementById('scroll-btn');
+            
+            if (autoScroll) {
+                btn.innerHTML = '<i class="fas fa-arrow-down"></i> Auto-scroll';
+                const logContent = document.getElementById('logger-content');
+                logContent.scrollTop = logContent.scrollHeight;
+            } else {
+                btn.innerHTML = '<i class="fas fa-pause"></i> Manual';
+            }
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            if (logEventSource) {
+                logEventSource.close();
+            }
+        });
+    </script>
 </body>
 </html>
 """
