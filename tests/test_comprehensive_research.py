@@ -4,8 +4,8 @@
 import os
 import sys
 
-# Add the current directory to Python path so we can import personal_agent
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add src to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
 
 def test_comprehensive_research():
