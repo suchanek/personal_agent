@@ -21,14 +21,16 @@ The web interface will be available at: `http://127.0.0.1:5001`
 ### Features
 
 ✅ **12 Integrated Tools:**
+
 - 📁 **File Operations** - Read, write, list directories, create directories
-- 🔍 **Web Search** - Brave Search integration 
+- 🔍 **Web Search** - Brave Search integration
 - 🐙 **GitHub Search** - Repository and code search
 - 🧠 **Memory Management** - Store/query knowledge base, clear memory
 - 🔬 **Research Tools** - Comprehensive research, intelligent file search
 - ⚡ **System Integration** - Shell commands
 
 ✅ **Framework Benefits:**
+
 - **LiteLLM Integration** - Works with Ollama and other model providers
 - **Enhanced Tool Calling** - More reliable tool execution
 - **Better Error Handling** - Improved error messages and recovery
@@ -87,6 +89,7 @@ model = LiteLLMModel(
 ### MCP Servers
 
 All existing MCP servers are supported:
+
 - `filesystem-home` - Home directory operations
 - `filesystem-data` - Data directory operations  
 - `filesystem-root` - Root directory operations
@@ -115,18 +118,21 @@ python tests/test_tools_directly.py
 ### Example Interactions
 
 **File Operations:**
+
 ```
 User: "List the files in my home directory"
 Agent: Uses mcp_list_directory tool → Returns directory contents
 ```
 
 **Web Search:**
+
 ```  
 User: "Search for information about Python async"
 Agent: Uses web_search tool → Returns search results from Brave
 ```
 
 **Research:**
+
 ```
 User: "Research the latest trends in AI frameworks"
 Agent: Uses comprehensive_research → Multi-tool research with web search + memory
@@ -135,6 +141,7 @@ Agent: Uses comprehensive_research → Multi-tool research with web search + mem
 ## Migration Status
 
 ### Completed ✅
+
 - Core smolagents integration
 - All 12 tools migrated and tested
 - Web interface compatibility
@@ -143,7 +150,8 @@ Agent: Uses comprehensive_research → Multi-tool research with web search + mem
 - End-to-end validation
 
 ### Available Interfaces
-- **LangChain (Legacy)**: `python run_agent.py` 
+
+- **LangChain (Legacy)**: `python run_agent.py`
 - **Smolagents (New)**: `python run_smolagents.py`
 
 Both interfaces use the same MCP servers and memory system, ensuring compatibility.
@@ -153,6 +161,7 @@ Both interfaces use the same MCP servers and memory system, ensuring compatibili
 ### Common Issues
 
 **MCP Servers Not Starting:**
+
 ```bash
 # Check MCP server status
 poetry run mcp list-servers
@@ -162,6 +171,7 @@ python scripts/install_mcp.py
 ```
 
 **Model Not Available:**
+
 ```bash
 # Ensure Ollama is running
 ollama serve
@@ -171,6 +181,7 @@ ollama pull qwen2.5:7b-instruct
 ```
 
 **Web Interface Issues:**
+
 ```bash
 # Test basic functionality
 python tests/test_smolagents_web.py
@@ -181,12 +192,14 @@ python tests/test_smolagents_web.py
 ## Performance
 
 ### Benchmarks
+
 - **Tool Call Reliability**: 95%+ success rate
 - **Memory Retrieval**: ~200ms average
 - **Web Search**: ~2-3s average response
 - **File Operations**: ~100ms average
 
 ### Resource Usage
+
 - **Memory**: ~500MB baseline + model memory
 - **CPU**: Moderate during tool execution
 - **Network**: Only for web search and GitHub tools

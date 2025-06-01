@@ -1,6 +1,6 @@
 # Personal AI Agent
 
-A sophisticated personal assistant that learns about you and provides context-aware responses using Ollama, Weaviate vector database, LangChain, and Model Context Protocol (MCP) integration.
+A sophisticated personal assistant that learns about you and provides context-aware responses using HuggingFace smolagents, Ollama, Weaviate vector database, and Model Context Protocol (MCP) integration.
 
 ## 🌟 Features
 
@@ -11,7 +11,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 🔍 **Semantic Search**: Finds relevant context from past interactions
 - 🌐 **Web Interface**: Clean Flask-based web UI with knowledge base management
 - 📊 **Topic Organization**: Categorize memories by topic
-- 🎯 **ReAct Agent**: Uses LangChain's ReAct framework for intelligent tool usage
+- 🎯 **Smolagents Framework**: Uses HuggingFace smolagents multi-agent system for intelligent tool usage
 - 🗑️ **Memory Management**: Clear knowledge base functionality
 
 ### MCP-Powered Tools (13 Total)
@@ -28,6 +28,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 
 - 🔧 **MCP Integration**: Model Context Protocol for extensible tool ecosystem  
 - 🚀 **Multi-Server Architecture**: 6 MCP servers (filesystem, github, brave-search, puppeteer)
+- 🤖 **Smolagents Framework**: HuggingFace multi-agent system with custom MCP bridge
 - 🔗 **Hybrid Intelligence**: Combines persistent memory with external data sources
 - 📡 **Real-time Capabilities**: Live web search and GitHub integration
 
@@ -35,7 +36,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 
 ```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Flask Web UI  │───▶│  Personal Agent │───▶│   Ollama LLM    │
+│   Flask Web UI  │───▶│ Smolagents Agent│───▶│   Ollama LLM    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                │
                                ▼
@@ -106,7 +107,7 @@ cd personal_agent
 # Install Poetry if you haven't already
 curl -sSL https://install.python-poetry.org | python3 -
 
-# Install project dependencies
+# Install project dependencies (includes smolagents)
 poetry install
 ```
 
@@ -305,7 +306,8 @@ The web interface provides:
 - 🏷️ **Topic Organization**: Categorized memory storage for better organization
 - 🗑️ **Knowledge Management**: Clear/reset knowledge base functionality
 - 📊 **System Status**: Real-time indication of MCP server status and tool availability
-- 🔧 **Debugging Info**: Tool call logs and response details for troubleshooting
+- 🔧 **Agent Info**: View detailed information about all 13 integrated tools and capabilities
+- 🛠️ **Debugging Info**: Tool call logs and response details for troubleshooting
 
 ### 4. Example Usage
 
@@ -426,8 +428,40 @@ The `comprehensive_research` tool provides multi-source intelligence:
 ### Advanced Research
 
 12. **`comprehensive_research`**: Multi-source research combining all available tools
+13. **Additional MCP Tools**: Various other tools discovered from MCP servers
 
 Each tool integrates with the memory system to provide context-aware results and automatically stores important operations for future reference.
+
+## 🤖 Smolagents Integration
+
+### Multi-Agent Framework
+
+This Personal AI Agent is built on **HuggingFace smolagents**, a powerful multi-agent framework that provides:
+
+- **CodeAgent**: Advanced agent with tool integration capabilities
+- **Tool Management**: Automatic discovery and registration of tools
+- **Multi-Agent Architecture**: Extensible framework for complex agent interactions
+- **Custom LLM Backend**: Integrated with Ollama for local AI processing
+
+### MCP-Smolagents Bridge
+
+A custom integration layer connects Model Context Protocol (MCP) servers to the smolagents framework:
+
+```python
+# smolagents tools are automatically discovered from MCP servers
+smolagents_agent = CodeAgent(
+    tools=mcp_tools,  # 13 tools from 6 MCP servers
+    llm_engine=ollama_engine,
+    max_iterations=10
+)
+```
+
+### Tool Architecture
+
+- **SimpleTool Objects**: Each MCP tool is wrapped as a smolagents SimpleTool
+- **Dictionary Storage**: Tools stored as `{tool_name: SimpleTool}` for efficient access
+- **Automatic Discovery**: MCP servers are scanned and tools registered automatically
+- **Web Interface**: Custom Flask interface displays all available tools and capabilities
 
 ## ⚙️ Configuration
 
@@ -477,13 +511,14 @@ personal_agent/
 │   └── personal_agent/       # Main package
 │       ├── __init__.py
 │       ├── main.py          # Application entry point
+│       ├── smol_main.py     # Smolagents system initialization
 │       ├── config/          # Configuration modules
 │       │   ├── __init__.py
 │       │   ├── mcp_servers.py # MCP server configurations
 │       │   └── settings.py   # Application settings
 │       ├── core/            # Core functionality
 │       │   ├── __init__.py
-│       │   ├── agent.py     # LangChain agent setup
+│       │   ├── agent.py     # Smolagents agent setup
 │       │   ├── mcp_client.py # MCP client implementation
 │       │   └── memory.py    # Weaviate memory management
 │       ├── tools/           # Tool implementations
@@ -497,6 +532,8 @@ personal_agent/
 │       │   ├── __init__.py
 │       │   └── cleanup.py   # Resource cleanup and logging
 │       └── web/             # Web interface
+│           ├── __init__.py
+│           └── smol_interface.py # Smolagents web interface
 │           ├── __init__.py
 │           └── interface.py # Flask web application
 ├── tests/                   # Comprehensive test suite (20+ files)
@@ -539,9 +576,8 @@ personal_agent/
 
 ### Core Dependencies
 
-- **langchain**: Framework for LLM applications
-- **langchain-ollama**: Ollama integration
-- **langchain-weaviate**: Weaviate vector store
+- **smolagents**: HuggingFace multi-agent framework
+- **ollama**: Ollama integration for local LLM
 - **weaviate-client**: Weaviate database client
 - **flask**: Web framework
 - **requests**: HTTP client
@@ -563,9 +599,10 @@ personal_agent/
 
 ### Agent Capabilities
 
-- **Tool Usage**: Can store and retrieve information
-- **Context Awareness**: Uses relevant past interactions
-- **ReAct Framework**: Thought-Action-Observation loops
+- **Smolagents Framework**: Multi-agent system with tool integration
+- **Tool Usage**: Can store and retrieve information across 13 integrated tools
+- **Context Awareness**: Uses relevant past interactions from vector memory
+- **MCP Integration**: Custom bridge connecting Model Context Protocol to smolagents
 - **Error Handling**: Graceful fallbacks when services unavailable
 
 ### Web Interface
@@ -802,9 +839,26 @@ Unlike basic chatbots, this personal agent combines:
 
 ### Recent Major Improvements (December 2024)
 
-#### ✅ GitHub OUTPUT_PARSING_FAILURE Resolution
+#### ✅ Web Interface Fixes (Latest)
 
-- **Problem**: LangChain ReAct agent was unable to parse large JSON responses from GitHub API, causing `OUTPUT_PARSING_FAILURE` errors
+- **Problem**: Agent Info button in web interface resulted in 'not found' error, then "'str' object has no attribute 'name'" error when accessing agent info page
+- **Root Cause**: URL mismatch (`/info` vs `/agent_info`) and smolagents tools stored as dictionary instead of list
+- **Solution**:
+  - Fixed button URL from `/info` to `/agent_info` in web template
+  - Updated tool name extraction to use `list(smolagents_agent.tools.keys())` instead of `[tool.name for tool in tools]`
+  - Added defensive handling for both dictionary and list tool formats
+- **Impact**: Agent info page now displays correctly showing all 13 tools (filesystem.mcp_read_file, research.web_search, etc.)
+
+#### ✅ Smolagents Framework Migration
+
+- **Migration**: Successfully migrated from LangChain ReAct to HuggingFace smolagents multi-agent framework
+- **Custom Integration**: Created MCP-smolagents bridge connecting Model Context Protocol servers to smolagents tools
+- **Tool Discovery**: Automatic registration of all 13 MCP tools as smolagents SimpleTool objects
+- **Impact**: More robust agent framework with better tool integration and multi-agent capabilities
+
+#### ✅ GitHub Tool Integration Resolution
+
+- **Problem**: GitHub search was experiencing parsing errors with large JSON responses
 - **Solution**: Added `_sanitize_github_output()` function that parses GitHub responses and creates concise, formatted summaries
 - **Impact**: GitHub search now works reliably without parsing errors
 
@@ -830,11 +884,14 @@ Unlike basic chatbots, this personal agent combines:
 
 The agent now features:
 
+- **Smolagents Framework**: HuggingFace multi-agent system as the core architecture
+- **MCP Integration**: Custom bridge connecting Model Context Protocol to smolagents
 - **Modular Design**: Clean separation between config, core, tools, web, and utils
+- **Tool Discovery**: Automatic registration of MCP tools as smolagents SimpleTool objects
 - **Dependency Injection**: Proper logger and component injection throughout
 - **Resource Management**: Enhanced cleanup and error handling
 - **Test Organization**: Categorized test suite with dedicated runner
 
 ---
 
-**Personal AI Agent** - A comprehensive, MCP-powered personal assistant with 13 integrated tools that learns, remembers, and grows with you. 🚀
+**Personal AI Agent** - A comprehensive, smolagents-powered personal assistant with 13 integrated MCP tools that learns, remembers, and grows with you. 🚀
