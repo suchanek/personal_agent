@@ -47,7 +47,6 @@ def register_routes(flask_app: Flask, executor, log, query_kb, store_int, clear_
 def index():
     """Main route for the agent interface."""
     response = None
-    context = None
     agent_thoughts = []
     if request.method == "POST":
         user_input = request.form.get("query", "")
@@ -59,12 +58,10 @@ def index():
                 "🔍 Searching memory for context...",
             ]
 
-            # Query knowledge base for context
+            # Query knowledge base for context (used internally only)
             try:
                 # Call the function directly with proper parameters
-                context = query_knowledge_base.invoke(
-                    {"query": user_input, "limit": 3}
-                )  # Reduced from 5 to 3
+                context = query_knowledge_base.invoke({"query": user_input, "limit": 3})
                 context_str = (
                     "\n".join(context) if context else "No relevant context found."
                 )
@@ -89,16 +86,14 @@ def index():
                     ]
                 )
 
-                # Execute agent with retries and enhanced thoughts
+                # Execute agent
                 try:
-                    # Simple execution
                     result = agent_executor.invoke(
                         {"input": user_input, "context": context_str}
                     )
 
                     # Enhance thoughts with more realistic processing steps
                     if len(agent_thoughts) < 8:
-                        # Add some realistic intermediate thoughts if we don't have many
                         intermediate_thoughts = [
                             "🔍 Examining available tools",
                             "📊 Processing information patterns",
@@ -106,7 +101,6 @@ def index():
                             "🎯 Executing chosen approach",
                         ]
 
-                        # Add thoughts that aren't already present
                         for thought in intermediate_thoughts:
                             if (
                                 thought not in agent_thoughts
@@ -158,10 +152,11 @@ def index():
                 else:
                     response = str(result)
 
+                # Clean any thinking process content from the response
+                response = clean_response_from_thinking_process(response)
+
                 # Remove duplicate final thoughts and add completion
-                agent_thoughts = list(
-                    dict.fromkeys(agent_thoughts)
-                )  # Remove duplicates while preserving order
+                agent_thoughts = list(dict.fromkeys(agent_thoughts))
                 if not any(
                     "complete" in thought.lower() or "final" in thought.lower()
                     for thought in agent_thoughts
@@ -183,7 +178,6 @@ def index():
     return render_template_string(
         get_main_template(),
         response=response,
-        context=context,
         agent_thoughts=agent_thoughts,
     )
 
@@ -208,346 +202,81 @@ def clear_kb_route():
 def get_main_template() -> str:
     """Get the main HTML template for the agent interface."""
     return """
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>🤖 Personal AI Agent</title>
-                <style>
-                    * { box-sizing: border-box; }
-                    body { 
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        margin: 0; 
-                        padding: 20px; 
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        min-height: 100vh;
-                        color: #333;
-                    }
-                    .container {
-                        max-width: 1200px;
-                        margin: 0 auto;
-                        background: white;
-                        border-radius: 15px;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                        overflow: hidden;
-                    }
-                    .header {
-                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                        color: white;
-                        padding: 20px;
-                        text-align: center;
-                    }
-                    .header h1 {
-                        margin: 0;
-                        font-size: 2rem;
-                        font-weight: 300;
-                    }
-                    .content {
-                        display: grid;
-                        grid-template-columns: 1fr 400px;
-                        gap: 0;
-                        min-height: 600px;
-                    }
-                    .main-panel {
-                        padding: 30px;
-                    }
-                    .thoughts-panel {
-                        background: #f8f9fa;
-                        border-left: 3px solid #4facfe;
-                        padding: 20px;
-                        overflow-y: auto;
-                        max-height: 600px;
-                    }
-                    .form-group {
-                        margin-bottom: 20px;
-                    }
-                    label {
-                        display: block;
-                        font-weight: 600;
-                        margin-bottom: 5px;
-                        color: #555;
-                    }
-                    textarea, input[type="text"] {
-                        width: 100%;
-                        padding: 12px;
-                        border: 2px solid #e1e8ed;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-family: inherit;
-                        transition: border-color 0.3s ease;
-                    }
-                    textarea:focus, input[type="text"]:focus {
-                        outline: none;
-                        border-color: #4facfe;
-                        box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
-                    }
-                    .button-group {
-                        display: flex;
-                        gap: 10px;
-                        margin-top: 20px;
-                    }
-                    .btn {
-                        padding: 12px 24px;
-                        border: none;
-                        border-radius: 8px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        font-size: 14px;
-                        text-decoration: none;
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 8px;
-                    }
-                    .btn-primary {
-                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                        color: white;
-                    }
-                    .btn-primary:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
-                    }
-                    .btn-danger {
-                        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-                        color: white;
-                    }
-                    .btn-danger:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 5px 15px rgba(238, 90, 82, 0.4);
-                    }
-                    .response-section {
-                        margin-top: 30px;
-                        padding: 20px;
-                        background: #f8f9fa;
-                        border-radius: 10px;
-                        border-left: 4px solid #28a745;
-                    }
-                    .response-section h2 {
-                        margin: 0 0 15px 0;
-                        color: #28a745;
-                        font-size: 1.2rem;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                    }
-                    .response-content {
-                        white-space: pre-wrap;
-                        line-height: 1.6;
-                        background: white;
-                        padding: 15px;
-                        border-radius: 8px;
-                        border: 1px solid #e1e8ed;
-                    }
-                    .context-section {
-                        margin-top: 20px;
-                        padding: 15px;
-                        background: #e3f2fd;
-                        border-radius: 10px;
-                        border-left: 4px solid #2196f3;
-                    }
-                    .context-section h3 {
-                        margin: 0 0 10px 0;
-                        color: #1976d2;
-                        font-size: 1rem;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                    }
-                    .context-item {
-                        background: white;
-                        padding: 10px;
-                        margin: 5px 0;
-                        border-radius: 6px;
-                        border-left: 3px solid #2196f3;
-                        font-size: 0.9rem;
-                        line-height: 1.4;
-                    }
-                    .thoughts-header {
-                        font-weight: 600;
-                        color: #666;
-                        margin-bottom: 15px;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        font-size: 1.1rem;
-                    }
-                    .thought-item {
-                        background: white;
-                        padding: 10px 15px;
-                        margin: 8px 0;
-                        border-radius: 8px;
-                        border-left: 3px solid #4facfe;
-                        font-size: 0.9rem;
-                        line-height: 1.4;
-                        animation: slideIn 0.3s ease-out;
-                    }
-                    @keyframes slideIn {
-                        from { opacity: 0; transform: translateX(-10px); }
-                        to { opacity: 1; transform: translateX(0); }
-                    }
-                    .empty-thoughts {
-                        text-align: center;
-                        color: #999;
-                        font-style: italic;
-                        padding: 40px 20px;
-                    }
-                    @media (max-width: 768px) {
-                        .content {
-                            grid-template-columns: 1fr;
-                        }
-                        .thoughts-panel {
-                            border-left: none;
-                            border-top: 3px solid #4facfe;
-                            max-height: 300px;
-                        }
-                        body { padding: 10px; }
-                    }
-                    .context-preview {
-                        max-height: 150px;
-                        overflow-y: auto;
-                    }
-                    .context-item-short {
-                        display: -webkit-box;
-                        -webkit-line-clamp: 2;
-                        -webkit-box-orient: vertical;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                    }
-                    .loading-spinner {
-                        display: none;
-                        border: 3px solid #f3f3f3;
-                        border-top: 3px solid #4facfe;
-                        border-radius: 50%;
-                        width: 20px;
-                        height: 20px;
-                        animation: spin 1s linear infinite;
-                        margin-right: 8px;
-                    }
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                    .processing-thoughts {
-                        display: none;
-                    }
-                    .btn:disabled {
-                        opacity: 0.6;
-                        cursor: not-allowed;
-                        transform: none !important;
-                    }
-                </style>
-                <script>
-                    function showProgress() {
-                        // Show loading spinner on button
-                        const submitBtn = document.querySelector('.btn-primary');
-                        const spinner = document.querySelector('.loading-spinner');
-                        
-                        if (submitBtn && spinner) {
-                            submitBtn.disabled = true;
-                            spinner.style.display = 'inline-block';
-                            submitBtn.innerHTML = '<div class="loading-spinner" style="display: inline-block;"></div>Processing...';
-                        }
-                        
-                        // Show processing thoughts immediately
-                        const thoughtsPanel = document.querySelector('.thoughts-panel');
-                        if (thoughtsPanel) {
-                            const processingThoughts = [
-                                '🚀 Starting to process your request...',
-                                '🔄 Initializing AI reasoning...',
-                                '📊 Preparing tools and memory access...'
-                            ];
-                            
-                            // Clear existing thoughts
-                            const thoughtsContainer = thoughtsPanel.querySelector('.thoughts-header').parentNode;
-                            const existingThoughts = thoughtsContainer.querySelectorAll('.thought-item, .empty-thoughts');
-                            existingThoughts.forEach(item => item.remove());
-                            
-                            // Add processing thoughts
-                            processingThoughts.forEach((thought, index) => {
-                                setTimeout(() => {
-                                    const thoughtItem = document.createElement('div');
-                                    thoughtItem.className = 'thought-item';
-                                    thoughtItem.textContent = thought;
-                                    thoughtsContainer.appendChild(thoughtItem);
-                                }, index * 500); // Stagger the thoughts
-                            });
-                        }
-                        
-                        return true; // Allow form to submit
-                    }
-                </script>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>🤖 Personal AI Agent</h1>
-                        <p style="margin: 5px 0 0 0; opacity: 0.9;">Your intelligent assistant with memory, research, and reasoning capabilities</p>
-                    </div>
-                    
-                    <div class="content">
-                        <div class="main-panel">
-                            <form method="post" onsubmit="return showProgress()">
-                                <div class="form-group">
-                                    <label for="query">💬 Ask me anything:</label>
-                                    <textarea name="query" id="query" rows="4" placeholder="e.g., Research Python 3.12 features, help me write a script, remember my preferences..."></textarea>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="topic">🏷️ Topic Category:</label>
-                                    <input type="text" name="topic" id="topic" value="general" placeholder="e.g., programming, personal, research, etc.">
-                                </div>
-                                
-                                <div class="button-group">
-                                    <button type="submit" class="btn btn-primary">
-                                        <div class="loading-spinner"></div>
-                                        🚀 Ask Agent
-                                    </button>
-                                    <button type="button" class="btn btn-danger" onclick="if(confirm('⚠️ Are you sure you want to clear all stored knowledge? This action cannot be undone.')) { window.location.href='/clear'; }">
-                                        🗑️ Reset Knowledge
-                                    </button>
-                                </div>
-                            </form>
-                            
-                            {% if response %}
-                                <div class="response-section">
-                                    <h2>🎯 Agent Response</h2>
-                                    <div class="response-content">{{ response }}</div>
-                                </div>
-                            {% endif %}
-                            
-                            {% if context and context != ['No relevant context found.'] and context != ['Weaviate is disabled, no context available.'] %}
-                                <div class="context-section">
-                                    <h3>🧠 Memory Context Used</h3>
-                                    <div class="context-preview">
-                                        {% for item in context %}
-                                            <div class="context-item context-item-short">{{ item }}</div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="thoughts-panel">
-                            <div class="thoughts-header">
-                                🧠 Agent Thoughts
-                            </div>
-                            
-                            {% if agent_thoughts %}
-                                {% for thought in agent_thoughts %}
-                                    <div class="thought-item">{{ thought }}</div>
-                                {% endfor %}
-                            {% else %}
-                                <div class="empty-thoughts">
-                                    💭 Agent thoughts will appear here during processing...
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Personal AI Agent</title>
+        <style>
+            /* General styles */
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: #f4f4f9;
+                color: #333;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .content {
+                background: #fff;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .response-section {
+                margin-top: 20px;
+            }
+            .response-content {
+                white-space: pre-wrap;
+                line-height: 1.6;
+                color: #444;
+            }
+            .btn {
+                display: inline-block;
+                padding: 10px 20px;
+                margin-top: 20px;
+                background-color: #007bff;
+                color: #fff;
+                text-decoration: none;
+                border-radius: 5px;
+                transition: background-color 0.3s;
+            }
+            .btn:hover {
+                background-color: #0056b3;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Personal AI Agent</h1>
+            </div>
+            <div class="content">
+                <form method="post">
+                    <label for="query">Enter your query:</label>
+                    <textarea id="query" name="query" rows="4" style="width: 100%;"></textarea>
+                    <button type="submit" class="btn">Submit</button>
+                </form>
+                {% if response %}
+                <div class="response-section">
+                    <h2>Response</h2>
+                    <div class="response-content">{{ response }}</div>
                 </div>
-            </body>
-        </html>
-        """
+                {% endif %}
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 
 def get_success_template() -> str:
@@ -726,3 +455,52 @@ def get_error_template() -> str:
                 </body>
             </html>
             """
+
+
+def clean_response_from_thinking_process(response: str) -> str:
+    """
+    Remove thinking process content from agent response.
+
+    :param response: Raw agent response that may contain thinking process
+    :return: Cleaned response with thinking process removed
+    """
+    import re
+
+    # Remove common thinking process patterns
+    patterns_to_remove = [
+        r"🤔.*?\n",  # Thinking emoji lines
+        r"🔍.*?\n",  # Search emoji lines
+        r"✅.*?\n",  # Checkmark emoji lines
+        r"📝.*?\n",  # Note emoji lines
+        r"🧠.*?\n",  # Brain emoji lines
+        r"🔧.*?\n",  # Tool emoji lines
+        r"⚡.*?\n",  # Lightning emoji lines
+        r"🛠️.*?\n",  # Hammer emoji lines
+        r"🔄.*?\n",  # Refresh emoji lines
+        r"💡.*?\n",  # Lightbulb emoji lines
+        r"📊.*?\n",  # Chart emoji lines
+        r"🎯.*?\n",  # Target emoji lines
+        r"✨.*?\n",  # Sparkle emoji lines
+        r"❌.*?\n",  # X emoji lines
+        r"Thinking about.*?\n",
+        r"Searching memory.*?\n",
+        r"Processing.*?\n",
+        r"Analyzing.*?\n",
+        r"I'm thinking.*?\n",
+        r"Let me think.*?\n",
+        r"Hmm.*?\n",
+        r".*thinking process.*?\n",
+        r".*agent thoughts.*?\n",
+    ]
+
+    cleaned_response = response
+    for pattern in patterns_to_remove:
+        cleaned_response = re.sub(pattern, "", cleaned_response, flags=re.IGNORECASE)
+
+    # Remove multiple consecutive newlines
+    cleaned_response = re.sub(r"\n\s*\n", "\n\n", cleaned_response)
+
+    # Strip leading/trailing whitespace
+    cleaned_response = cleaned_response.strip()
+
+    return cleaned_response
