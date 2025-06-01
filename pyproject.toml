@@ -16,6 +16,8 @@ requests = "^2.32.3"
 langchain-weaviate = "^0.0.4"
 rich = "^14.0.0"
 python-dotenv = "^1.1.0"
+smolagents = "^1.17.0"
+litellm = "^1.71.3"
 
 [tool.poetry.scripts]
 personal-agent = "src.personal_agent.main:main"

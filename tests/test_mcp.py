@@ -8,8 +8,8 @@ import os
 import subprocess
 import sys
 
-# Add parent directory to path to import personal_agent
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add src to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 from personal_agent import ROOT_DIR
 
 logging.basicConfig(level=logging.DEBUG)
