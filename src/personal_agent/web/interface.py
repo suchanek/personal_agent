@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+# pylint: disable=C0302, W0603, C0103, C0301
 """
 Web interface module for the Personal AI Agent.
 
