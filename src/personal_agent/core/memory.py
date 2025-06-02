@@ -130,3 +130,23 @@ def setup_weaviate() -> bool:
     except Exception as e:
         logger.error("Error initializing vector store: %s", e)
         return False
+
+
+def is_weaviate_connected() -> bool:
+    """
+    Check if Weaviate is available and connected.
+
+    :return: True if Weaviate is connected and ready, False otherwise
+    """
+    if not USE_WEAVIATE:
+        return False
+
+    if weaviate_client is None:
+        return False
+
+    try:
+        # Check if Weaviate is ready via HTTP endpoint
+        response = requests.get(f"{WEAVIATE_URL}/v1/.well-known/ready", timeout=5)
+        return response.status_code == 200
+    except (requests.exceptions.RequestException, Exception):
+        return False
