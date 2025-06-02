@@ -140,7 +140,7 @@ docker-compose up -d
 poetry run test-tools
 
 # 6. Run the LangChain agent (default)
-poetry run personal-agent-langchain
+poetry run personal-agent
 ```
 
 ### Smolagents Version (Experimental)
@@ -149,7 +149,7 @@ poetry run personal-agent-langchain
 # Follow steps 1-5 above, then:
 
 # 6. Run the Smolagents agent
-poetry run personal-agent
+poetry run personal-agent-smolagent
 ```
 
 Then open `http://127.0.0.1:5001` in your browser and start chatting!
