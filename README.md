@@ -89,6 +89,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 **Command**: `poetry run personal-agent-langchain`
 
 **Features**:
+
 - ✅ More stable and mature
 - ✅ Better error handling and debugging
 - ✅ Enhanced web interface with brain status indicator
@@ -104,6 +105,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 **Command**: `poetry run personal-agent`
 
 **Features**:
+
 - 🧪 Experimental multi-agent framework
 - 🧪 HuggingFace smolagents integration
 - 🧪 Custom MCP bridge implementation
