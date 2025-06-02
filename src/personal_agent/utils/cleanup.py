@@ -41,13 +41,26 @@ def setup_logging() -> logging.Logger:
         "ignore", category=ResourceWarning, message=".*subprocess.*"
     )
 
-    # Setup logging
-    logging.basicConfig(level=logging.INFO, handlers=[])
+    # Setup logging with DEBUG level and RichHandler
+    logging.basicConfig(level=logging.DEBUG, handlers=[RichHandler()])
     log = logging.getLogger(__name__)
-    log.setLevel(logging.INFO)
+    log.setLevel(logging.DEBUG)
 
     # Reduce httpx logging verbosity to WARNING to reduce noise
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+
+    # Reduce Flask/Werkzeug logging verbosity to WARNING to reduce noise
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    logging.getLogger("flask").setLevel(logging.WARNING)
+    logging.getLogger("flask.app").setLevel(logging.WARNING)
+    logging.getLogger("werkzeug._internal").setLevel(logging.WARNING)
+
+    # Also suppress other common noisy loggers
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
 
     return log
 
