@@ -16,17 +16,17 @@ import warnings
 from typing import TYPE_CHECKING
 
 from rich.logging import RichHandler
+from weaviate import WeaviateClient
 
-if TYPE_CHECKING:
-    from weaviate import WeaviateClient
-
-    from personal_agent.core.mcp_client import SimpleMCPClient
+from personal_agent.core.mcp_client import SimpleMCPClient
 
 # These will be injected by the main module
 weaviate_client: "WeaviateClient" = None
 vector_store = None
 mcp_client: "SimpleMCPClient" = None
 logger: logging.Logger = None
+
+LOG_LEVEL = logging.DEBUG
 
 
 def setup_logging() -> logging.Logger:
@@ -44,7 +44,7 @@ def setup_logging() -> logging.Logger:
     # Setup logging with DEBUG level and RichHandler
     logging.basicConfig(level=logging.DEBUG, handlers=[RichHandler()])
     log = logging.getLogger(__name__)
-    log.setLevel(logging.DEBUG)
+    log.setLevel(LOG_LEVEL)
 
     # Reduce httpx logging verbosity to WARNING to reduce noise
     logging.getLogger("httpx").setLevel(logging.WARNING)

@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 
 from flask import Flask, Response, render_template_string, request
 
+from ..core.memory import is_weaviate_connected
+
 if TYPE_CHECKING:
     from logging import Logger
 
@@ -412,12 +414,19 @@ Please help the user with their request. Use available tools as needed and provi
                 str(response)[:50] if response else "None",
             )
 
+            # Reset thought status to Ready after processing is complete
+            add_thought("Ready", session_id)
+
+    # Check Weaviate connection status
+    weaviate_status = is_weaviate_connected()
+
     return render_template_string(
         get_main_template(),
         response=response,
         context=context,
         agent_thoughts=agent_thoughts,
         is_multi_agent=hasattr(agent_executor, "get_agent_info"),
+        weaviate_connected=weaviate_status,
     )
 
 
@@ -470,6 +479,8 @@ def get_main_template():
                 --border-color: #e2e8f0;
                 --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
                 --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                --brain-connected: #10b981;
+                --brain-disconnected: #ef4444;
             }
 
             * {
@@ -772,6 +783,29 @@ def get_main_template():
                 font-size: 1rem;
             }
 
+            /* Brain icon status styles */
+            .brain-connected {
+                color: var(--brain-connected) !important;
+                animation: pulse-connected 2s infinite;
+            }
+
+            .brain-disconnected {
+                color: var(--brain-disconnected) !important;
+                animation: pulse-disconnected 2s infinite;
+            }
+
+            @keyframes pulse-connected {
+                0% { opacity: 1; }
+                50% { opacity: 0.7; }
+                100% { opacity: 1; }
+            }
+
+            @keyframes pulse-disconnected {
+                0% { opacity: 1; }
+                50% { opacity: 0.4; }
+                100% { opacity: 1; }
+            }
+
             .thought-content {
                 color: var(--text-primary);
                 font-size: 1.2rem;
@@ -888,7 +922,7 @@ def get_main_template():
             <div class=\"header\">
                 <h1>
                     <div class=\"header-icon\">
-                        <i class=\"fas fa-brain\"></i>
+                        <i class=\"fas fa-brain {% if weaviate_connected %}brain-connected{% else %}brain-disconnected{% endif %}\"></i>
                     </div>
                     Personal AI Agent
                 </h1>
@@ -900,7 +934,7 @@ def get_main_template():
                 <div class=\"current-thought\" id=\"current-thought\">
                     <div class=\"thought-header\">
                         <div class=\"thought-icon\">
-                            <i class=\"fas fa-brain\"></i>
+                            <i class=\"fas fa-brain {% if weaviate_connected %}brain-connected{% else %}brain-disconnected{% endif %}\"></i>
                         </div>
                         <span>Agent Status</span>
                     </div>
@@ -997,15 +1031,18 @@ def get_main_template():
                 }, 100);
             });
 
-            // Monitor processing state to reset thought to "Ready" when complete, but only if no user interaction
+            // Monitor processing state to reset thought to "Ready" when complete
             const observer = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                         const target = mutation.target;
                         if (target.id === 'processing' && !target.classList.contains('active')) {
-                            // Processing completed, but don't automatically reset to Ready
-                            // Let the user see the final processing thought
-                            console.log('Processing completed - keeping final thought visible');
+                            // Processing completed, reset thought to Ready
+                            console.log('Processing completed - resetting thought to Ready');
+                            const thoughtContent = document.getElementById('thought-content');
+                            if (thoughtContent) {
+                                thoughtContent.textContent = 'Ready';
+                            }
                         }
                     }
                 });
@@ -1027,9 +1064,21 @@ def get_main_template():
                 this.style.height = Math.max(120, this.scrollHeight) + 'px';
             });
 
-            // Focus on load
+            // Focus on load and reset thought status if needed
             window.addEventListener('load', function() {
                 document.getElementById('query').focus();
+                
+                // Reset thought content to Ready if page just loaded with a response
+                const thoughtContent = document.getElementById('thought-content');
+                const responseContent = document.querySelector('.response-content');
+                
+                // If there's a response visible and thought content isn't "Ready", reset it
+                if (thoughtContent && responseContent && responseContent.textContent.trim() !== 'Your response will appear here...') {
+                    if (thoughtContent.textContent !== 'Ready') {
+                        console.log('Page loaded with response, resetting thought to Ready');
+                        thoughtContent.textContent = 'Ready';
+                    }
+                }
             });
 
             // Keyboard shortcuts
@@ -1142,6 +1191,15 @@ def get_main_template():
                 setTimeout(() => {
                     document.getElementById('query').focus();
                 }, 100);
+                
+                // Add a timeout to reset the thought content if processing takes too long or gets stuck
+                setTimeout(() => {
+                    const thoughtContent = document.getElementById('thought-content');
+                    if (thoughtContent && !processing.classList.contains('active')) {
+                        console.log('Timeout reached, ensuring thought is reset to Ready');
+                        thoughtContent.textContent = 'Ready';
+                    }
+                }, 10000); // 10 second timeout
             });
             
             // Start initial stream
