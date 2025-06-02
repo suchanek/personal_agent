@@ -630,7 +630,9 @@ personal_agent/
 │   ├── debug_github_direct.py # Direct GitHub API testing
 │   ├── debug_tool_call.py   # General MCP debugging
 │   ├── debug_memory_tools.py # Memory debugging
-│   └── debug_globals.py     # Global variable debugging
+│   ├── debug_globals.py     # Global variable debugging
+│   ├── debug_agent_tools.py # Agent tools debugging
+│   └── debug_mcp_client.py  # MCP client debugging
 ├── scripts/                 # Installation and utility scripts
 │   ├── __init__.py
 │   └── install_mcp.py      # Automated MCP server installation
@@ -639,8 +641,6 @@ personal_agent/
 │   ├── mcp.json            # Legacy MCP configuration
 │   ├── mcp.json.template   # Legacy MCP template
 │   └── weaviate_examples.py # Weaviate example code
-├── debug_agent_tools.py    # Root-level debugging scripts
-├── debug_mcp_client.py     # MCP client debugging
 ├── run_agent.py            # Direct agent runner
 ├── run_smolagents.py       # Direct smolagents runner
 ├── pyproject.toml          # Poetry dependencies & scripts
