@@ -21,8 +21,8 @@ litellm = "^1.71.3"
 markdownify = "^1.1.0"
 
 [tool.poetry.scripts]
-personal-agent-langchain = "src.personal_agent.main:main"
-personal-agent = "src.personal_agent.smol_main:run_smolagents_web"
+personal-agent = "src.personal_agent.main:main"
+personal-agent-smolagent = "src.personal_agent.smol_main:run_smolagents_web"
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"

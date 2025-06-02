@@ -2,7 +2,7 @@
 
 A sophisticated personal assistant that learns about you and provides context-aware responses. Features two implementations: **LangChain** (default, production-ready) and **Smolagents** (experimental), both with local Ollama AI, persistent Weaviate memory, and extensible Model Context Protocol (MCP) tools.
 
-> **🎯 Quick Start**: Run `poetry run personal-agent-langchain` for the recommended LangChain version
+> **🎯 Quick Start**: Run `poetry run personal-agent` for the recommended LangChain version
 
 ## 🌟 Features
 
@@ -86,7 +86,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 
 ### LangChain Version (Default - Recommended)
 
-**Command**: `poetry run personal-agent-langchain`
+**Command**: `poetry run personal-agent`
 
 **Features**:
 
@@ -102,7 +102,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 
 ### Smolagents Version (Experimental)
 
-**Command**: `poetry run personal-agent`
+**Command**: `poetry run personal-agent-smolagent`
 
 **Features**:
 
