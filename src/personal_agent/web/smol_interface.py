@@ -34,7 +34,7 @@ clear_knowledge_base_func = None
 # Streaming thoughts management
 thoughts_queue = queue.Queue()
 active_sessions = set()
-pending_thoughts = {}  # Buffer thoughts until session is active
+current_thoughts = {}  # Store only the latest thought per session
 
 # Logger capture setup
 log_capture_string = StringIO()
@@ -72,71 +72,66 @@ def setup_log_capture():
 
 
 def add_thought(thought: str, session_id: str = "default"):
-    """Add a thought to the streaming queue."""
+    """Add a thought to the streaming queue - only keeps the latest thought per session."""
     thought_data = {
         "session_id": session_id,
         "thought": thought,
         "timestamp": datetime.now().isoformat() + "Z",
     }
 
-    # If session is active, add directly to queue
-    if session_id in active_sessions:
+    # Store only the latest thought for this session
+    current_thoughts[session_id] = thought_data
+
+    # Always add to queue for all active sessions to see
+    # This ensures thoughts are streamed even if the specific session becomes inactive
+    if active_sessions:  # If any sessions are active
         thoughts_queue.put(thought_data)
         if logger:
-            logger.info(f"Added thought for active session {session_id}: {thought}")
+            logger.info(f"Added latest thought for session {session_id}: {thought}")
     else:
-        # Buffer thoughts for inactive sessions
-        if session_id not in pending_thoughts:
-            pending_thoughts[session_id] = []
-        pending_thoughts[session_id].append(thought_data)
+        # For when no sessions are active, just store the latest thought
         if logger:
             logger.info(
-                f"Buffered thought for inactive session {session_id}: {thought}"
+                f"Stored latest thought for inactive session {session_id}: {thought}"
             )
 
 
 def stream_thoughts(session_id: str = "default"):
-    """Generator for streaming thoughts."""
+    """Generator for streaming thoughts - sends only the latest thought per session."""
     active_sessions.add(session_id)
     if logger:
-        logger.info(f"Started streaming for session: {session_id}")
+        logger.debug(f"Started streaming for session: {session_id}")
 
     try:
         # Send initial connection confirmation
         yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
 
-        # Flush any pending thoughts for this session
-        if session_id in pending_thoughts:
-            for thought_data in pending_thoughts[session_id]:
-                if logger:
-                    logger.info(
-                        f"Flushing buffered thought for {session_id}: {thought_data['thought']}"
-                    )
-                yield f"data: {json.dumps(thought_data)}\n\n"
-            del pending_thoughts[session_id]
+        # Send the current latest thought if one exists for this session
+        if session_id in current_thoughts:
+            thought_data = current_thoughts[session_id]
+            if logger:
+                logger.debug(
+                    f"Sending current thought for {session_id}: {thought_data['thought']}"
+                )
+            yield f"data: {json.dumps(thought_data)}\n\n"
 
         while session_id in active_sessions:
             try:
-                # Check for new thoughts
+                # Check for new thoughts - broadcast all thoughts to all active connections
                 thought_data = thoughts_queue.get(timeout=1.0)
-                if thought_data["session_id"] == session_id:
-                    if logger:
-                        logger.info(
-                            f"Streaming thought for {session_id}: {thought_data['thought']}"
-                        )
-                    yield f"data: {json.dumps(thought_data)}\n\n"
-                else:
-                    # Put back thoughts for other sessions
-                    thoughts_queue.put(thought_data)
+                # Stream all thoughts to all active sessions - let the client decide what to show
+                if logger:
+                    logger.debug(
+                        f"Broadcasting thought from {thought_data['session_id']} to session {session_id}: {thought_data['thought']}"
+                    )
+                yield f"data: {json.dumps(thought_data)}\n\n"
             except queue.Empty:
                 # Send keep-alive
                 yield f"data: {json.dumps({'type': 'keep-alive'})}\n\n"
     finally:
         active_sessions.discard(session_id)
         if logger:
-            logger.info(f"Stopped streaming for session: {session_id}")
-        if logger:
-            logger.info(f"Stopped streaming for session: {session_id}")
+            logger.debug(f"Stopped streaming for session: {session_id}")
 
 
 def stream_logs():
@@ -396,7 +391,7 @@ Please help the user with their request. Use available tools as needed and provi
                 response = f"Error processing query: {str(e)}"
                 add_thought(f"❌ Error occurred: {str(e)}", session_id)
 
-            logger.info(
+            logger.debug(
                 "Received query: %s..., Response: %s...",
                 user_input[:50],
                 str(response)[:50] if response else "None",
@@ -695,14 +690,9 @@ def get_main_template():
                 font-weight: 300;
             }
 
-            .main-layout {
-                display: grid;
-                grid-template-columns: 2fr 1fr;
-                gap: 2rem;
-                align-items: start;
-            }
-
             .content {
+                max-width: 1000px;
+                margin: 0 auto;
                 background: var(--surface);
                 padding: 2rem;
                 border-radius: 1rem;
@@ -840,9 +830,48 @@ def get_main_template():
             }
 
             .response-section {
+                display: block; /* Ensure the response pane is always visible */
                 margin-top: 2rem;
                 padding-top: 2rem;
                 border-top: 2px solid var(--border-color);
+            }
+
+            .current-thought {
+                margin-bottom: 2rem;
+                padding: 1.25rem;
+                background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+                border-radius: 0.75rem;
+                border-left: 4px solid var(--primary-color);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                transition: all 0.3s ease;
+            }
+
+            .thought-header {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 0.75rem;
+                color: var(--primary-color);
+                font-size: 1.1rem;
+                font-weight: 600;
+            }
+
+            .thought-icon {
+                background: var(--primary-color);
+                color: white;
+                padding: 0.6rem;
+                border-radius: 0.6rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1rem;
+            }
+
+            .thought-content {
+                color: var(--text-primary);
+                font-size: 1.2rem;
+                line-height: 1.5;
+                font-weight: 500;
             }
 
             .response-header {
@@ -876,120 +905,10 @@ def get_main_template():
                 color: var(--text-primary);
                 font-size: 1rem;
                 box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-            }
-
-            .thinking-panel {
-                background: var(--surface);
-                padding: 1.5rem;
-                border-radius: 1rem;
-                box-shadow: var(--shadow);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                backdrop-filter: blur(10px);
-                max-height: 80vh;
-                overflow-y: auto;
-                position: sticky;
-                top: 6rem;
-            }
-
-            .thinking-header {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-                margin-bottom: 1.5rem;
-                color: var(--primary-color);
-                font-size: 1.125rem;
-                font-weight: 600;
-                padding-bottom: 1rem;
-                border-bottom: 2px solid var(--border-color);
-            }
-
-            .thinking-icon {
-                background: var(--primary-color);
-                color: white;
-                padding: 0.5rem;
-                border-radius: 0.5rem;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 0.875rem;
-            }
-
-            .connection-status {
-                margin-left: auto;
-                display: flex;
-                align-items: center;
-                gap: 0.25rem;
-                font-size: 0.8rem;
-                color: var(--text-secondary);
-            }
-
-            .thought-item {
-                background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-                padding: 1rem;
-                margin: 0.75rem 0;
-                border-radius: 0.75rem;
-                border-left: 4px solid var(--primary-color);
-                font-size: 0.9rem;
-                animation: slideIn 0.5s ease-out;
-                position: relative;
-                overflow: hidden;
-            }
-
-            .thought-item::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 2px;
-                background: linear-gradient(90deg, var(--primary-color), transparent);
-                animation: progress 3s ease-out;
-            }
-
-            @keyframes slideIn {
-                from { 
-                    opacity: 0; 
-                    transform: translateX(-20px) scale(0.95); 
-                }
-                to { 
-                    opacity: 1; 
-                    transform: translateX(0) scale(1); 
-                }
-            }
-
-            @keyframes progress {
-                from { transform: scaleX(0); }
-                to { transform: scaleX(1); }
-            }
-
-            .empty-thoughts {
-                text-align: center;
-                color: var(--text-secondary);
-                font-style: italic;
-                padding: 3rem 1rem;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 1rem;
-            }
-
-            .empty-icon {
-                font-size: 3rem;
-                opacity: 0.5;
+                min-height: 100px; /* Ensure a minimum height for visibility */
             }
 
             @media (max-width: 1024px) {
-                .main-layout {
-                    grid-template-columns: 1fr;
-                    gap: 1.5rem;
-                }
-                
-                .thinking-panel {
-                    position: static;
-                    max-height: none;
-                    order: -1;
-                }
-
                 .status-bar {
                     padding: 0.5rem 1rem;
                 }
@@ -1021,32 +940,9 @@ def get_main_template():
                     padding: 0.75rem 1rem;
                 }
 
-                .main-layout {
-                    gap: 1rem;
-                }
-
-                .content, .thinking-panel {
+                .content {
                     padding: 1.5rem;
                 }
-            }
-
-            /* Smooth scrollbar styling */
-            .thinking-panel::-webkit-scrollbar {
-                width: 6px;
-            }
-
-            .thinking-panel::-webkit-scrollbar-track {
-                background: var(--surface-alt);
-                border-radius: 3px;
-            }
-
-            .thinking-panel::-webkit-scrollbar-thumb {
-                background: var(--border-color);
-                border-radius: 3px;
-            }
-
-            .thinking-panel::-webkit-scrollbar-thumb:hover {
-                background: var(--text-secondary);
             }
         </style>
     </head>
@@ -1094,77 +990,67 @@ def get_main_template():
                 <p>Your intelligent assistant powered by advanced multi-agent architecture</p>
             </div>
             
-            <div class=\"main-layout\">
-                <div class=\"content\">
-                    <div class=\"form-section\">
-                        <div class=\"form-header\">
-                            <div class=\"form-icon\">
-                                <i class=\"fas fa-comment-dots\"></i>
-                            </div>
-                            Ask me anything
+            <div class=\"content\">
+                <!-- Current Thought Display - Always Visible -->
+                <div class=\"current-thought\" id=\"current-thought\">
+                    <div class=\"thought-header\">
+                        <div class=\"thought-icon\">
+                            <i class=\"fas fa-brain\"></i>
                         </div>
-                        <form method=\"post\" id=\"query-form\">
-                            <input type=\"hidden\" id=\"session_id\" name=\"session_id\" value=\"default\">
-                            <div class=\"query-container\">
-                                <i class=\"fas fa-pen query-icon\"></i>
-                                <textarea 
-                                    id=\"query\" 
-                                    name=\"query\" 
-                                    class=\"query-input\"
-                                    placeholder=\"Type your question or request here...\"
-                                    required
-                                ></textarea>
-                            </div>
-                            <div class=\"submit-container\">
-                                <button type=\"submit\" class=\"btn\">
-                                    <i class=\"fas fa-paper-plane\"></i>
-                                    Send Query
-                                </button>
-                                <button type=\"button\" class=\"btn btn-secondary\" onclick=\"clearForm()\">
-                                    <i class=\"fas fa-eraser\"></i>
-                                    Clear
-                                </button>
-                                <div class=\"processing-indicator\" id=\"processing\">
-                                    <div class=\"spinner\"></div>
-                                    <span>Processing your request...</span>
-                                </div>
-                            </div>
-                        </form>
+                        <span>Agent Status</span>
                     </div>
-                    
-                    {% if response %}
-                    <div class=\"response-section\">
-                        <div class=\"response-header\">
-                            <div class=\"response-icon\">
-                                <i class=\"fas fa-check-circle\"></i>
-                            </div>
-                            Agent Response
-                        </div>
-                        <div class=\"response-content\">{{ response }}</div>
+                    <div class=\"thought-content\" id=\"thought-content\">
+                        Ready
                     </div>
-                    {% endif %}
                 </div>
                 
-                <div class=\"thinking-panel\">
-                    <div class=\"thinking-header\">
-                        <div class=\"thinking-icon\">
-                            <i class=\"fas fa-cogs\"></i>
+                <div class=\"form-section\">
+                    <div class=\"form-header\">
+                        <div class=\"form-icon\">
+                            <i class=\"fas fa-comment-dots\"></i>
                         </div>
-                        Agent Thoughts
-                        <div class=\"connection-status\" id=\"connection-status\">
-                            <i class=\"fas fa-circle\" style=\"color: #22c55e; font-size: 0.5rem;\"></i>
-                            <span style=\"font-size: 0.8rem; color: var(--text-secondary);\">Connected</span>
-                        </div>
+                        Ask me anything
                     </div>
-                    <div id=\"thoughts-container\">
-                        <div class=\"empty-thoughts\">
-                            <div class=\"empty-icon\">
-                                <i class=\"fas fa-lightbulb\"></i>
+                    <form method=\"post\" id=\"query-form\">
+                        <input type=\"hidden\" id=\"session_id\" name=\"session_id\" value=\"default\">
+                        <div class=\"query-container\">
+                            <i class=\"fas fa-pen query-icon\"></i>
+                            <textarea 
+                                id=\"query\" 
+                                name=\"query\" 
+                                class=\"query-input\"
+                                placeholder=\"Type your question or request here...\"
+                                required
+                            ></textarea>
+                        </div>
+                        <div class=\"submit-container\">
+                            <button type=\"submit\" class=\"btn\">
+                                <i class=\"fas fa-paper-plane\"></i>
+                                Send Query
+                            </button>
+                            <button type=\"button\" class=\"btn btn-secondary\" onclick=\"clearForm()\">
+                                <i class=\"fas fa-eraser\"></i>
+                                Clear
+                            </button>
+                            <div class=\"processing-indicator\" id=\"processing\">
+                                <div class=\"spinner\"></div>
+                                <span>Processing your request...</span>
                             </div>
-                            <span>Agent thoughts and reasoning will appear here during processing...</span>
                         </div>
-                    </div>
+                    </form>
                 </div>
+                
+                {% if response %}
+                <div class=\"response-section\">
+                    <div class=\"response-header\">
+                        <div class=\"response-icon\">
+                            <i class=\"fas fa-check-circle\"></i>
+                        </div>
+                        Agent Response
+                    </div>
+                    <div class=\"response-content\">{{ response }}</div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -1195,6 +1081,28 @@ def get_main_template():
                     document.getElementById('query').focus();
                 }, 100);
             });
+
+            // Monitor processing state to reset thought to "Ready" when complete
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        const target = mutation.target;
+                        if (target.id === 'processing' && !target.classList.contains('active')) {
+                            // Processing completed, reset thought to Ready
+                            const thoughtContent = document.getElementById('thought-content');
+                            if (thoughtContent && thoughtContent.textContent !== 'Ready') {
+                                setTimeout(() => {
+                                    thoughtContent.textContent = 'Ready';
+                                    console.log('Reset thought to Ready state');
+                                }, 1000); // Small delay to let any final thoughts show
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Start observing the processing indicator
+            observer.observe(processing, { attributes: true });
 
             // Clear form function
             function clearForm() {
@@ -1229,9 +1137,10 @@ def get_main_template():
                 }
             });
 
-            // Real-time thoughts streaming
+            // Current thought display streaming
             let eventSource = null;
             let sessionId = 'default';
+            let currentSessionId = 'default'; // Track the current active session
             
             function startThoughtsStream() {
                 console.log('Starting thoughts stream for session:', sessionId);
@@ -1241,14 +1150,11 @@ def get_main_template():
                 }
                 
                 eventSource = new EventSource('/stream_thoughts?session_id=' + sessionId);
-                const connectionStatus = document.getElementById('connection-status');
-                const thoughtsContainer = document.getElementById('thoughts-container');
+                const currentThought = document.getElementById('current-thought');
+                const thoughtContent = document.getElementById('thought-content');
                 
                 eventSource.onopen = function() {
                     console.log('EventSource connection opened for session:', sessionId);
-                    if (connectionStatus) {
-                        connectionStatus.innerHTML = '<i class=\"fas fa-circle\" style=\"color: #22c55e; font-size: 0.5rem;\"></i><span style=\"font-size: 0.8rem; color: var(--text-secondary);\">Connected</span>';
-                    }
                 };
                 
                 eventSource.onmessage = function(event) {
@@ -1269,25 +1175,22 @@ def get_main_template():
                             return;
                         }
                         
-                        // Handle thought messages (they have 'thought' field)
+                        // Handle thought messages - show the actual thoughts
+                        // Accept thoughts from any session if they're more recent than our current session
                         if (data.thought) {
-                            console.log('Processing thought:', data.thought);
-                            // Clear empty thoughts if it's the first real thought
-                            const emptyThoughts = thoughtsContainer.querySelector('.empty-thoughts');
-                            if (emptyThoughts) {
-                                console.log('Removing empty thoughts placeholder');
-                                emptyThoughts.remove();
+                            console.log('Processing thought:', data.thought, 'from session:', data.session_id);
+                            
+                            // Show the current thought display if hidden
+                            if (currentThought && currentThought.style.display === 'none') {
+                                currentThought.style.display = 'block';
                             }
                             
-                            // Add new thought
-                            const thoughtElement = document.createElement('div');
-                            thoughtElement.className = 'thought-item';
-                            thoughtElement.textContent = data.thought;
-                            thoughtsContainer.appendChild(thoughtElement);
-                            console.log('Added thought element to container');
+                            // Update the thought content with the actual thought
+                            if (thoughtContent) {
+                                thoughtContent.textContent = data.thought;
+                            }
                             
-                            // Auto-scroll to bottom
-                            thoughtsContainer.parentElement.scrollTop = thoughtsContainer.parentElement.scrollHeight;
+                            console.log('Updated current thought display with:', data.thought);
                         }
                     } catch (e) {
                         console.error('Error parsing thought data:', e, 'Raw data:', event.data);
@@ -1296,9 +1199,6 @@ def get_main_template():
                 
                 eventSource.onerror = function(error) {
                     console.error('EventSource error:', error);
-                    if (connectionStatus) {
-                        connectionStatus.innerHTML = '<i class=\"fas fa-circle\" style=\"color: #ef4444; font-size: 0.5rem;\"></i><span style=\"font-size: 0.8rem; color: var(--text-secondary);\">Disconnected</span>';
-                    }
                     
                     // Retry connection after 3 seconds
                     setTimeout(() => {
@@ -1320,18 +1220,11 @@ def get_main_template():
                 document.getElementById('session_id').value = sessionId;
                 console.log('Updated hidden session_id field to:', sessionId);
                 
-                // Restart thoughts stream with new session ID
-                console.log('Restarting thoughts stream with new session ID');
-                startThoughtsStream();
-                
-                // Clear previous thoughts
-                const thoughtsContainer = document.getElementById('thoughts-container');
-                thoughtsContainer.innerHTML = '<div class=\"empty-thoughts\"><div class=\"empty-icon\"><i class=\"fas fa-lightbulb\"></i></div><span>Processing your request...</span></div>';
-                console.log('Cleared thoughts container');
-                
-                // Start new stream for this session
-                console.log('Starting new stream for session:', sessionId);
-                startThoughtsStream();
+                // Don't restart connection immediately - wait a bit to avoid timing issues
+                setTimeout(() => {
+                    console.log('Restarting thoughts stream with new session ID');
+                    startThoughtsStream();
+                }, 200); // Small delay to allow form submission to complete
                 
                 processing.classList.add('active');
                 
@@ -2144,7 +2037,7 @@ def get_logger_template():
     <script>
         let autoScroll = true;
         let logCount = 0;
-        const maxLogs = 1000; // Limit to prevent memory issues
+        const maxLogs = 25; // Limit to prevent memory issues
 
         // Connect to log stream
         const logEventSource = new EventSource('/stream_logs');

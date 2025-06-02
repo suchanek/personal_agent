@@ -3,7 +3,7 @@
 import logging
 from typing import List, Optional
 
-from smolagents import LiteLLMModel, ToolCallingAgent, tool
+from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent, tool
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_WEAVIATE
 from ..tools.smol_tools import ALL_TOOLS, set_mcp_client, set_memory_components
@@ -58,5 +58,6 @@ def create_smolagents_executor(
         tools = ALL_TOOLS
 
     agent = ToolCallingAgent(tools=tools, model=model)
-    logger.info("Created smolagents ToolCallingAgent with %d tools", len(tools))
+    # agent = CodeAgent(tools=tools, model=model)
+    logger.info("Created smolagents CodeAgent with %d tools", len(tools))
     return agent

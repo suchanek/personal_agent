@@ -42,7 +42,7 @@ def setup_logging() -> logging.Logger:
     )
 
     # Setup logging
-    logging.basicConfig(level=logging.INFO, handlers=[RichHandler()])
+    logging.basicConfig(level=logging.INFO, handlers=[])
     log = logging.getLogger(__name__)
     log.setLevel(logging.INFO)
 

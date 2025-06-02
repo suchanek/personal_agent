@@ -34,3 +34,4 @@ ROOT_DIR = get_env_var("ROOT_DIR", ".")  # Root directory for MCP filesystem ser
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
 
 LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
+# LLM_MODEL = "llama3.1:8b-instruct-q8_0"

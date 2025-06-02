@@ -6,4 +6,7 @@ You are a helpful assistant. Your task is to provide clear and concise answers t
 2. ensure all docstrings are complete and provide useful information about parameters and return values
 3. maintain consistent formatting across all docstrings
 4. use type hints for function parameters and return values
-5. always activate the .venv before running tests or scripts
+5. always activate the .venv before running tests or scripts with `source .venv/bin/activate`
+6. ensure that all code is properly indented and follows PEP 8 style guidelines
+7. use descriptive variable names that clearly indicate their purpose
+8. avoid using global variables unless absolutely necessary
