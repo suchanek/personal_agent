@@ -8,12 +8,10 @@ and other utility functions.
 import atexit
 import gc
 import logging
-import os
 import signal
 import sys
 import time
 import warnings
-from typing import TYPE_CHECKING
 
 from rich.logging import RichHandler
 from weaviate import WeaviateClient

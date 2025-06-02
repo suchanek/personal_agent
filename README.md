@@ -1,17 +1,24 @@
 # Personal AI Agent
 
-A sophisticated personal assistant that learns about you and provides context-aware responses using HuggingFace smolagents, Ollama, Weaviate vector database, and Model Context Protocol (MCP) integration.
+A sophisticated personal assistant that learns about you and provides context-aware responses. Features two implementations: **LangChain** (default, production-ready) and **Smolagents** (experimental), both with local Ollama AI, persistent Weaviate memory, and extensible Model Context Protocol (MCP) tools.
+
+> **🎯 Quick Start**: Run `poetry run personal-agent-langchain` for the recommended LangChain version
 
 ## 🌟 Features
+
+### Two Powerful Versions Available
+
+- 🎯 **LangChain Version** (Default): Production-ready, stable, feature-complete
+- 🧪 **Smolagents Version**: Experimental HuggingFace multi-agent framework
 
 ### Core Capabilities
 
 - 🧠 **Persistent Memory**: Uses Weaviate vector database for semantic memory storage
 - 🤖 **Local AI**: Powered by Ollama (qwen2.5:7b-instruct model)
 - 🔍 **Semantic Search**: Finds relevant context from past interactions
-- 🌐 **Web Interface**: Clean Flask-based web UI with knowledge base management
+- 🌐 **Web Interface**: Clean Flask-based web UI with live status indicators
 - 📊 **Topic Organization**: Categorize memories by topic
-- 🎯 **Smolagents Framework**: Uses HuggingFace smolagents multi-agent system for intelligent tool usage
+- 🎯 **Brain Status Indicator**: Visual feedback for Weaviate connection status
 - 🗑️ **Memory Management**: Clear knowledge base functionality
 
 ### MCP-Powered Tools (13 Total)
@@ -34,9 +41,11 @@ A sophisticated personal assistant that learns about you and provides context-aw
 
 ## 🏗️ Architecture
 
+### LangChain Version (Default - More Functional)
+
 ```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Flask Web UI  │───▶│ Smolagents Agent│───▶│   Ollama LLM    │
+│   Flask Web UI  │───▶│ LangChain Agent │───▶│   Ollama LLM    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                │
                                ▼
@@ -55,7 +64,57 @@ A sophisticated personal assistant that learns about you and provides context-aw
                    └─────────────────────────────────────────┘
 ```
 
+### Smolagents Version (Experimental)
+
+```text
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Flask Web UI  │───▶│ Smolagents Agent│───▶│   Ollama LLM    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                               │
+                               ▼
+                   ┌─────────────────────────────────────────┐
+                   │      Multi-Agent Framework              │
+                   │                                         │
+                   │  ┌─────────────────┐  ┌───────────────┐ │
+                   │  │ Weaviate Vector │  │ MCP Bridge    │ │
+                   │  │    Database     │  │ Tools         │ │
+                   │  └─────────────────┘  └───────────────┘ │
+                   └─────────────────────────────────────────┘
+```
+
+## 🔄 Version Comparison
+
+### LangChain Version (Default - Recommended)
+
+**Command**: `poetry run personal-agent-langchain`
+
+**Features**:
+- ✅ More stable and mature
+- ✅ Better error handling and debugging
+- ✅ Enhanced web interface with brain status indicator
+- ✅ Comprehensive tool integration
+- ✅ Real-time thought streaming
+- ✅ Better memory integration with Weaviate
+- ✅ Production-ready
+
+**Best For**: Daily use, production environments, reliable performance
+
+### Smolagents Version (Experimental)
+
+**Command**: `poetry run personal-agent`
+
+**Features**:
+- 🧪 Experimental multi-agent framework
+- 🧪 HuggingFace smolagents integration
+- 🧪 Custom MCP bridge implementation
+- ⚠️ Less stable, occasional tool discovery issues
+- ⚠️ Limited error recovery
+
+**Best For**: Research, experimentation, contributing to smolagents ecosystem
+
 ## 🚀 Quick Start
+
+### LangChain Version (Default - Recommended)
 
 ```bash
 # 1. Clone and setup
@@ -78,7 +137,16 @@ docker-compose up -d
 # 5. Test everything works
 poetry run test-tools
 
-# 6. Run the agent
+# 6. Run the LangChain agent (default)
+poetry run personal-agent-langchain
+```
+
+### Smolagents Version (Experimental)
+
+```bash
+# Follow steps 1-5 above, then:
+
+# 6. Run the Smolagents agent
 poetry run personal-agent
 ```
 
@@ -754,6 +822,27 @@ Weaviate collection structure:
 2. Add configuration to `src/personal_agent/config/mcp_servers.py` in the `MCP_SERVERS` dictionary
 3. Create corresponding `@tool` function in the appropriate module under `src/personal_agent/tools/`
 4. Update `src/personal_agent/tools/__init__.py` to include the new tool
+
+## 📜 Available Commands
+
+The project provides several convenient Poetry scripts:
+
+```bash
+# Run LangChain version (default, recommended)
+poetry run personal-agent-langchain
+
+# Run Smolagents version (experimental)
+poetry run personal-agent
+
+# Install MCP servers automatically
+poetry run install-mcp-servers
+
+# Test MCP server availability
+poetry run test-mcp-servers
+
+# Test all tools functionality
+poetry run test-tools
+```
 
 ## 📄 License
 
