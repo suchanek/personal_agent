@@ -580,7 +580,7 @@ personal_agent/
 ├── src/                      # Source code directory
 │   └── personal_agent/       # Main package
 │       ├── __init__.py
-│       ├── main.py          # Application entry point
+│       ├── main.py          # LangChain application entry point
 │       ├── smol_main.py     # Smolagents system initialization
 │       ├── config/          # Configuration modules
 │       │   ├── __init__.py
@@ -588,50 +588,68 @@ personal_agent/
 │       │   └── settings.py   # Application settings
 │       ├── core/            # Core functionality
 │       │   ├── __init__.py
-│       │   ├── agent.py     # Smolagents agent setup
+│       │   ├── agent.py     # LangChain agent setup
 │       │   ├── mcp_client.py # MCP client implementation
-│       │   └── memory.py    # Weaviate memory management
+│       │   ├── memory.py    # Weaviate memory management
+│       │   ├── multi_agent_example.py # Multi-agent examples
+│       │   ├── multi_agent_system.py # Multi-agent system
+│       │   └── smol_agent.py # Smolagents agent setup
 │       ├── tools/           # Tool implementations
 │       │   ├── __init__.py
 │       │   ├── filesystem.py # File system operations
 │       │   ├── memory_tools.py # Knowledge base tools
+│       │   ├── multiple_tools.py # Multi-tool coordination
 │       │   ├── research.py  # Comprehensive research tool
+│       │   ├── smol_tools.py # Smolagents-specific tools
 │       │   ├── system.py    # Shell command execution
 │       │   └── web.py       # Web search and GitHub tools
 │       ├── utils/           # Utility modules
 │       │   ├── __init__.py
-│       │   └── cleanup.py   # Resource cleanup and logging
+│       │   ├── cleanup.py   # Resource cleanup and logging
+│       │   ├── smol_blog.py # Blog utilities
+│       │   └── visit_webpage.py # Web page utilities
 │       └── web/             # Web interface
 │           ├── __init__.py
+│           ├── interface.py # LangChain Flask web application
 │           └── smol_interface.py # Smolagents web interface
-│           ├── __init__.py
-│           └── interface.py # Flask web application
-├── tests/                   # Comprehensive test suite (20+ files)
+├── tests/                   # Comprehensive test suite (30+ files)
 │   ├── __init__.py
 │   ├── run_tests.py         # Test runner with categories
-│   ├── test_tools.py        # Tool verification script  
+│   ├── test_tools.py        # Tool verification script
 │   ├── test_mcp_availability.py # MCP server testing
-│   ├── test_github.py       # GitHub integration tests (7 tests)
+│   ├── test_github.py       # GitHub integration tests
 │   ├── test_comprehensive_research.py # Research functionality
 │   ├── test_agent_init.py   # System initialization tests
 │   ├── test_refactored_system.py # Modular architecture tests
+│   ├── test_smolagents.py   # Smolagents framework tests
+│   ├── test_web_interface.py # Web interface tests
+│   ├── test_brain_status.py # Brain status indicator tests
+│   ├── test_cleanup.py      # Cleanup functionality tests
+│   ├── test_memory_tools.py # Memory tool tests
 │   ├── debug_github_tools.py # GitHub MCP tool discovery
 │   ├── debug_github_direct.py # Direct GitHub API testing
-│   └── debug_tool_call.py   # General MCP debugging
+│   ├── debug_tool_call.py   # General MCP debugging
+│   ├── debug_memory_tools.py # Memory debugging
+│   └── debug_globals.py     # Global variable debugging
 ├── scripts/                 # Installation and utility scripts
-│   ├── __init__.py        
+│   ├── __init__.py
 │   └── install_mcp.py      # Automated MCP server installation
 ├── old/                     # Legacy code (archived)
 │   ├── personal_agent.py   # Original monolithic version
 │   ├── mcp.json            # Legacy MCP configuration
-│   └── mcp.json.template   # Legacy MCP template
+│   ├── mcp.json.template   # Legacy MCP template
+│   └── weaviate_examples.py # Weaviate example code
+├── debug_agent_tools.py    # Root-level debugging scripts
+├── debug_mcp_client.py     # MCP client debugging
+├── run_agent.py            # Direct agent runner
+├── run_smolagents.py       # Direct smolagents runner
 ├── pyproject.toml          # Poetry dependencies & scripts
 ├── docker-compose.yml      # Weaviate database setup
 ├── .env.example           # Example environment variables
 ├── .env                   # Your actual API keys (excluded from git)
 ├── README.md              # This documentation
 ├── PROJECT_SUMMARY.md     # Project overview and status
-├── FIX_SUMMARY.md         # Comprehensive fix documentation
+├── LICENSE                # Project license
 └── .venv/                 # Virtual environment
 ```
 
