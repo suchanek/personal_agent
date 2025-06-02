@@ -12,6 +12,12 @@ from typing import Dict, List, Optional
 from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_WEAVIATE
+from ..tools.multiple_tools import (
+    get_joke,
+    get_news_headlines,
+    get_random_fact,
+    get_weather,
+)
 from ..tools.smol_tools import (
     ALL_TOOLS,
     clear_knowledge_base,
@@ -117,6 +123,8 @@ class MultiAgentSystem:
             web_search,
             github_search_repositories,
             comprehensive_research,
+            get_news_headlines,
+            get_weather,
         ]
 
         # Memory tools (if available)
@@ -129,6 +137,8 @@ class MultiAgentSystem:
 
         # System tools
         tool_groups["system"] = [shell_command]
+        # Fun tools
+        tool_groups["fun"] = [get_joke, get_random_fact]
 
         return tool_groups
 
@@ -148,6 +158,13 @@ class MultiAgentSystem:
             tools=all_tools,
             model=self.model,
             additional_authorized_imports=["time", "json", "re", "os"],
+            stream_outputs=True,
+            description=(
+                "This agent coordinates multiple specialized tools for different domains. "
+                "It can handle filesystem operations, web research, memory management, "
+                "system commands, and fun tasks. Available specialists:\n"
+                f"{self._get_specialist_descriptions()}"
+            ),
         )
 
         return agent

@@ -42,7 +42,10 @@ IMPORTANT: Action Input must be valid JSON format. For example:
 
 When storing information, always use a relevant topic to categorize it for better retrieval.
 When working with files, prefer using absolute paths and be careful about file permissions.
-Always store important interactions in memory for future reference.
+Always store important interactions in memory for future reference. When asked about Github
+repositories, use the GitHub tool to search for repositories and provide relevant information.
+When asked about the weather, use the weather tool to get current conditions. When asked about
+the news, use the news tool to get the latest headlines.
 
 Begin!
 
