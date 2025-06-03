@@ -9,7 +9,7 @@ Last update: 2025-06-02 23:17:39
 """
 
 import logging
-from pathlib import Path
+import warnings
 
 from rich.logging import RichHandler
 
@@ -76,6 +76,37 @@ def configure_master_logger(
     # Remove all existing handlers
     # root_logger.handlers.clear()
     root_logger.disabled = disabled
+
+
+def setup_logging_filters() -> None:
+    """Set up logging configuration with Rich handler."""
+    # Suppress warnings
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
+    warnings.filterwarnings(
+        "ignore", message=".*model_fields.*", category=DeprecationWarning
+    )
+    warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
+    warnings.filterwarnings(
+        "ignore", category=ResourceWarning, message=".*subprocess.*"
+    )
+
+    # Reduce httpx logging verbosity to WARNING to reduce noise
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
+    logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+
+    # Reduce Flask/Werkzeug logging verbosity to WARNING to reduce noise
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    logging.getLogger("flask").setLevel(logging.WARNING)
+    logging.getLogger("flask.app").setLevel(logging.WARNING)
+    logging.getLogger("werkzeug._internal").setLevel(logging.WARNING)
+
+    # Also suppress other common noisy loggers
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+
+    return None
 
 
 def setup_logging(

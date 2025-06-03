@@ -980,19 +980,6 @@ def get_main_template():
             </div>
             
             <div class=\"content\">
-                <!-- Current Thought Display - Always Visible -->
-                <div class=\"current-thought\" id=\"current-thought\">
-                    <div class=\"thought-header\">
-                        <div class=\"thought-icon\">
-                            <i class=\"fas fa-brain {% if weaviate_connected %}brain-connected{% else %}brain-disconnected{% endif %}\"></i>
-                        </div>
-                        <span>Agent Status</span>
-                    </div>
-                    <div class=\"thought-content\" id=\"thought-content\">
-                        Ready
-                    </div>
-                </div>
-                
                 <div class=\"form-section\">
                     <div class=\"form-header\">
                         <div class=\"form-icon\">
@@ -1038,6 +1025,19 @@ def get_main_template():
                     </div>
                     <div class=\"response-content\">
                         {% if response %}{{ response }}{% else %}Your response will appear here...{% endif %}
+                    </div>
+                </div>
+                
+                <!-- Current Thought Display - Now positioned under the result pane -->
+                <div class=\"current-thought\" id=\"current-thought\">
+                    <div class=\"thought-header\">
+                        <div class=\"thought-icon\">
+                            <i class=\"fas fa-brain {% if weaviate_connected %}brain-connected{% else %}brain-disconnected{% endif %}\"></i>
+                        </div>
+                        <span>Agent Status</span>
+                    </div>
+                    <div class=\"thought-content\" id=\"thought-content\">
+                        Ready
                     </div>
                 </div>
             </div>
