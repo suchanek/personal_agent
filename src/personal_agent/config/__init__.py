@@ -4,6 +4,7 @@ from .mcp_servers import MCP_SERVERS, get_mcp_servers
 from .settings import (
     DATA_DIR,
     LLM_MODEL,
+    LOG_LEVEL,
     OLLAMA_URL,
     ROOT_DIR,
     USE_MCP,
@@ -24,6 +25,10 @@ def get_settings():
         "LLM_MODEL": LLM_MODEL,
         "USE_WEAVIATE": USE_WEAVIATE,
         "USE_MCP": USE_MCP,
+        "LOG_LEVEL": LOG_LEVEL,
+        "MCP_SERVERS": MCP_SERVERS,
+        "get_env_var": get_env_var,
+        "get_settings": get_settings,
     }
 
 
@@ -39,4 +44,5 @@ __all__ = [
     "MCP_SERVERS",
     "get_mcp_servers",
     "get_settings",
+    "LOG_LEVEL",
 ]

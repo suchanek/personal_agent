@@ -17,8 +17,10 @@ from weaviate import WeaviateClient
 from weaviate.connect import ConnectionParams
 
 from ..config import OLLAMA_URL, USE_WEAVIATE, WEAVIATE_URL
+from ..utils import setup_logging
 
-logger = logging.getLogger(__name__)
+# Setup logging
+logger = setup_logging(name=__name__, level=logging.INFO)
 
 # Global variables for vector store and client
 vector_store: Optional[WeaviateVectorStore] = None
