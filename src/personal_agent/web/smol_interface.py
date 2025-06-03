@@ -4,7 +4,7 @@ Smolagents-compatible web interface module for the Personal AI Agent.
 This module provides a Flask-based web interface that works with smolagents
 instead of LangChain, maintaining the same UI and functionality.
 """
-
+# pylint: disable=W0718,C0103,C0301,
 import json
 import logging
 import queue
@@ -14,7 +14,7 @@ from datetime import datetime
 from io import StringIO
 from typing import TYPE_CHECKING, Optional
 
-from flask import Flask, Response, render_template_string, request, stream_template
+from flask import Flask, Response, render_template_string, request
 
 if TYPE_CHECKING:
     from logging import Logger

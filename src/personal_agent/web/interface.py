@@ -8,17 +8,14 @@ maintaining the same UI and functionality as smol_interface.py.
 """
 
 import json
-import logging
 import queue
 import threading
 import time
 from datetime import datetime
-from io import StringIO
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict
 
 from flask import Flask, Response, render_template_string, request
 from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.outputs import LLMResult
 
 from ..core.memory import is_weaviate_connected
 
@@ -41,9 +38,6 @@ clear_knowledge_base_func = None
 thoughts_queue = queue.Queue()
 active_sessions = set()
 current_thoughts = {}  # Store only the latest thought per session
-
-log_capture_string = StringIO()
-log_handler = None
 
 
 class ToolUsageCallbackHandler(BaseCallbackHandler):
@@ -85,26 +79,6 @@ def create_app() -> Flask:
     """
     flask_app = Flask(__name__)
     return flask_app
-
-
-def setup_log_capture():
-    """Setup log capture for streaming to web interface."""
-    global log_handler, log_capture_string
-
-    if log_handler is not None:
-        return  # Already set up
-
-    log_capture_string = StringIO()
-    log_handler = logging.StreamHandler(log_capture_string)
-    log_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    log_handler.setFormatter(formatter)
-
-    # Add to root logger to capture all logs
-    root_logger = logging.getLogger()
-    root_logger.addHandler(log_handler)
 
 
 def add_thought(thought: str, session_id: str = "default"):
@@ -167,28 +141,6 @@ def stream_thoughts(session_id: str = "default"):
             logger.debug(f"Stopped streaming for session: {session_id}")
 
 
-def stream_logs():
-    """Generator for streaming log output."""
-    last_position = 0
-    while True:
-        try:
-            current_content = log_capture_string.getvalue()
-            if len(current_content) > last_position:
-                new_content = current_content[last_position:]
-                last_position = len(current_content)
-
-                for line in new_content.strip().split("\n"):
-                    if line.strip():
-                        # Format timestamp as ISO string for JavaScript Date parsing
-                        timestamp = datetime.now().isoformat() + "Z"
-                        yield f"data: {json.dumps({'log': line, 'timestamp': timestamp})}\n\n"
-
-            time.sleep(0.5)  # Poll every 500ms
-        except (OSError, IOError, ValueError) as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            break
-
-
 def register_routes(
     flask_app: Flask,
     executor,
@@ -216,18 +168,13 @@ def register_routes(
     store_interaction_func = store_int_func
     clear_knowledge_base_func = clear_kb_func
 
-    # Setup log capture for streaming
-    setup_log_capture()
-
     # Add initial system ready thought
-    add_thought("🟢 LangChain Agent System Ready", "default")
+    add_thought("🟢 System Ready", "default")
 
     app.add_url_rule("/", "index", index, methods=["GET", "POST"])
     app.add_url_rule("/clear", "clear_kb", clear_kb_route)
     app.add_url_rule("/agent_info", "agent_info", agent_info_route)
     app.add_url_rule("/stream_thoughts", "stream_thoughts", stream_thoughts_route)
-    app.add_url_rule("/stream_logs", "stream_logs", stream_logs_route)
-    app.add_url_rule("/logger", "logger", logger_route)
 
 
 def index():
@@ -790,37 +737,6 @@ def get_main_template():
                 border-top: 2px solid var(--border-color);
             }
 
-            .current-thought {
-                margin-bottom: 2rem;
-                padding: 1.25rem;
-                background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-                border-radius: 0.75rem;
-                border-left: 4px solid var(--primary-color);
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-                transition: all 0.3s ease;
-            }
-
-            .thought-header {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-                margin-bottom: 0.75rem;
-                color: var(--primary-color);
-                font-size: 1.1rem;
-                font-weight: 600;
-            }
-
-            .thought-icon {
-                background: var(--primary-color);
-                color: white;
-                padding: 0.6rem;
-                border-radius: 0.6rem;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1rem;
-            }
-
             /* Brain icon status styles */
             .brain-connected {
                 color: var(--brain-connected) !important;
@@ -843,12 +759,6 @@ def get_main_template():
                 50% { opacity: 0.4; }
                 100% { opacity: 1; }
             }
-
-            .thought-content {
-                color: var(--text-primary);
-                font-size: 1.2rem;
-                line-height: 1.5;
-                font-weight: 500;
             }
 
             .response-header {
@@ -864,12 +774,13 @@ def get_main_template():
             .response-icon {
                 background: var(--success-color);
                 color: white;
-                padding: 0.75rem;
+                padding: 0.75rem 1rem;
                 border-radius: 0.75rem;
                 display: flex;
                 align-items: center;
-                justify-content: center;
+                gap: 0.5rem;
                 font-size: 1rem;
+                font-weight: 600;
             }
 
             .response-content {
@@ -877,12 +788,13 @@ def get_main_template():
                 padding: 1.5rem;
                 border-radius: 0.75rem;
                 border-left: 4px solid var(--success-color);
-                white-space: pre-wrap;
+                white-space: pre-line;
                 line-height: 1.8;
                 color: var(--text-primary);
                 font-size: 1rem;
                 box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
                 min-height: 100px; /* Ensure a minimum height for visibility */
+                text-indent: 0; /* Ensure no text indentation */
             }
 
             /* Responsive Design */
@@ -951,15 +863,15 @@ def get_main_template():
                     <i class=\"fas fa-clock\"></i>
                     <span id=\"current-time\"></span>
                 </div>
+                <div class=\"status-item\" id=\"agent-status-item\">
+                    <i class=\"fas fa-brain {% if weaviate_connected %}brain-connected{% else %}brain-disconnected{% endif %}\"></i>
+                    <span id=\"agent-status-text\">Ready</span>
+                </div>
             </div>
             <div class=\"status-right\">
                 <a href=\"/agent_info\" class=\"nav-button\">
                     <i class=\"fas fa-info-circle\"></i>
                     <span>Agent Info</span>
-                </a>
-                <a href=\"/logger\" class=\"nav-button\">
-                    <i class=\"fas fa-terminal\"></i>
-                    <span>Logger</span>
                 </a>
                 <a href=\"/clear\" class=\"nav-button\">
                     <i class=\"fas fa-trash-alt\"></i>
@@ -1020,24 +932,11 @@ def get_main_template():
                     <div class=\"response-header\">
                         <div class=\"response-icon\">
                             <i class=\"fas fa-check-circle\"></i>
+                            Agent Response
                         </div>
-                        Agent Response
                     </div>
                     <div class=\"response-content\">
                         {% if response %}{{ response }}{% else %}Your response will appear here...{% endif %}
-                    </div>
-                </div>
-                
-                <!-- Current Thought Display - Now positioned under the result pane -->
-                <div class=\"current-thought\" id=\"current-thought\">
-                    <div class=\"thought-header\">
-                        <div class=\"thought-icon\">
-                            <i class=\"fas fa-brain {% if weaviate_connected %}brain-connected{% else %}brain-disconnected{% endif %}\"></i>
-                        </div>
-                        <span>Agent Status</span>
-                    </div>
-                    <div class=\"thought-content\" id=\"thought-content\">
-                        Ready
                     </div>
                 </div>
             </div>
@@ -1088,10 +987,10 @@ def get_main_template():
                         const target = mutation.target;
                         if (target.id === 'processing' && !target.classList.contains('active')) {
                             // Processing completed, reset thought to Ready
-                            console.log('Processing completed - resetting thought to Ready');
-                            const thoughtContent = document.getElementById('thought-content');
-                            if (thoughtContent) {
-                                thoughtContent.textContent = 'Ready';
+                            console.log('Processing completed - resetting status to Ready');
+                            const agentStatusText = document.getElementById('agent-status-text');
+                            if (agentStatusText) {
+                                agentStatusText.textContent = 'Ready';
                             }
                         }
                     }
@@ -1118,13 +1017,13 @@ def get_main_template():
             window.addEventListener('load', function() {
                 document.getElementById('query').focus();
                 
-                // Reset thought content to Ready if page just loaded with a response
-                const thoughtContent = document.getElementById('thought-content');
+                // Reset status text to Ready if page just loaded with a response
+                const agentStatusText = document.getElementById('agent-status-text');
                 const responseContent = document.querySelector('.response-content');
                 
-                // If there's a response visible and thought content isn't "Ready", reset it
-                if (thoughtContent && responseContent && responseContent.textContent.trim() !== 'Your response will appear here...') {
-                    if (thoughtContent.textContent !== 'Ready') {
+                // If there's a response visible and status text isn't "Ready", reset it
+                if (agentStatusText && responseContent && responseContent.textContent.trim() !== 'Your response will appear here...') {
+                    if (agentStatusText.textContent !== 'Ready') {
                         console.log('Page loaded with response, resetting thought to Ready');
                         thoughtContent.textContent = 'Ready';
                     }
@@ -1159,8 +1058,7 @@ def get_main_template():
                 }
                 
                 eventSource = new EventSource('/stream_thoughts?session_id=' + sessionId);
-                const currentThought = document.getElementById('current-thought');
-                const thoughtContent = document.getElementById('thought-content');
+                const agentStatusText = document.getElementById('agent-status-text');
                 
                 eventSource.onopen = function() {
                     console.log('EventSource connection opened for session:', sessionId);
@@ -1189,17 +1087,12 @@ def get_main_template():
                         if (data.thought) {
                             console.log('Processing thought:', data.thought, 'from session:', data.session_id);
                             
-                            // Show the current thought display if hidden
-                            if (currentThought && currentThought.style.display === 'none') {
-                                currentThought.style.display = 'block';
+                            // Update the status text with the actual thought
+                            if (agentStatusText) {
+                                agentStatusText.textContent = data.thought;
                             }
                             
-                            // Update the thought content with the actual thought
-                            if (thoughtContent) {
-                                thoughtContent.textContent = data.thought;
-                            }
-                            
-                            console.log('Updated current thought display with:', data.thought);
+                            console.log('Updated agent status text with:', data.thought);
                         }
                     } catch (e) {
                         console.error('Error parsing thought data:', e, 'Raw data:', event.data);
@@ -1242,12 +1135,12 @@ def get_main_template():
                     document.getElementById('query').focus();
                 }, 100);
                 
-                // Add a timeout to reset the thought content if processing takes too long or gets stuck
+                // Add a timeout to reset the status text if processing takes too long or gets stuck
                 setTimeout(() => {
-                    const thoughtContent = document.getElementById('thought-content');
-                    if (thoughtContent && !processing.classList.contains('active')) {
-                        console.log('Timeout reached, ensuring thought is reset to Ready');
-                        thoughtContent.textContent = 'Ready';
+                    const agentStatusText = document.getElementById('agent-status-text');
+                    if (agentStatusText && !processing.classList.contains('active')) {
+                        console.log('Timeout reached, ensuring status is reset to Ready');
+                        agentStatusText.textContent = 'Ready';
                     }
                 }, 10000); // 10 second timeout
             });
@@ -1671,546 +1564,6 @@ def get_agent_info_template():
 """
 
 
-def get_logger_template():
-    """
-    Get the logger output window template.
-
-    :return: HTML template string for logger window
-    """
-    return """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logger Output - Personal AI Agent</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1d4ed8;
-            --success-color: #059669;
-            --warning-color: #f59e0b;
-            --danger-color: #dc2626;
-            --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --surface: #ffffff;
-            --surface-alt: #f8fafc;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border-color: #e2e8f0;
-            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: white;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .header-icon {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.75rem;
-            border-radius: 0.75rem;
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .navigation-bar {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            text-decoration: none;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s;
-        }
-
-        .btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-dark);
-        }
-
-        .logger-panel {
-            background: var(--surface);
-            border-radius: 1rem;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            min-height: 70vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .logger-header {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: white;
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logger-title {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .control-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success-color);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .logger-content {
-            flex: 1;
-            background: #1a1a1a;
-            color: #e2e8f0;
-            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-            font-size: 0.9rem;
-            overflow: auto;
-            padding: 0;
-        }
-
-        .log-entry {
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            transition: background-color 0.2s;
-        }
-
-        .log-entry:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .log-timestamp {
-            color: #64748b;
-            font-size: 0.8rem;
-            min-width: 180px;
-            flex-shrink: 0;
-        }
-
-        .log-level {
-            padding: 0.125rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            min-width: 60px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .log-level.INFO {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-        }
-
-        .log-level.WARNING {
-            background: rgba(245, 158, 11, 0.2);
-            color: #f59e0b;
-        }
-
-        .log-level.ERROR {
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-        }
-
-        .log-level.DEBUG {
-            background: rgba(148, 163, 184, 0.2);
-            color: #94a3b8;
-        }
-
-        .log-message {
-            flex: 1;
-            word-break: break-word;
-        }
-
-        .log-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 300px;
-            color: #64748b;
-            text-align: center;
-            gap: 1rem;
-        }
-
-        .log-placeholder i {
-            font-size: 3rem;
-            opacity: 0.5;
-        }
-
-        /* Scrollbar styling */
-        .logger-content::-webkit-scrollbar {
-            width: 12px;
-        }
-
-        .logger-content::-webkit-scrollbar-track {
-            background: #2a2a2a;
-        }
-
-        .logger-content::-webkit-scrollbar-thumb {
-            background: #4a5568;
-            border-radius: 6px;
-        }
-
-        .logger-content::-webkit-scrollbar-thumb:hover {
-            background: #718096;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem 0.5rem;
-            }
-
-            .header h1 {
-                font-size: 2rem;
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .navigation-bar {
-                gap: 0.5rem;
-            }
-
-            .btn {
-                padding: 0.5rem 1rem;
-                font-size: 0.875rem;
-            }
-
-            .controls {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .log-entry {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .log-timestamp {
-                min-width: auto;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>
-                <div class="header-icon">
-                    <i class="fas fa-terminal"></i>
-                </div>
-                Logger Output
-            </h1>
-            <p>Real-time system logs and debug information</p>
-        </div>
-
-        <div class="navigation-bar">
-            <a href="/" class="btn btn-primary">
-                <i class="fas fa-home"></i>
-                Back to Chat
-            </a>
-            <a href="/agent_info" class="btn">
-                <i class="fas fa-info-circle"></i>
-                Agent Info
-            </a>
-            <a href="/clear" class="btn">
-                <i class="fas fa-trash-alt"></i>
-                Clear Memory
-            </a>
-        </div>
-
-        <div class="logger-panel">
-            <div class="logger-header">
-                <div class="logger-title">
-                    <i class="fas fa-stream"></i>
-                    Live Log Stream
-                </div>
-                <div class="controls">
-                    <div class="status-indicator">
-                        <div class="status-dot"></div>
-                        <span>Connected</span>
-                    </div>
-                    <button class="control-btn" onclick="clearLogs()">
-                        <i class="fas fa-eraser"></i>
-                        Clear
-                    </button>
-                    <button class="control-btn" onclick="toggleAutoScroll()" id="scroll-btn">
-                        <i class="fas fa-arrow-down"></i>
-                        Auto-scroll
-                    </button>
-                </div>
-            </div>
-            <div class="logger-content" id="logger-content">
-                <div class="log-placeholder">
-                    <i class="fas fa-hourglass-half"></i>
-                    <div>
-                        <p><strong>Waiting for log output...</strong></p>
-                        <p>Log entries will appear here in real-time</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let autoScroll = true;
-        let logCount = 0;
-        const maxLogs = 50; // Limit to prevent memory issues - matching smol_interface
-
-        // Connect to log stream
-        const logEventSource = new EventSource('/stream_logs');
-        
-        logEventSource.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                
-                if (data.error) {
-                    addLogEntry('ERROR', 'Stream Error', data.error);
-                    return;
-                }
-                
-                if (data.log) {
-                    parseAndAddLogEntry(data.log);
-                }
-            } catch (e) {
-                console.error('Error parsing log data:', e);
-            }
-        };
-
-        logEventSource.onerror = function(event) {
-            addLogEntry('ERROR', 'Connection Error', 'Lost connection to log stream. Attempting to reconnect...');
-        };
-
-        function parseAndAddLogEntry(logLine) {
-            // Parse log format: timestamp - logger - level - message
-            const parts = logLine.split(' - ');
-            if (parts.length >= 4) {
-                const timestamp = parts[0];
-                const logger = parts[1];
-                const level = parts[2];
-                const message = parts.slice(3).join(' - ');
-                addLogEntry(level, timestamp, `[${logger}] ${message}`);
-            } else {
-                // Fallback for unparsed logs - use current time safely
-                try {
-                    const currentTime = new Date().toISOString();
-                    addLogEntry('INFO', currentTime, logLine);
-                } catch (e) {
-                    // Ultimate fallback with fixed timestamp
-                    addLogEntry('INFO', '2024-01-01T00:00:00.000Z', logLine);
-                }
-            }
-        }
-
-        function addLogEntry(level, timestamp, message) {
-            const logContent = document.getElementById('logger-content');
-            
-            // Remove placeholder if it exists
-            const placeholder = logContent.querySelector('.log-placeholder');
-            if (placeholder) {
-                placeholder.remove();
-            }
-
-            // Create log entry
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
-            
-            logEntry.innerHTML = `
-                <div class="log-timestamp">${formatTimestamp(timestamp)}</div>
-                <div class="log-level ${level.toUpperCase()}">${level.toUpperCase()}</div>
-                <div class="log-message">${escapeHtml(message)}</div>
-            `;
-
-            logContent.appendChild(logEntry);
-            logCount++;
-
-            // Limit number of log entries to 50 lines as specified
-            if (logCount > maxLogs) {
-                const firstEntry = logContent.querySelector('.log-entry');
-                if (firstEntry) {
-                    firstEntry.remove();
-                    logCount--;
-                }
-            }
-
-            // Auto-scroll to bottom
-            if (autoScroll) {
-                logContent.scrollTop = logContent.scrollHeight;
-            }
-        }
-
-        function formatTimestamp(timestamp) {
-            try {
-                const date = new Date(timestamp);
-                if (isNaN(date.getTime())) {
-                    console.warn('Invalid timestamp:', timestamp);
-                    return new Date().toLocaleTimeString('en-US', { 
-                        hour12: false,
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    });
-                }
-                return date.toLocaleTimeString('en-US', { 
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-            } catch (e) {
-                console.warn('Error formatting timestamp:', e);
-                return timestamp || '--:--:--';
-            }
-        }
-
-        function escapeHtml(unsafe) {
-            return unsafe
-                 .replace(/&/g, "&amp;")
-                 .replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;")
-                 .replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
-        }
-
-        function clearLogs() {
-            const logContent = document.getElementById('logger-content');
-            logContent.innerHTML = `
-                <div class="log-placeholder">
-                    <i class="fas fa-hourglass-half"></i>
-                    <div>
-                        <p><strong>Logs cleared</strong></p>
-                        <p>New log entries will appear here</p>
-                    </div>
-                </div>
-            `;
-            logCount = 0;
-        }
-
-        function toggleAutoScroll() {
-            autoScroll = !autoScroll;
-            const btn = document.getElementById('scroll-btn');
-            
-            if (autoScroll) {
-                btn.innerHTML = '<i class="fas fa-arrow-down"></i> Auto-scroll';
-                const logContent = document.getElementById('logger-content');
-                logContent.scrollTop = logContent.scrollHeight;
-            } else {
-                btn.innerHTML = '<i class="fas fa-pause"></i> Manual';
-            }
-        }
-
-        // Handle page unload
-        window.addEventListener('beforeunload', function() {
-            if (logEventSource) {
-                logEventSource.close();
-            }
-        });
-    </script>
-</body>
-</html>
-"""
-
-
 def get_error_template() -> str:
     """Get the error HTML template for knowledge base clearing."""
     return """
@@ -2343,8 +1696,13 @@ def clean_response_from_thinking_process(response: str) -> str:
     # Remove multiple consecutive newlines
     cleaned_response = re.sub(r"\n\s*\n", "\n\n", cleaned_response)
 
-    # Strip leading/trailing whitespace
+    # Strip leading/trailing whitespace from the entire response
     cleaned_response = cleaned_response.strip()
+
+    # Remove leading whitespace from each line to prevent indentation issues
+    lines = cleaned_response.split("\n")
+    cleaned_lines = [line.lstrip() for line in lines]
+    cleaned_response = "\n".join(cleaned_lines)
 
     return cleaned_response
 
@@ -2353,16 +1711,6 @@ def stream_thoughts_route():
     """Route for streaming thoughts."""
     session_id = request.args.get("session_id", "default")
     return Response(stream_thoughts(session_id), content_type="text/event-stream")
-
-
-def stream_logs_route():
-    """Route for streaming logs."""
-    return Response(stream_logs(), content_type="text/event-stream")
-
-
-def logger_route():
-    """Route for displaying the logger page."""
-    return render_template_string(get_logger_template())
 
 
 def agent_info_route():
