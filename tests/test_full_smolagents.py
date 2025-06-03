@@ -14,7 +14,7 @@ def test_full_smolagents():
         from personal_agent.config import USE_WEAVIATE, get_mcp_servers
         from personal_agent.core.mcp_client import SimpleMCPClient
         from personal_agent.core.smol_agent import create_smolagents_executor
-        from personal_agent.utils.cleanup import setup_logging
+        from personal_agent.utils.logging import setup_logging
 
         logger = setup_logging()
         logger.info("🚀 Testing full smolagents integration")

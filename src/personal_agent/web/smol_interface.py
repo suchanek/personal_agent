@@ -652,9 +652,9 @@ def get_main_template():
             }
 
             .container {
-                max-width: 1400px;
+                max-width: 95%;
                 margin: 0 auto;
-                padding: 5rem 1rem 2rem;
+                padding: 5rem 2rem 2rem;
             }
 
             .header {
@@ -691,7 +691,7 @@ def get_main_template():
             }
 
             .content {
-                max-width: 1000px;
+                max-width: 90%;
                 margin: 0 auto;
                 background: var(--surface);
                 padding: 2rem;
@@ -906,6 +906,18 @@ def get_main_template():
                 font-size: 1rem;
                 box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
                 min-height: 100px; /* Ensure a minimum height for visibility */
+            }
+
+            /* Responsive Design */
+            @media (min-width: 1920px) {
+                .container {
+                    max-width: 90%;
+                }
+                
+                .content {
+                    max-width: 85%;
+                    padding: 3rem;
+                }
             }
 
             @media (max-width: 1024px) {
@@ -1355,7 +1367,7 @@ def get_agent_info_template():
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 95%;
             margin: 0 auto;
             padding: 2rem 1rem;
         }
@@ -1558,6 +1570,13 @@ def get_agent_info_template():
             color: var(--text-secondary);
             font-size: 0.9rem;
         }
+
+        /* Responsive Design */
+        @media (min-width: 1920px) {
+            .container {
+                max-width: 90%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1698,7 +1717,7 @@ def get_logger_template():
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 95%;
             margin: 0 auto;
             padding: 2rem 1rem;
         }
@@ -1936,6 +1955,13 @@ def get_logger_template():
 
         .logger-content::-webkit-scrollbar-thumb:hover {
             background: #718096;
+        }
+
+        /* Responsive Design */
+        @media (min-width: 1920px) {
+            .container {
+                max-width: 90%;
+            }
         }
 
         @media (max-width: 768px) {

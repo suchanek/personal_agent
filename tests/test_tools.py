@@ -17,7 +17,7 @@ def main():
         from personal_agent.config import USE_MCP, get_mcp_servers
         from personal_agent.core.mcp_client import SimpleMCPClient
         from personal_agent.tools import get_all_tools
-        from personal_agent.utils.cleanup import setup_logging
+        from personal_agent.utils import setup_logging
 
         print("✅ All core imports successful")
 

@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src
 from personal_agent.config import USE_WEAVIATE, get_mcp_servers
 from personal_agent.core.mcp_client import SimpleMCPClient
 from personal_agent.core.smol_agent import create_smolagents_executor
-from personal_agent.utils.cleanup import setup_logging
+from personal_agent.utils import setup_logging
 
 
 def test_smolagents_integration():
