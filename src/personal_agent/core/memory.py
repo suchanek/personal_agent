@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# pylint: disable=W0718,W0603
+
 """Memory and vector store operations."""
 
 import logging
@@ -23,7 +26,11 @@ weaviate_client: Optional[WeaviateClient] = None
 
 
 def setup_weaviate() -> bool:
-    """Setup Weaviate client and vector store. Returns True if successful."""
+    """
+    Setup Weaviate client and vector store. Returns True if successful.
+
+    :return: True if Weaviate setup succeeded, False otherwise
+    """
     global vector_store, weaviate_client
 
     if not USE_WEAVIATE:
@@ -147,6 +154,69 @@ def is_weaviate_connected() -> bool:
     try:
         # Check if Weaviate is ready via HTTP endpoint
         response = requests.get(f"{WEAVIATE_URL}/v1/.well-known/ready", timeout=5)
-        return response.status_code == 200
-    except (requests.exceptions.RequestException, Exception):
+        if response.status_code != 200:
+            return False
+
+        # Additionally check database health and attempt recovery if needed
+        return reset_weaviate_if_corrupted()
+
+    except (requests.exceptions.RequestException, Exception) as e:
+        logger.debug("Weaviate connection check failed: %s", e)
+        return False
+
+
+def reset_weaviate_if_corrupted() -> bool:
+    """
+    Check for Weaviate database corruption and attempt recovery.
+
+    :return: True if reset was successful or not needed, False if reset failed
+    """
+    global vector_store, weaviate_client
+
+    if not USE_WEAVIATE or weaviate_client is None:
+        return False
+
+    try:
+        # Try a simple operation to test database health
+        collection = weaviate_client.collections.get("UserKnowledgeBase")
+        # Attempt to get collection info
+        collection.config.get()
+        return True  # Database is healthy
+
+    except Exception as e:
+        error_msg = str(e).lower()
+
+        # Check for common corruption indicators
+        corruption_indicators = [
+            "no such file or directory",
+            "wal",
+            "segment-",
+            "commit log",
+            "failed to send all objects",
+            "weaviateinsertmanyallfailederror",
+        ]
+
+        if any(indicator in error_msg for indicator in corruption_indicators):
+            logger.warning("Database corruption detected: %s", e)
+            logger.info("Attempting to reconnect to Weaviate...")
+
+            # Close existing connection
+            try:
+                if weaviate_client:
+                    weaviate_client.close()
+            except Exception:
+                pass
+
+            # Reset global variables
+            weaviate_client = None
+            vector_store = None
+
+            # Wait a moment for cleanup
+            time.sleep(2)
+
+            # Attempt to reconnect
+            return setup_weaviate()
+
+        # Not a corruption error, re-raise
+        logger.error("Non-corruption Weaviate error: %s", e)
         return False

@@ -14,9 +14,11 @@ import threading
 import time
 from datetime import datetime
 from io import StringIO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from flask import Flask, Response, render_template_string, request
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
 
 from ..core.memory import is_weaviate_connected
 
@@ -40,9 +42,39 @@ thoughts_queue = queue.Queue()
 active_sessions = set()
 current_thoughts = {}  # Store only the latest thought per session
 
-# Logger capture setup
 log_capture_string = StringIO()
 log_handler = None
+
+
+class ToolUsageCallbackHandler(BaseCallbackHandler):
+    """Custom callback handler to track tool usage and add thoughts."""
+
+    def __init__(self, session_id: str = "default"):
+        """
+        Initialize the callback handler.
+
+        :param session_id: Session ID for thought tracking
+        """
+        super().__init__()
+        self.session_id = session_id
+
+    def on_tool_start(
+        self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+    ) -> Any:
+        """Called when a tool starts running."""
+        tool_name = serialized.get("name", "Unknown Tool")
+        add_thought(f"🔧 I am now using tool: {tool_name}", self.session_id)
+
+    def on_tool_end(self, output: str, **kwargs: Any) -> Any:
+        """Called when a tool finishes running."""
+        add_thought("✅ Tool execution completed", self.session_id)
+
+    def on_tool_error(self, error: Exception, **kwargs: Any) -> Any:
+        """Called when a tool encounters an error."""
+        add_thought(f"❌ Tool error: {str(error)}", self.session_id)
+
+
+# Logger capture setup
 
 
 def create_app() -> Flask:
@@ -188,7 +220,7 @@ def register_routes(
     setup_log_capture()
 
     # Add initial system ready thought
-    add_thought("🟢 LangChain Agent System Ready - Ask me anything!", "default")
+    add_thought("🟢 LangChain Agent System Ready", "default")
 
     app.add_url_rule("/", "index", index, methods=["GET", "POST"])
     app.add_url_rule("/clear", "clear_kb", clear_kb_route)
@@ -314,9 +346,13 @@ Please help the user with their request. Use available tools as needed and provi
                             add_thought("🔧 Analyzing with AI tools", session_id)
                             time.sleep(0.5)
 
-                            # Use LangChain agent executor
+                            # Create callback handler for tool usage tracking
+                            tool_callback = ToolUsageCallbackHandler(session_id)
+
+                            # Use LangChain agent executor with callback
                             agent_response = agent_executor.invoke(
-                                {"input": enhanced_prompt}
+                                {"input": enhanced_prompt},
+                                {"callbacks": [tool_callback]},
                             )
 
                             # Extract response based on LangChain format
@@ -570,9 +606,9 @@ def get_main_template():
             }
 
             .container {
-                max-width: 1400px;
+                max-width: 95%;
                 margin: 0 auto;
-                padding: 5rem 1rem 2rem;
+                padding: 5rem 2rem 2rem;
             }
 
             .header {
@@ -609,7 +645,7 @@ def get_main_template():
             }
 
             .content {
-                max-width: 1000px;
+                max-width: 90%;
                 margin: 0 auto;
                 background: var(--surface);
                 padding: 2rem;
@@ -847,6 +883,18 @@ def get_main_template():
                 font-size: 1rem;
                 box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
                 min-height: 100px; /* Ensure a minimum height for visibility */
+            }
+
+            /* Responsive Design */
+            @media (min-width: 1920px) {
+                .container {
+                    max-width: 90%;
+                }
+                
+                .content {
+                    max-width: 85%;
+                    padding: 3rem;
+                }
             }
 
             @media (max-width: 1024px) {

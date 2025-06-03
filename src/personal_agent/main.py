@@ -17,7 +17,12 @@ from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
 from .tools import get_all_tools
 
 # Import utilities
-from .utils import inject_dependencies, register_cleanup_handlers, setup_logging
+from .utils import (
+    cleanup,
+    inject_dependencies,
+    register_cleanup_handlers,
+    setup_logging,
+)
 
 # Import web interface
 from .web import create_app, register_routes
@@ -133,7 +138,6 @@ def main():
         # cleanup() will be called by atexit, no need to call here
     except Exception as e:
         logger_instance.error("Error running Flask app: %s", e)
-        from .utils.cleanup import cleanup
 
         cleanup()
         raise

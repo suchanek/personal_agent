@@ -1,5 +1,6 @@
 """Environment variables and application settings."""
 
+import logging
 import os
 
 import dotenv
@@ -32,6 +33,8 @@ USE_MCP = True  # Set to False to bypass MCP for testing
 
 ROOT_DIR = get_env_var("ROOT_DIR", ".")  # Root directory for MCP filesystem server
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
+
+LOG_LEVEL = logging.INFO
 
 LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
 # LLM_MODEL = "llama3.1:8b-instruct-q8_0"
