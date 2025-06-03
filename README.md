@@ -20,6 +20,7 @@ A sophisticated personal assistant that learns about you and provides context-aw
 - 📊 **Topic Organization**: Categorize memories by topic
 - 🎯 **Brain Status Indicator**: Visual feedback for Weaviate connection status
 - 🗑️ **Memory Management**: Clear knowledge base functionality
+- 📝 **Fact Storage Utility**: Command-line tool for storing facts directly in the knowledge base
 
 ### MCP-Powered Tools (13 Total)
 
@@ -849,10 +850,10 @@ The project provides several convenient Poetry scripts:
 
 ```bash
 # Run LangChain version (default, recommended)
-poetry run personal-agent-langchain
+poetry run personal-agent
 
 # Run Smolagents version (experimental)
-poetry run personal-agent
+poetry run personal-agent-smolagent
 
 # Install MCP servers automatically
 poetry run install-mcp-servers
@@ -862,6 +863,9 @@ poetry run test-mcp-servers
 
 # Test all tools functionality
 poetry run test-tools
+
+# Store facts directly in the knowledge base
+poetry run store-fact "Your fact here" --topic "optional_topic"
 ```
 
 ## 📄 License
