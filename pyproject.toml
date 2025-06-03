@@ -29,6 +29,7 @@ pags = "src.personal_agent.smol_main:run_smolagents_web"
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"
+store-fact = "scripts.store_fact:main"
 
 [build-system]
 requires = ["poetry-core"]
