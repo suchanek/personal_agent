@@ -38,20 +38,29 @@ from .utils.logging import (
     set_logger_level_for_module,
     set_logging_level_for_all_handlers,
     setup_logging,
+    setup_logging_filters,
     toggle_stream_handler,
 )
 
 # Import web interface
 from .web import create_app, register_routes
 
-configure_master_logger(disabled=True)  # Disable root logger to avoid duplicate logs
+# Package version
+__version__ = "0.2.1"
+
+# Setup package and module-level logging
+# Configure logging for the package
+
+# Disable master logger to avoid duplicate logs
+configure_master_logger(disabled=True)
+
+# Disable annoying warnings
+setup_logging_filters()
 
 # Package-level logger
 _logger = setup_logging()
 _logger.info("Initializing Personal AI Agent package...")
 
-# Package version
-__version__ = "0.2.1"
 
 # Main entry points
 from .main import create_web_app, initialize_system, main
@@ -85,6 +94,7 @@ __all__ = [
     "set_logging_level_for_all_handlers",
     "setup_logging",
     "toggle_stream_handler",
+    "setup_logging_filters",
     # Web interface
     "create_app",
     "register_routes",
