@@ -60,10 +60,8 @@ def configure_master_logger(
     disabled: bool = False,
 ) -> None:
     """
-    Configures the root logger to write to a specified log file.
+    Configures the root logger with the specified settings.
 
-    :param log_file: Name of the log file.
-    :type log_file: str
     :param log_level: The logging level to set. Defaults to logging.ERROR.
     :type log_level: int
     :param disabled: If True, the logger will be disabled. Defaults to False.
@@ -119,8 +117,8 @@ def setup_logging(
 
     :param name: The name of the logger.
     :type name: str
-    :param log_level: The logging level, defaults to logging.INFO
-    :type log_level: int
+    :param level: The logging level, defaults to LOG_LEVEL from config
+    :type level: int
     :param propagate: Whether to propagate messages to parent loggers, defaults to False
     :type propagate: bool
     :return: Configured logger instance.
@@ -135,7 +133,7 @@ def setup_logging(
     # Add RichHandler for console output
     rich_handler = RichHandler(rich_tracebacks=True)
     rich_formatter = logging.Formatter(
-        "proteusPy: %(levelname)s %(asctime)s - %(name)s.%(funcName)s - %(message)s"
+        "PersonalAgent: %(levelname)s %(asctime)s - %(name)s.%(funcName)s - %(message)s"
     )
     rich_handler.setLevel(level)
     rich_handler.setFormatter(rich_formatter)
@@ -197,7 +195,7 @@ def toggle_stream_handler(name, enable):
     if enable:
         if stream_handler is None:
             formatter = logging.Formatter(
-                "strm Agent: %(levelname)-7s %(asctime)s - %(name)s.%(funcName)s - %(message)s"
+                "PersonalAgent: %(levelname)-7s %(asctime)s - %(name)s.%(funcName)s - %(message)s"
             )
             stream_handler = logging.StreamHandler()
             stream_handler.setLevel(logger.level)

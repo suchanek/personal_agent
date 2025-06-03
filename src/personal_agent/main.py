@@ -29,13 +29,12 @@ from .web import create_app, register_routes
 
 # Global variables for cleanup
 agent_executor: Optional[object] = None
-logger: Optional[object] = None
+logger: Optional[object] = setup_logging()
 
 
 def initialize_system():
     """Initialize all system components."""
-    # Setup logging first
-    logger = setup_logging()
+
     logger.info("Starting Personal AI Agent...")
 
     # Initialize MCP client if enabled
@@ -63,14 +62,16 @@ def initialize_system():
     # Get all tools with injected dependencies
     logger.info("Setting up tools...")
     # Import globals directly from memory module to get updated values
+    # leave this import here to avoid circular dependency issues
     from .core.memory import vector_store, weaviate_client
+
+    global agent_executor
 
     tools = get_all_tools(mcp_client, weaviate_client, vector_store, logger)
     logger.info("Loaded %d tools successfully", len(tools))
 
     # Create agent executor
     logger.info("Creating agent executor...")
-    global agent_executor
     agent_executor = create_agent_executor(tools)
     logger.info("Agent executor created successfully")
 

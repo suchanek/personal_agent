@@ -52,7 +52,7 @@ __version__ = "0.2.1"
 # Configure logging for the package
 
 # Disable master logger to avoid duplicate logs
-configure_master_logger(disabled=True)
+configure_master_logger(disabled=False)
 
 # Disable annoying warnings
 setup_logging_filters()
