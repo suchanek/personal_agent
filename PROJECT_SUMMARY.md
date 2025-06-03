@@ -143,14 +143,32 @@ A comprehensive Personal AI Agent with **13 integrated tools** powered by:
 
 ### 🎯 Next Steps (Optional Enhancements)
 
-1. **API Key Configuration**: Add GitHub token and Brave API key for full external access
-2. **Custom Tool Development**: Add domain-specific tools as needed
-3. **Advanced Prompting**: Fine-tune system prompts for specific use cases
-4. **Performance Optimization**: Monitor and optimize for high-volume usage
+1. **Custom Tool Development**: Add domain-specific tools as needed
+2. **Advanced Prompting**: Fine-tune system prompts for specific use cases
+3. **Performance Optimization**: Monitor and optimize for high-volume usage
 
 ### 🚀 Recent Major Improvements (Latest Updates)
 
-#### ✅ Web Interface Fixes (December 2024 - Latest)
+#### ✅ Code Refactoring & Error Handling Enhancements (June 2, 2025 - Latest)
+
+- **Logging Module Refactoring**: Successfully moved `setup_logging` function from `cleanup.py` to dedicated `utils/logging.py` module
+  - Created new `src/personal_agent/utils/logging.py` with centralized logging configuration
+  - Updated all import references across 12 files to use new utils module location
+  - Enhanced code organization by centralizing logging utilities in proper utils package
+- **Weaviate Error Handling Enhancement**: Added robust database corruption detection and automatic recovery
+  - Implemented `reset_weaviate_if_corrupted()` function in `core/memory.py` for automatic database recovery
+  - Added corruption detection in `memory_tools.py` for storage and query operations
+  - Enhanced error handling with automatic retry logic after successful database recovery
+  - Improved system resilience against Weaviate WAL file corruption and missing segment errors
+- **Import Path Standardization**: Updated all files to use consistent import patterns
+  - Memory tools: `from ..utils import setup_logging`
+  - Main modules: `from .utils.logging import setup_logging`
+  - Test files: Updated import paths to match new structure
+- **Code Quality Improvements**: Enhanced docstrings, type hints, and PEP 8 compliance
+- **Git Workflow**: Proper commit and push to dev2 branch with comprehensive change tracking
+- **Impact**: More robust system with centralized logging, automatic error recovery, and improved maintainability
+
+#### ✅ Web Interface Fixes (May 2025)
 
 - **Agent Info Page Fix**: Resolved 'not found' error when clicking Agent Info button
   - Fixed URL mismatch: Updated button URL from `/info` to `/agent_info` in web template
