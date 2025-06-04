@@ -8,22 +8,22 @@ from .settings import DATA_DIR, ROOT_DIR, get_env_var
 MCP_SERVERS = {
     "filesystem-home": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
         "description": "Access home directory filesystem operations",
     },
     "filesystem-data": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", DATA_DIR],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", DATA_DIR],
         "description": "Access data directory for vector database",
     },
     "filesystem-root": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-filesystem", "/"],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
         "description": "Access root directory filesystem operations",
     },
     "github": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-github"],
+        "args": ["-y", "@modelcontextprotocol/server-github"],
         "description": "GitHub repository operations and code search",
         "env": {
             "GITHUB_PERSONAL_ACCESS_TOKEN": get_env_var(
@@ -33,13 +33,13 @@ MCP_SERVERS = {
     },
     "brave-search": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-brave-search"],
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
         "description": "Web search for research and technical information",
         "env": {"BRAVE_API_KEY": get_env_var("BRAVE_API_KEY", "")},
     },
     "puppeteer": {
         "command": "npx",
-        "args": ["--yes", "@modelcontextprotocol/server-puppeteer"],
+        "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
         "description": "Browser automation and web content fetching",
     },
 }
