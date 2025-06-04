@@ -20,6 +20,10 @@ smolagents = "^1.17.0"
 litellm = "^1.71.3"
 markdownify = "^1.1.0"
 pathlib = "^1.0.1"
+duckduckgo-search = "^8.0.2"
+duckdb = "^1.3.0"
+yfinance = "^0.2.61"
+agno = "^1.5.8"
 
 [tool.poetry.scripts]
 personal-agent = "src.personal_agent.main:main"
