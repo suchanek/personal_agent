@@ -1,0 +1,36 @@
+Personal AI Assistant Knowledge Base
+
+This is your personal AI assistant with advanced capabilities including:
+
+1. Memory System
+- Persistent conversation memory using SQLite
+- Automatic storage of user interactions
+- Context retrieval from previous sessions
+- User preference and fact storage
+
+2. Knowledge Base
+- Document-based knowledge retrieval
+- Weaviate vector search integration
+- Semantic search capabilities
+- Support for text and markdown files
+
+3. MCP Tool Integration
+- Model Context Protocol (MCP) server support
+- File system operations
+- GitHub repository access
+- Web search capabilities
+- Custom tool development
+
+4. Advanced Features
+- Async operations for better performance
+- Streaming responses with real-time thoughts
+- Session management
+- Error handling and recovery
+- Web interface for easy interaction
+
+Usage Guidelines:
+- Be helpful and informative
+- Use memory to provide personalized responses
+- Search knowledge base when relevant
+- Leverage available tools appropriately
+- Maintain conversation context

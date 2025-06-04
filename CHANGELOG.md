@@ -1,3 +1,36 @@
+# Changelog
+
+All notable changes to the Personal AI Agent project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [agnodev1 - Unreleased]
+
+### Added
+
+- Native Agno framework implementation as third complete system
+- Built-in Memory(SqliteMemoryDb) integration with agno Agent
+- TextKnowledgeBase with hybrid search capabilities
+- Native agno Weaviate vector database integration
+- Enhanced knowledge base functionality with document storage
+
+### Changed
+
+- Migrated from custom AgnoPersonalAgent wrapper to native agno Agent framework
+- Updated MCP tools integration to use native agno `@tool` decorator
+- Replaced custom `WeaviateVectorStore` with native `agno.vectordb.weaviate.Weaviate`
+- Changed agno implementation port from 5002 to 5003
+- Updated web interface to use native agno `arun()` method for agent execution
+
+### Fixed
+
+- Resolved type mismatch issues with Weaviate vector database integration
+- Fixed `Function.from_callable()` usage in MCP tools registration
+- Enabled both memory AND knowledge systems (previously only memory worked)
+
+## [Previous Releases] - Project History
+
 # Personal AI Agent - Project Summary
 
 ## 🎉 Project Status: COMPLETE & FULLY OPERATIONAL

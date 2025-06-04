@@ -11,7 +11,7 @@ import json
 import queue
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict
 
 from flask import Flask, Response, render_template_string, request
@@ -86,7 +86,7 @@ def add_thought(thought: str, session_id: str = "default"):
     thought_data = {
         "session_id": session_id,
         "thought": thought,
-        "timestamp": datetime.now().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Store only the latest thought for this session

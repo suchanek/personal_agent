@@ -39,9 +39,9 @@ def setup_weaviate() -> bool:
         logger.info("Weaviate disabled by configuration")
         return False
 
-    try:
-        # Verify Weaviate is running with retries
-        for attempt in range(5):
+    # Verify Weaviate is running with retries
+    for attempt in range(5):
+        try:
             logger.info(
                 "Attempting to connect to Weaviate at %s (attempt %d/5)",
                 WEAVIATE_URL,
@@ -53,23 +53,24 @@ def setup_weaviate() -> bool:
                 break
             else:
                 raise RuntimeError(f"Weaviate returned status {response.status_code}")
-        else:
-            # If we've exhausted all attempts
+        except requests.exceptions.RequestException as e:
             logger.error(
-                "Cannot connect to Weaviate at %s after 5 attempts",
-                WEAVIATE_URL,
+                "Attempt %d/5: Error connecting to Weaviate: %s", attempt + 1, e
             )
-            return False
-
-    except requests.exceptions.RequestException as e:
-        logger.error("Attempt %d/5: Error connecting to Weaviate: %s", attempt + 1, e)
-        if attempt == 4:
-            logger.error(
-                "Cannot connect to Weaviate at %s, proceeding without Weaviate",
-                WEAVIATE_URL,
-            )
-            return False
-        time.sleep(10)
+            if attempt == 4:
+                logger.error(
+                    "Cannot connect to Weaviate at %s, proceeding without Weaviate",
+                    WEAVIATE_URL,
+                )
+                return False
+            time.sleep(10)
+    else:
+        # If we've exhausted all attempts without success
+        logger.error(
+            "Cannot connect to Weaviate at %s after 5 attempts",
+            WEAVIATE_URL,
+        )
+        return False
 
     # Parse WEAVIATE_URL to create ConnectionParams
     parsed_url = parse_url(WEAVIATE_URL)
@@ -82,23 +83,34 @@ def setup_weaviate() -> bool:
         grpc_secure=parsed_url.scheme == "https",
     )
 
-    # Initialize Weaviate client !!!
+    # Initialize Weaviate client
     try:
+        # Prepare headers - only add OpenAI key if it exists
+        headers = {}
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        if openai_key:
+            headers["X-OpenAI-Api-Key"] = openai_key
+
         weaviate_client = WeaviateClient(
             connection_params,
             skip_init_checks=True,
-            additional_headers={
-                "X-OpenAI-Api-Key": os.environ[
-                    "OPENAI_API_KEY"
-                ]  # Add inference API keys as needed
-            },
+            additional_headers=headers if headers else None,
         )
         weaviate_client.connect()  # Explicitly connect
+
+        # Verify connection is working
+        is_ready = weaviate_client.is_ready()
+        if not is_ready:
+            logger.error("Weaviate client connection failed - not ready")
+            weaviate_client.close()
+            return False
+
+        logger.info("Weaviate client connected successfully")
         collection_name = "UserKnowledgeBase"
 
         # Create Weaviate collection if it doesn't exist
         if not weaviate_client.collections.exists(collection_name):
-            logger.info("Creating Weaviate collection: %s", collection_name)
+            logger.warning("Creating Weaviate collection: %s", collection_name)
             weaviate_client.collections.create(
                 name=collection_name,
                 properties=[
@@ -111,18 +123,14 @@ def setup_weaviate() -> bool:
                     model="nomic-embed-text",
                 ),
             )
-    except ImportError as e:
-        logger.error("Import error initializing Weaviate client or collection: %s", e)
-        return False
-    except AttributeError as e:
-        logger.error(
-            "Attribute error initializing Weaviate client or collection: %s", e
-        )
-        return False
     except Exception as e:
-        logger.error(
-            "Unexpected error initializing Weaviate client or collection: %s", e
-        )
+        logger.error("Error initializing Weaviate client or collection: %s", e)
+        if weaviate_client:
+            try:
+                weaviate_client.close()
+            except Exception:
+                pass
+        weaviate_client = None
         return False
 
     # Initialize Weaviate vector store

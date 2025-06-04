@@ -4,13 +4,14 @@ Smolagents-compatible web interface module for the Personal AI Agent.
 This module provides a Flask-based web interface that works with smolagents
 instead of LangChain, maintaining the same UI and functionality.
 """
+
 # pylint: disable=W0718,C0103,C0301,
 import json
 import logging
 import queue
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from typing import TYPE_CHECKING, Optional
 
@@ -76,7 +77,7 @@ def add_thought(thought: str, session_id: str = "default"):
     thought_data = {
         "session_id": session_id,
         "thought": thought,
-        "timestamp": datetime.now().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Store only the latest thought for this session
@@ -149,7 +150,7 @@ def stream_logs():
                 for line in new_content.strip().split("\n"):
                     if line.strip():
                         # Format timestamp as ISO string for JavaScript Date parsing
-                        timestamp = datetime.now().isoformat() + "Z"
+                        timestamp = datetime.now(timezone.utc).isoformat()
                         yield f"data: {json.dumps({'log': line, 'timestamp': timestamp})}\n\n"
 
             time.sleep(0.5)  # Poll every 500ms

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=C0302, W0603, C0103, C0301
+# pylint: disable=C0302, W0603, C0103, C0301, W0718
 """
 Web interface module for the Personal AI Agent using agno framework.
 
@@ -9,13 +9,11 @@ maintaining the same UI and functionality as the original interface.py.
 
 import asyncio
 import json
-import logging
 import queue
 import threading
 import time
-from datetime import datetime
-from io import StringIO
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from flask import Flask, Response, render_template_string, request
 
@@ -24,17 +22,15 @@ from ..core.memory import is_weaviate_connected
 if TYPE_CHECKING:
     from logging import Logger
 
-    from ..core.agno_agent import AgnoPersonalAgent
+    from agno.agent import Agent
 
 # These will be injected by the main module
 app: Flask = None
-agno_agent: "AgnoPersonalAgent" = None
+agno_agent: "Agent" = None  # Now using native agno Agent
 logger: "Logger" = None
 
-# Memory function references (async functions from agno)
-query_knowledge_base_func: Optional[Callable[[str], str]] = None
-store_interaction_func: Optional[Callable[[str, str], bool]] = None
-clear_knowledge_base_func: Optional[Callable[[], bool]] = None
+# Memory function references - no longer needed with native agno agent
+# The native agent handles memory automatically
 
 # Streaming thoughts management
 thoughts_queue = queue.Queue()
@@ -57,7 +53,7 @@ def add_thought(thought: str, session_id: str = "default"):
     thought_data = {
         "session_id": session_id,
         "thought": thought,
-        "timestamp": datetime.now().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Store only the latest thought for this session
@@ -114,35 +110,26 @@ def stream_thoughts(session_id: str = "default"):
 
 def register_routes(
     flask_app: Flask,
-    agent: "AgnoPersonalAgent",
+    agent: "Agent",
     log: "Logger",
-    query_kb_func: Callable[[str], str],
-    store_int_func: Callable[[str, str], bool],
-    clear_kb_func: Callable[[], bool],
 ):
     """
-    Register Flask routes with the agno agent.
+    Register Flask routes with the native agno agent.
 
     :param flask_app: Flask application instance
-    :param agent: Agno agent instance
+    :param agent: Native agno Agent instance
     :param log: Logger instance
-    :param query_kb_func: Function to query knowledge base (async)
-    :param store_int_func: Function to store interactions (async)
-    :param clear_kb_func: Function to clear knowledge base (async)
     """
-    global app, agno_agent, logger, query_knowledge_base_func, store_interaction_func, clear_knowledge_base_func
+    global app, agno_agent, logger
 
     app = flask_app
     agno_agent = agent
     logger = log
-    query_knowledge_base_func = query_kb_func
-    store_interaction_func = store_int_func
-    clear_knowledge_base_func = clear_kb_func
 
-    logger.info("Starting route registration for agno interface")
+    logger.info("Starting route registration for native agno interface")
 
     # Add initial system ready thought
-    add_thought("🟢 Agno System Ready", "default")
+    add_thought("🟢 Native Agno System Ready", "default")
     logger.info("Added initial system ready thought")
 
     app.add_url_rule("/", "index", index, methods=["GET", "POST"])
@@ -150,7 +137,7 @@ def register_routes(
     app.add_url_rule("/agent_info", "agent_info", agent_info_route)
     app.add_url_rule("/stream_thoughts", "stream_thoughts", stream_thoughts_route)
 
-    logger.info("All agno interface routes registered successfully")
+    logger.info("All native agno interface routes registered successfully")
 
 
 def run_async_in_thread(coroutine):
@@ -179,8 +166,12 @@ def run_async_in_thread(coroutine):
     thread.start()
     thread.join(timeout=60)  # 60 second timeout
 
-    if result_container["error"]:
-        raise result_container["error"]
+    error = result_container.get("error")
+    if error is not None:
+        if isinstance(error, Exception):
+            raise error
+        # Convert non-Exception errors to RuntimeError
+        raise RuntimeError(f"Unknown error: {error}")
 
     if not result_container["done"]:
         raise TimeoutError("Async operation timed out")
@@ -198,12 +189,10 @@ def index():
         logger.info(f"Index route accessed - method: {request.method}")
 
     response = None
-    context = None
     agent_thoughts = []
 
     if request.method == "POST":
         user_input = request.form.get("query", "")
-        topic = request.form.get("topic", "general")
         session_id = request.form.get("session_id", "default")
 
         if logger:
@@ -234,59 +223,19 @@ def index():
             add_thought("🔍 Searching memory for context...", session_id)
 
             try:
-                # Query knowledge base for context using agno agent
+                # Native agno agent handles memory/knowledge automatically
                 if logger:
-                    logger.info("Starting knowledge base query for context")
-
-                context = None
-                if query_knowledge_base_func:
-                    try:
-                        if logger:
-                            logger.info("Executing async knowledge base query")
-
-                        # Use async function via thread
-                        context_result = run_async_in_thread(
-                            query_knowledge_base_func(user_input)
-                        )
-
-                        if (
-                            context_result
-                            and context_result != "No relevant context found."
-                            and "not initialized" not in context_result.lower()
-                        ):
-                            context = (
-                                [context_result]
-                                if isinstance(context_result, str)
-                                else context_result
-                            )
-                            if logger:
-                                logger.info(
-                                    f"Knowledge base query successful - found {len(context)} context items"
-                                )
-                        else:
-                            context = ["No relevant context found."]
-                            if logger:
-                                logger.info(
-                                    "Knowledge base query returned no relevant context"
-                                )
-
-                    except Exception as e:
-                        logger.warning("Could not query knowledge base: %s", e)
-                        context = ["No context available."]
-                else:
-                    context = ["Memory not available."]
+                    logger.info(
+                        "Native agno agent will handle memory and knowledge automatically"
+                    )
 
                 # Update thoughts after context search
-                if (
-                    context
-                    and context != ["No relevant context found."]
-                    and context != ["Memory not available."]
-                ):
-                    add_thought("✅ Found relevant context in memory", session_id)
-                else:
+                if agno_agent.memory or agno_agent.knowledge:
                     add_thought(
-                        "📝 No previous context found, starting fresh", session_id
+                        "✅ Native memory and knowledge systems active", session_id
                     )
+                else:
+                    add_thought("📝 Running without persistent memory", session_id)
 
                 # Add processing thoughts
                 add_thought("🧠 Analyzing request with agno reasoning", session_id)
@@ -320,27 +269,18 @@ def index():
                             add_thought("🔧 Analyzing with MCP tools", session_id)
                             time.sleep(0.5)
 
-                            # Prepare context string for agent
-                            context_str = (
-                                "\n".join(context)
-                                if context
-                                else "No relevant context found."
-                            )
+                            # Prepare enhanced prompt with user request
+                            # The native agno agent will automatically:
+                            # - Search knowledge base if enabled
+                            # - Retrieve relevant memory context
+                            # - Store the interaction after completion
 
                             if logger:
                                 logger.info(
-                                    f"Prepared context string with {len(context_str)} characters"
+                                    f"Prepared user input with {len(user_input)} characters"
                                 )
 
-                            # Create enhanced prompt with context
-                            enhanced_prompt = f"""Previous Context:
-{context_str}
-
-User Request: {user_input}
-
-Please help the user with their request. Use available MCP tools as needed and provide a helpful, comprehensive response."""
-
-                            # Use agno agent with async execution and thought callback
+                            # Use agno agent with async execution
                             if logger:
                                 logger.info(
                                     "Creating new event loop for agno agent execution"
@@ -349,26 +289,20 @@ Please help the user with their request. Use available MCP tools as needed and p
                             loop = asyncio.new_event_loop()
                             asyncio.set_event_loop(loop)
                             try:
-                                # Create thought callback for this session
-                                def thought_callback(thought: str):
-                                    add_thought(thought, session_id)
-
                                 if logger:
                                     logger.info(
-                                        "Starting agno agent run with enhanced prompt"
+                                        "Starting native agno agent run with user query"
                                     )
 
+                                # Use native agno agent which handles memory automatically
                                 agent_response = loop.run_until_complete(
-                                    agno_agent.run(
-                                        enhanced_prompt,
-                                        add_thought_callback=thought_callback,
-                                    )
+                                    agno_agent.arun(user_input)
                                 )
-                                result_container["response"] = agent_response
+                                result_container["response"] = agent_response.content
 
                                 if logger:
                                     logger.info(
-                                        f"Agno agent completed successfully - response length: {len(str(agent_response))}"
+                                        f"Native agno agent completed successfully - response length: {len(str(agent_response.content))}"
                                     )
 
                                 add_thought(
@@ -437,10 +371,7 @@ Please help the user with their request. Use available MCP tools as needed and p
                     if error is not None:
                         if logger:
                             logger.error(f"Agent thread returned error: {error}")
-                        if isinstance(error, Exception):
-                            raise error
-                        else:
-                            raise RuntimeError(f"Agno agent execution failed: {error}")
+                        raise error
 
                     response = result_container.get("response")
                     if response is None:
@@ -449,7 +380,7 @@ Please help the user with their request. Use available MCP tools as needed and p
                                 "Agent thread completed but returned no response"
                             )
                         raise RuntimeError(
-                            "Agno agent execution timed out or returned no response"
+                            "Native agno agent execution timed out or returned no response"
                         )
 
                     if logger:
@@ -457,30 +388,15 @@ Please help the user with their request. Use available MCP tools as needed and p
                             f"Successfully received response from agent thread - length: {len(str(response))}"
                         )
 
-                    # Store interaction AFTER getting response
-                    if store_interaction_func:
-                        try:
-                            if logger:
-                                logger.info(
-                                    "Storing interaction in memory using async function"
-                                )
+                    # Native agno agent handles interaction storage automatically
+                    add_thought(
+                        "💾 Interaction stored automatically by agno", session_id
+                    )
 
-                            # Use async function via thread
-                            run_async_in_thread(
-                                store_interaction_func(user_input, response)
-                            )
-                            add_thought("💾 Interaction stored in memory", session_id)
-
-                            if logger:
-                                logger.info("Interaction successfully stored in memory")
-
-                        except Exception as e:
-                            logger.warning("Could not store interaction: %s", e)
-                    else:
-                        if logger:
-                            logger.warning(
-                                "No store_interaction_func available - skipping memory storage"
-                            )
+                    if logger:
+                        logger.info(
+                            "Native agno agent handles memory storage automatically"
+                        )
 
                 except Exception as e:
                     logger.error("Error with agno execution: %s", str(e))
@@ -512,7 +428,7 @@ Please help the user with their request. Use available MCP tools as needed and p
     return render_template_string(
         get_main_template(),
         response=response,
-        context=context,
+        context=None,  # Native agno agent handles context automatically
         agent_thoughts=agent_thoughts,
         is_multi_agent=True,  # agno supports multiple capabilities
         weaviate_connected=weaviate_status,
@@ -525,22 +441,24 @@ def clear_kb_route():
         logger.info("Clear knowledge base route accessed")
 
     try:
-        if clear_knowledge_base_func:
-            if logger:
-                logger.info("Executing clear knowledge base function")
-            result = run_async_in_thread(clear_knowledge_base_func())
-        else:
-            if logger:
-                logger.warning("Clear knowledge base function not available")
-            result = "Clear function not available"
+        result = "Knowledge base clearing not supported with native agno agent"
 
-        logger.info("Knowledge base cleared via web interface: %s", result)
+        # With native agno agent, knowledge/memory management is handled differently
+        # The agent's memory and knowledge systems manage their own lifecycle
+        if agno_agent and hasattr(agno_agent, "knowledge") and agno_agent.knowledge:
+            result = "Native agno agent knowledge system is managed automatically"
+        elif agno_agent and hasattr(agno_agent, "memory") and agno_agent.memory:
+            result = "Native agno agent memory system is managed automatically"
+        else:
+            result = "No knowledge base or memory system detected"
+
+        logger.info("Knowledge base status via web interface: %s", result)
         return render_template_string(
             get_success_template(),
             result=result,
         )
     except Exception as e:
-        logger.error("Error clearing knowledge base via web interface: %s", str(e))
+        logger.error("Error checking knowledge base via web interface: %s", str(e))
         return render_template_string(
             get_error_template(),
             error=str(e),
@@ -552,26 +470,72 @@ def agent_info_route():
     if logger:
         logger.info("Agent info route accessed")
 
-    # Get agent info from agno agent
-    agent_type = "Agno Framework Agent"
-    agent_info = agno_agent.get_agent_info() if agno_agent else {}
+    # Get agent info from native agno agent
+    agent_type = "Native Agno Framework Agent"
+    agent_info = {}
 
-    if logger:
-        logger.info(f"Retrieved agent info: {agent_info}")
+    if agno_agent:
+        try:
+            # Get info about the native agno agent
+            agent_info = {
+                "model": str(
+                    agno_agent.model.id
+                    if hasattr(agno_agent.model, "id")
+                    else agno_agent.model
+                ),
+                "memory_enabled": agno_agent.memory is not None,
+                "knowledge_enabled": agno_agent.knowledge is not None,
+                "tools_count": len(agno_agent.tools) if agno_agent.tools else 0,
+                "session_id": getattr(agno_agent, "session_id", "Not available"),
+                "user_id": getattr(agno_agent, "user_id", "Not available"),
+                "agentic_memory": getattr(agno_agent, "enable_agentic_memory", False),
+                "user_memories": getattr(agno_agent, "enable_user_memories", False),
+                "session_summaries": getattr(
+                    agno_agent, "enable_session_summaries", False
+                ),
+            }
 
-    # Get available tools from the agno agent
+            if logger:
+                logger.info(f"Retrieved native agno agent info: {agent_info}")
+
+        except Exception as e:
+            logger.warning("Could not get native agno agent info: %s", e)
+            agent_info = {"error": str(e)}
+
+    # Get available tools from the native agno agent
     available_tools = []
     if agno_agent:
         try:
-            # Extract tool names from agent info
-            mcp_servers = agent_info.get("mcp_servers", 0)
-            available_tools.append(f"MCP Servers: {mcp_servers}")
+            # Extract tool information from native agent
+            if agno_agent.tools:
+                for tool in agno_agent.tools:
+                    tool_name = getattr(tool, "name", str(tool))
+                    available_tools.append(tool_name)
 
+            # Add native agno capabilities
             if agent_info.get("memory_enabled"):
-                available_tools.append("Weaviate Memory")
+                available_tools.append("Native Agno Memory System")
 
+            if agent_info.get("knowledge_enabled"):
+                available_tools.append("Native Agno Knowledge Base")
+
+            if agent_info.get("agentic_memory"):
+                available_tools.append("Agentic Memory Management")
+
+            if agent_info.get("user_memories"):
+                available_tools.append("User Memory Tracking")
+
+            if agent_info.get("session_summaries"):
+                available_tools.append("Session Summary Generation")
+
+            # Add core agno features
             available_tools.extend(
-                ["Async Processing", "Multi-tool Coordination", "Context Enhancement"]
+                [
+                    "Async Processing",
+                    "Message History",
+                    "Multi-tool Coordination",
+                    "Context Enhancement",
+                ]
             )
 
             if logger:

@@ -577,4 +577,4 @@ BSD 3-Clause License - See LICENSE file for details.
 
 ---
 
-**Personal AI Agent (Agno)** - A modern async AI assistant with native MCP integration, real-time thought streaming, and persistent memory. 🚀
+**Personal AI Agent (Agno)** - A modern async agentic AI assistant with native MCP integration, real-time thought streaming, and persistent memory. 🚀
