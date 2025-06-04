@@ -41,10 +41,6 @@ thoughts_queue = queue.Queue()
 active_sessions = set()
 current_thoughts = {}  # Store only the latest thought per session
 
-# Logger capture setup
-log_capture_string = StringIO()
-log_handler = None
-
 
 def create_app() -> Flask:
     """
@@ -54,34 +50,6 @@ def create_app() -> Flask:
     """
     flask_app = Flask(__name__)
     return flask_app
-
-
-def setup_log_capture():
-    """Setup log capture for streaming to web interface."""
-    global log_handler, log_capture_string
-
-    if log_handler is not None:
-        if logger:
-            logger.info("Log capture already set up, skipping initialization")
-        return  # Already set up
-
-    if logger:
-        logger.info("Setting up log capture for web interface streaming")
-
-    log_capture_string = StringIO()
-    log_handler = logging.StreamHandler(log_capture_string)
-    log_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    log_handler.setFormatter(formatter)
-
-    # Add to root logger to capture all logs
-    root_logger = logging.getLogger()
-    root_logger.addHandler(log_handler)
-
-    if logger:
-        logger.info("Log capture setup completed successfully")
 
 
 def add_thought(thought: str, session_id: str = "default"):
@@ -144,35 +112,6 @@ def stream_thoughts(session_id: str = "default"):
             logger.debug(f"Stopped streaming for session: {session_id}")
 
 
-def stream_logs():
-    """Generator for streaming log output."""
-    global log_capture_string
-
-    if logger:
-        logger.debug("Starting log stream generator")
-
-    last_position = 0
-    while True:
-        try:
-            current_content = log_capture_string.getvalue()
-            if len(current_content) > last_position:
-                new_content = current_content[last_position:]
-                last_position = len(current_content)
-
-                for line in new_content.strip().split("\n"):
-                    if line.strip():
-                        # Format timestamp as ISO string for JavaScript Date parsing
-                        timestamp = datetime.now().isoformat() + "Z"
-                        yield f"data: {json.dumps({'log': line, 'timestamp': timestamp})}\n\n"
-
-            time.sleep(0.5)  # Poll every 500ms
-        except Exception as e:
-            if logger:
-                logger.error(f"Error in stream_logs generator: {str(e)}")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            break
-
-
 def register_routes(
     flask_app: Flask,
     agent: "AgnoPersonalAgent",
@@ -206,15 +145,10 @@ def register_routes(
     add_thought("🟢 Agno System Ready", "default")
     logger.info("Added initial system ready thought")
 
-    # Setup log capture for streaming
-    setup_log_capture()
-
     app.add_url_rule("/", "index", index, methods=["GET", "POST"])
     app.add_url_rule("/clear", "clear_kb", clear_kb_route)
     app.add_url_rule("/agent_info", "agent_info", agent_info_route)
     app.add_url_rule("/stream_thoughts", "stream_thoughts", stream_thoughts_route)
-    app.add_url_rule("/stream_logs", "stream_logs", stream_logs_route)
-    app.add_url_rule("/logger", "logger", logger_route)
 
     logger.info("All agno interface routes registered successfully")
 
@@ -1107,10 +1041,6 @@ def get_main_template():
                     <i class="fas fa-info-circle"></i>
                     <span>Agent Info</span>
                 </a>
-                <a href="/logger" class="nav-button">
-                    <i class="fas fa-terminal"></i>
-                    <span>Logger</span>
-                </a>
                 <a href="/clear" class="nav-button">
                     <i class="fas fa-trash-alt"></i>
                     <span>Clear Memory</span>
@@ -1203,27 +1133,42 @@ def get_main_template():
         </div>
 
         <script>
-            // Show thoughts panel when form is submitted
-            document.getElementById('submitBtn').addEventListener('click', function(e) {
+            // Form submission handling
+            const form = document.querySelector('form');
+            const submitBtn = document.getElementById('submitBtn');
+            let sessionId = 'default';
+            
+            form.addEventListener('submit', function(e) {
+                // Generate new session ID for this interaction
+                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                console.log('Form submitted, new session ID:', sessionId);
+                
+                // Update hidden session field
+                document.querySelector('input[name="session_id"]').value = sessionId;
+                
+                // Show thoughts panel
                 const thoughtsPanel = document.getElementById('thoughtsPanel');
                 thoughtsPanel.style.display = 'block';
                 
                 // Change button to loading state
-                this.innerHTML = '<div class="loading"></div><span>Processing...</span>';
-                this.disabled = true;
+                submitBtn.innerHTML = '<div class="loading"></div><span>Processing...</span>';
+                submitBtn.disabled = true;
                 
-                // Start listening for thoughts
-                startThoughtStream();
+                // Start listening for thoughts after small delay
+                setTimeout(() => {
+                    startThoughtStream();
+                }, 200);
+                
+                // Allow form to submit normally (don't prevent default)
             });
 
             function startThoughtStream() {
                 const thoughtsContent = document.getElementById('thoughtsContent');
-                const sessionId = 'default';
                 
                 // Clear existing thoughts
                 thoughtsContent.innerHTML = '';
                 
-                // Create EventSource for streaming
+                // Create EventSource for streaming with current session ID
                 const eventSource = new EventSource(`/stream_thoughts?session_id=${sessionId}`);
                 
                 eventSource.onmessage = function(event) {
@@ -1242,8 +1187,14 @@ def get_main_template():
                         if (data.thought && data.thought !== 'Ready') {
                             addThoughtToPanel(data.thought, data.timestamp);
                         } else if (data.thought === 'Ready') {
-                            // Processing complete
+                            // Processing complete - reset form and hide thoughts panel
                             eventSource.close();
+                            
+                            // Reset submit button
+                            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Request</span>';
+                            submitBtn.disabled = false;
+                            
+                            // Hide thoughts panel after a delay
                             setTimeout(() => {
                                 document.getElementById('thoughtsPanel').style.display = 'none';
                             }, 2000);
@@ -1256,6 +1207,10 @@ def get_main_template():
                 eventSource.onerror = function(event) {
                     console.error('Thought stream error:', event);
                     eventSource.close();
+                    
+                    // Reset button on error
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Request</span>';
+                    submitBtn.disabled = false;
                 };
             }
 
@@ -1609,569 +1564,6 @@ def get_agent_info_template():
     </body>
     </html>
     """
-
-
-def stream_logs_route():
-    """
-    SSE route for streaming logger output in real-time.
-
-    :return: Server-sent events stream
-    """
-    if logger:
-        logger.info("Stream logs route accessed - starting SSE connection")
-
-    def generate():
-        for log_data in stream_logs():
-            yield log_data
-
-    response = Response(generate(), mimetype="text/event-stream")
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["Connection"] = "keep-alive"
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    return response
-
-
-def logger_route():
-    """
-    Route to display the logger output window.
-
-    :return: Rendered logger template
-    """
-    if logger:
-        logger.info("Logger page route accessed")
-
-    return render_template_string(get_logger_template())
-
-
-def get_logger_template():
-    """
-    Get the logger output window template.
-
-    :return: HTML template string for logger window
-    """
-    return """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logger Output - Personal AI Agent (Agno)</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1d4ed8;
-            --success-color: #059669;
-            --warning-color: #f59e0b;
-            --danger-color: #dc2626;
-            --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --surface: #ffffff;
-            --surface-alt: #f8fafc;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border-color: #e2e8f0;
-            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 95%;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: white;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .header-icon {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.75rem;
-            border-radius: 0.75rem;
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .navigation-bar {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            text-decoration: none;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s;
-        }
-
-        .btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-dark);
-        }
-
-        .logger-panel {
-            background: var(--surface);
-            border-radius: 1rem;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            min-height: 70vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .logger-header {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: white;
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logger-title {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .control-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success-color);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .logger-content {
-            flex: 1;
-            background: #1a1a1a;
-            color: #e2e8f0;
-            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-            font-size: 0.9rem;
-            overflow: auto;
-            padding: 0;
-        }
-
-        .log-entry {
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            transition: background-color 0.2s;
-        }
-
-        .log-entry:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .log-timestamp {
-            color: #64748b;
-            font-size: 0.8rem;
-            min-width: 180px;
-            flex-shrink: 0;
-        }
-
-        .log-level {
-            padding: 0.125rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            min-width: 60px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .log-level.INFO {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-        }
-
-        .log-level.WARNING {
-            background: rgba(245, 158, 11, 0.2);
-            color: #f59e0b;
-        }
-
-        .log-level.ERROR {
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-        }
-
-        .log-level.DEBUG {
-            background: rgba(148, 163, 184, 0.2);
-            color: #94a3b8;
-        }
-
-        .log-message {
-            flex: 1;
-            word-break: break-word;
-        }
-
-        .log-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 300px;
-            color: #64748b;
-            text-align: center;
-            gap: 1rem;
-        }
-
-        .log-placeholder i {
-            font-size: 3rem;
-            opacity: 0.5;
-        }
-
-        /* Scrollbar styling */
-        .logger-content::-webkit-scrollbar {
-            width: 12px;
-        }
-
-        .logger-content::-webkit-scrollbar-track {
-            background: #2a2a2a;
-        }
-
-        .logger-content::-webkit-scrollbar-thumb {
-            background: #4a5568;
-            border-radius: 6px;
-        }
-
-        .logger-content::-webkit-scrollbar-thumb:hover {
-            background: #718096;
-        }
-
-        /* Responsive Design */
-        @media (min-width: 1920px) {
-            .container {
-                max-width: 90%;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem 0.5rem;
-            }
-
-            .header h1 {
-                font-size: 2rem;
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .navigation-bar {
-                gap: 0.5rem;
-            }
-
-            .btn {
-                padding: 0.5rem 1rem;
-                font-size: 0.875rem;
-            }
-
-            .controls {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .log-entry {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .log-timestamp {
-                min-width: auto;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>
-                <div class="header-icon">
-                    <i class="fas fa-terminal"></i>
-                </div>
-                Agno Logger Output
-            </h1>
-            <p>Real-time system logs and debug information</p>
-        </div>
-
-        <div class="navigation-bar">
-            <a href="/" class="btn btn-primary">
-                <i class="fas fa-home"></i>
-                Back to Chat
-            </a>
-            <a href="/agent_info" class="btn">
-                <i class="fas fa-info-circle"></i>
-                Agent Info
-            </a>
-            <a href="/clear" class="btn">
-                <i class="fas fa-trash-alt"></i>
-                Clear Memory
-            </a>
-        </div>
-
-        <div class="logger-panel">
-            <div class="logger-header">
-                <div class="logger-title">
-                    <i class="fas fa-stream"></i>
-                    Live Log Stream (Agno)
-                </div>
-                <div class="controls">
-                    <div class="status-indicator">
-                        <div class="status-dot"></div>
-                        <span>Connected</span>
-                    </div>
-                    <button class="control-btn" onclick="clearLogs()">
-                        <i class="fas fa-eraser"></i>
-                        Clear
-                    </button>
-                    <button class="control-btn" onclick="toggleAutoScroll()" id="scroll-btn">
-                        <i class="fas fa-arrow-down"></i>
-                        Auto-scroll
-                    </button>
-                </div>
-            </div>
-            <div class="logger-content" id="logger-content">
-                <div class="log-placeholder">
-                    <i class="fas fa-hourglass-half"></i>
-                    <div>
-                        <p><strong>Waiting for log output...</strong></p>
-                        <p>Log entries will appear here in real-time</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let autoScroll = true;
-        let logCount = 0;
-        const maxLogs = 25; // Limit to prevent memory issues
-
-        // Connect to log stream
-        const logEventSource = new EventSource('/stream_logs');
-        
-        logEventSource.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                
-                if (data.error) {
-                    addLogEntry('ERROR', 'Stream Error', data.error);
-                    return;
-                }
-                
-                if (data.log) {
-                    parseAndAddLogEntry(data.log);
-                }
-            } catch (e) {
-                console.error('Error parsing log data:', e);
-            }
-        };
-
-        logEventSource.onerror = function(event) {
-            addLogEntry('ERROR', 'Connection Error', 'Lost connection to log stream. Attempting to reconnect...');
-        };
-
-        function parseAndAddLogEntry(logLine) {
-            // Parse log format: timestamp - logger - level - message
-            const parts = logLine.split(' - ');
-            if (parts.length >= 4) {
-                const timestamp = parts[0];
-                const logger = parts[1];
-                const level = parts[2];
-                const message = parts.slice(3).join(' - ');
-                addLogEntry(level, timestamp, `[${logger}] ${message}`);
-            } else {
-                // Fallback for unparsed logs
-                addLogEntry('INFO', new Date().toISOString(), logLine);
-            }
-        }
-
-        function addLogEntry(level, timestamp, message) {
-            const logContent = document.getElementById('logger-content');
-            
-            // Remove placeholder if it exists
-            const placeholder = logContent.querySelector('.log-placeholder');
-            if (placeholder) {
-                placeholder.remove();
-            }
-
-            // Create log entry
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
-            
-            logEntry.innerHTML = `
-                <div class="log-timestamp">${formatTimestamp(timestamp)}</div>
-                <div class="log-level ${level.toUpperCase()}">${level.toUpperCase()}</div>
-                <div class="log-message">${escapeHtml(message)}</div>
-            `;
-
-            logContent.appendChild(logEntry);
-            logCount++;
-
-            // Limit number of log entries
-            if (logCount > maxLogs) {
-                const firstEntry = logContent.querySelector('.log-entry');
-                if (firstEntry) {
-                    firstEntry.remove();
-                    logCount--;
-                }
-            }
-
-            // Auto-scroll to bottom
-            if (autoScroll) {
-                logContent.scrollTop = logContent.scrollHeight;
-            }
-        }
-
-        function formatTimestamp(timestamp) {
-            try {
-                const date = new Date(timestamp);
-                return date.toLocaleTimeString('en-US', { 
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-            } catch (e) {
-                return timestamp;
-            }
-        }
-
-        function escapeHtml(unsafe) {
-            return unsafe
-                 .replace(/&/g, "&amp;")
-                 .replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;")
-                 .replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
-        }
-
-        function clearLogs() {
-            const logContent = document.getElementById('logger-content');
-            logContent.innerHTML = `
-                <div class="log-placeholder">
-                    <i class="fas fa-hourglass-half"></i>
-                    <div>
-                        <p><strong>Logs cleared</strong></p>
-                        <p>New log entries will appear here</p>
-                    </div>
-                </div>
-            `;
-            logCount = 0;
-        }
-
-        function toggleAutoScroll() {
-            autoScroll = !autoScroll;
-            const btn = document.getElementById('scroll-btn');
-            
-            if (autoScroll) {
-                btn.innerHTML = '<i class="fas fa-arrow-down"></i> Auto-scroll';
-                const logContent = document.getElementById('logger-content');
-                logContent.scrollTop = logContent.scrollHeight;
-            } else {
-                btn.innerHTML = '<i class="fas fa-pause"></i> Manual';
-            }
-        }
-
-        // Handle page unload
-        window.addEventListener('beforeunload', function() {
-            if (logEventSource) {
-                logEventSource.close();
-            }
-        });
-    </script>
-</body>
-</html>
-"""
 
 
 def main():
