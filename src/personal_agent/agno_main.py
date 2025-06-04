@@ -113,6 +113,44 @@ async def initialize_agno_system():
         )
     )
 
+    # Initialize MCP client for traditional tools compatibility
+    mcp_client = None
+    if USE_MCP:
+        logger.info("Initializing MCP client...")
+        from .core.mcp_client import SimpleMCPClient
+
+        mcp_servers = get_mcp_servers()
+        mcp_client = SimpleMCPClient(mcp_servers)
+
+        if mcp_client.start_servers():
+            logger.info("MCP servers started successfully")
+        else:
+            logger.warning("Failed to start some MCP servers")
+
+    # Inject MCP client into tools modules for compatibility
+    if mcp_client:
+        logger.info("Injecting MCP dependencies into tools modules...")
+        from .tools import filesystem, research, system, web
+
+        # Inject MCP client and configuration
+        web.mcp_client = mcp_client
+        web.USE_MCP = True
+        web.logger = logger
+
+        filesystem.mcp_client = mcp_client
+        filesystem.USE_MCP = True
+        filesystem.logger = logger
+
+        system.mcp_client = mcp_client
+        system.USE_MCP = True
+        system.logger = logger
+
+        research.mcp_client = mcp_client
+        research.USE_MCP = True
+        research.logger = logger
+
+        logger.info("MCP dependencies injected successfully")
+
     # Get MCP tools as native agno Functions
     mcp_tools = await get_mcp_tools_as_functions() if USE_MCP else []
 
@@ -157,7 +195,7 @@ async def initialize_agno_system():
     )
 
     # Inject dependencies for cleanup (maintain compatibility)
-    inject_dependencies(weaviate_client, vector_store, None, logger)
+    inject_dependencies(weaviate_client, vector_store, mcp_client, logger)
 
     return agno_agent
 

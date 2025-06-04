@@ -131,7 +131,11 @@ def mcp_github_search(query: str, repo: str = "") -> str:
                 params = {"q": query}
         elif any(
             keyword in query.lower()
-            for keyword in ["issue", "bug", "feature", "pull request", "pr"]
+            for keyword in ["issue", "bug", "feature", "pull request"]
+        ) or (
+            " pr " in f" {query.lower()} "
+            or query.lower().startswith("pr ")
+            or query.lower().endswith(" pr")
         ):
             tool_name = "search_issues"
             if repo:
