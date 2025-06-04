@@ -31,7 +31,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-personal_agent/src/agno/*
+src/agno/
 
 
 # PyInstaller
