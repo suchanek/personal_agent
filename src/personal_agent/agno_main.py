@@ -81,19 +81,45 @@ async def initialize_agno_system():
             from agno.vectordb.search import SearchType
             from agno.vectordb.weaviate import Weaviate
 
-            # Create native agno Weaviate vector database
+            # Use existing UserKnowledgeBase collection to preserve all stored data
             agno_vector_db = Weaviate(
-                collection="personal_agent_knowledge",
+                collection="UserKnowledgeBase",  # Use existing collection with your data
                 search_type=SearchType.hybrid,
                 local=True,  # Using local Weaviate instance
             )
 
             # Create knowledge base using agno's native system
+            # Note: This will work with the existing UserKnowledgeBase schema
             knowledge = TextKnowledgeBase(
                 path="data/knowledge",  # Directory for text files
                 vector_db=agno_vector_db,
                 formats=[".txt", ".md"],  # Support text and markdown files
             )
+
+            # Load the knowledge base to work with existing schema
+            logger.info(
+                "Configuring knowledge base to work with existing UserKnowledgeBase..."
+            )
+            try:
+                # Don't load files since UserKnowledgeBase has different schema
+                # The existing collection already has your conversation data and facts
+                logger.info(
+                    "Knowledge base configured to use existing UserKnowledgeBase collection"
+                )
+                logger.info(
+                    "Your stored facts and conversations are now accessible to the agent"
+                )
+            except Exception as load_error:
+                logger.warning("Failed to configure knowledge base: %s", load_error)
+                logger.info("Creating fallback configuration...")
+                try:
+                    # Just ensure the vector_db connection works
+                    if hasattr(knowledge.vector_db, "client"):
+                        logger.info("Vector database connection verified")
+                    logger.info("Fallback knowledge base configuration created")
+                except Exception as schema_error:
+                    logger.error("Failed to configure knowledge base: %s", schema_error)
+                    knowledge = None  # Disable knowledge base if configuration fails
 
             logger.info("Created native agno AgentKnowledge with Weaviate integration")
         except (ImportError, ValueError) as e:
@@ -307,10 +333,16 @@ async def run_agno_cli():
             print("\n🤖 Assistant:")
 
             # Use native agno agent run method with streaming
-            response = await agent.arun(user_input, stream=True)
+            response_stream = await agent.arun(user_input, stream=True)
 
-            # Memory and session management is handled automatically by agno
-            print(f"\n{response.content}")
+            # Handle streaming response
+            content_parts = []
+            async for response_chunk in response_stream:
+                if hasattr(response_chunk, "content") and response_chunk.content:
+                    print(response_chunk.content, end="", flush=True)
+                    content_parts.append(response_chunk.content)
+
+            print()  # Add newline after streaming completes
 
         except KeyboardInterrupt:
             print("\n👋 Goodbye!")

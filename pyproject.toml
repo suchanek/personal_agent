@@ -29,7 +29,7 @@ nest-asyncio = "^1.6.0"
 mcp = "^1.9.2"
 
 [tool.poetry.scripts]
-personal-agent = "src.personal_agent.main:main"
+personal-agent-langchain = "src.personal_agent.main:main"
 pagl = "src.personal_agent.main:main"
 personal-agent-smolagent = "src.personal_agent.smol_main:run_smolagents_web"
 pags = "src.personal_agent.smol_main:run_smolagents_web"
