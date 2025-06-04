@@ -46,7 +46,7 @@ from .utils.logging import (
 from .web import create_app, register_routes
 
 # Package version
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 # Setup package and module-level logging
 # Configure logging for the package
