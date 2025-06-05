@@ -174,8 +174,10 @@ async def initialize_agno_system():
 
         logger.info("MCP dependencies injected successfully")
 
-    # Get MCP tools as native agno Functions
-    mcp_tools = await get_mcp_tools_as_functions() if USE_MCP else []
+    # Get MCP tools as native agno Functions (using static implementation)
+    from .agno_static_tools import get_static_mcp_tools
+
+    mcp_tools = await get_static_mcp_tools() if USE_MCP else []
 
     # Create native agno Agent with built-in memory capabilities
     agno_agent = Agent(
@@ -221,37 +223,6 @@ async def initialize_agno_system():
     inject_dependencies(weaviate_client, vector_store, mcp_client, logger)
 
     return agno_agent
-
-
-async def get_mcp_tools_as_functions() -> List[Function]:
-    """Convert MCP tools to native agno Functions."""
-    from agno.tools import tool
-
-    tools = []
-
-    if not USE_MCP:
-        return tools
-
-    mcp_servers = get_mcp_servers()
-
-    for server_name, _ in mcp_servers.items():
-        try:
-            # Create agno tool function that wraps MCP server calls
-            @tool(
-                name=f"mcp_{server_name}",
-                description=f"Access {server_name} MCP server tools",
-            )
-            async def mcp_tool_wrapper(query: str) -> str:
-                """Execute MCP tool via server."""
-                # This is a simplified wrapper - in practice you'd want more sophisticated MCP integration
-                return f"MCP tool {server_name} executed with query: {query}"
-
-            tools.append(mcp_tool_wrapper)
-
-        except (ImportError, ValueError) as e:
-            logger.warning("Failed to create MCP tool for %s: %s", server_name, e)
-
-    return tools
 
 
 def create_agno_web_app():
