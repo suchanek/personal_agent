@@ -27,6 +27,8 @@ agno = "^1.5.8"
 streamlit = "^1.40.0"
 nest-asyncio = "^1.6.0"
 mcp = "^1.9.2"
+lancedb = "^0.23.0"
+tantivy = "^0.24.0"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"

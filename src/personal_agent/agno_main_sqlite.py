@@ -69,21 +69,8 @@ async def initialize_agno_system():
     # 2. LanceDB Knowledge Base (for facts and documents)
     knowledge = None
     try:
-        # Ensure knowledge directory exists and has essential files
-        knowledge_path = DATA_DIR / "knowledge"
-
-        # Auto-create essential knowledge files if they don't exist
-        from .utils.knowledge_init import auto_create_knowledge_files
-
-        try:
-            files_created = auto_create_knowledge_files(knowledge_path, logger)
-            if files_created:
-                logger.info("Created essential knowledge files for new installation")
-        except Exception as creation_error:
-            logger.warning("Failed to auto-create knowledge files: %s", creation_error)
-
         knowledge = TextKnowledgeBase(
-            path=str(knowledge_path),
+            path=str(DATA_DIR / "knowledge"),
             vector_db=LanceDb(
                 table_name="personal_agent_knowledge",
                 uri=str(DATA_DIR / "lancedb"),  # Local directory storage
@@ -94,22 +81,15 @@ async def initialize_agno_system():
         )
         logger.info("Initialized LanceDB knowledge base")
 
-        # Load knowledge files into the vector database
+        # Load existing knowledge files if they exist
+        knowledge_path = DATA_DIR / "knowledge"
         if knowledge_path.exists() and any(knowledge_path.iterdir()):
             try:
                 knowledge.load(recreate=False)  # Don't recreate, preserve existing data
-                logger.info("Loaded knowledge files into LanceDB")
-
-                # Count and report loaded files
-                files_count = len(list(knowledge_path.glob("*.*")))
-                logger.info("Knowledge base contains %d files", files_count)
+                logger.info("Loaded existing knowledge files into LanceDB")
             except Exception as load_error:
                 logger.warning("Could not load existing knowledge: %s", load_error)
                 logger.info("Knowledge base will work with new files only")
-        else:
-            logger.info(
-                "No knowledge files found, knowledge base ready for new content"
-            )
     except Exception as e:
         logger.warning("Failed to initialize LanceDB knowledge base: %s", e)
         logger.info("Continuing without knowledge base")

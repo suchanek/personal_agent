@@ -1,6 +1,6 @@
 # Personal AI Agent
 
-A sophisticated personal assistant powered by the **Agno Framework** with native MCP integration, async operations, and persistent memory. Built for modern AI workflows with local Ollama AI, Weaviate vector database, and extensible Model Context Protocol (MCP) tools.
+A sophisticated personal assistant powered by the **Agno Framework** with native MCP integration, async operations, and persistent local storage. Built for modern AI workflows with local Ollama AI, SQLite + LanceDB vector database, and extensible Model Context Protocol (MCP) tools.
 
 > **🎯 Quick Start**: Run `poetry run personal-agent-agno` or `paga` for the modern Agno implementation
 
@@ -10,19 +10,21 @@ A sophisticated personal assistant powered by the **Agno Framework** with native
 
 - 🚀 **Modern Async Architecture**: Built on agno framework with native async/await operations
 - 🔧 **Native MCP Integration**: Direct Model Context Protocol support without bridges
-- 🧠 **Persistent Memory**: Weaviate vector database for semantic memory storage
+- 🧠 **Local Persistent Storage**: SQLite + LanceDB for zero external dependencies
 - 🤖 **Local AI**: Powered by Ollama (qwen2.5:7b-instruct model)
-- 🌐 **Modern Web Interface**: Real-time thought streaming and session management
+- 🌐 **Modern Streamlit Interface**: Interactive web UI with real-time updates
 - ⚡ **Enhanced Performance**: Async operations and optimized tool coordination
+- 🔒 **Privacy-First**: All data stored locally, no external database dependencies
 
 ### Core Capabilities
 
-- 🔍 **Semantic Search**: Finds relevant context from past interactions
-- 📊 **Topic Organization**: Categorize memories by topic
-- 🎯 **Brain Status Indicator**: Visual feedback for Weaviate connection status
+- 🔍 **Semantic Search**: Finds relevant context from past interactions using LanceDB
+- 📊 **Topic Organization**: Categorize memories by topic in local SQLite database
+- 🎯 **System Status Indicator**: Visual feedback for local storage connection status
 - 🗑️ **Memory Management**: Clear knowledge base functionality
-- 📝 **Fact Storage Utility**: Command-line tool for storing facts directly in the knowledge base
+- 📝 **Knowledge Auto-Creation**: Automatic creation of essential knowledge files
 - 💭 **Real-time Thoughts**: Live streaming of agent reasoning process
+- 📁 **File-Based Storage**: Easy backup/restore by copying data directory
 
 ### MCP-Powered Tools (6 Servers)
 
@@ -37,6 +39,7 @@ A sophisticated personal assistant powered by the **Agno Framework** with native
 
 - 🔧 **LangChain Version**: Traditional agent executor (stable but being phased out)
 - 🧪 **Smolagents Version**: HuggingFace experimental framework (research only)
+- 📦 **Weaviate Version**: Original Docker-based vector storage (migrated to SQLite + LanceDB)
 
 ## 🏗️ Architecture
 
@@ -44,8 +47,8 @@ A sophisticated personal assistant powered by the **Agno Framework** with native
 
 ```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Flask Web UI  │───▶│   Agno Agent    │───▶│   Ollama LLM    │
-│  (Port 5002)    │    │  (Async/Await)  │    │  qwen2.5:7b     │
+│ Streamlit Web UI│───▶│   Agno Agent    │───▶│   Ollama LLM    │
+│  (Port 8501)    │    │  (Async/Await)  │    │  qwen2.5:7b     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                │
                                ▼
@@ -53,8 +56,8 @@ A sophisticated personal assistant powered by the **Agno Framework** with native
                    │         Native MCP Integration          │
                    │                                         │
                    │  ┌─────────────────┐  ┌───────────────┐ │
-                   │  │ Weaviate Vector │  │ MCP Servers   │ │
-                   │  │    Database     │  │ (6 servers)   │ │
+                   │  │SQLite + LanceDB │  │ MCP Servers   │ │
+                   │  │  Local Storage  │  │ (6 servers)   │ │
                    │  └─────────────────┘  └───────────────┘ │
                    │                                         │
                    │  📁 Filesystem     🐙 GitHub           │
@@ -67,8 +70,7 @@ A sophisticated personal assistant powered by the **Agno Framework** with native
 
 **Main Interface:**
 
-- `GET/POST /` - Main chat interface with real-time thought streaming
-- `GET /stream_thoughts?session_id={id}` - Server-Sent Events for live thoughts
+- `GET/POST /` - Main chat interface with real-time thought streaming (Streamlit on port 8501)
 - `GET /agent_info` - Agent capabilities and MCP server status
 - `GET /clear` - Clear knowledge base/memory
 
@@ -96,13 +98,10 @@ ollama serve
 ollama pull qwen2.5:7b-instruct
 ollama pull nomic-embed-text
 
-# 4. Start Weaviate database
-docker-compose up -d
-
-# 5. Test everything works
+# 4. Test everything works
 poetry run test-tools
 
-# 6. Run the Agno agent (recommended)
+# 5. Run the Agno agent (recommended)
 poetry run personal-agent-agno
 # OR use the short alias:
 paga
@@ -110,7 +109,7 @@ paga
 
 **Commands Available:**
 
-- `personal-agent-agno` or `paga` - Web interface (port 5002)
+- `personal-agent-agno` or `paga` - Streamlit web interface (port 8501)
 - `personal-agent-agno-cli` or `pagc` - CLI interface
 
 ### Alternative Implementations
@@ -123,13 +122,12 @@ poetry run personal-agent  # port 5001
 poetry run personal-agent-smolagent  # port 5003
 ```
 
-Then open `http://127.0.0.1:5002` in your browser and start chatting with the Agno-powered agent!
+Then open `http://localhost:8501` in your browser and start chatting with the Agno-powered agent!
 
 ## 📋 Prerequisites
 
 - **Python**: 3.11 or higher
 - **Poetry**: For dependency management
-- **Docker**: For Weaviate database
 - **Ollama**: For local LLM inference
 - **Node.js**: For MCP servers (filesystem, github, brave-search, puppeteer)
 
@@ -196,13 +194,10 @@ For proper operation, you **must** configure filesystem paths and optionally set
 
 2. Edit `.env` file and configure your settings:
 
-   ```bash
+      ```bash
    # REQUIRED: Filesystem path configuration
    # ROOT_DIR: Your home directory (used by filesystem MCP server)
    ROOT_DIR=/Users/your_username
-   
-   # DATA_DIR: Directory for vector database storage
-   DATA_DIR=/Users/your_username/data
    
    # OPTIONAL: API keys for enhanced functionality
    # GitHub Personal Access Token
@@ -219,24 +214,13 @@ For proper operation, you **must** configure filesystem paths and optionally set
 ```bash
 # Required filesystem paths
 export ROOT_DIR="/Users/$(whoami)"
-export DATA_DIR="/Users/$(whoami)/data"
 
 # Optional API keys
 export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 export BRAVE_API_KEY="your_api_key_here"
 ```
 
-### 6. Start Weaviate Database
-
-```bash
-# Start the vector database
-docker-compose up -d
-
-# Verify it's running
-docker-compose ps
-```
-
-### 7. Test Installation
+### 6. Test Installation
 
 ```bash
 # Test all components are working
@@ -262,55 +246,32 @@ poetry run personal-agent-agno-cli
 pagc
 ```
 
-**Web Interface**: Open `http://127.0.0.1:5002` in your browser
+**Web Interface**: Open `http://localhost:8501` in your browser
 
 **Features:**
 
 - 🔄 **Real-time Thoughts**: Live streaming of agent reasoning
-- 🧠 **Memory Integration**: Persistent knowledge with Weaviate
+- 🧠 **Memory Integration**: Persistent knowledge with SQLite + LanceDB
 - ⚡ **Async Operations**: Modern async/await architecture  
 - 🔧 **Native MCP**: Direct Model Context Protocol integration
 - 💭 **Session Management**: Unique sessions for each interaction
 
-### API Endpoints (Agno)
+### Streamlit Interface (Agno)
 
 **Main Interface:**
 
-- `GET/POST /` - Chat interface with thought streaming
-- `GET /stream_thoughts?session_id={id}` - Real-time thought stream (SSE)
-- `GET /agent_info` - Agent capabilities and server status
-- `GET /clear` - Memory management (clear knowledge base)
+- Streamlit web app on `http://localhost:8501`
+- Interactive chat interface with thought streaming
+- Agent capabilities and MCP server status displayed
+- Memory management controls integrated in UI
 
-**Mogli Usage Example:**
+**Streamlit Interface Features:**
 
-```python
-import requests
-
-# Chat with the agent
-response = requests.post('http://localhost:5002/', data={
-    'query': 'What is the current status of Python 3.12?',
-    'topic': 'programming',
-    'session_id': 'api_session_001'
-})
-
-# Get agent information
-info = requests.get('http://localhost:5002/agent_info')
-print(info.text)  # Shows MCP servers, tools, capabilities
-
-# Clear memory
-clear_result = requests.get('http://localhost:5002/clear')
-```
-
-**Server-Sent Events (Thoughts):**
-
-```javascript
-// Subscribe to real-time agent thoughts
-const eventSource = new EventSource('/stream_thoughts?session_id=my_session');
-eventSource.onmessage = function(event) {
-    const thought = JSON.parse(event.data);
-    console.log('Agent thinking:', thought.thought);
-};
-```
+- 🎯 **Interactive Chat**: Real-time conversation with the agent
+- 💭 **Thought Streaming**: Live display of agent reasoning process
+- 🔧 **Tool Integration**: Visual feedback on MCP tool usage
+- 🧠 **Memory Status**: Display of knowledge base connection
+- 📊 **Session Management**: Automatic session handling
 
 ### Testing the System
 
@@ -327,33 +288,39 @@ poetry run python scripts/install_mcp.py
 
 ## 🎯 Example Interactions
 
-### Research with Real-time Thoughts
+### Research with Streamlit Interface
 
 ```text
-💭 "🤔 Thinking about your request..."
-💭 "🔍 Searching memory for context..."
-💭 "✅ Found relevant context in memory"
-💭 "🧠 Analyzing request with agno reasoning"
-💭 "🔧 Preparing MCP tools and capabilities"
+[Streamlit Interface]
+User Input: "Research the latest developments in async Python"
 
-User: Research the latest developments in async Python
-Agent: I'll research the latest async Python developments using multiple sources...
+💭 Agent Thoughts (Live Display):
+- 🤔 Thinking about your request...
+- 🔍 Searching memory for context...
+- ✅ Found relevant context in memory
+- 🧠 Analyzing request with agno reasoning
+- 🔧 Preparing MCP tools and capabilities
 
-[Agent uses MCP tools: brave_search, github_search, filesystem]
-[Results combined with memory context for comprehensive response]
+Agent Response:
+I'll research the latest async Python developments using multiple sources...
+
+[MCP Tools Used: brave_search, github_search, filesystem]
+[Results displayed with memory context integration]
 ```
 
 ### File Operations with Memory
 
 ```text
-User: Create a FastAPI app that uses async/await patterns
-Agent: I'll create a modern FastAPI application for you...
+[Streamlit Interface]
+User Input: "Create a FastAPI app that uses async/await patterns"
 
-💭 "📁 Creating new Python file..."
-💭 "🔧 Using MCP filesystem tools..."
-💭 "💾 Storing interaction in memory..."
+💭 Agent Thoughts (Live Display):
+- 📁 Creating new Python file...
+- 🔧 Using MCP filesystem tools...
+- 💾 Storing interaction in memory...
 
 [Agent creates file using mcp_write_file and stores the interaction]
+[File content displayed in Streamlit with syntax highlighting]
 ```
 
 ## 🛠️ Tool Reference (Agno MCP Integration)
@@ -392,7 +359,7 @@ Agent: I'll create a modern FastAPI application for you...
 
 **System Tools:**
 
-- Memory management (Weaviate integration)
+- Memory management (SQLite + LanceDB integration)
 - Session and state management
 - Error handling and recovery
 
@@ -400,7 +367,7 @@ Agent: I'll create a modern FastAPI application for you...
 
 All tools integrate with the persistent memory system:
 
-- **Automatic Storage**: Important interactions saved to Weaviate
+- **Automatic Storage**: Important interactions saved to SQLite + LanceDB
 - **Context Enhancement**: Past knowledge enriches current responses
 - **Semantic Search**: Vector-based retrieval of relevant information
 - **Topic Organization**: Categorized storage for better organization
@@ -448,23 +415,25 @@ async def process_request(query: str) -> str:
     return response
 ```
 
-### Real-time Thought Streaming
+### Streamlit Integration
 
-Monitor agent reasoning in real-time:
+Monitor agent reasoning through the interactive interface:
 
-- **Session-based**: Each interaction gets unique session ID
-- **Live Updates**: Server-Sent Events for instant thought delivery
+- **Session-based**: Each conversation gets unique session management
+- **Live Updates**: Real-time display of agent thoughts and tool usage
 - **Progress Tracking**: Visual feedback on processing stages
 - **Error Recovery**: Graceful handling of failed operations
+- **Interactive Controls**: Memory management and tool configuration
 
 ### Enhanced Memory System
 
-Intelligent memory management with Weaviate:
+Intelligent memory management with SQLite + LanceDB:
 
-- **Vector Storage**: Semantic similarity search
+- **Vector Storage**: Semantic similarity search using LanceDB
 - **Context Retrieval**: Relevant past interactions surface automatically
 - **Knowledge Building**: Each interaction improves future responses
-- **Topic Categorization**: Organized knowledge domains
+- **Topic Categorization**: Organized knowledge domains in SQLite
+- **Local Files**: Easy backup/restore by copying data directory
 
 ### MCP Native Integration
 
@@ -474,7 +443,7 @@ Direct Model Context Protocol support:
 - **Multi-Server**: Coordinate across 6 different MCP servers
 - **Tool Discovery**: Automatic detection of available capabilities  
 - **Error Handling**: Robust fallbacks for server unavailability
-- **Web Interface**: Custom Flask interface displays all available tools and capabilities
+- **Streamlit Interface**: Modern web interface displays all available tools and capabilities
 
 ## 🔧 Troubleshooting (Agno)
 
@@ -493,12 +462,16 @@ poetry run test-mcp-servers
 poetry run personal-agent-agno-cli --help
 ```
 
-**2. Real-time Thoughts Not Streaming**
+**2. Streamlit Interface Issues**
 
 ```bash
-# Check browser developer console for SSE errors
-# Verify session ID is being passed correctly
-# Test endpoint directly: curl http://localhost:5002/stream_thoughts?session_id=test
+# Check if Streamlit is properly installed
+poetry show streamlit
+
+# Verify the agno agent starts without errors
+poetry run personal-agent-agno-cli --help
+
+# Check console output for any startup errors
 ```
 
 **3. MCP Tools Not Available**
@@ -507,18 +480,21 @@ poetry run personal-agent-agno-cli --help
 # Reinstall MCP servers
 poetry run python scripts/install_mcp.py
 
-# Check agent info endpoint
-curl http://localhost:5002/agent_info
+# Test MCP server availability
+poetry run test-mcp-servers
 ```
 
-**4. Memory/Weaviate Issues**
+**4. Memory/Storage Issues**
 
 ```bash
-# Restart Weaviate
-docker-compose down && docker-compose up -d
+# Check if data directory exists and is writable
+ls -la data/
 
-# Clear and rebuild memory
-curl http://localhost:5002/clear
+# Verify SQLite database files
+ls -la data/*.db
+
+# Test memory functionality
+poetry run test-tools
 ```
 
 **5. API Key Configuration**
@@ -538,7 +514,6 @@ cat .env | grep -E "(GITHUB|BRAVE)"
 ```bash
 # REQUIRED: Filesystem paths - must be configured in .env file
 ROOT_DIR="/Users/your_username"        # Your home directory
-DATA_DIR="/Users/your_username/data"   # Vector database storage
 ```
 
 ### Optional Environment Variables
@@ -549,7 +524,6 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 export BRAVE_API_KEY="your_api_key_here"
 
 # Optional: Override default service URLs
-export WEAVIATE_URL="http://localhost:8080"
 export OLLAMA_URL="http://localhost:11434"
 ```
 
@@ -571,10 +545,58 @@ poetry run test-tools
 poetry run store-fact "Your fact here" --topic "optional_topic"
 ```
 
+## 📚 Migration from Weaviate (Legacy)
+
+### What Changed
+
+The project has migrated from Docker-based Weaviate vector database to a local SQLite + LanceDB architecture for improved privacy and zero external dependencies.
+
+### Key Benefits of New Architecture
+
+- 🔒 **Privacy-First**: All data stored locally, no external database
+- 🚀 **Zero Setup**: No Docker containers or external services required
+- 📁 **Easy Backup**: Simple file-based storage in `data/` directory
+- ⚡ **Faster Startup**: Instant initialization without waiting for containers
+- 🔧 **Simplified Development**: No complex database management
+
+### Legacy Weaviate Setup (Deprecated)
+
+If you need to reference the old Weaviate setup:
+
+```bash
+# OLD: Docker-based Weaviate (no longer needed)
+docker-compose up -d weaviate
+
+# NEW: Automatic local storage initialization
+poetry run personal-agent-agno  # Automatically creates SQLite + LanceDB
+```
+
+### Migration Path
+
+Data from existing Weaviate installations should be migrated using the built-in migration tools:
+
+```bash
+# Run migration script (if available)
+poetry run python migration_plan_sqlite.py
+
+# Or start fresh with knowledge auto-creation
+poetry run personal-agent-agno  # Creates essential knowledge files automatically
+```
+
+### Legacy Environment Variables
+
+These variables are no longer needed:
+
+```bash
+# REMOVED: No longer required
+# DATA_DIR="/Users/your_username/data"  # Auto-managed now
+# WEAVIATE_URL="http://localhost:8080"  # No external DB needed
+```
+
 ## 📄 License
 
 BSD 3-Clause License - See LICENSE file for details.
 
 ---
 
-**Personal AI Agent (Agno)** - A modern async agentic AI assistant with native MCP integration, real-time thought streaming, and persistent memory. 🚀
+**Personal AI Agent (Agno)** - A modern async agentic AI assistant with native MCP integration, Streamlit interface, and local persistent memory. 🚀

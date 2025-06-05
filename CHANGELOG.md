@@ -5,6 +5,43 @@ All notable changes to the Personal AI Agent project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [agnodev2] - 2025-06-04
+
+### Added
+
+- SQLite + LanceDB local storage architecture for zero external dependencies
+- Streamlit web interface replacing Flask implementation
+- Knowledge auto-creation functionality with essential knowledge files
+- File-based backup/restore capabilities for data directory
+- Privacy-first local data storage with no external database requirements
+
+### Changed
+
+- **BREAKING**: Migrated from Weaviate vector database to SQLite + LanceDB
+- **BREAKING**: Replaced Flask web interface with Streamlit (port 8501)
+- Updated README.md to reflect new local storage architecture
+- Removed Docker dependency from prerequisites
+- Updated installation instructions to remove Weaviate setup
+- Modified environment variables (removed DATA_DIR and WEAVIATE_URL)
+- Updated troubleshooting section for local storage
+
+### Removed
+
+- Docker-based Weaviate database dependency
+- Flask web interface and related API endpoints
+- Complex database management requirements
+
+### Fixed
+
+- Simplified setup process with automatic storage initialization
+- Eliminated external service dependencies for improved reliability
+
+### Migration Notes
+
+- Legacy Weaviate installations can be migrated using built-in tools
+- Knowledge base now auto-creates essential files on first run
+- All data stored locally in `data/` directory for easy backup
+
 ## [agnodev1 - Unreleased]
 
 ### Added
