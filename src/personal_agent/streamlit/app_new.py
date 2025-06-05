@@ -10,6 +10,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import nest_asyncio
 import streamlit as st
@@ -77,6 +78,9 @@ class PersonalAgentApp:
 
     def apply_theme_aware_styling(self) -> None:
         """Apply theme-aware styling that respects Streamlit's built-in theme system"""
+        # Use Streamlit's built-in theme detection
+        current_theme = st.get_option("theme.base")
+
         # Apply theme-aware CSS that works with both light and dark themes
         theme_aware_css = """
         <style>
@@ -183,7 +187,7 @@ class PersonalAgentApp:
                     logger.info("Agent initialized successfully in Streamlit")
             except Exception as e:
                 st.error(f"Failed to initialize agent: {e}")
-                logger.error("Agent initialization failed: %s", e)
+                logger.error(f"Agent initialization failed: {e}")
 
     def run(self) -> None:
         """
@@ -265,7 +269,7 @@ class PersonalAgentApp:
 
         except Exception as e:
             error_msg = f"Sorry, I encountered an error: {str(e)}"
-            logger.error("Error processing query '%s': %s", query, e)
+            logger.error(f"Error processing query '{query}': {e}")
             st.error(error_msg)
             return error_msg
 

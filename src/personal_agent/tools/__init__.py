@@ -20,7 +20,7 @@ from .memory_tools import (
 )
 from .research import comprehensive_research
 from .system import mcp_shell_command
-from .web import mcp_brave_search, mcp_fetch_url, mcp_github_search
+from .web import fetch_url, github_search, web_search
 
 __all__ = [
     # Memory tools
@@ -34,9 +34,9 @@ __all__ = [
     "intelligent_file_search",
     "create_and_save_file",
     # Web tools
-    "mcp_github_search",
-    "mcp_brave_search",
-    "mcp_fetch_url",
+    "github_search",
+    "web_search",
+    "fetch_url",
     # System tools
     "mcp_shell_command",
     # Research tools
@@ -132,9 +132,9 @@ def get_all_tools(
                 filesystem.intelligent_file_search,
                 filesystem.create_and_save_file,
                 # Web tools
-                web.mcp_github_search,
-                web.mcp_brave_search,
-                web.mcp_fetch_url,
+                web.github_search,
+                web.web_search,
+                web.fetch_url,
                 # System tools
                 system.mcp_shell_command,
                 # Research tools

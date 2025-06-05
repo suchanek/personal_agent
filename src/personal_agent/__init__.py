@@ -26,6 +26,7 @@ from .core.memory import is_weaviate_connected, vector_store, weaviate_client
 
 # Import tools
 from .tools import get_all_tools
+from .tools.web import github_search
 
 # Import utilities
 from .utils import cleanup, inject_dependencies, register_cleanup_handlers
@@ -61,6 +62,13 @@ setup_logging_filters()
 _logger = setup_logging()
 _logger.info("Initializing Personal AI Agent package...")
 
+# Export logger for public use
+logger = _logger
+
+# Initialize MCP client if enabled
+mcp_client = None
+if USE_MCP:
+    mcp_client = SimpleMCPClient(get_mcp_servers())
 
 # Main entry points
 from .main import create_web_app, initialize_system, main
@@ -105,4 +113,10 @@ __all__ = [
     "run_smolagents_web",
     # Package info
     "__version__",
+    # Logger
+    "logger",
+    # MCP Client
+    "mcp_client",
+    # GitHub Search Tool
+    "github_search",
 ]

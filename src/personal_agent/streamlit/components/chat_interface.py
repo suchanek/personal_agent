@@ -6,7 +6,7 @@ conversation history, tool call visualization, and agent status indicators.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import streamlit as st
 
@@ -23,7 +23,6 @@ class ChatInterface:
 
     def __init__(self) -> None:
         """Initialize the chat interface component."""
-        pass
 
     def render(self) -> None:
         """
@@ -140,37 +139,26 @@ class ChatInterface:
 
     def display_agent_status(self) -> None:
         """
-        Display agent connection and capability status.
+        Display a compact agent status bar at the top.
 
-        Shows real-time status of memory, knowledge base, tools,
-        and other agent capabilities in a metrics layout.
+        Shows essential status information in a single line format.
         """
         if "agent" not in st.session_state or st.session_state.agent is None:
-            st.warning("⚠️ Agent not initialized")
+            st.error("🔴 Agent not initialized")
             return
 
         agent = st.session_state.agent
 
-        # Create status metrics in columns
-        col1, col2, col3, col4 = st.columns(4)
+        # Create compact status indicators
+        memory_icon = "🟢" if agent.memory else "🔴"
+        knowledge_icon = "🟢" if agent.knowledge else "🔴"
+        tools_count = len(agent.tools) if agent.tools else 0
+        session_icon = "🟢" if st.session_state.get("session_id") else "🆕"
 
-        with col1:
-            memory_status = "🟢 Active" if agent.memory else "🔴 Inactive"
-            st.metric("Memory", memory_status)
-
-        with col2:
-            knowledge_status = "🟢 Connected" if agent.knowledge else "🔴 Disconnected"
-            st.metric("Knowledge Base", knowledge_status)
-
-        with col3:
-            tools_count = len(agent.tools) if agent.tools else 0
-            st.metric("Tools", f"{tools_count} available")
-
-        with col4:
-            session_status = (
-                "🟢 Active" if st.session_state.get("session_id") else "🔴 New"
-            )
-            st.metric("Session", session_status)
+        # Display as a single info line
+        st.info(
+            f"**Status:** {memory_icon} Memory | {knowledge_icon} Knowledge | 🔧 {tools_count} Tools | {session_icon} Session"
+        )
 
     def display_thinking_process(self, thinking_text: str) -> None:
         """
@@ -213,196 +201,3 @@ class ChatInterface:
                     st.rerun()
             else:
                 st.info("No conversation to clear")
-
-
-from ..utils.styling import create_metric_card, create_status_badge
-
-logger = logging.getLogger(__name__)
-
-
-class ChatInterface:
-    """
-    Handles the main chat interface rendering and interactions.
-
-    This class manages the display of conversation history, agent status,
-    tool usage information, and other chat-related UI components.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the chat interface component."""
-        pass
-
-    def render(self) -> None:
-        """
-        Render the complete chat interface.
-
-        This method displays the header, chat history, agent status,
-        and any additional interface elements.
-        """
-        self.render_header()
-        self.display_chat_history()
-        self.display_agent_status()
-
-    def render_header(self) -> None:
-        """Render the main header section."""
-        st.markdown(
-            """
-        <div class="main-header">
-            <h1>🤖 Personal AI Agent</h1>
-            <p><em>Powered by Agno Framework with Native Memory & MCP Tools</em></p>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    def display_chat_history(self) -> None:
-        """
-        Display the conversation history.
-
-        Renders all messages in the conversation with proper formatting
-        and includes tool usage information where applicable.
-        """
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
-
-        # Display welcome message if no conversation exists
-        if not st.session_state.messages:
-            self.display_welcome_message()
-            return
-
-        # Display each message in the conversation
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-                # Display tool calls if available
-                if "tool_calls" in message and message["tool_calls"]:
-                    self.display_tool_calls(message["tool_calls"])
-
-                # Display timestamp in small text
-                if "timestamp" in message:
-                    st.caption(f"*{message['timestamp']}*")
-
-    def display_welcome_message(self) -> None:
-        """Display a welcome message for new users."""
-        with st.chat_message("assistant"):
-            st.markdown(
-                """
-            👋 **Welcome to your Personal AI Agent!**
-            
-            I'm here to help you with:
-            - **Research & Analysis** - Search the web and analyze information
-            - **Memory & Context** - Remember our conversations and build knowledge
-            - **Tool Integration** - Access various tools and services through MCP
-            - **Document Processing** - Work with files and documents
-            
-            Feel free to ask me anything! I'll use my tools and memory to provide the best assistance possible.
-            
-            **Try asking:**
-            - "What can you help me with?"
-            - "Search for information about [topic]"
-            - "Remember that I prefer [preference]"
-            - "What tools do you have access to?"
-            """
-            )
-
-    def display_tool_calls(self, tool_calls: List[Dict]) -> None:
-        """
-        Display tool usage information.
-
-        :param tool_calls: List of tool call dictionaries
-        """
-        with st.expander("🔧 Tool Usage", expanded=False):
-            for i, tool_call in enumerate(tool_calls, 1):
-                tool_name = tool_call.get("name", "Unknown Tool")
-                st.markdown(f"**{i}. {tool_name}**")
-
-                # Display tool arguments if available
-                if tool_call.get("arguments"):
-                    st.code(str(tool_call["arguments"]), language="json")
-
-                # Display tool output if available
-                if tool_call.get("output"):
-                    with st.expander(f"Output from {tool_name}", expanded=False):
-                        st.text(str(tool_call["output"]))
-
-                if i < len(tool_calls):
-                    st.divider()
-
-    def display_agent_status(self) -> None:
-        """
-        Display current agent connection and status information.
-
-        Shows the status of memory, knowledge base, tools, and other
-        agent components in a compact, informative layout.
-        """
-        if "agent" not in st.session_state or not st.session_state.agent:
-            st.warning("⚠️ Agent not initialized")
-            return
-
-        agent = st.session_state.agent
-
-        # Create status section
-        st.markdown("### 📊 Agent Status")
-
-        # Create three columns for status metrics
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            memory_status = "🟢 Active" if agent.memory else "🔴 Inactive"
-            st.markdown(
-                create_metric_card("Memory", memory_status, "Conversation history"),
-                unsafe_allow_html=True,
-            )
-
-        with col2:
-            knowledge_status = "🟢 Connected" if agent.knowledge else "🔴 Disconnected"
-            st.markdown(
-                create_metric_card("Knowledge Base", knowledge_status, "Vector search"),
-                unsafe_allow_html=True,
-            )
-
-        with col3:
-            tools_count = len(agent.tools) if agent.tools else 0
-            tools_status = f"{tools_count} tools"
-            st.markdown(
-                create_metric_card("MCP Tools", tools_status, "Available integrations"),
-                unsafe_allow_html=True,
-            )
-
-        # Display session information
-        if st.session_state.get("session_id"):
-            st.info(f"📝 Session: `{st.session_state.session_id[:8]}...`")
-
-        # Display conversation statistics
-        message_count = len(st.session_state.messages)
-        if message_count > 0:
-            tool_calls_count = len(st.session_state.get("tool_calls_history", []))
-            st.caption(
-                f"💬 {message_count} messages • 🔧 {tool_calls_count} tool calls"
-            )
-
-    def display_thinking_indicator(self, thinking_text: str) -> None:
-        """
-        Display agent thinking process.
-
-        :param thinking_text: Text showing what the agent is thinking about
-        """
-        with st.container():
-            st.markdown(f"🤔 **Thinking:** {thinking_text}")
-
-    def display_streaming_response(self, container, response_text: str) -> None:
-        """
-        Display streaming response in real-time.
-
-        :param container: Streamlit container for the response
-        :param response_text: Current response text
-        """
-        container.markdown(response_text)
-
-    def clear_chat_history(self) -> None:
-        """Clear the chat history and reset the conversation."""
-        st.session_state.messages = []
-        st.session_state.tool_calls_history = []
-        st.session_state.session_id = None
-        st.rerun()

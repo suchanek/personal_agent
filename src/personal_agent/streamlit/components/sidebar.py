@@ -123,16 +123,6 @@ class Sidebar:
         """Render application settings and preferences."""
         st.markdown("### ⚙️ Settings")
 
-        # Theme toggle
-        dark_theme = st.checkbox(
-            "🌙 Dark Theme",
-            value=st.session_state.get("dark_theme", True),
-            help="Enable dark theme for better visibility",
-        )
-        if dark_theme != st.session_state.get("dark_theme", True):
-            st.session_state.dark_theme = dark_theme
-            st.rerun()
-
         # Debug mode toggle
         debug_mode = st.checkbox(
             "Debug Mode",

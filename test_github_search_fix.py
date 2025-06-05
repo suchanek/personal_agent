@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from personal_agent.config import USE_MCP, get_mcp_servers
 from personal_agent.core.mcp_client import SimpleMCPClient
-from personal_agent.tools.web import mcp_github_search
+from personal_agent.tools.web import github_search
 from personal_agent.utils import setup_logging
 
 
@@ -70,7 +70,7 @@ def test_github_search() -> None:
     # Test proteusPy search (should use search_repositories)
     print("Searching for 'proteusPy'...")
     try:
-        result = mcp_github_search("proteusPy")
+        result = github_search.entrypoint("proteusPy")
         if "suchanek/proteusPy" in result:
             print("✅ Found proteusPy repository")
         else:
@@ -82,7 +82,7 @@ def test_github_search() -> None:
     # Test issue search (should use search_issues)
     print("\nSearching for 'issue with authentication'...")
     try:
-        result = mcp_github_search("issue with authentication")
+        result = github_search.entrypoint("issue with authentication")
         print("✅ Issue search completed")
         print(f"Result preview: {result[:100]}...")
     except Exception as e:

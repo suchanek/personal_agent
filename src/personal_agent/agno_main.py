@@ -217,6 +217,7 @@ async def initialize_agno_system():
 
 async def get_mcp_tools_as_functions(model) -> List[Function]:
     """Convert MCP tools to native agno Functions with real MCP server connections."""
+    import logging
     from textwrap import dedent
 
     from mcp import ClientSession, StdioServerParameters
@@ -224,6 +225,9 @@ async def get_mcp_tools_as_functions(model) -> List[Function]:
 
     from agno.tools import tool
     from agno.tools.mcp import MCPTools
+
+    # Get logger for this function
+    logger = logging.getLogger(__name__)
 
     tools = []
 
