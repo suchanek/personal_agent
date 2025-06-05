@@ -29,10 +29,10 @@ duckdb = "^1.3.0"
 yfinance = "^0.2.61"
 
 [tool.poetry.scripts]
-# Main entry points for Personal AI Agent (agno-based system)
-personal-agent = "personal_agent.agno_main:run_agno_web"
+# Main entry points for Personal AI Agent (Streamlit-based system)
+personal-agent = "personal_agent.streamlit.main:streamlit_main"
 personal-agent-cli = "personal_agent.agno_main:cli_main"
-personal-agent-streamlit = "personal_agent.agno_main:run_agno_web"
+personal-agent-streamlit = "personal_agent.streamlit.main:streamlit_main"
 # Convenience aliases
 cli = "personal_agent.agno_main:cli_main"
 # Setup and testing utilities
