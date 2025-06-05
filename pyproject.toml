@@ -30,11 +30,11 @@ yfinance = "^0.2.61"
 
 [tool.poetry.scripts]
 # Main entry points for Personal AI Agent (agno-based system)
-personal-agent = "src.personal_agent.streamlit.main:streamlit_main"
-personal-agent-cli = "src.personal_agent.streamlit.main:cli_main"
-personal-agent-streamlit = "src.personal_agent.streamlit.main:main"
+personal-agent = "personal_agent.agno_main:run_agno_web"
+personal-agent-cli = "personal_agent.agno_main:cli_main"
+personal-agent-streamlit = "personal_agent.agno_main:run_agno_web"
 # Convenience aliases
-cli = "src.personal_agent.streamlit.main:cli_main"
+cli = "personal_agent.agno_main:cli_main"
 # Setup and testing utilities
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"

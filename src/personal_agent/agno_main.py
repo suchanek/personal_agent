@@ -160,7 +160,7 @@ async def initialize_agno_system():
         logger.info("MCP dependencies injected successfully")
 
     # Get MCP tools as native agno Functions
-    mcp_tools = await get_mcp_tools_as_functions() if USE_MCP else []
+    mcp_tools = await get_mcp_tools_as_functions(model) if USE_MCP else []
 
     # 4. Create the Native Agno Agent
     agno_agent = Agent(
@@ -215,9 +215,15 @@ async def initialize_agno_system():
     return agno_agent
 
 
-async def get_mcp_tools_as_functions() -> List[Function]:
-    """Convert MCP tools to native agno Functions."""
+async def get_mcp_tools_as_functions(model) -> List[Function]:
+    """Convert MCP tools to native agno Functions with real MCP server connections."""
+    from textwrap import dedent
+
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
     from agno.tools import tool
+    from agno.tools.mcp import MCPTools
 
     tools = []
 
@@ -226,19 +232,116 @@ async def get_mcp_tools_as_functions() -> List[Function]:
 
     mcp_servers = get_mcp_servers()
 
-    for server_name, _ in mcp_servers.items():
+    for server_name, config in mcp_servers.items():
         try:
-            # Create agno tool function that wraps MCP server calls
-            @tool(
-                name=f"mcp_{server_name}",
-                description=f"Access {server_name} MCP server tools",
+            # Extract server configuration
+            command = config.get("command", "npx")
+            args = config.get("args", [])
+            env = config.get("env", {})
+            description = config.get(
+                "description", f"Access to {server_name} MCP server"
             )
-            async def mcp_tool_wrapper(query: str) -> str:
-                """Execute MCP tool via server."""
-                # This is a simplified wrapper - in practice you'd want more sophisticated MCP integration
-                return f"MCP tool {server_name} executed with query: {query}"
 
-            tools.append(mcp_tool_wrapper)
+            # Create the actual tool function with proper MCP integration
+            def make_mcp_tool(
+                name: str, cmd: str, tool_args: list, tool_env: dict, desc: str
+            ):
+                @tool(
+                    name=f"mcp_{name}",
+                    description=f"Access {name} MCP server tools: {desc}",
+                )
+                async def mcp_tool_wrapper(query: str) -> str:
+                    """Execute MCP tool via real server connection."""
+                    try:
+                        # Prepare environment - convert GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN if needed
+                        server_env = tool_env.copy() if tool_env else {}
+                        if (
+                            name == "github"
+                            and "GITHUB_PERSONAL_ACCESS_TOKEN" in server_env
+                        ):
+                            # The GitHub MCP server expects GITHUB_TOKEN
+                            server_env["GITHUB_TOKEN"] = server_env[
+                                "GITHUB_PERSONAL_ACCESS_TOKEN"
+                            ]
+                            logger.info(
+                                "Converted GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN for GitHub MCP server"
+                            )
+
+                        server_params = StdioServerParameters(
+                            command=cmd,
+                            args=tool_args,
+                            env=server_env,
+                        )
+
+                        # Create client session using async context manager
+                        async with stdio_client(server_params) as (read, write):
+                            async with ClientSession(read, write) as session:
+                                # Initialize MCP toolkit with session
+                                mcp_tools = MCPTools(session=session)
+                                await mcp_tools.initialize()
+
+                                # Create specialized instructions based on server type
+                                if name == "github":
+                                    instructions = dedent(
+                                        """\
+                                        You are a GitHub assistant. Help users explore repositories and their activity.
+                                        
+                                        Available tools include:
+                                        - search_repositories: Search for repositories by name or keywords
+                                        - get_file_contents: Get contents of files in a repository
+                                        - search_code: Search for code within repositories
+                                        - search_issues: Search for issues in repositories
+                                        - list_issues: List issues in a repository
+                                        - get_issue: Get details of a specific issue
+                                        - list_commits: List commits in a repository
+                                        - list_pull_requests: List pull requests in a repository
+                                        - get_pull_request: Get details of a specific pull request
+                                        
+                                        When searching for repository information:
+                                        1. Use search_repositories to find repositories by name
+                                        2. Use get_file_contents to examine README, setup files, etc.
+                                        3. Use search_code to find specific code patterns
+                                        4. Use list_issues and list_commits for activity information
+                                        
+                                        - Provide organized, concise insights about the repository
+                                        - Focus on facts and data from the GitHub API
+                                        - Use markdown formatting for better readability
+                                        - Present numerical data in tables when appropriate
+                                        - Include links to relevant GitHub pages when helpful
+                                    """
+                                    )
+                                elif name.startswith("filesystem"):
+                                    instructions = f"You are a filesystem assistant for {name}. Help with file and directory operations."
+                                elif name == "brave-search":
+                                    instructions = "You are a web search assistant. Help users find information on the web."
+                                elif name == "puppeteer":
+                                    instructions = "You are a browser automation assistant. Help with web scraping and automation tasks."
+                                else:
+                                    instructions = f"You are an assistant using {name} MCP server. Help with the user's request."
+
+                                # Create a temporary agent for this MCP server
+                                temp_agent = Agent(
+                                    model=model,  # Use the global model from initialize_agno_system
+                                    tools=[mcp_tools],
+                                    instructions=instructions,
+                                    markdown=True,
+                                    show_tool_calls=False,  # Keep clean for production
+                                )
+
+                                # Run the query
+                                response = await temp_agent.arun(query)
+                                return response.content
+
+                    except Exception as e:
+                        logger.error("Error running %s MCP server: %s", name, e)
+                        return f"Error using {name}: {str(e)}"
+
+                return mcp_tool_wrapper
+
+            # Create the tool and add it to the list
+            tool_func = make_mcp_tool(server_name, command, args, env, description)
+            tools.append(tool_func)
+            logger.info("Created real MCP tool function for: %s", server_name)
 
         except (ImportError, ValueError) as e:
             logger.warning("Failed to create MCP tool for %s: %s", server_name, e)
