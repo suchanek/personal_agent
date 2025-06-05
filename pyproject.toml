@@ -1,46 +1,41 @@
 [tool.poetry]
 name = "personal-agent"
 version = "0.3.0"
-description = "Personal AI agent with MCP and Weaviate"
+description = "Personal AI agent with MCP, SQLite memory, and LanceDB vector storage"
 authors = ["Your Name <your.email@example.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
-langchain = "^0.3.0"
-langchain-ollama = "^0.3.3"
-langchain-community = "^0.3.0"
-weaviate-client = "^4.8.1"
-flask = "^3.0.3"
-hypercorn = "^0.17.3"
+# Core AI framework (replaced langchain + smolagents)
+agno = "^1.5.8"
+# Vector database and search
+lancedb = "^0.23.0"
+tantivy = "^0.24.0"
+# Model Context Protocol support
+mcp = "^1.9.2"
+# Web interface
+streamlit = "^1.40.0"
+# HTTP and API dependencies
 requests = "^2.32.3"
-langchain-weaviate = "^0.0.4"
+litellm = "^1.71.3"
+# Utilities
 rich = "^14.0.0"
 python-dotenv = "^1.1.0"
-smolagents = "^1.17.0"
-litellm = "^1.71.3"
 markdownify = "^1.1.0"
-pathlib = "^1.0.1"
+nest-asyncio = "^1.6.0"
+# Data sources and tools
 duckduckgo-search = "^8.0.2"
 duckdb = "^1.3.0"
 yfinance = "^0.2.61"
-agno = "^1.5.8"
-streamlit = "^1.40.0"
-nest-asyncio = "^1.6.0"
-mcp = "^1.9.2"
-lancedb = "^0.23.0"
-tantivy = "^0.24.0"
 
 [tool.poetry.scripts]
-personal-agent-langchain = "src.personal_agent.main:main"
-pagl = "src.personal_agent.main:main"
-personal-agent-smolagent = "src.personal_agent.smol_main:run_smolagents_web"
-pags = "src.personal_agent.smol_main:run_smolagents_web"
-personal-agent-agno = "src.personal_agent.web.agno_interface:main"
-paga = "src.personal_agent.web.agno_interface:main"
-personal-agent-agno-cli = "src.personal_agent.agno_main:cli_main"
-pagc = "src.personal_agent.agno_main:cli_main"
+# Main entry points for Personal AI Agent (agno-based system)
+personal-agent = "src.personal_agent.streamlit.main:streamlit_main"
+personal-agent-cli = "src.personal_agent.streamlit.main:cli_main"
 personal-agent-streamlit = "src.personal_agent.streamlit.main:main"
-pass = "src.personal_agent.streamlit.main:main"
+# Convenience aliases
+cli = "src.personal_agent.streamlit.main:cli_main"
+# Setup and testing utilities
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"

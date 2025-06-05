@@ -179,9 +179,9 @@ async def initialize_agno_system():
         memory=memory,
         enable_agentic_memory=True,
         enable_user_memories=True,
-        enable_session_summaries=True,
+        enable_session_summaries=False,  # Disabled to prevent hanging
         add_memory_references=True,
-        add_session_summary_references=True,
+        add_session_summary_references=False,  # Disabled to prevent hanging
         # Knowledge capabilities
         knowledge=knowledge,
         search_knowledge=True if knowledge else False,

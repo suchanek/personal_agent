@@ -1,0 +1,15 @@
+[theme]
+# Streamlit native dark theme configuration
+primaryColor = "#3b82f6"
+backgroundColor = "#0f172a"
+secondaryBackgroundColor = "#1e293b"
+textColor = "#f1f5f9"
+font = "sans serif"
+
+[server]
+# Performance settings
+maxUploadSize = 200
+
+[browser]
+# Gather usage stats
+gatherUsageStats = false

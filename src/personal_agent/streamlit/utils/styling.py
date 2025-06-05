@@ -23,30 +23,133 @@ def apply_custom_css() -> None:
     /* Import fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    /* Global styling */
+    /* Global styling - Light mode default */
     .main > div {
         padding-top: 1rem;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
-    /* Header styling */
+    /* Header styling - Light mode */
     .main-header {
         text-align: center;
         padding: 1rem 0 2rem 0;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--border-color, #e2e8f0);
         margin-bottom: 2rem;
     }
     
     .main-header h1 {
-        color: #1e293b;
+        color: var(--text-primary, #1e293b);
         font-weight: 700;
         margin-bottom: 0.5rem;
     }
     
     .main-header p {
-        color: #64748b;
+        color: var(--text-secondary, #64748b);
         font-style: italic;
         margin: 0;
+    }
+
+    /* Dark mode detection and variables */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border-color: #475569;
+            --chat-user-bg: #1e293b;
+            --chat-assistant-bg: #0f172a;
+            --button-bg: #334155;
+            --button-hover-bg: #475569;
+        }
+        
+        /* Force dark backgrounds for main content areas */
+        .stApp > div:first-child,
+        .main .block-container,
+        .stChatMessage,
+        .metric-container,
+        .sidebar-section {
+            background-color: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        /* Chat messages in dark mode */
+        .stChatMessage[data-testid="chat-message-user"] {
+            background-color: var(--chat-user-bg) !important;
+            border-left: 4px solid #3b82f6;
+            color: var(--text-primary) !important;
+        }
+        
+        .stChatMessage[data-testid="chat-message-assistant"] {
+            background-color: var(--chat-assistant-bg) !important;
+            border-left: 4px solid #10b981;
+            color: var(--text-primary) !important;
+        }
+        
+        /* Buttons in dark mode */
+        .stButton > button {
+            background-color: var(--button-bg) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: var(--button-hover-bg) !important;
+        }
+        
+        /* Input fields in dark mode */
+        .stTextInput > div > div > input,
+        .stChatInput > div > div > input {
+            background-color: var(--bg-tertiary) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+        }
+        
+        /* Headers and text in dark mode */
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--text-primary) !important;
+        }
+        
+        p, span, div {
+            color: var(--text-primary) !important;
+        }
+        
+        /* Sidebar in dark mode */
+        .css-1d391kg {
+            background-color: var(--bg-primary) !important;
+            border-right: 1px solid var(--border-color) !important;
+        }
+        
+        /* Expanders in dark mode */
+        .streamlit-expanderHeader {
+            background-color: var(--bg-tertiary) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        /* Metrics in dark mode */
+        .metric-container .metric-value {
+            color: var(--text-primary) !important;
+        }
+        
+        .metric-container .metric-label {
+            color: var(--text-secondary) !important;
+        }
+    }
+    
+    /* Light mode variables (default) */
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #f1f5f9;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --chat-user-bg: #f1f5f9;
+        --chat-assistant-bg: #fefefe;
+        --button-bg: #ffffff;
+        --button-hover-bg: #f9fafb;
     }
     
     /* Chat message styling */
@@ -54,44 +157,45 @@ def apply_custom_css() -> None:
         padding: 1rem;
         margin: 0.5rem 0;
         border-radius: 0.75rem;
-        border: 1px solid #e2e8f0;
-        background-color: #ffffff;
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-secondary);
+        color: var(--text-primary);
     }
     
     .stChatMessage[data-testid="chat-message-user"] {
-        background-color: #f1f5f9;
+        background-color: var(--chat-user-bg);
         border-left: 4px solid #3b82f6;
     }
     
     .stChatMessage[data-testid="chat-message-assistant"] {
-        background-color: #fefefe;
+        background-color: var(--chat-assistant-bg);
         border-left: 4px solid #10b981;
     }
     
     /* Sidebar styling */
     .css-1d391kg {
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
+        background-color: var(--bg-secondary);
+        border-right: 1px solid var(--border-color);
     }
     
     /* Button styling */
     .stButton > button {
         width: 100%;
         border-radius: 0.5rem;
-        border: 1px solid #d1d5db;
+        border: 1px solid var(--border-color);
         padding: 0.75rem 1rem;
         font-weight: 500;
         font-size: 0.875rem;
         transition: all 0.2s ease;
-        background-color: #ffffff;
-        color: #374151;
+        background-color: var(--button-bg);
+        color: var(--text-primary);
     }
     
     .stButton > button:hover {
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        border-color: #9ca3af;
-        background-color: #f9fafb;
+        border-color: var(--border-color);
+        background-color: var(--button-hover-bg);
     }
     
     .stButton > button:active {
@@ -113,12 +217,13 @@ def apply_custom_css() -> None:
     
     /* Status indicators */
     .metric-container {
-        background-color: white;
+        background-color: var(--bg-secondary);
         padding: 1rem;
         border-radius: 0.5rem;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--border-color);
         margin: 0.5rem 0;
+        color: var(--text-primary);
     }
     
     /* Agent status */
@@ -134,28 +239,32 @@ def apply_custom_css() -> None:
     
     /* Tool calls styling */
     .tool-call {
-        background-color: #f1f5f9;
+        background-color: var(--bg-tertiary);
         padding: 0.75rem;
         border-radius: 0.375rem;
         margin: 0.5rem 0;
         font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
         font-size: 0.8rem;
         border-left: 3px solid #3b82f6;
+        color: var(--text-primary);
     }
     
     /* Expander styling */
     .streamlit-expanderHeader {
-        background-color: #f8fafc;
+        background-color: var(--bg-tertiary);
         border-radius: 0.375rem;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
     }
     
     /* Chat input styling */
     .stChatInput > div > div > input {
         border-radius: 1.5rem;
-        border: 2px solid #e2e8f0;
+        border: 2px solid var(--border-color);
         padding: 0.75rem 1rem;
         font-size: 0.9rem;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
     }
     
     .stChatInput > div > div > input:focus {
@@ -173,27 +282,28 @@ def apply_custom_css() -> None:
     .metric-container .metric-value {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #1f2937;
+        color: var(--text-primary);
     }
     
     .metric-container .metric-label {
         font-size: 0.875rem;
-        color: #6b7280;
+        color: var(--text-secondary);
         font-weight: 500;
     }
     
     /* Sidebar sections */
     .sidebar-section {
-        background-color: white;
+        background-color: var(--bg-secondary);
         padding: 1rem;
         border-radius: 0.5rem;
         margin: 1rem 0;
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
     }
     
     .sidebar-section h3 {
         margin-top: 0;
-        color: #374151;
+        color: var(--text-primary);
         font-size: 1rem;
         font-weight: 600;
     }

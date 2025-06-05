@@ -95,7 +95,16 @@ class Sidebar:
                     # This depends on the agent's memory implementation
                     memory_info = self.get_memory_info(agent)
                     if memory_info:
-                        st.json(memory_info)
+                        # Display memory info in a user-friendly format
+                        st.markdown(
+                            f"**Session ID:** {memory_info.get('session_id', 'None')}"
+                        )
+                        st.markdown(
+                            f"**Messages:** {memory_info.get('messages_count', 0)}"
+                        )
+                        st.markdown(
+                            f"**Tools:** {memory_info.get('tools_available', 0)}"
+                        )
                 except Exception as e:
                     logger.debug(f"Could not retrieve memory info: {e}")
 
@@ -113,6 +122,16 @@ class Sidebar:
     def render_settings(self) -> None:
         """Render application settings and preferences."""
         st.markdown("### ⚙️ Settings")
+
+        # Theme toggle
+        dark_theme = st.checkbox(
+            "🌙 Dark Theme",
+            value=st.session_state.get("dark_theme", True),
+            help="Enable dark theme for better visibility",
+        )
+        if dark_theme != st.session_state.get("dark_theme", True):
+            st.session_state.dark_theme = dark_theme
+            st.rerun()
 
         # Debug mode toggle
         debug_mode = st.checkbox(

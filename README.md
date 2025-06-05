@@ -1,30 +1,31 @@
 # Personal AI Agent
 
-A sophisticated personal assistant powered by the **Agno Framework** with native MCP integration, async operations, and persistent local storage. Built for modern AI workflows with local Ollama AI, SQLite + LanceDB vector database, and extensible Model Context Protocol (MCP) tools.
+A sophisticated personal assistant powered by the **Agno Framework** with native MCP integration, async operations, and local SQLite + LanceDB storage. Built for modern AI workflows with local Ollama AI, zero external dependencies, and extensible Model Context Protocol (MCP) tools.
 
-> **🎯 Quick Start**: Run `poetry run personal-agent-agno` or `paga` for the modern Agno implementation
+> **🎯 Quick Start**: Run `poetry run personal-agent` for the modern Agno-based Streamlit interface or `poetry run cli` for command-line interaction
 
 ## 🌟 Features
 
-### Agno Framework (Primary Implementation)
+### Modern Architecture (Current Implementation)
 
-- 🚀 **Modern Async Architecture**: Built on agno framework with native async/await operations
+- 🚀 **Agno Framework**: Built on modern agno framework with native async/await operations
 - 🔧 **Native MCP Integration**: Direct Model Context Protocol support without bridges
-- 🧠 **Local Persistent Storage**: SQLite + LanceDB for zero external dependencies
+- 🧠 **Local Storage**: SQLite + LanceDB for zero external dependencies
 - 🤖 **Local AI**: Powered by Ollama (qwen2.5:7b-instruct model)
-- 🌐 **Modern Streamlit Interface**: Interactive web UI with real-time updates
+- 🌐 **Dual Interface**: Interactive Streamlit web UI + CLI with real-time streaming
 - ⚡ **Enhanced Performance**: Async operations and optimized tool coordination
-- 🔒 **Privacy-First**: All data stored locally, no external database dependencies
+- 🔒 **Privacy-First**: All data stored locally, complete data sovereignty
 
 ### Core Capabilities
 
-- 🔍 **Semantic Search**: Finds relevant context from past interactions using LanceDB
-- 📊 **Topic Organization**: Categorize memories by topic in local SQLite database
-- 🎯 **System Status Indicator**: Visual feedback for local storage connection status
-- 🗑️ **Memory Management**: Clear knowledge base functionality
-- 📝 **Knowledge Auto-Creation**: Automatic creation of essential knowledge files
-- 💭 **Real-time Thoughts**: Live streaming of agent reasoning process
+- 🔍 **Semantic Search**: Finds relevant context from past interactions using LanceDB vectors
+- 📊 **Memory Management**: SQLite-based conversation and knowledge storage
+- 🎯 **System Status**: Visual feedback for local storage connection status
+- 🗑️ **Knowledge Management**: Clear and organize knowledge base functionality
+- 📝 **Auto-Knowledge Creation**: Automatic creation of essential knowledge files
+- 💭 **Real-time Thoughts**: Live streaming of agent reasoning process (Streamlit)
 - 📁 **File-Based Storage**: Easy backup/restore by copying data directory
+- 🌙 **Dark Mode**: Modern dark theme with user toggle
 
 ### MCP-Powered Tools (6 Servers)
 
@@ -35,53 +36,55 @@ A sophisticated personal assistant powered by the **Agno Framework** with native
 - 💻 **Shell Commands**: Safe execution of terminal commands
 - 🌐 **Web Fetching**: Retrieve content from URLs and APIs via Puppeteer
 
-### Alternative Implementations (Legacy)
-
-- 🔧 **LangChain Version**: Traditional agent executor (stable but being phased out)
-- 🧪 **Smolagents Version**: HuggingFace experimental framework (research only)
-- 📦 **Weaviate Version**: Original Docker-based vector storage (migrated to SQLite + LanceDB)
-
 ## 🏗️ Architecture
 
-### Agno Framework (Primary)
+### Current System (SQLite + LanceDB)
 
 ```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │ Streamlit Web UI│───▶│   Agno Agent    │───▶│   Ollama LLM    │
-│  (Port 8501)    │    │  (Async/Await)  │    │  qwen2.5:7b     │
+│  (Port 8502)    │    │  (Async/Await)  │    │  qwen2.5:7b     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                               │
-                               ▼
-                   ┌─────────────────────────────────────────┐
-                   │         Native MCP Integration          │
-                   │                                         │
-                   │  ┌─────────────────┐  ┌───────────────┐ │
-                   │  │SQLite + LanceDB │  │ MCP Servers   │ │
-                   │  │  Local Storage  │  │ (6 servers)   │ │
-                   │  └─────────────────┘  └───────────────┘ │
-                   │                                         │
-                   │  📁 Filesystem     🐙 GitHub           │
-                   │  🌍 Brave Search   🌐 Puppeteer        │
-                   │  💻 Shell          🔧 System Tools     │
-                   └─────────────────────────────────────────┘
+         │                      │
+         │                      ▼
+         │          ┌─────────────────────────────────────────┐
+         │          │         Native MCP Integration          │
+         │          │                                         │
+         │          │  ┌─────────────────┐  ┌───────────────┐ │
+         │          │  │SQLite + LanceDB │  │ MCP Servers   │ │
+         │          │  │  Local Storage  │  │ (6 servers)   │ │
+         │          │  └─────────────────┘  └───────────────┘ │
+         │          │                                         │
+         │          │  📁 Filesystem     🐙 GitHub           │
+         │          │  🌍 Brave Search   🌐 Puppeteer        │
+         │          │  💻 Shell          🔧 System Tools     │
+         │          └─────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│ CLI Interface   │
+│ (poetry run cli)│
+└─────────────────┘
 ```
 
-### API Endpoints
+### Available Interfaces
 
-**Main Interface:**
+**Web Interface (Primary):**
 
-- `GET/POST /` - Main chat interface with real-time thought streaming (Streamlit on port 8501)
-- `GET /agent_info` - Agent capabilities and MCP server status
-- `GET /clear` - Clear knowledge base/memory
+- Streamlit app on `http://localhost:8502`
+- Real-time streaming responses with agent thoughts
+- Dark mode toggle and modern UI
+- Memory status and system information
 
-**Alternative Implementations:**
+**CLI Interface:**
 
-- **LangChain**: Port 5001 (`poetry run personal-agent`)
-- **Smolagents**: Port 5003 (`poetry run personal-agent-smolagent`)
+- Command-line interaction with streaming responses
+- Same agno agent backend as web interface
+- Direct terminal access for automation
 
 ## 🚀 Quick Start
 
-### Agno Framework (Recommended)
+### Current System (Recommended)
 
 ```bash
 # 1. Clone and setup
@@ -90,7 +93,7 @@ cd personal_agent
 
 # 2. Install dependencies and MCP servers
 poetry install
-poetry run python scripts/install_mcp.py
+poetry run install-mcp-servers
 
 # 3. Setup Ollama (if not already installed)
 brew install ollama
@@ -101,28 +104,22 @@ ollama pull nomic-embed-text
 # 4. Test everything works
 poetry run test-tools
 
-# 5. Run the Agno agent (recommended)
-poetry run personal-agent-agno
-# OR use the short alias:
-paga
+# 5. Run the Personal AI Agent
+# Web interface (recommended)
+poetry run personal-agent
+# Opens Streamlit at http://localhost:8502
+
+# CLI interface
+poetry run cli
+# Interactive command-line interface
 ```
 
-**Commands Available:**
+**Available Commands:**
 
-- `personal-agent-agno` or `paga` - Streamlit web interface (port 8501)
-- `personal-agent-agno-cli` or `pagc` - CLI interface
-
-### Alternative Implementations
-
-```bash
-# LangChain version (legacy, stable)
-poetry run personal-agent  # port 5001
-
-# Smolagents version (experimental)
-poetry run personal-agent-smolagent  # port 5003
-```
-
-Then open `http://localhost:8501` in your browser and start chatting with the Agno-powered agent!
+- `personal-agent` - Streamlit web interface (port 8502)
+- `personal-agent-cli` - CLI interface with streaming
+- `personal-agent-streamlit` - Direct Streamlit app launcher
+- `cli` - Convenience alias for CLI interface
 
 ## 📋 Prerequisites
 
@@ -146,7 +143,7 @@ cd personal_agent
 # Install Poetry if you haven't already
 curl -sSL https://install.python-poetry.org | python3 -
 
-# Install project dependencies (includes smolagents)
+# Install project dependencies
 poetry install
 ```
 
@@ -156,7 +153,7 @@ Use our automated installation script to install all required MCP servers:
 
 ```bash
 # Run the automated MCP server installation script
-poetry run python scripts/install_mcp.py
+poetry run install-mcp-servers
 ```
 
 This script will automatically install:
@@ -233,45 +230,50 @@ poetry run personal-agent-agno-cli --help
 
 ## 💻 Usage
 
-### Starting the Agno Agent
+### Starting the Personal AI Agent
 
 ```bash
-# Launch the Agno framework agent (recommended)
-poetry run personal-agent-agno
-# OR use the short alias:
-paga
+# Web interface (recommended)
+poetry run personal-agent
+# Opens Streamlit at http://localhost:8502
 
-# Alternative CLI interface
-poetry run personal-agent-agno-cli
-pagc
+# CLI interface with streaming
+poetry run cli
+# Interactive command-line interface
 ```
 
-**Web Interface**: Open `http://localhost:8501` in your browser
+**Available Commands:**
 
-**Features:**
+- `personal-agent` - Launch Streamlit web interface
+- `personal-agent-cli` - CLI interface with streaming responses  
+- `cli` - Convenience alias for CLI interface
+- `personal-agent-streamlit` - Direct Streamlit app launcher
 
-- 🔄 **Real-time Thoughts**: Live streaming of agent reasoning
-- 🧠 **Memory Integration**: Persistent knowledge with SQLite + LanceDB
-- ⚡ **Async Operations**: Modern async/await architecture  
-- 🔧 **Native MCP**: Direct Model Context Protocol integration
-- 💭 **Session Management**: Unique sessions for each interaction
+### Web Interface Features
 
-### Streamlit Interface (Agno)
+**Main Interface (<http://localhost:8502>):**
 
-**Main Interface:**
+- Interactive chat interface with real-time streaming
+- Agent thoughts display during processing
+- Dark mode toggle in sidebar settings
+- Memory status and system information
+- MCP tool integration with visual feedback
 
-- Streamlit web app on `http://localhost:8501`
-- Interactive chat interface with thought streaming
-- Agent capabilities and MCP server status displayed
-- Memory management controls integrated in UI
-
-**Streamlit Interface Features:**
+**Key Features:**
 
 - 🎯 **Interactive Chat**: Real-time conversation with the agent
 - 💭 **Thought Streaming**: Live display of agent reasoning process
 - 🔧 **Tool Integration**: Visual feedback on MCP tool usage
-- 🧠 **Memory Status**: Display of knowledge base connection
+- 🧠 **Memory Status**: Display of knowledge base connection status
 - 📊 **Session Management**: Automatic session handling
+- 🌙 **Dark Mode**: Toggle between light and dark themes
+
+### CLI Interface Features
+
+- Real-time streaming responses
+- Same agent backend as web interface
+- Direct terminal access for automation
+- Session continuity across interactions
 
 ### Testing the System
 
@@ -279,11 +281,11 @@ pagc
 # Test all tool functionality
 poetry run test-tools
 
-# Test MCP server availability
+# Test MCP server availability  
 poetry run test-mcp-servers
 
-# Install/check MCP servers
-poetry run python scripts/install_mcp.py
+# Install/verify MCP servers
+poetry run install-mcp-servers
 ```
 
 ## 🎯 Example Interactions
@@ -323,7 +325,7 @@ User Input: "Create a FastAPI app that uses async/await patterns"
 [File content displayed in Streamlit with syntax highlighting]
 ```
 
-## 🛠️ Tool Reference (Agno MCP Integration)
+## 🛠️ Tool Reference
 
 ### Native MCP Tools (6 Servers)
 
@@ -372,45 +374,17 @@ All tools integrate with the persistent memory system:
 - **Semantic Search**: Vector-based retrieval of relevant information
 - **Topic Organization**: Categorized storage for better organization
 
-## 🗂️ Legacy Implementations
-
-The project includes alternative implementations that are being phased out in favor of the Agno framework:
-
-### LangChain Version (Port 5001)
-
-```bash
-poetry run personal-agent
-# OR short alias:
-pagl
-```
-
-- **Status**: Stable but deprecated
-- **Use Case**: Fallback option if agno version has issues
-
-### Smolagents Version (Port 5003)  
-
-```bash
-poetry run personal-agent-smolagent
-# OR short alias:
-pags
-```
-
-- **Status**: Experimental research platform
-- **Use Case**: Multi-agent research and development
-
-> **⚠️ Note**: These implementations are maintained for compatibility but new features are developed in the Agno framework only.
-
 ## 🚀 Advanced Features
 
 ### Async Architecture
 
-The Agno framework provides true async operations:
+The system provides true async operations throughout:
 
 ```python
 # Native async/await throughout the stack
 async def process_request(query: str) -> str:
     context = await query_knowledge_base(query)
-    response = await agno_agent.run(enhanced_prompt)
+    response = await agent.run(enhanced_prompt)
     await store_interaction(query, response)
     return response
 ```
@@ -443,13 +417,13 @@ Direct Model Context Protocol support:
 - **Multi-Server**: Coordinate across 6 different MCP servers
 - **Tool Discovery**: Automatic detection of available capabilities  
 - **Error Handling**: Robust fallbacks for server unavailability
-- **Streamlit Interface**: Modern web interface displays all available tools and capabilities
+- **Web Interface**: Modern Streamlit interface displays all available tools and capabilities
 
-## 🔧 Troubleshooting (Agno)
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-**1. Agno Agent Won't Start**
+**1. Agent Won't Start**
 
 ```bash
 # Check if all dependencies are installed
@@ -458,8 +432,8 @@ poetry install
 # Verify MCP servers are available
 poetry run test-mcp-servers
 
-# Test agno specifically
-poetry run personal-agent-agno-cli --help
+# Test system components
+poetry run test-tools
 ```
 
 **2. Streamlit Interface Issues**
@@ -468,17 +442,17 @@ poetry run personal-agent-agno-cli --help
 # Check if Streamlit is properly installed
 poetry show streamlit
 
-# Verify the agno agent starts without errors
-poetry run personal-agent-agno-cli --help
+# Verify agent backend works
+poetry run cli
 
-# Check console output for any startup errors
+# Check console output for startup errors
 ```
 
 **3. MCP Tools Not Available**
 
 ```bash
 # Reinstall MCP servers
-poetry run python scripts/install_mcp.py
+poetry run install-mcp-servers
 
 # Test MCP server availability
 poetry run test-mcp-servers
@@ -501,7 +475,7 @@ poetry run test-tools
 
 ```bash
 # Check environment variables are loaded
-poetry run personal-agent-agno-cli --help
+echo $ROOT_DIR
 
 # Verify .env file exists and has correct format
 cat .env | grep -E "(GITHUB|BRAVE)"
@@ -527,65 +501,75 @@ export BRAVE_API_KEY="your_api_key_here"
 export OLLAMA_URL="http://localhost:11434"
 ```
 
-## 📜 Available Commands (Agno)
+## 📜 Available Commands
 
-The agno implementation provides these Poetry scripts:
+The system provides these Poetry scripts:
 
 ```bash
-# Run Agno web interface (recommended)
-poetry run personal-agent-agno   # or paga
-
-# Run Agno CLI interface  
-poetry run personal-agent-agno-cli   # or pagc
+# Main interfaces
+poetry run personal-agent         # Streamlit web interface (port 8502)
+poetry run personal-agent-cli     # CLI interface with streaming
+poetry run cli                    # Convenience alias for CLI
 
 # System maintenance
 poetry run install-mcp-servers
-poetry run test-mcp-servers
+poetry run test-mcp-servers  
 poetry run test-tools
 poetry run store-fact "Your fact here" --topic "optional_topic"
 ```
 
-## 📚 Migration from Weaviate (Legacy)
+## 📚 Migration from Weaviate (Completed)
 
-### What Changed
+### Migration Status: ✅ COMPLETE
 
-The project has migrated from Docker-based Weaviate vector database to a local SQLite + LanceDB architecture for improved privacy and zero external dependencies.
+The project has successfully migrated from Docker-based Weaviate vector database to a local SQLite + LanceDB architecture. This migration is **complete** and operational.
 
-### Key Benefits of New Architecture
+### Key Benefits of Current Architecture
 
-- 🔒 **Privacy-First**: All data stored locally, no external database
-- 🚀 **Zero Setup**: No Docker containers or external services required
+- 🔒 **Privacy-First**: All data stored locally, no external database required
+- 🚀 **Zero Setup**: No Docker containers or external services needed
 - 📁 **Easy Backup**: Simple file-based storage in `data/` directory
 - ⚡ **Faster Startup**: Instant initialization without waiting for containers
 - 🔧 **Simplified Development**: No complex database management
+- 🌐 **Dual Interface**: Both web and CLI interfaces available
 
-### Legacy Weaviate Setup (Deprecated)
+### What Changed
 
-If you need to reference the old Weaviate setup:
+- **REMOVED**: Docker-based Weaviate vector database
+- **REMOVED**: External database dependencies  
+- **ADDED**: SQLite + LanceDB local storage
+- **ADDED**: CLI interface with streaming responses
+- **ADDED**: Dark mode support in Streamlit interface
+- **ENHANCED**: Session management and memory persistence
+
+### Current System Commands
 
 ```bash
+# NEW: Local storage system (current)
+poetry run personal-agent      # Streamlit web interface
+poetry run cli                 # CLI interface
+
 # OLD: Docker-based Weaviate (no longer needed)
-docker-compose up -d weaviate
-
-# NEW: Automatic local storage initialization
-poetry run personal-agent-agno  # Automatically creates SQLite + LanceDB
+# docker-compose up -d weaviate  # DEPRECATED
 ```
 
-### Migration Path
+### Data Storage
 
-Data from existing Weaviate installations should be migrated using the built-in migration tools:
+All data is now stored locally in the `data/` directory:
 
-```bash
-# Run migration script (if available)
-poetry run python migration_plan_sqlite.py
-
-# Or start fresh with knowledge auto-creation
-poetry run personal-agent-agno  # Creates essential knowledge files automatically
+```
+data/
+├── agents.db              # Agent configurations
+├── memory.db              # Conversation memory  
+├── personal_agent_memory.db # User memory
+├── knowledge/             # Knowledge files
+└── lancedb/              # Vector embeddings
+    └── personal_agent_knowledge.lance/
 ```
 
-### Legacy Environment Variables
+### Legacy Environment Variables (No Longer Needed)
 
-These variables are no longer needed:
+These variables have been removed:
 
 ```bash
 # REMOVED: No longer required
@@ -599,4 +583,4 @@ BSD 3-Clause License - See LICENSE file for details.
 
 ---
 
-**Personal AI Agent (Agno)** - A modern async agentic AI assistant with native MCP integration, Streamlit interface, and local persistent memory. 🚀
+**Personal AI Agent** - A modern async AI assistant with native MCP integration, dual interfaces (Streamlit + CLI), and local SQLite + LanceDB storage. Zero external dependencies, complete data privacy. 🚀
