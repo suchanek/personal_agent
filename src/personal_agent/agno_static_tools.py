@@ -227,4 +227,291 @@ async def get_static_mcp_tools() -> List[Function]:
         except Exception as e:
             logger.warning("Failed to create MCP tool for %s: %s", server_name, e)
 
+    # Add filesystem tools from tools.filesystem module
+    logger.info("Adding filesystem tools...")
+    try:
+        # Create static filesystem tools that use MCP client
+        def make_filesystem_tools(client):
+
+            @tool(
+                name="read_file",
+                description="Read file content using MCP filesystem server",
+            )
+            def read_file_tool(file_path: str) -> str:
+                """
+                Read file content using MCP filesystem server.
+
+                Args:
+                    file_path: Path to the file to read
+
+                Returns:
+                    str: File content or error message
+                """
+                try:
+                    if not client:
+                        return "MCP client not available"
+
+                    # Determine which server to use based on path
+                    server_name = "filesystem-home"
+
+                    # Start filesystem server if not already running
+                    if server_name not in client.active_servers:
+                        start_result = client.start_server_sync(server_name)
+                        if not start_result:
+                            return "Failed to start MCP filesystem server."
+
+                    # Convert absolute paths to relative paths for the restricted root
+                    processed_path = file_path
+                    if processed_path.startswith("~/"):
+                        processed_path = processed_path[2:]  # Remove "~/" prefix
+                    elif processed_path.startswith("/"):
+                        processed_path = processed_path[1:]  # Remove leading slash
+
+                    # Call read_file tool with correct parameter name
+                    result = client.call_tool_sync(
+                        server_name, "read_file", {"path": processed_path}
+                    )
+
+                    logger.info("Read file via MCP: %s", file_path)
+                    return result
+
+                except Exception as e:
+                    logger.error("Error reading file via MCP: %s", str(e))
+                    return f"Error reading file: {str(e)}"
+
+            @tool(
+                name="write_file",
+                description="Write content to file using MCP filesystem server",
+            )
+            def write_file_tool(file_path: str, content: str) -> str:
+                """
+                Write content to file using MCP filesystem server.
+
+                Args:
+                    file_path: Path to the file to write
+                    content: Content to write to the file
+
+                Returns:
+                    str: Success message or error
+                """
+                try:
+                    if not client:
+                        return "MCP client not available"
+
+                    if not file_path or content is None:
+                        return "Error: file_path and content parameters are required"
+
+                    # Determine which server to use based on path
+                    server_name = "filesystem-home"
+
+                    # Start filesystem server if not already running
+                    if server_name not in client.active_servers:
+                        start_result = client.start_server_sync(server_name)
+                        if not start_result:
+                            return "Failed to start MCP filesystem server."
+
+                    # Convert absolute paths to relative paths for the restricted root
+                    processed_path = file_path
+                    if processed_path.startswith("~/"):
+                        processed_path = processed_path[2:]  # Remove "~/" prefix
+                    elif processed_path.startswith("/"):
+                        processed_path = processed_path[1:]  # Remove leading slash
+
+                    # Call write_file tool with correct parameter name
+                    result = client.call_tool_sync(
+                        server_name,
+                        "write_file",
+                        {"path": processed_path, "content": content},
+                    )
+
+                    logger.info("Wrote file via MCP: %s", file_path)
+                    return result
+
+                except Exception as e:
+                    logger.error("Error writing file via MCP: %s", str(e))
+                    return f"Error writing file: {str(e)}"
+
+            @tool(
+                name="list_directory",
+                description="List directory contents using MCP filesystem server",
+            )
+            def list_directory_tool(directory_path: str) -> str:
+                """
+                List directory contents using MCP filesystem server.
+
+                Args:
+                    directory_path: Path to the directory to list
+
+                Returns:
+                    str: Directory listing or error message
+                """
+                try:
+                    if not client:
+                        return "MCP client not available"
+
+                    # Determine which server to use based on path
+                    server_name = "filesystem-home"
+
+                    # Start filesystem server if not already running
+                    if server_name not in client.active_servers:
+                        start_result = client.start_server_sync(server_name)
+                        if not start_result:
+                            return "Failed to start MCP filesystem server."
+
+                    # Convert absolute paths to relative paths for the restricted root
+                    processed_path = directory_path
+                    if processed_path in ["~", "$HOME"]:
+                        processed_path = "."  # Root directory
+                    elif processed_path.startswith("~/"):
+                        processed_path = processed_path[2:]  # Remove "~/" prefix
+                    elif processed_path.startswith("/"):
+                        processed_path = processed_path[1:]  # Remove leading slash
+
+                    # If path is empty after processing, it means we want the root directory
+                    if not processed_path:
+                        processed_path = "."
+
+                    # Call list_directory tool with the correct path
+                    result = client.call_tool_sync(
+                        server_name, "list_directory", {"path": processed_path}
+                    )
+
+                    logger.info("Listed directory via MCP: %s", directory_path)
+                    return result
+
+                except Exception as e:
+                    logger.error("Error listing directory via MCP: %s", str(e))
+                    return f"Error listing directory: {str(e)}"
+
+            @tool(
+                name="search_files",
+                description="Search for files and content in the filesystem",
+            )
+            def search_files_tool(search_query: str, directory: str = ".") -> str:
+                """
+                Search for files and content in the filesystem.
+
+                Args:
+                    search_query: Query to search for
+                    directory: Directory to search in (default: current directory)
+
+                Returns:
+                    str: Search results or error message
+                """
+                try:
+                    if not client:
+                        return "MCP client not available"
+                    
+                    # Get directory listing using the same logic as list_directory_tool
+                    server_name = "filesystem-home"
+                    
+                    # Start filesystem server if not already running
+                    if server_name not in client.active_servers:
+                        start_result = client.start_server_sync(server_name)
+                        if not start_result:
+                            return "Failed to start MCP filesystem server."
+                    
+                    # Convert absolute paths to relative paths for the restricted root
+                    processed_path = directory
+                    if processed_path in ["~", "$HOME"]:
+                        processed_path = "."  # Root directory
+                    elif processed_path.startswith("~/"):
+                        processed_path = processed_path[2:]  # Remove "~/" prefix
+                    elif processed_path.startswith("/"):
+                        processed_path = processed_path[1:]  # Remove leading slash
+                    
+                    # If path is empty after processing, it means we want the root directory
+                    if not processed_path:
+                        processed_path = "."
+                    
+                    # Call list_directory tool to get directory contents
+                    directory_listing = client.call_tool_sync(
+                        server_name, "list_directory", {"path": processed_path}
+                    )
+                    
+                    # Filter results based on search query
+                    lines = directory_listing.split('\n')
+                    matching_lines = [line for line in lines if search_query.lower() in line.lower()]
+                    
+                    if matching_lines:
+                        result = f"Search results for '{search_query}' in {directory}:\n" + "\n".join(matching_lines)
+                    else:
+                        result = f"No files found matching '{search_query}' in {directory}"
+                    
+                    return result
+                    
+                except Exception as e:
+                    logger.error("Error in file search: %s", str(e))
+                    return f"Error searching files: {str(e)}"
+
+            @tool(
+                name="create_file",
+                description="Create a new file with content, creating directories if needed",
+            )
+            def create_file_tool(file_path: str, content: str) -> str:
+                """
+                Create a new file with content, creating directories if needed.
+
+                Args:
+                    file_path: Path to the file to create
+                    content: Content to write to the file
+
+                Returns:
+                    str: Success message or error
+                """
+                try:
+                    if not client:
+                        return "MCP client not available"
+                    
+                    # Use the same logic as write_file_tool to create the file
+                    if not file_path or content is None:
+                        return "Error: file_path and content parameters are required"
+                    
+                    # Determine which server to use based on path
+                    server_name = "filesystem-home"
+                    
+                    # Start filesystem server if not already running
+                    if server_name not in client.active_servers:
+                        start_result = client.start_server_sync(server_name)
+                        if not start_result:
+                            return "Failed to start MCP filesystem server."
+                    
+                    # Convert absolute paths to relative paths for the restricted root
+                    processed_path = file_path
+                    if processed_path.startswith("~/"):
+                        processed_path = processed_path[2:]  # Remove "~/" prefix
+                    elif processed_path.startswith("/"):
+                        processed_path = processed_path[1:]  # Remove leading slash
+                    
+                    # Call write_file tool with correct parameter name
+                    result = client.call_tool_sync(
+                        server_name, "write_file", {"path": processed_path, "content": content}
+                    )
+                    
+                    if "Error" not in result:
+                        logger.info("Created file via MCP: %s", file_path)
+                        return f"Successfully created file: {file_path}\n{result}"
+                    else:
+                        return result
+                    
+                except Exception as e:
+                    logger.error("Error creating file: %s", str(e))
+                    return f"Error creating file: {str(e)}"
+
+            return [
+                read_file_tool,
+                write_file_tool,
+                list_directory_tool,
+                search_files_tool,
+                create_file_tool,
+            ]
+
+        # Create filesystem tools with the MCP client
+        filesystem_tools = make_filesystem_tools(mcp_client)
+        tools.extend(filesystem_tools)
+        logger.info("Added %d filesystem tools", len(filesystem_tools))
+
+    except Exception as e:
+        logger.warning("Failed to create filesystem tools: %s", e)
+
     return tools

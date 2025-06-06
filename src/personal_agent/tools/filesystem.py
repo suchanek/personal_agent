@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient
 
 # These will be injected by the main module
-USE_MCP = False
+USE_MCP = True
 mcp_client: "SimpleMCPClient" = None
 ROOT_DIR = ""
 DATA_DIR = ""

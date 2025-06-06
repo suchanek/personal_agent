@@ -122,17 +122,18 @@ async def initialize_agno_system():
 
     # Initialize MCP client for tool compatibility (if enabled)
     mcp_client = None
-    if USE_MCP:
-        logger.info("Initializing MCP client...")
-        from .core.mcp_client import SimpleMCPClient
+    # if USE_MCP:
+    
+    logger.info("Initializing MCP client...")
+    from .core.mcp_client import SimpleMCPClient
 
-        mcp_servers = get_mcp_servers()
-        mcp_client = SimpleMCPClient(mcp_servers)
+    mcp_servers = get_mcp_servers()
+    mcp_client = SimpleMCPClient(mcp_servers)
 
-        if mcp_client.start_servers():
-            logger.info("MCP servers started successfully")
-        else:
-            logger.warning("Failed to start some MCP servers")
+    if mcp_client.start_servers():
+        logger.info("MCP servers started successfully")
+    else:
+        logger.warning("Failed to start some MCP servers")
 
     # Inject MCP client into tools modules for compatibility
     if mcp_client:
