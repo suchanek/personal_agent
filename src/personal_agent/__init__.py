@@ -3,15 +3,14 @@
 This module serves as the main entry point for the Personal AI Agent package,
 providing a comprehensive suite of AI-powered tools and capabilities including:
 
-- Multi-agent framework powered by HuggingFace smolagents
+- Agno framework for AI agent orchestration
 - Model Context Protocol (MCP) integration with 6 servers
-- Weaviate vector database for persistent memory
 - 13 integrated tools spanning memory management, file operations, and web research
 - Flask web interface for easy interaction
 - Modular architecture with organized code structure
 
-The package supports both LangChain ReAct and smolagents frameworks, with the
-smolagents implementation being the primary interface for production use.
+The package uses the Agno framework for AI agent orchestration, with legacy
+LangChain and smolagents implementations archived for reference.
 
 Author: Personal Agent Development Team
 Last modified: June 2, 2025
@@ -19,10 +18,12 @@ Last modified: June 2, 2025
 
 import logging
 
+# Package version
+from .__version__ import __version__
+
 # Import core components
-from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
-from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
-from .core.memory import is_weaviate_connected, vector_store, weaviate_client
+from .config import USE_MCP, get_mcp_servers
+from .core import SimpleMCPClient
 
 # Import tools
 from .tools import get_all_tools
@@ -46,9 +47,6 @@ from .utils.logging import (
 # Import web interface
 from .web import create_app, register_routes
 
-# Package version
-__version__ = "0.3.0"
-
 # Setup package and module-level logging
 # Configure logging for the package
 
@@ -71,21 +69,15 @@ if USE_MCP:
     mcp_client = SimpleMCPClient(get_mcp_servers())
 
 # Main entry points
-from .main import create_web_app, initialize_system, main
-from .smol_main import run_smolagents_web
+# Note: main.py and smol_main.py have been archived to legacy_frameworks/
+# Current system uses agno_main.py and agno framework
 
 # Export public API
 __all__ = [
     # Core components
     "SimpleMCPClient",
-    "create_agent_executor",
-    "setup_weaviate",
-    "is_weaviate_connected",
-    "vector_store",
-    "weaviate_client",
     # Configuration
     "USE_MCP",
-    "USE_WEAVIATE",
     "get_mcp_servers",
     # Tools
     "get_all_tools",
@@ -106,11 +98,6 @@ __all__ = [
     # Web interface
     "create_app",
     "register_routes",
-    # Main entry points
-    "main",
-    "create_web_app",
-    "initialize_system",
-    "run_smolagents_web",
     # Package info
     "__version__",
     # Logger

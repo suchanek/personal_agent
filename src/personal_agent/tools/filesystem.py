@@ -8,14 +8,10 @@ from langchain.tools import tool
 
 if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient
-    from ..core.memory import WeaviateVectorStore
 
 # These will be injected by the main module
 USE_MCP = False
-USE_WEAVIATE = False
 mcp_client: "SimpleMCPClient" = None
-vector_store: "WeaviateVectorStore" = None
-store_interaction = None
 ROOT_DIR = ""
 DATA_DIR = ""
 logger = None
@@ -69,15 +65,6 @@ def mcp_read_file(file_path: str) -> str:
         result = mcp_client.call_tool_sync(
             server_name, "read_file", {"path": file_path}
         )
-
-        # Store the file read operation in memory for context
-        if USE_WEAVIATE and vector_store is not None:
-            interaction_text = (
-                f"Read file: {file_path}\nContent preview: {result[:200]}..."
-            )
-            store_interaction.invoke(
-                {"text": interaction_text, "topic": "file_operations"}
-            )
 
         logger.info("Read file via MCP: %s", file_path)
         return result
@@ -208,13 +195,6 @@ def mcp_write_file(file_path: str, content: str = None) -> str:
             server_name, "write_file", {"path": file_path, "content": content}
         )
 
-        # Store the file write operation in memory for context
-        if USE_WEAVIATE and vector_store is not None:
-            interaction_text = f"Wrote file: {original_path}\nContent length: {len(content)} characters"
-            store_interaction.invoke(
-                {"text": interaction_text, "topic": "file_operations"}
-            )
-
         logger.info("Wrote file via MCP: %s -> %s", original_path, file_path)
         return result
 
@@ -299,15 +279,6 @@ def mcp_list_directory(directory_path: str) -> str:
             server_name, "list_directory", {"path": directory_path}
         )
 
-        # Store the directory listing operation in memory for context
-        if USE_WEAVIATE and vector_store is not None:
-            interaction_text = (
-                f"Listed directory: {original_path}\nResult: {result[:300]}..."
-            )
-            store_interaction.invoke(
-                {"text": interaction_text, "topic": "file_operations"}
-            )
-
         logger.info("Listed directory via MCP: %s -> %s", original_path, directory_path)
         return result
 
@@ -325,18 +296,6 @@ def intelligent_file_search(search_query: str, directory: str = "/") -> str:
     try:
         # First, search memory for relevant context
         memory_context = []
-        if USE_WEAVIATE and vector_store is not None:
-            from ..tools.memory_tools import query_knowledge_base
-
-            memory_results = query_knowledge_base.invoke(
-                {"query": search_query, "limit": 3}
-            )
-            memory_context = (
-                memory_results
-                if memory_results != ["No relevant context found."]
-                else []
-            )
-
         # Use MCP to list directory contents and search for relevant files
         directory_listing = mcp_list_directory.invoke({"directory_path": directory})
 
@@ -351,14 +310,6 @@ def intelligent_file_search(search_query: str, directory: str = "/") -> str:
         Which files in this directory are most relevant to the search query? 
         Provide a focused analysis and suggest the top 2-3 most relevant files to examine.
         """
-
-        # Store this search operation in memory
-        if USE_WEAVIATE and vector_store is not None:
-            interaction_text = f"File search: {search_query} in {directory}\nFound: {directory_listing[:200]}..."
-            store_interaction.invoke({"text": interaction_text, "topic": "file_search"})
-
-        logger.info("Performed intelligent file search: %s", search_query)
-        return f"Directory contents: {directory_listing}\n\nMemory context: {memory_context}\n\nAnalysis needed: {analysis_prompt}"
 
     except Exception as e:
         logger.error("Error in intelligent file search: %s", str(e))
@@ -402,13 +353,6 @@ def create_and_save_file(file_path: str, content: str, create_dirs: bool = True)
 
         # Now use the existing mcp_write_file tool
         result = mcp_write_file.invoke({"file_path": original_path, "content": content})
-
-        # Store the file creation operation in memory
-        if USE_WEAVIATE and vector_store is not None:
-            interaction_text = f"Created file: {original_path}\nContent length: {len(content)} characters\nDirectory created: {create_dirs}"
-            store_interaction.invoke(
-                {"text": interaction_text, "topic": "file_creation"}
-            )
 
         logger.info("Created and saved file: %s", original_path)
         return f"Successfully created file: {original_path}\n{result}"

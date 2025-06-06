@@ -25,7 +25,8 @@ from .logging import (
     setup_logging_filters,
     toggle_stream_handler,
 )
-from .store_fact import store_fact_in_knowledge_base
+
+# Note: store_fact.py has been archived to legacy_frameworks/langchain/utils/
 
 __all__ = [
     # Cleanup utilities
@@ -49,6 +50,5 @@ __all__ = [
     "set_logger_level_for_module",
     "set_logging_level_for_all_handlers",
     "toggle_stream_handler",
-    # Fact storage utilities
-    "store_fact_in_knowledge_base",
+    # Note: store_fact_in_knowledge_base archived to legacy_frameworks/
 ]

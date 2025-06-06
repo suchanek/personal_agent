@@ -17,7 +17,14 @@ from typing import TYPE_CHECKING
 
 from flask import Flask, Response, render_template_string, request
 
-from ..core.memory import is_weaviate_connected
+from ..config import USE_MCP
+
+
+# Simple function to replace archived memory functionality
+def is_weaviate_connected() -> bool:
+    """Check if Weaviate is configured and potentially connected."""
+    return False  # Always return False since we don't use Weaviate anymore
+
 
 if TYPE_CHECKING:
     from logging import Logger

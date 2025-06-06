@@ -11,34 +11,24 @@ import logging
 import signal
 import sys
 import time
-import warnings
 
-from rich.logging import RichHandler
-from weaviate import WeaviateClient
 
-from personal_agent.config.settings import LOG_LEVEL
 from personal_agent.core.mcp_client import SimpleMCPClient
 
 # These will be injected by the main module
-weaviate_client: "WeaviateClient" = None
-vector_store = None
 mcp_client: "SimpleMCPClient" = None
 logger: logging.Logger = None
 
 
-def inject_dependencies(weaviate_cli, vec_store, mcp_cli, log):
+def inject_dependencies(mcp_cli, log):
     """Inject dependencies for cleanup functions."""
-    global weaviate_client, vector_store, mcp_client, logger
-    weaviate_client = weaviate_cli
-    vector_store = vec_store
+    global mcp_client, logger
     mcp_client = mcp_cli
     logger = log
 
 
 def cleanup():
     """Clean up resources on shutdown."""
-    global weaviate_client, vector_store
-
     # Prevent multiple cleanup calls
     if hasattr(cleanup, "called") and cleanup.called:
         logger.debug("Cleanup already called, skipping...")
@@ -59,33 +49,6 @@ def cleanup():
 
         except Exception as e:
             logger.error("Error stopping MCP servers: %s", e)
-
-    # Clean up Weaviate vector store and client
-    if vector_store:
-        try:
-            # Clean up the vector store first
-            if hasattr(vector_store, "client") and vector_store.client:
-                vector_store.client.close()
-                logger.debug("Vector store client closed")
-            vector_store = None
-        except Exception as e:
-            logger.error("Error closing vector store: %s", e)
-
-    if weaviate_client:
-        try:
-            # Ensure the client is properly disconnected
-            if (
-                hasattr(weaviate_client, "is_connected")
-                and weaviate_client.is_connected()
-            ):
-                weaviate_client.close()
-                logger.info("Weaviate client closed successfully")
-            elif hasattr(weaviate_client, "close"):
-                weaviate_client.close()
-                logger.info("Weaviate client closed successfully")
-            weaviate_client = None
-        except Exception as e:
-            logger.error("Error closing Weaviate client: %s", e)
 
     # Force garbage collection to help with cleanup
     gc.collect()

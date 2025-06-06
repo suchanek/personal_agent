@@ -6,10 +6,11 @@ built-in memory capabilities and local file-based storage, eliminating external
 database dependencies entirely.
 """
 
+# pylint: disable=C0415, C0301, W0718, W0603
 import asyncio
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from agno.agent import Agent
 from agno.embedder.ollama import OllamaEmbedder
@@ -21,10 +22,8 @@ from agno.storage.agent.sqlite import SqliteAgentStorage
 from agno.vectordb.lancedb import LanceDb
 from agno.vectordb.search import SearchType
 
-from agno.tools.function import Function
-
 # Import configuration
-from .config import OLLAMA_URL, USE_MCP, get_mcp_servers
+from .config import USE_MCP, get_mcp_servers
 
 # Import utilities
 from .utils import inject_dependencies, register_cleanup_handlers, setup_logging
@@ -198,7 +197,7 @@ async def initialize_agno_system():
         read_chat_history=True,
         markdown=True,
         debug_mode=True,
-        add_history_to_messages=True,
+        add_history_to_messages=False,
         num_history_runs=3,
     )
 
@@ -212,7 +211,7 @@ async def initialize_agno_system():
 
     # Inject dependencies for cleanup (maintain compatibility)
     # Note: No weaviate_client or vector_store since we're using LanceDB
-    inject_dependencies(None, None, mcp_client, logger)
+    inject_dependencies(mcp_client, logger)
 
     return agno_agent
 

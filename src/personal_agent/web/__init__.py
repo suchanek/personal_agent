@@ -1,11 +1,24 @@
 """
 Web interface package for the Personal AI Agent.
 
-This package provides Flask-based web interfaces for both LangChain and smolagents.
+Note: LangChain interface.py and smolagents smol_interface.py have been archived to legacy_frameworks/
+Current system uses the Agno framework with agno_main.py for web interfaces.
 """
 
-from .interface import create_app, register_routes
-from .smol_interface import create_app as create_smol_app
-from .smol_interface import register_routes as register_smol_routes
+# Note: Legacy interfaces have been archived
+# from .interface import create_app, register_routes  # Archived to legacy_frameworks/langchain/
+# from .smol_interface import create_app as create_smol_app  # Archived to legacy_frameworks/smolagents/
 
-__all__ = ["create_app", "register_routes", "create_smol_app", "register_smol_routes"]
+
+# Placeholder functions for compatibility
+def create_app():
+    """Legacy function - interfaces archived to legacy_frameworks/"""
+    raise NotImplementedError("Legacy interfaces archived. Use agno_main.py instead.")
+
+
+def register_routes():
+    """Legacy function - interfaces archived to legacy_frameworks/"""
+    raise NotImplementedError("Legacy interfaces archived. Use agno_main.py instead.")
+
+
+__all__ = ["create_app", "register_routes"]

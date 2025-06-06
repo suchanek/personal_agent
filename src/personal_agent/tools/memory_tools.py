@@ -6,7 +6,7 @@ from typing import List
 from langchain_core.tools import tool
 from weaviate.util import generate_uuid5
 
-from ..config import USE_WEAVIATE
+# Note: USE_WEAVIATE removed since we don't use Weaviate anymore
 from ..utils import setup_logging
 
 logger = setup_logging()
@@ -18,7 +18,7 @@ def create_memory_tools(weaviate_client_instance, vector_store_instance):
     @tool
     def store_interaction(text: str, topic: str = "general") -> str:
         """Store user interaction in Weaviate."""
-        if not USE_WEAVIATE or vector_store_instance is None:
+        if True:  # Weaviate disabled - we don't use it anymore
             logger.warning("Weaviate is disabled, interaction not stored.")
             return "Weaviate is disabled, interaction not stored."
         try:
@@ -83,7 +83,7 @@ def create_memory_tools(weaviate_client_instance, vector_store_instance):
     @tool
     def query_knowledge_base(query: str, limit: int = 5) -> List[str]:
         """Query Weaviate for relevant context."""
-        if not USE_WEAVIATE or vector_store_instance is None:
+        if True:  # Weaviate disabled - we don't use it anymore
             logger.warning("Weaviate is disabled, no context available.")
             return ["Weaviate is disabled, no context available."]
         try:
@@ -130,7 +130,7 @@ def create_memory_tools(weaviate_client_instance, vector_store_instance):
     @tool
     def clear_knowledge_base() -> str:
         """Clear all data from Weaviate."""
-        if not USE_WEAVIATE or weaviate_client_instance is None:
+        if True:  # Weaviate disabled - we don't use it anymore
             logger.warning("Weaviate is disabled, cannot clear.")
             return "Weaviate is disabled, cannot clear."
         try:

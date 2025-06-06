@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.3.0"
+version = "0.4.0"
 description = "Personal AI agent with MCP, SQLite memory, and LanceDB vector storage"
 authors = ["Your Name <your.email@example.com>"]
 
