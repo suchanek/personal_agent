@@ -401,16 +401,16 @@ async def get_static_mcp_tools() -> List[Function]:
                 try:
                     if not client:
                         return "MCP client not available"
-                    
+
                     # Get directory listing using the same logic as list_directory_tool
                     server_name = "filesystem-home"
-                    
+
                     # Start filesystem server if not already running
                     if server_name not in client.active_servers:
                         start_result = client.start_server_sync(server_name)
                         if not start_result:
                             return "Failed to start MCP filesystem server."
-                    
+
                     # Convert absolute paths to relative paths for the restricted root
                     processed_path = directory
                     if processed_path in ["~", "$HOME"]:
@@ -419,27 +419,34 @@ async def get_static_mcp_tools() -> List[Function]:
                         processed_path = processed_path[2:]  # Remove "~/" prefix
                     elif processed_path.startswith("/"):
                         processed_path = processed_path[1:]  # Remove leading slash
-                    
+
                     # If path is empty after processing, it means we want the root directory
                     if not processed_path:
                         processed_path = "."
-                    
+
                     # Call list_directory tool to get directory contents
                     directory_listing = client.call_tool_sync(
                         server_name, "list_directory", {"path": processed_path}
                     )
-                    
+
                     # Filter results based on search query
-                    lines = directory_listing.split('\n')
-                    matching_lines = [line for line in lines if search_query.lower() in line.lower()]
-                    
+                    lines = directory_listing.split("\n")
+                    matching_lines = [
+                        line for line in lines if search_query.lower() in line.lower()
+                    ]
+
                     if matching_lines:
-                        result = f"Search results for '{search_query}' in {directory}:\n" + "\n".join(matching_lines)
+                        result = (
+                            f"Search results for '{search_query}' in {directory}:\n"
+                            + "\n".join(matching_lines)
+                        )
                     else:
-                        result = f"No files found matching '{search_query}' in {directory}"
-                    
+                        result = (
+                            f"No files found matching '{search_query}' in {directory}"
+                        )
+
                     return result
-                    
+
                 except Exception as e:
                     logger.error("Error in file search: %s", str(e))
                     return f"Error searching files: {str(e)}"
@@ -462,38 +469,40 @@ async def get_static_mcp_tools() -> List[Function]:
                 try:
                     if not client:
                         return "MCP client not available"
-                    
+
                     # Use the same logic as write_file_tool to create the file
                     if not file_path or content is None:
                         return "Error: file_path and content parameters are required"
-                    
+
                     # Determine which server to use based on path
                     server_name = "filesystem-home"
-                    
+
                     # Start filesystem server if not already running
                     if server_name not in client.active_servers:
                         start_result = client.start_server_sync(server_name)
                         if not start_result:
                             return "Failed to start MCP filesystem server."
-                    
+
                     # Convert absolute paths to relative paths for the restricted root
                     processed_path = file_path
                     if processed_path.startswith("~/"):
                         processed_path = processed_path[2:]  # Remove "~/" prefix
                     elif processed_path.startswith("/"):
                         processed_path = processed_path[1:]  # Remove leading slash
-                    
+
                     # Call write_file tool with correct parameter name
                     result = client.call_tool_sync(
-                        server_name, "write_file", {"path": processed_path, "content": content}
+                        server_name,
+                        "write_file",
+                        {"path": processed_path, "content": content},
                     )
-                    
+
                     if "Error" not in result:
                         logger.info("Created file via MCP: %s", file_path)
                         return f"Successfully created file: {file_path}\n{result}"
                     else:
                         return result
-                    
+
                 except Exception as e:
                     logger.error("Error creating file: %s", str(e))
                     return f"Error creating file: {str(e)}"

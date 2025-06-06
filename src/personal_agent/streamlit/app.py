@@ -230,10 +230,18 @@ class PersonalAgentApp:
             # Add user message to conversation
             self.session_manager.add_message("user", prompt)
 
-            # Process with agent and display response
+            # Process with agent and display response with real-time tool calls
             with st.chat_message("assistant"):
-                with st.spinner("🤔 Thinking..."):
-                    response = asyncio.run(self.process_agent_response(prompt))
+                # Create containers for tool calls and response
+                tool_calls_container = st.empty()
+                response_container = st.empty()
+
+                # Process agent response with streaming
+                response = asyncio.run(
+                    self.process_agent_response(
+                        prompt, tool_calls_container, response_container
+                    )
+                )
 
             # Add assistant response to conversation
             self.session_manager.add_message("assistant", response)
@@ -241,11 +249,15 @@ class PersonalAgentApp:
             # Refresh the interface to show new messages
             st.rerun()
 
-    async def process_agent_response(self, query: str) -> str:
+    async def process_agent_response(
+        self, query: str, tool_calls_container, response_container
+    ) -> str:
         """
-        Process user query through the agno agent.
+        Process user query through the agno agent with real-time streaming.
 
         :param query: User's input message
+        :param tool_calls_container: Streamlit container for displaying tool calls
+        :param response_container: Streamlit container for displaying response
         :return: Agent's response content
         """
         try:
@@ -254,20 +266,173 @@ class PersonalAgentApp:
             # Use session_id if available for conversation continuity
             session_id = st.session_state.get("session_id")
 
-            # Run agent with query
-            response = await agent.arun(message=query, session_id=session_id)
+            # Run agent with streaming enabled to show tool calls in real-time
+            response_text = ""
 
-            # Update session_id if it was generated
-            if hasattr(response, "session_id") and response.session_id:
-                st.session_state.session_id = response.session_id
+            try:
+                # Create a status container for real-time agent thinking
+                status_container = st.empty()
 
-            return response.content
+                # Use streaming with intermediate steps to see tool calls
+                response_stream = await agent.arun(
+                    message=query,
+                    session_id=session_id,
+                    stream=True,
+                    stream_intermediate_steps=True,
+                )
+
+                # Process streaming response chunks
+                async for response_chunk in response_stream:
+                    # Show real-time status updates for all events
+                    if hasattr(response_chunk, "event") and response_chunk.event:
+                        event_name = response_chunk.event
+
+                        # Display status based on event type
+                        if event_name == "run_started":
+                            with status_container.container():
+                                st.info("🚀 Starting to process your request...")
+                        elif event_name == "tool_call_started":
+                            with status_container.container():
+                                st.info("🔧 Using tools to help with your request...")
+                        elif event_name == "reasoning_started":
+                            with status_container.container():
+                                st.info("🧠 Thinking through the problem...")
+                        elif event_name == "reasoning_step":
+                            if (
+                                hasattr(response_chunk, "content")
+                                and response_chunk.content
+                            ):
+                                with status_container.container():
+                                    st.info(f"💭 {response_chunk.content}")
+                        elif event_name == "tool_call_completed":
+                            with status_container.container():
+                                st.info("✅ Tool execution completed")
+
+                    # Display tool calls if available
+                    if response_chunk.tools and len(response_chunk.tools) > 0:
+                        self.display_tool_calls_realtime(
+                            tool_calls_container, response_chunk.tools
+                        )
+
+                    # Display response content as it streams (for any event with content)
+                    if (
+                        hasattr(response_chunk, "content")
+                        and response_chunk.content is not None
+                    ):
+                        # Only accumulate content for RunResponse events for final response
+                        if response_chunk.event == "RunResponse":
+                            response_text += response_chunk.content
+                            with response_container.container():
+                                st.markdown(response_text)
+                        else:
+                            # For other events, show the content as status if it's text
+                            content = response_chunk.content
+                            if isinstance(content, str) and content.strip():
+                                with status_container.container():
+                                    st.info(f"💬 {content}")
+
+                # Clear status when done
+                status_container.empty()
+
+                # Update session_id if it was generated
+                if hasattr(agent, "run_response") and agent.run_response:
+                    if (
+                        hasattr(agent.run_response, "session_id")
+                        and agent.run_response.session_id
+                    ):
+                        st.session_state.session_id = agent.run_response.session_id
+
+                # Return the complete response text
+                return (
+                    response_text
+                    or "I processed your request but didn't generate a text response."
+                )
+
+            except Exception as stream_error:
+                logger.warning(
+                    f"Streaming failed, falling back to standard processing: {stream_error}"
+                )
+
+                # Fallback to non-streaming
+                with response_container.container():
+                    st.info("🤔 Processing your request...")
+
+                response = await agent.arun(message=query, session_id=session_id)
+
+                # Update session_id if it was generated
+                if hasattr(response, "session_id") and response.session_id:
+                    st.session_state.session_id = response.session_id
+
+                with response_container.container():
+                    st.markdown(response.content)
+
+                return response.content
 
         except Exception as e:
             error_msg = f"Sorry, I encountered an error: {str(e)}"
             logger.error("Error processing query '%s': %s", query, e)
-            st.error(error_msg)
+
+            with response_container.container():
+                st.error(f"❌ Error: {str(e)}")
+
             return error_msg
+
+    def display_tool_calls_realtime(self, tool_calls_container, tools):
+        """
+        Display tool calls in real-time as they execute.
+
+        :param tool_calls_container: Streamlit container for tool calls
+        :param tools: List of tool execution objects
+        """
+        try:
+            with tool_calls_container.container():
+                for tool_call in tools:
+                    tool_name = getattr(tool_call, "tool_name", "Unknown Tool")
+                    tool_args = getattr(tool_call, "tool_args", {})
+                    content = getattr(tool_call, "result", None) or getattr(
+                        tool_call, "content", None
+                    )
+
+                    # Get execution time if available
+                    execution_time_str = "Running..."
+                    if hasattr(tool_call, "metrics") and tool_call.metrics:
+                        if (
+                            hasattr(tool_call.metrics, "time")
+                            and tool_call.metrics.time is not None
+                        ):
+                            execution_time_str = f"{tool_call.metrics.time:.4f}s"
+                    elif content:  # Tool has completed
+                        execution_time_str = "Completed"
+
+                    with st.expander(
+                        f"🔧 {tool_name.replace('_', ' ').title()} ({execution_time_str})",
+                        expanded=False,
+                    ):
+                        # Display tool arguments
+                        if tool_args and tool_args != {"query": None}:
+                            st.markdown("**Arguments:**")
+                            if isinstance(tool_args, dict) and "query" in tool_args:
+                                st.code(tool_args["query"], language="text")
+                            try:
+                                st.json(tool_args)
+                            except Exception:
+                                st.write(tool_args)
+
+                        # Display tool results if available
+                        if content:
+                            st.markdown("**Results:**")
+                            try:
+                                if isinstance(content, (dict, list)):
+                                    st.json(content)
+                                else:
+                                    st.markdown(str(content))
+                            except Exception:
+                                st.text(str(content))
+
+        except Exception as e:
+            logger.error(f"Error displaying tool calls: {str(e)}")
+            with tool_calls_container.container():
+                st.warning("⚠️ Error displaying tool execution details")
 
 
 def main() -> None:

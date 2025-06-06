@@ -635,22 +635,21 @@ def get_main_template():
                 color: var(--text-primary);
                 line-height: 1.6;
                 min-height: 100vh;
+                padding-top: 200px; /* Account for fixed header */
             }
 
             .status-bar {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: rgba(255, 255, 255, 0.95);
+                background: rgba(255, 255, 255, 0.15);
                 backdrop-filter: blur(10px);
                 padding: 0.75rem 1rem;
-                border-bottom: 1px solid var(--border-color);
-                z-index: 1000;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 0.75rem;
+                margin-top: 1rem;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 font-size: 0.875rem;
+                box-shadow: var(--shadow);
             }
 
             .status-left {
@@ -663,7 +662,7 @@ def get_main_template():
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
-                color: var(--text-secondary);
+                color: rgba(255, 255, 255, 0.9);
             }
 
             .status-indicator {
@@ -692,37 +691,45 @@ def get_main_template():
                 gap: 0.5rem;
                 padding: 0.5rem 1rem;
                 background: transparent;
-                border: 1px solid var(--border-color);
+                border: 1px solid rgba(255, 255, 255, 0.3);
                 border-radius: 0.5rem;
-                color: var(--text-secondary);
+                color: rgba(255, 255, 255, 0.9);
                 text-decoration: none;
                 transition: all 0.2s;
                 font-size: 0.875rem;
             }
 
             .nav-button:hover {
-                background: var(--primary-color);
+                background: rgba(255, 255, 255, 0.2);
                 color: white;
-                border-color: var(--primary-color);
+                border-color: rgba(255, 255, 255, 0.5);
                 transform: translateY(-1px);
             }
 
             .container {
                 max-width: 95%;
                 margin: 0 auto;
-                padding: 5rem 2rem 2rem;
+                padding: 2rem;
             }
 
             .header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: var(--background);
                 text-align: center;
-                margin-bottom: 3rem;
+                padding: 1rem 2rem;
                 color: white;
+                z-index: 1000;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
             }
 
             .header h1 {
-                font-size: 3rem;
+                font-size: 2rem;
                 font-weight: 700;
-                margin-bottom: 0.5rem;
+                margin-bottom: 0.25rem;
                 text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
                 display: flex;
                 align-items: center;
@@ -741,9 +748,10 @@ def get_main_template():
             }
 
             .header p {
-                font-size: 1.2rem;
+                font-size: 1rem;
                 opacity: 0.9;
                 font-weight: 300;
+                margin-bottom: 0.25rem;
             }
 
             .framework-badge {
@@ -882,7 +890,7 @@ def get_main_template():
 
             .thoughts-panel {
                 position: fixed;
-                top: 4rem;
+                top: 1rem;
                 right: 1rem;
                 width: 320px;
                 max-height: 400px;
@@ -952,7 +960,7 @@ def get_main_template():
                 }
 
                 .container {
-                    padding: 5rem 1rem 2rem;
+                    padding: 1rem;
                 }
 
                 .content {
@@ -992,33 +1000,6 @@ def get_main_template():
         </style>
     </head>
     <body>
-        <div class="status-bar">
-            <div class="status-left">
-                <div class="status-item">
-                    <div class="status-indicator"></div>
-                    <span>Agno Framework Active</span>
-                </div>
-                <div class="status-item">
-                    <i class="fas fa-brain brain-icon"></i>
-                    <span>Memory: {{ 'Connected' if weaviate_connected else 'Disconnected' }}</span>
-                </div>
-                <div class="status-item">
-                    <i class="fas fa-plug"></i>
-                    <span>MCP Tools Ready</span>
-                </div>
-            </div>
-            <div class="status-right">
-                <a href="/agent_info" class="nav-button">
-                    <i class="fas fa-info-circle"></i>
-                    <span>Agent Info</span>
-                </a>
-                <a href="/clear" class="nav-button">
-                    <i class="fas fa-trash-alt"></i>
-                    <span>Clear Memory</span>
-                </a>
-            </div>
-        </div>
-
         <div class="container">
             <div class="header">
                 <h1>
@@ -1031,6 +1012,33 @@ def get_main_template():
                 <div class="framework-badge">
                     <i class="fas fa-rocket"></i>
                     <span>Agno Framework</span>
+                </div>
+                
+                <div class="status-bar">
+                    <div class="status-left">
+                        <div class="status-item">
+                            <div class="status-indicator"></div>
+                            <span>Agno Framework Active</span>
+                        </div>
+                        <div class="status-item">
+                            <i class="fas fa-brain brain-icon"></i>
+                            <span>Memory: {{ 'Connected' if weaviate_connected else 'Disconnected' }}</span>
+                        </div>
+                        <div class="status-item">
+                            <i class="fas fa-plug"></i>
+                            <span>MCP Tools Ready</span>
+                        </div>
+                    </div>
+                    <div class="status-right">
+                        <a href="/agent_info" class="nav-button">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Agent Info</span>
+                        </a>
+                        <a href="/clear" class="nav-button">
+                            <i class="fas fa-trash-alt"></i>
+                            <span>Clear Memory</span>
+                        </a>
+                    </div>
                 </div>
             </div>
 

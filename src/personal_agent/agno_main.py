@@ -22,8 +22,15 @@ from agno.storage.agent.sqlite import SqliteAgentStorage
 from agno.vectordb.lancedb import LanceDb
 from agno.vectordb.search import SearchType
 
+from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.yfinance import YFinanceTools
+from agno.tools.youtube import YouTubeTools
+
+from .agents.ollama_agents import finance_agent, web_agent, youtube_agent
+
 # Import configuration
-from .config import USE_MCP, get_mcp_servers
+from .config import get_mcp_servers
+from .config.settings import LLM_MODEL
 
 # Import utilities
 from .utils import inject_dependencies, register_cleanup_handlers, setup_logging
@@ -123,7 +130,7 @@ async def initialize_agno_system():
     # Initialize MCP client for tool compatibility (if enabled)
     mcp_client = None
     # if USE_MCP:
-    
+
     logger.info("Initializing MCP client...")
     from .core.mcp_client import SimpleMCPClient
 
@@ -162,7 +169,22 @@ async def initialize_agno_system():
     # Get MCP tools as native agno Functions (using static implementation)
     from .agno_static_tools import get_static_mcp_tools
 
-    mcp_tools = await get_static_mcp_tools() if USE_MCP else []
+    mcp_tools = await get_static_mcp_tools()
+    if mcp_tools:
+        logger.info("Loaded %d MCP tools for agent integration", len(mcp_tools))
+        mcp_tools.append(DuckDuckGoTools())
+        mcp_tools.append(
+            YFinanceTools(
+                stock_price=True,
+                analyst_recommendations=True,
+                company_info=True,
+                company_news=True,
+            )
+        )
+        mcp_tools.append(YouTubeTools())
+        logger.info("Added web, finance, and YouTube tools to MCP tools list")
+    else:
+        logger.warning("No MCP tools found, agent will run without them")
 
     # 4. Create the Native Agno Agent
     agno_agent = Agent(
@@ -200,6 +222,7 @@ async def initialize_agno_system():
         debug_mode=True,
         add_history_to_messages=False,
         num_history_runs=3,
+        team=[web_agent, finance_agent, youtube_agent],  # Example agents
     )
 
     logger.info(

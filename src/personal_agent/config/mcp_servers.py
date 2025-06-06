@@ -5,7 +5,7 @@ from typing import Any, Dict
 from .settings import DATA_DIR, ROOT_DIR, get_env_var
 
 # MCP Server configurations
-MCP_SERVERS = {
+OMCP_SERVERS = {
     "filesystem-home": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
@@ -36,6 +36,39 @@ MCP_SERVERS = {
         "args": ["-y", "@modelcontextprotocol/server-brave-search"],
         "description": "Web search for research and technical information",
         "env": {"BRAVE_API_KEY": get_env_var("BRAVE_API_KEY", "")},
+    },
+    "puppeteer": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+        "description": "Browser automation and web content fetching",
+    },
+}
+
+MCP_SERVERS = {
+    "filesystem-home": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
+        "description": "Access home directory filesystem operations",
+    },
+    "filesystem-data": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", DATA_DIR],
+        "description": "Access data directory for vector database",
+    },
+    "filesystem-root": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+        "description": "Access root directory filesystem operations",
+    },
+    "github": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "description": "GitHub repository operations and code search",
+        "env": {
+            "GITHUB_PERSONAL_ACCESS_TOKEN": get_env_var(
+                "GITHUB_PERSONAL_ACCESS_TOKEN", ""
+            )
+        },
     },
     "puppeteer": {
         "command": "npx",

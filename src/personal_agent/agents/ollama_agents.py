@@ -4,9 +4,12 @@ from agno.agent import Agent
 from agno.models.ollama import Ollama
 from agno.playground import Playground
 from agno.storage.sqlite import SqliteStorage
+
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
+
+from personal_agent.config.settings import LLM_MODEL
 
 local_agent_storage_file: str = "tmp/local_agents.db"
 common_instructions = [
@@ -17,7 +20,7 @@ web_agent = Agent(
     name="Web Agent",
     role="Search the web for information",
     agent_id="web-agent",
-    model=Ollama(id="llama3.1:8b"),
+    model=Ollama(id=LLM_MODEL),
     tools=[DuckDuckGoTools()],
     instructions=["Always include sources."] + common_instructions,
     storage=SqliteStorage(
@@ -37,7 +40,7 @@ finance_agent = Agent(
     name="Finance Agent",
     role="Get financial data",
     agent_id="finance-agent",
-    model=Ollama(id="llama3.1:8b"),
+    model=Ollama(id=LLM_MODEL),
     tools=[
         YFinanceTools(
             stock_price=True,
@@ -65,7 +68,7 @@ youtube_agent = Agent(
     name="YouTube Agent",
     role="Understand YouTube videos and answer questions",
     agent_id="youtube-agent",
-    model=Ollama(id="llama3.1:8b"),
+    model=Ollama(id=LLM_MODEL),
     tools=[YouTubeTools()],
     description="You are a YouTube agent that has the special skill of understanding YouTube videos and answering questions about them.",
     instructions=[
@@ -94,8 +97,8 @@ playground = Playground(
     description="A playground for ollama agents",
     app_id="ollama-agents",
 )
-app = playground.get_app(use_async=False)
+app_playground = playground.get_app(use_async=False)
 
 
 if __name__ == "__main__":
-    playground.serve(app="ollama_agents:app", reload=True)
+    playground.serve(app="ollama_agents:app_playground", reload=True)

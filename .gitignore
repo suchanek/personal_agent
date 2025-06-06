@@ -185,3 +185,4 @@ cython_debug/
 weaviate_data/
 data/
 .DS_Store
+src/personal_agent/streamlit/app.py

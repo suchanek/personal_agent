@@ -28,22 +28,25 @@ class ChatInterface:
         """
         Render the complete chat interface.
 
-        This method displays the header, chat history, and agent status
+        This method displays the header with status bar and chat history
         in a cohesive chat interface layout.
         """
         self.display_header()
         self.display_chat_history()
-        self.display_agent_status()
 
     def display_header(self) -> None:
         """
-        Display the main header with branding and description.
+        Display the main header with branding, description, and status bar.
 
-        Shows the application title and description to match the
-        Flask interface branding.
+        Shows the application title, description, and agent status
+        to match the Flask interface branding.
         """
         st.markdown("# 🤖 Personal AI Agent")
         st.markdown("*Powered by Agno Framework with Native Memory & MCP Tools*")
+
+        # Display status bar in header area
+        self.display_agent_status()
+
         st.markdown("---")
 
     def display_chat_history(self) -> None:
@@ -155,10 +158,19 @@ class ChatInterface:
         tools_count = len(agent.tools) if agent.tools else 0
         session_icon = "🟢" if st.session_state.get("session_id") else "🆕"
 
-        # Display as a single info line
+        # Display as a single info line with more detailed information
         st.info(
             f"**Status:** {memory_icon} Memory | {knowledge_icon} Knowledge | 🔧 {tools_count} Tools | {session_icon} Session"
         )
+
+        # Add debug information if tools are available
+        if hasattr(agent, "tools") and agent.tools:
+            with st.expander("🔧 Available Tools", expanded=False):
+                for tool in agent.tools:
+                    tool_name = getattr(tool, "name", str(tool))
+                    st.write(f"• {tool_name}")
+        else:
+            st.warning("⚠️ No tools detected in agent")
 
     def display_thinking_process(self, thinking_text: str) -> None:
         """
