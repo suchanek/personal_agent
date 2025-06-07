@@ -134,7 +134,7 @@ def get_joke() -> str:
     url = "https://v2.jokeapi.dev/joke/Any?type=single"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)  # Set a timeout for the request
         response.raise_for_status()
 
         data = response.json()

@@ -135,17 +135,53 @@ class SimpleMCPClient:
             }
 
             response = self._send_request_sync(server_name, request)
+            logger.debug(f"MCP tool response for {tool_name}: {response}")
+
             if response and response.get("result"):
                 content = response["result"].get("content", [])
+                logger.debug(f"MCP tool content: {content}")
+
                 if content and len(content) > 0:
-                    return content[0].get("text", "No response")
+                    # Check for different content types
+                    first_content = content[0]
+                    if isinstance(first_content, dict):
+                        # Standard MCP response format
+                        text_content = first_content.get("text", "")
+                        if text_content:
+                            return text_content
+                        # Try other possible keys
+                        for key in ["content", "output", "result"]:
+                            if key in first_content and first_content[key]:
+                                return str(first_content[key])
+                    elif isinstance(first_content, str):
+                        # Direct string response
+                        return first_content
+
+                # If we have content but can't extract text, return the raw content
+                if content:
+                    return str(content)
+
+                # Check if there's an error in the result
+                if "error" in response["result"]:
+                    error_info = response["result"]["error"]
+                    return f"Tool error: {error_info}"
+
+            # Check for top-level error
+            if response and "error" in response:
+                error_info = response["error"]
+                return f"MCP error: {error_info}"
+
+            # If we get here, we have an unexpected response format
+            logger.warning(
+                f"Unexpected MCP response format for {tool_name}: {response}"
+            )
+            return f"Unexpected response format from {tool_name}: {response}"
 
         except Exception as e:
             logger.error(
                 "Error calling tool %s on server %s: %s", tool_name, server_name, e
             )
-
-        return f"Error calling tool {tool_name}"
+            return f"Error calling tool {tool_name}: {str(e)}"
 
     def list_tools_sync(self, server_name: str) -> List[Dict[str, Any]]:
         """List available tools on an MCP server synchronously."""

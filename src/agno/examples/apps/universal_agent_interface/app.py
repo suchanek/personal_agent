@@ -162,21 +162,181 @@ async def body() -> None:
                     run_response = await uagi.arun(
                         user_message, stream=True, stream_intermediate_steps=True
                     )
-                    async for resp_chunk in run_response:
-                        # Display tool calls if available
-                        if resp_chunk.tools and len(resp_chunk.tools) > 0:
-                            display_tool_calls(tool_calls_container, resp_chunk.tools)
+                    # Create a status container for real-time updates
+                    status_container = st.empty()
 
-                        # Display response if available and event is RunResponse
+                    # Collect tool results from the stream
+                    tool_results_map = {}
+                    all_tool_calls = []
+
+                    async for resp_chunk in run_response:
+                        # DIAGNOSTIC: Log the chunk structure
+                        print(f"\n🔍 CHUNK DEBUG:")
+                        print(f"   Type: {type(resp_chunk)}")
+                        print(
+                            f"   Dir: {[attr for attr in dir(resp_chunk) if not attr.startswith('_')]}"
+                        )
+
+                        if hasattr(resp_chunk, "event"):
+                            print(f"   Event: {resp_chunk.event}")
+
+                        if hasattr(resp_chunk, "tools") and resp_chunk.tools:
+                            print(f"   Tools count: {len(resp_chunk.tools)}")
+                            for i, tool in enumerate(resp_chunk.tools):
+                                print(f"     Tool {i}:")
+                                print(f"       Type: {type(tool)}")
+                                print(
+                                    f"       Dir: {[attr for attr in dir(tool) if not attr.startswith('_')]}"
+                                )
+                                if hasattr(tool, "name"):
+                                    print(f"       Name: {tool.name}")
+                                if hasattr(tool, "id"):
+                                    print(f"       ID: {tool.id}")
+                                if hasattr(tool, "result"):
+                                    print(f"       Result: {repr(tool.result)}")
+                                if hasattr(tool, "content"):
+                                    print(f"       Content: {repr(tool.content)}")
+
+                        if hasattr(resp_chunk, "messages") and resp_chunk.messages:
+                            print(f"   Messages count: {len(resp_chunk.messages)}")
+                            for i, msg in enumerate(resp_chunk.messages):
+                                print(f"     Message {i}:")
+                                print(f"       Type: {type(msg)}")
+                                print(f"       Role: {getattr(msg, 'role', 'N/A')}")
+                                print(
+                                    f"       Content: {repr(getattr(msg, 'content', 'N/A'))}"
+                                )
+                                print(
+                                    f"       Tool Call ID: {getattr(msg, 'tool_call_id', 'N/A')}"
+                                )
+
+                        # Show real-time status updates for all events
+                        if hasattr(resp_chunk, "event") and resp_chunk.event:
+                            event_name = resp_chunk.event
+
+                            # Display status based on event type
+                            if event_name == "run_started":
+                                with status_container.container():
+                                    st.info("🚀 Starting to process your request...")
+                            elif event_name == "tool_call_started":
+                                with status_container.container():
+                                    st.info(
+                                        "🔧 Using tools to help with your request..."
+                                    )
+                            elif event_name == "reasoning_started":
+                                with status_container.container():
+                                    st.info("🧠 Thinking through the problem...")
+                            elif event_name == "reasoning_step":
+                                if (
+                                    hasattr(resp_chunk, "content")
+                                    and resp_chunk.content
+                                ):
+                                    with status_container.container():
+                                        st.info(f"💭 {resp_chunk.content}")
+                            elif event_name == "tool_call_completed":
+                                with status_container.container():
+                                    st.info("✅ Tool execution completed")
+
+                                # Display raw tool results immediately
+                                if hasattr(resp_chunk, "tools") and resp_chunk.tools:
+                                    for tool in resp_chunk.tools:
+                                        tool_name = getattr(
+                                            tool, "name", "Unknown Tool"
+                                        )
+                                        tool_result = getattr(
+                                            tool, "result", None
+                                        ) or getattr(tool, "content", None)
+
+                                        if tool_result:
+                                            with st.expander(
+                                                f"🔧 {tool_name} - Raw Output",
+                                                expanded=True,
+                                            ):
+                                                st.text(str(tool_result))
+
+                        # Collect tool results from messages with role='tool'
+                        if hasattr(resp_chunk, "messages") and resp_chunk.messages:
+                            for message in resp_chunk.messages:
+                                if hasattr(message, "role") and message.role == "tool":
+                                    if hasattr(message, "tool_call_id") and hasattr(
+                                        message, "content"
+                                    ):
+                                        tool_results_map[message.tool_call_id] = (
+                                            message.content
+                                        )
+
+                                        # Also display raw tool results immediately from messages
+                                        with st.expander(
+                                            f"🔧 Tool Result (ID: {message.tool_call_id}) - Raw Output",
+                                            expanded=True,
+                                        ):
+                                            st.text(str(message.content))
+
+                        # Display tool calls if available and update with results
+                        if resp_chunk.tools and len(resp_chunk.tools) > 0:
+                            # Update tool calls with results if available
+                            enhanced_tools = []
+                            for tool in resp_chunk.tools:
+                                tool_dict = (
+                                    tool
+                                    if isinstance(tool, dict)
+                                    else {
+                                        "tool_name": getattr(
+                                            tool,
+                                            "tool_name",
+                                            getattr(tool, "name", "Unknown Tool"),
+                                        ),
+                                        "tool_args": getattr(
+                                            tool,
+                                            "tool_args",
+                                            getattr(tool, "arguments", {}),
+                                        ),
+                                        "metrics": getattr(tool, "metrics", None),
+                                        "id": getattr(tool, "id", None),
+                                    }
+                                )
+
+                                # Add result if available
+                                tool_id = tool_dict.get("id")
+                                if tool_id and tool_id in tool_results_map:
+                                    tool_dict["content"] = tool_results_map[tool_id]
+                                elif not tool_dict.get("content"):
+                                    # Check if the tool object already has content/result
+                                    content = getattr(tool, "content", None) or getattr(
+                                        tool, "result", None
+                                    )
+                                    if content:
+                                        tool_dict["content"] = content
+
+                                enhanced_tools.append(tool_dict)
+
+                            # Store for final display
+                            all_tool_calls = enhanced_tools
+                            display_tool_calls(tool_calls_container, enhanced_tools)
+
+                        # Display response content as it streams (for any event with content)
                         if (
-                            resp_chunk.event == "RunResponse"
+                            hasattr(resp_chunk, "content")
                             and resp_chunk.content is not None
                         ):
-                            response += resp_chunk.content
-                            resp_container.markdown(response)
+                            # Only accumulate content for RunResponse events for final response
+                            if resp_chunk.event == "RunResponse":
+                                response += resp_chunk.content
+                                resp_container.markdown(response)
+                            else:
+                                # For other events with text content, show as intermediate status
+                                content = resp_chunk.content
+                                if isinstance(content, str) and content.strip():
+                                    with status_container.container():
+                                        st.info(f"💬 {content}")
 
-                    # Add the response to the messages
-                    if uagi.run_response is not None:
+                    # Clear status when done
+                    status_container.empty()
+
+                    # Add the response to the messages with enhanced tool calls
+                    if all_tool_calls:
+                        await add_message("assistant", response, all_tool_calls)
+                    elif uagi.run_response is not None:
                         await add_message(
                             "assistant", response, uagi.run_response.tools
                         )

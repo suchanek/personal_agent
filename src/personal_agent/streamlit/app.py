@@ -268,6 +268,7 @@ class PersonalAgentApp:
 
             # Run agent with streaming enabled to show tool calls in real-time
             response_text = ""
+            raw_tool_used = False  # Flag to track if raw tool was used
 
             try:
                 # Create a status container for real-time agent thinking
@@ -310,9 +311,59 @@ class PersonalAgentApp:
 
                     # Display tool calls if available
                     if response_chunk.tools and len(response_chunk.tools) > 0:
-                        self.display_tool_calls_realtime(
-                            tool_calls_container, response_chunk.tools
+                        # Check if any tool is a "raw output" tool (shell, directory listing, etc.)
+                        raw_output_tools = {
+                            "list_directory",
+                            "run_shell_command",
+                            "execute_command",
+                            "shell",
+                            "bash",
+                            "terminal",
+                            "directory",
+                            "ls",
+                            "pwd",
+                            "filesystem",
+                            "mcp",
+                            "file_system",
+                            "list_files",
+                        }
+
+                        has_raw_tool = any(
+                            any(
+                                raw_tool in getattr(tool, "tool_name", "").lower()
+                                for raw_tool in raw_output_tools
+                            )
+                            for tool in response_chunk.tools
                         )
+
+                        # Debug logging
+                        tool_names = [
+                            getattr(tool, "tool_name", "Unknown")
+                            for tool in response_chunk.tools
+                        ]
+                        print(f"🔍 DEBUG: Tool names: {tool_names}")
+                        print(f"🔍 DEBUG: Raw tool detected: {has_raw_tool}")
+
+                        if has_raw_tool:
+                            raw_tool_used = True
+                            # For raw output tools, show tool execution info but continue streaming
+                            # to capture the agent's response content which contains the actual data
+                            with tool_calls_container.container():
+                                for tool_call in response_chunk.tools:
+                                    tool_name = getattr(
+                                        tool_call, "tool_name", "Unknown Tool"
+                                    )
+                                    st.info(
+                                        f"🔧 Executed: {tool_name.replace('_', ' ').title()}"
+                                    )
+
+                            # Don't break - continue streaming to get agent's response content
+                            # which contains the actual directory listing
+                        else:
+                            # Normal tool display for non-raw tools
+                            self.display_tool_calls_realtime(
+                                tool_calls_container, response_chunk.tools
+                            )
 
                     # Display response content as it streams (for any event with content)
                     if (
@@ -323,7 +374,30 @@ class PersonalAgentApp:
                         if response_chunk.event == "RunResponse":
                             response_text += response_chunk.content
                             with response_container.container():
-                                st.markdown(response_text)
+                                if raw_tool_used:
+                                    # For raw tools, display content as plain text in an expanded box
+                                    # Extract any code blocks for better formatting
+                                    content = response_text
+                                    if "```" in content:
+                                        # Find the content between code blocks
+                                        import re
+
+                                        code_match = re.search(r"```[^`]*```", content)
+                                        if code_match:
+                                            code_content = code_match.group()
+                                            # Remove the ``` markers and clean up
+                                            clean_content = code_content.replace(
+                                                "```", ""
+                                            ).strip()
+                                            # Display as raw output
+                                            st.markdown("**Raw Output:**")
+                                            st.text(clean_content)
+                                        else:
+                                            st.text(response_text)
+                                    else:
+                                        st.text(response_text)
+                                else:
+                                    st.markdown(response_text)
                         else:
                             # For other events, show the content as status if it's text
                             content = response_chunk.content
@@ -343,10 +417,13 @@ class PersonalAgentApp:
                         st.session_state.session_id = agent.run_response.session_id
 
                 # Return the complete response text
-                return (
-                    response_text
-                    or "I processed your request but didn't generate a text response."
-                )
+                if raw_tool_used:
+                    return response_text or "Tool executed successfully."
+                else:
+                    return (
+                        response_text
+                        or "I processed your request but didn't generate a text response."
+                    )
 
             except Exception as stream_error:
                 logger.warning(
@@ -376,6 +453,58 @@ class PersonalAgentApp:
                 st.error(f"❌ Error: {str(e)}")
 
             return error_msg
+
+    def display_raw_tool_output(self, tool_calls_container, tools):
+        """
+        Display raw tool output immediately without agent interpretation.
+
+        :param tool_calls_container: Streamlit container for tool calls
+        :param tools: List of tool execution objects
+        """
+        try:
+            with tool_calls_container.container():
+                for tool_call in tools:
+                    tool_name = getattr(tool_call, "tool_name", "Unknown Tool")
+                    tool_args = getattr(tool_call, "tool_args", {})
+                    content = getattr(tool_call, "result", None) or getattr(
+                        tool_call, "content", None
+                    )
+
+                    # Get execution time if available
+                    execution_time_str = "Completed"
+                    if hasattr(tool_call, "metrics") and tool_call.metrics:
+                        if (
+                            hasattr(tool_call.metrics, "time")
+                            and tool_call.metrics.time is not None
+                        ):
+                            execution_time_str = f"{tool_call.metrics.time:.4f}s"
+
+                    with st.expander(
+                        f"🔧 {tool_name.replace('_', ' ').title()} - Raw Output ({execution_time_str})",
+                        expanded=True,  # Auto-expand for raw output
+                    ):
+                        # Display tool arguments if they exist
+                        if tool_args and tool_args != {"query": None}:
+                            st.markdown("**Command/Arguments:**")
+                            if isinstance(tool_args, dict):
+                                for key, value in tool_args.items():
+                                    if key in ["command", "directory_path", "path"]:
+                                        st.code(str(value), language="bash")
+                                    else:
+                                        st.write(f"**{key}:** {value}")
+
+                        # Display raw tool results
+                        if content:
+                            st.markdown("**Raw Output:**")
+                            # Display as plain text to preserve formatting
+                            st.text(str(content))
+                        else:
+                            st.info("Tool executed but returned no output.")
+
+        except Exception as e:
+            logger.error(f"Error displaying raw tool output: {str(e)}")
+            with tool_calls_container.container():
+                st.error("⚠️ Error displaying raw tool output")
 
     def display_tool_calls_realtime(self, tool_calls_container, tools):
         """

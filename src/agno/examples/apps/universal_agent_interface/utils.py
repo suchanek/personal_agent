@@ -114,9 +114,11 @@ async def show_user_memories(uagi_memory: Memory, user_id: str) -> None:
                         for memory in user_memories
                     ],
                     "Last Updated": [
-                        memory.last_updated.strftime("%Y-%m-%d %H:%M")
-                        if memory.last_updated
-                        else ""
+                        (
+                            memory.last_updated.strftime("%Y-%m-%d %H:%M")
+                            if memory.last_updated
+                            else ""
+                        )
                         for memory in user_memories
                     ],
                 }
@@ -202,11 +204,13 @@ async def about_agno():
     """Show information about Agno in the sidebar"""
     with st.sidebar:
         st.markdown("### About Agno ✨")
-        st.markdown("""
+        st.markdown(
+            """
         Agno is a lightweight library for building Reasoning Agents.
 
         [GitHub](https://github.com/agno-agi/agno) | [Docs](https://docs.agno.com)
-        """)
+        """
+        )
 
         st.markdown("### Need Help?")
         st.markdown(
@@ -247,7 +251,16 @@ def display_tool_calls(tool_calls_container, tools):
                     "name", "Unknown Tool"
                 )
                 tool_args = tool_call.get("tool_args") or tool_call.get("args", {})
-                content = tool_call.get("content", None)
+
+                # Get content from the tool call
+                content = (
+                    tool_call.get("content")
+                    or tool_call.get("result")
+                    or tool_call.get("output")
+                    or tool_call.get("response")
+                    or None
+                )
+
                 metrics = tool_call.get("metrics", None)
 
                 # Add timing information safely

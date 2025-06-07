@@ -4,7 +4,7 @@ import json
 import os
 from typing import TYPE_CHECKING
 
-from langchain.tools import tool
+from agno.tools import tool
 
 if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient

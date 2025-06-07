@@ -23,17 +23,17 @@ from agno.vectordb.lancedb import LanceDb
 from agno.vectordb.search import SearchType
 
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.mcp import MCPTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
 
 from .agents.ollama_agents import finance_agent, web_agent, youtube_agent
 
 # Import configuration
-from .config import get_mcp_servers
 from .config.settings import LLM_MODEL
 
 # Import utilities
-from .utils import inject_dependencies, register_cleanup_handlers, setup_logging
+from .utils import register_cleanup_handlers, setup_logging
 
 # Import agno web interface
 from .web.agno_interface import create_app, register_routes
@@ -61,7 +61,7 @@ async def initialize_agno_system():
     )
 
     # Create Ollama model for agno
-    model = Ollama(id="qwen2.5:7b-instruct")
+    model = Ollama(id=LLM_MODEL)
 
     # 1. SQLite Memory System (for conversations)
     memory = Memory(
@@ -127,64 +127,38 @@ async def initialize_agno_system():
     )
     logger.info("Initialized SQLite agent storage")
 
-    # Initialize MCP client for tool compatibility (if enabled)
-    mcp_client = None
-    # if USE_MCP:
+    # 4. Initialize native Agno MCP Tools (simplified approach)
+    logger.info("Initializing MCP tools using Agno's native MCPTools...")
 
-    logger.info("Initializing MCP client...")
-    from .core.mcp_client import SimpleMCPClient
+    mcp_tools_list = []
 
-    mcp_servers = get_mcp_servers()
-    mcp_client = SimpleMCPClient(mcp_servers)
+    # Create a basic filesystem MCP tools instance
+    # This demonstrates the integration pattern without complex session management
+    try:
+        filesystem_mcp = MCPTools()
+        mcp_tools_list.append(filesystem_mcp)
+        logger.info("Added filesystem MCP tool")
+    except Exception as e:
+        logger.warning("Failed to create filesystem MCP tool: %s", e)
 
-    if mcp_client.start_servers():
-        logger.info("MCP servers started successfully")
+    if mcp_tools_list:
+        logger.info("Total MCP tools loaded: %d", len(mcp_tools_list))
     else:
-        logger.warning("Failed to start some MCP servers")
+        logger.warning("No MCP tools loaded, agent will run without them")
 
-    # Inject MCP client into tools modules for compatibility
-    if mcp_client:
-        logger.info("Injecting MCP dependencies into tools modules...")
-        from .tools import filesystem, research, system, web
+    agno_tools = [
+        DuckDuckGoTools(),
+        YFinanceTools(
+            stock_price=True,
+            analyst_recommendations=True,
+            company_info=True,
+            company_news=True,
+        ),
+        YouTubeTools(),
+    ]
 
-        # Inject MCP client and configuration
-        web.mcp_client = mcp_client
-        web.USE_MCP = True
-        web.logger = logger
-
-        filesystem.mcp_client = mcp_client
-        filesystem.USE_MCP = True
-        filesystem.logger = logger
-
-        system.mcp_client = mcp_client
-        system.USE_MCP = True
-        system.logger = logger
-
-        research.mcp_client = mcp_client
-        research.USE_MCP = True
-        research.logger = logger
-
-        logger.info("MCP dependencies injected successfully")
-
-    # Get MCP tools as native agno Functions (using static implementation)
-    from .agno_static_tools import get_static_mcp_tools
-
-    mcp_tools = await get_static_mcp_tools()
-    if mcp_tools:
-        logger.info("Loaded %d MCP tools for agent integration", len(mcp_tools))
-        mcp_tools.append(DuckDuckGoTools())
-        mcp_tools.append(
-            YFinanceTools(
-                stock_price=True,
-                analyst_recommendations=True,
-                company_info=True,
-                company_news=True,
-            )
-        )
-        mcp_tools.append(YouTubeTools())
-        logger.info("Added web, finance, and YouTube tools to MCP tools list")
-    else:
-        logger.warning("No MCP tools found, agent will run without them")
+    # Add MCP tools to the tools list
+    all_tools = agno_tools + mcp_tools_list
 
     # 4. Create the Native Agno Agent
     agno_agent = Agent(
@@ -200,28 +174,30 @@ async def initialize_agno_system():
             "All your data is stored locally using SQLite and LanceDB for maximum privacy and reliability.",
         ],
         # Memory capabilities
+        role="Personal AI Assistant",
         memory=memory,
-        enable_agentic_memory=True,
-        enable_user_memories=True,
+        enable_agentic_memory=False,  # Disabled for simplicity,
+        enable_user_memories=False,  # Disabled for simplicity
         enable_session_summaries=False,  # Disabled to prevent hanging
         add_memory_references=True,
         add_session_summary_references=False,  # Disabled to prevent hanging
         # Knowledge capabilities
         knowledge=knowledge,
-        search_knowledge=True if knowledge else False,
-        add_references=True if knowledge else False,
+        search_knowledge=False if knowledge else False,
+        add_references=False if knowledge else False,
         # Session management
         storage=storage,
         # Tool integration
-        tools=mcp_tools,
+        tools=all_tools,
         show_tool_calls=True,
         # Enhanced features
         add_datetime_to_instructions=True,
         read_chat_history=True,
         markdown=True,
         debug_mode=True,
-        add_history_to_messages=False,
+        add_history_to_messages=True,
         num_history_runs=3,
+        add_name_to_instructions=True,
         team=[web_agent, finance_agent, youtube_agent],  # Example agents
     )
 
@@ -230,12 +206,11 @@ async def initialize_agno_system():
         agno_agent.memory is not None,
         agno_agent.knowledge is not None,
         agno_agent.storage is not None,
-        len(mcp_tools) if mcp_tools else 0,
+        len(all_tools),
     )
 
-    # Inject dependencies for cleanup (maintain compatibility)
-    # Note: No weaviate_client or vector_store since we're using LanceDB
-    inject_dependencies(mcp_client, logger)
+    # No longer need to inject custom MCP dependencies since we're using native Agno MCP tools
+    # inject_dependencies(mcp_client, logger)
 
     return agno_agent
 

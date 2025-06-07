@@ -23,7 +23,7 @@ from .__version__ import __version__
 
 # Import core components
 from .config import USE_MCP, get_mcp_servers
-from .core import SimpleMCPClient
+from .core.mcp_client import SimpleMCPClient
 
 # Import tools
 from .tools import get_all_tools
@@ -34,14 +34,9 @@ from .utils import cleanup, inject_dependencies, register_cleanup_handlers
 from .utils.logging import (
     configure_master_logger,
     disable_stream_handlers_for_namespace,
-    list_all_loggers,
-    list_handlers,
     set_logger_level,
-    set_logger_level_for_module,
-    set_logging_level_for_all_handlers,
     setup_logging,
     setup_logging_filters,
-    toggle_stream_handler,
 )
 
 # Import web interface
@@ -65,8 +60,8 @@ logger = _logger
 
 # Initialize MCP client if enabled
 mcp_client = None
-if USE_MCP:
-    mcp_client = SimpleMCPClient(get_mcp_servers())
+# if USE_MCP:
+#    mcp_client = SimpleMCPClient(get_mcp_servers())
 
 # Main entry points
 # Note: main.py and smol_main.py have been archived to legacy_frameworks/
@@ -87,13 +82,8 @@ __all__ = [
     "register_cleanup_handlers",
     "configure_master_logger",
     "disable_stream_handlers_for_namespace",
-    "list_all_loggers",
-    "list_handlers",
     "set_logger_level",
-    "set_logger_level_for_module",
-    "set_logging_level_for_all_handlers",
     "setup_logging",
-    "toggle_stream_handler",
     "setup_logging_filters",
     # Web interface
     "create_app",
