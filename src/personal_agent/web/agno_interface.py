@@ -14,11 +14,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-
-from flask import Flask, Response, render_template_string, request
-
-from ..config import USE_MCP
-
+# from flask import Flask, Response, request, render_template_string
 
 # Simple function to replace archived memory functionality
 def is_weaviate_connected() -> bool:

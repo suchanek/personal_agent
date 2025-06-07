@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.4.0"
+version = "0.4.1"
 description = "Personal AI agent with MCP, SQLite memory, and LanceDB vector storage"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
@@ -38,6 +38,10 @@ aiofiles = "^24.1.0"
 python-docx = "^1.1.2"
 pypdf = "^5.6.0"
 pygithub = "^2.6.1"
+langchain-core = "^0.3.64"
+weaviate-client = "^4.9.3"
+ollama = "^0.4.1"
+sqlalchemy = "^2.0.41"
 
 [tool.poetry.scripts]
 # Main entry points for Personal AI Agent (Streamlit-based system)
