@@ -34,5 +34,6 @@ DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory
 
 LOG_LEVEL = logging.INFO
 
-LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
+LLM_MODEL = "qwen3:8b"  # Ollama model to use for LLM
+# LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
 # LLM_MODEL = "llama3.1:8b-instruct-q8_0"

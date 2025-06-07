@@ -348,6 +348,30 @@ def get_main_template():
             overflow-y: auto;
         }
 
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-style: italic;
+            margin: 20px 0;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #667eea;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         .footer {
             text-align: center;
             margin-top: 40px;
@@ -445,9 +469,20 @@ def get_main_template():
                 return;
             }
             
-            // Show loading state on button only
+            // Show loading state
             submitButton.disabled = true;
             submitButton.innerHTML = 'Processing...';
+            
+            // Remove any existing response to show loading
+            const existingResponse = document.querySelector('.response-container');
+            if (existingResponse) {
+                existingResponse.innerHTML = '<h3>🤔 Agent is thinking...</h3><div class="loading">Processing your request</div>';
+            } else {
+                const newResponse = document.createElement('div');
+                newResponse.className = 'response-container';
+                newResponse.innerHTML = '<h3>🤔 Agent is thinking...</h3><div class="loading">Processing your request</div>';
+                document.querySelector('.container').appendChild(newResponse);
+            }
         });
 
         // Auto-resize textarea
