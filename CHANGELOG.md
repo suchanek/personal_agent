@@ -5,6 +5,52 @@ All notable changes to the Personal AI Agent project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2025-06-07
+
+### 🔧 CRITICAL FIXES
+
+- **MCPTools Session Management**: Fixed broken MCPTools initialization that was failing due to missing session parameter
+- **Agno Framework Integration**: Replaced custom SimpleMCPClient with native Agno MCPTools for proper streaming support
+- **Agent Initialization**: Resolved agent startup failures with session-based MCP tool architecture
+
+### Added
+
+- **Session-Based MCP Utilities**: New `create_filesystem_mcp_tools()` and `create_github_mcp_tools()` functions with proper session management
+- **File Agent Module**: New `agents/file_agent.py` demonstrating correct MCP session usage pattern
+- **GitHub Agents Module**: New `agents/github_agents.py` with GitHub-specific MCP integration
+- **Real-Time Streaming Interface**: Enhanced Streamlit interface with real-time agent response streaming
+- **Comprehensive Filesystem Tools**: Expanded filesystem operations in static MCP tools implementation
+- **Development Testing Tools**: Added multiple debug and test files for MCP functionality validation
+
+### Changed
+
+- **MCP Architecture**: Moved from direct MCPTools instantiation to on-demand creation with proper sessions
+- **Tool Integration**: Main agent now uses reliable tools (DuckDuckGo, YFinance, YouTube, GitHub) with MCP available on-demand
+- **Error Handling**: Improved graceful fallback when MCP servers are unavailable
+- **Streamlit Interface**: Enhanced with real-time streaming capabilities and better user experience
+- **Agent Configuration**: Updated team agent configurations in `agents/ollama_agents.py`
+
+### Fixed
+
+- **Session Parameter Error**: Resolved `MCPTools()` constructor requiring session parameter in `agno_main.py`
+- **Streaming Integration**: Fixed SimpleMCPClient compatibility issues with Agno's streaming architecture
+- **Import Dependencies**: Cleaned up unused imports and undefined variable references
+- **Tool Initialization**: Eliminated agent initialization failures caused by broken MCP tool setup
+- **Memory Integration**: Improved SQLite + LanceDB integration with proper error handling
+
+### Removed
+
+- **Broken MCP Client**: Eliminated custom SimpleMCPClient in favor of native Agno MCPTools
+- **Direct MCPTools Instantiation**: Removed problematic direct initialization without sessions
+- **Legacy Test Files**: Cleaned up outdated test files and moved relevant tests to `tests/` directory
+
+### Technical Details
+
+- **Session Management**: All MCP tools now use `stdio_client` and `ClientSession` for proper server communication
+- **Architecture Pattern**: Follows session-based pattern from `file_agent.py` throughout the codebase
+- **Tool Availability**: MCP tools created with proper sessions when specifically needed
+- **Zero Dependencies**: Maintains SQLite + LanceDB architecture with no external database requirements
+
 ## [0.4.0] - 2025-06-05
 
 ### 🚀 BREAKING CHANGES
