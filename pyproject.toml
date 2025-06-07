@@ -42,6 +42,7 @@ langchain-core = "^0.3.64"
 weaviate-client = "^4.9.3"
 ollama = "^0.4.1"
 sqlalchemy = "^2.0.41"
+watchdog = "^6.0.0"
 
 [tool.poetry.scripts]
 # Main entry points for Personal AI Agent (Streamlit-based system)

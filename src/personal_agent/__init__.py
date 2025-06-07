@@ -39,8 +39,8 @@ from .utils.logging import (
     setup_logging_filters,
 )
 
-# Import web interface
-from .web import create_app, register_routes
+# Web interface removed - using Streamlit instead
+# from .web import create_app, register_routes
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -85,9 +85,6 @@ __all__ = [
     "set_logger_level",
     "setup_logging",
     "setup_logging_filters",
-    # Web interface
-    "create_app",
-    "register_routes",
     # Package info
     "__version__",
     # Logger

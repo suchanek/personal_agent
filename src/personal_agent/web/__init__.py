@@ -1,24 +1,13 @@
 """
 Web interface package for the Personal AI Agent.
 
-Note: LangChain interface.py and smolagents smol_interface.py have been archived to legacy_frameworks/
-Current system uses the Agno framework with agno_main.py for web interfaces.
+Note: Flask-based interfaces have been removed.
+Current system uses:
+- Streamlit for web interface (personal_agent.streamlit.main)
+- CLI for command line (personal_agent.agno_main)
 """
 
-# Note: Legacy interfaces have been archived
-# from .interface import create_app, register_routes  # Archived to legacy_frameworks/langchain/
-# from .smol_interface import create_app as create_smol_app  # Archived to legacy_frameworks/smolagents/
-
-
-# Placeholder functions for compatibility
-def create_app():
-    """Legacy function - interfaces archived to legacy_frameworks/"""
-    raise NotImplementedError("Legacy interfaces archived. Use agno_main.py instead.")
-
-
-def register_routes():
-    """Legacy function - interfaces archived to legacy_frameworks/"""
-    raise NotImplementedError("Legacy interfaces archived. Use agno_main.py instead.")
-
-
-__all__ = ["create_app", "register_routes"]
+# Web interfaces have been simplified:
+# - Streamlit handles web UI
+# - agno_main.py handles CLI
+# - Flask interfaces removed

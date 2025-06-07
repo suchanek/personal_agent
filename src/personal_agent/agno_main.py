@@ -22,6 +22,8 @@ from agno.models.ollama import Ollama
 from agno.storage.agent.sqlite import SqliteAgentStorage
 from agno.vectordb.lancedb import LanceDb
 from agno.vectordb.search import SearchType
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.github import GithubTools
@@ -29,37 +31,33 @@ from agno.tools.mcp import MCPTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-
 from .agents.ollama_agents import finance_agent, web_agent, youtube_agent
 
 # Import configuration
 from .config.settings import LLM_MODEL
 
 # Import utilities
-from .utils import register_cleanup_handlers, setup_logging
+from .utils import setup_logging
 
-# Import agno web interface
-from .web.agno_interface import create_app, register_routes
+# Web interface removed - using Streamlit instead
 
 
 async def create_filesystem_mcp_tools(root_path: str = None) -> Optional[MCPTools]:
     """
     Create filesystem MCP tools with proper session management.
-    
+
     This function demonstrates how to properly initialize MCPTools with a session.
     Based on the pattern from file_agent.py.
-    
+
     Args:
         root_path: Root directory for filesystem operations (defaults to current working directory)
-        
+
     Returns:
         Initialized MCPTools instance or None if initialization fails
     """
     if root_path is None:
         root_path = str(Path.cwd())
-        
+
     try:
         server_params = StdioServerParameters(
             command="npx",
@@ -73,7 +71,7 @@ async def create_filesystem_mcp_tools(root_path: str = None) -> Optional[MCPTool
                 mcp_tools = MCPTools(session=session)
                 await mcp_tools.initialize()
                 return mcp_tools
-                
+
     except Exception as e:
         if logger:
             logger.error("Failed to create filesystem MCP tools: %s", e)
@@ -83,10 +81,10 @@ async def create_filesystem_mcp_tools(root_path: str = None) -> Optional[MCPTool
 async def create_github_mcp_tools() -> Optional[MCPTools]:
     """
     Create GitHub MCP tools with proper session management.
-    
+
     This function demonstrates how to properly initialize GitHub MCPTools with a session.
     Based on the pattern from github_agents.py.
-    
+
     Returns:
         Initialized MCPTools instance or None if initialization fails
     """
@@ -94,7 +92,7 @@ async def create_github_mcp_tools() -> Optional[MCPTools]:
         if logger:
             logger.warning("GITHUB_TOKEN not set, cannot create GitHub MCP tools")
         return None
-        
+
     try:
         server_params = StdioServerParameters(
             command="npx",
@@ -108,7 +106,7 @@ async def create_github_mcp_tools() -> Optional[MCPTools]:
                 mcp_tools = MCPTools(session=session)
                 await mcp_tools.initialize()
                 return mcp_tools
-                
+
     except Exception as e:
         if logger:
             logger.error("Failed to create GitHub MCP tools: %s", e)
@@ -206,7 +204,9 @@ async def initialize_agno_system():
 
     # 4. MCP Tools are created on-demand with proper sessions
     # See file_agent.py and github_agents.py for examples of session-based MCP tools
-    logger.info("MCP tools will be initialized on-demand with proper sessions when needed")
+    logger.info(
+        "MCP tools will be initialized on-demand with proper sessions when needed"
+    )
 
     agno_tools = [
         DuckDuckGoTools(),
@@ -217,9 +217,19 @@ async def initialize_agno_system():
             company_news=True,
         ),
         YouTubeTools(),
-        GithubTools(access_token=os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN", None)),
     ]
-    
+
+    # Add GitHub tools only if token is available
+    github_token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN", None)
+    if github_token:
+        agno_tools.append(GithubTools(access_token=github_token))
+        logger.info("GitHub tools enabled with access token")
+    else:
+        logger.warning("GitHub tools disabled - GITHUB_PERSONAL_ACCESS_TOKEN not found")
+        logger.info(
+            "To enable GitHub tools, set GITHUB_PERSONAL_ACCESS_TOKEN environment variable"
+        )
+
     # Use agno_tools directly (MCP tools created on-demand with sessions)
     all_tools = agno_tools
 
@@ -276,54 +286,6 @@ async def initialize_agno_system():
     # inject_dependencies(mcp_client, logger)
 
     return agno_agent
-
-
-def create_agno_web_app():
-    """
-    Create and configure the Flask web application with native agno Agent.
-
-    Returns:
-        Configured Flask application
-    """
-    # Get logger instance first
-    logger_instance = setup_logging()
-
-    # Initialize agno system (run async initialization)
-    agno_agent_instance = asyncio.run(initialize_agno_system())
-
-    # Create Flask app
-    app = create_app()
-
-    # Register routes with native agno agent
-    register_routes(
-        app,
-        agno_agent_instance,
-        logger_instance,
-    )
-
-    # Register cleanup handlers
-    register_cleanup_handlers()
-
-    logger_instance.info("SQLite + LanceDB web application ready!")
-    return app
-
-
-def run_agno_web():
-    """
-    Run the agno web application.
-    """
-    app = create_agno_web_app()
-
-    # Run the app
-    print("\n🚀 Starting Personal AI Agent with SQLite + LanceDB...")
-    print("🌐 Web interface will be available at: http://127.0.0.1:5003")
-    print("📚 Features: SQLite Memory + LanceDB Knowledge + MCP Tools")
-    print("⚡ Storage: Local files only (no external databases)")
-    print("🔧 Files: data/memory.db, data/lancedb/, data/knowledge/")
-    print("🔒 Privacy: All data stored locally")
-    print("\nPress Ctrl+C to stop the server.\n")
-
-    app.run(host="127.0.0.1", port=5003, debug=False)
 
 
 async def run_agno_cli():
@@ -406,12 +368,9 @@ def show_storage_info():
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) > 1 and sys.argv[1] == "cli":
-        # Run in CLI mode
-        asyncio.run(run_agno_cli())
-    elif len(sys.argv) > 1 and sys.argv[1] == "info":
+    if len(sys.argv) > 1 and sys.argv[1] == "info":
         # Show storage info
         show_storage_info()
     else:
-        # Run web interface
-        run_agno_web()
+        # Run CLI mode (web interface moved to Streamlit)
+        asyncio.run(run_agno_cli())
