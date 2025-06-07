@@ -8,6 +8,7 @@ maintaining the same UI and functionality as the original interface.py.
 """
 
 import asyncio
+import re
 import threading
 from typing import TYPE_CHECKING
 
@@ -16,10 +17,10 @@ from flask import Flask, render_template_string, request
 from ..config import USE_MCP
 
 
-# Simple function to replace archived memory functionality
-def is_weaviate_connected() -> bool:
-    """Check if Weaviate is configured and potentially connected."""
-    return False  # Always return False since we don't use Weaviate anymore
+# Function to check if memory system is available
+def is_memory_available() -> bool:
+    """Check if agno memory management is available."""
+    return agno_agent is not None  # Memory is available when agent is configured
 
 
 if TYPE_CHECKING:
@@ -90,6 +91,27 @@ def run_async_in_thread(coroutine):
     return result_container["result"]
 
 
+def remove_thinking_tags(text: str) -> str:
+    """
+    Remove <think>...</think> tags from the response text.
+
+    :param text: The response text that may contain thinking tags
+    :return: Clean text with thinking tags removed
+    """
+    if not text:
+        return text
+
+    # Remove <think>...</think> blocks using regex
+    # This handles multiline content within thinking tags
+    clean_text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+
+    # Clean up any extra whitespace that might be left
+    clean_text = re.sub(r"\n\s*\n\s*\n", "\n\n", clean_text)
+    clean_text = clean_text.strip()
+
+    return clean_text
+
+
 def index():
     """
     Main route for the agent interface using agno framework.
@@ -128,10 +150,17 @@ def index():
                     if hasattr(response, "content"):
                         response = response.content
 
+                    # Remove thinking tags from response to prevent HTML styling
+                    if response:
+                        response = remove_thinking_tags(str(response))
+
                     if logger:
                         logger.info(
                             f"Agno agent response received: '{str(response)[:100]}{'...' if len(str(response)) > 100 else ''}'"
                         )
+
+                    # Remove thinking tags from the response
+                    response = remove_thinking_tags(response)
 
                 except Exception as e:
                     if logger:
@@ -147,7 +176,7 @@ def index():
     return render_template_string(
         get_main_template(),
         response=response,
-        show_memory_status=is_weaviate_connected(),
+        show_memory_status=is_memory_available(),
         use_mcp=USE_MCP,
     )
 
@@ -389,11 +418,11 @@ def get_main_template():
             </div>
             {% if show_memory_status %}
                 <div class="status-indicator status-connected">
-                    🧠 Memory Connected
+                    🧠 Agno Memory Active
                 </div>
             {% else %}
                 <div class="status-indicator status-disconnected">
-                    🧠 Memory Disabled
+                    🧠 Memory Unavailable
                 </div>
             {% endif %}
             {% if use_mcp %}
