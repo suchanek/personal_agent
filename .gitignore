@@ -186,3 +186,4 @@ weaviate_data/
 data/
 .DS_Store
 src/personal_agent/streamlit/app.py
+tmp/local_agents.db

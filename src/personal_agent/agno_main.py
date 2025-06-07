@@ -9,6 +9,7 @@ database dependencies entirely.
 # pylint: disable=C0415, C0301, W0718, W0603
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -23,9 +24,13 @@ from agno.vectordb.lancedb import LanceDb
 from agno.vectordb.search import SearchType
 
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.github import GithubTools
 from agno.tools.mcp import MCPTools
 from agno.tools.yfinance import YFinanceTools
 from agno.tools.youtube import YouTubeTools
+
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 from .agents.ollama_agents import finance_agent, web_agent, youtube_agent
 
@@ -37,6 +42,78 @@ from .utils import register_cleanup_handlers, setup_logging
 
 # Import agno web interface
 from .web.agno_interface import create_app, register_routes
+
+
+async def create_filesystem_mcp_tools(root_path: str = None) -> Optional[MCPTools]:
+    """
+    Create filesystem MCP tools with proper session management.
+    
+    This function demonstrates how to properly initialize MCPTools with a session.
+    Based on the pattern from file_agent.py.
+    
+    Args:
+        root_path: Root directory for filesystem operations (defaults to current working directory)
+        
+    Returns:
+        Initialized MCPTools instance or None if initialization fails
+    """
+    if root_path is None:
+        root_path = str(Path.cwd())
+        
+    try:
+        server_params = StdioServerParameters(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", root_path],
+        )
+
+        # Create client session
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                # Initialize MCP toolkit
+                mcp_tools = MCPTools(session=session)
+                await mcp_tools.initialize()
+                return mcp_tools
+                
+    except Exception as e:
+        if logger:
+            logger.error("Failed to create filesystem MCP tools: %s", e)
+        return None
+
+
+async def create_github_mcp_tools() -> Optional[MCPTools]:
+    """
+    Create GitHub MCP tools with proper session management.
+    
+    This function demonstrates how to properly initialize GitHub MCPTools with a session.
+    Based on the pattern from github_agents.py.
+    
+    Returns:
+        Initialized MCPTools instance or None if initialization fails
+    """
+    if not os.getenv("GITHUB_TOKEN"):
+        if logger:
+            logger.warning("GITHUB_TOKEN not set, cannot create GitHub MCP tools")
+        return None
+        
+    try:
+        server_params = StdioServerParameters(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-github"],
+        )
+
+        # Create client session
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                # Initialize MCP toolkit
+                mcp_tools = MCPTools(session=session)
+                await mcp_tools.initialize()
+                return mcp_tools
+                
+    except Exception as e:
+        if logger:
+            logger.error("Failed to create GitHub MCP tools: %s", e)
+        return None
+
 
 # Global variables for cleanup
 agno_agent: Optional[Agent] = None
@@ -127,24 +204,9 @@ async def initialize_agno_system():
     )
     logger.info("Initialized SQLite agent storage")
 
-    # 4. Initialize native Agno MCP Tools (simplified approach)
-    logger.info("Initializing MCP tools using Agno's native MCPTools...")
-
-    mcp_tools_list = []
-
-    # Create a basic filesystem MCP tools instance
-    # This demonstrates the integration pattern without complex session management
-    try:
-        filesystem_mcp = MCPTools()
-        mcp_tools_list.append(filesystem_mcp)
-        logger.info("Added filesystem MCP tool")
-    except Exception as e:
-        logger.warning("Failed to create filesystem MCP tool: %s", e)
-
-    if mcp_tools_list:
-        logger.info("Total MCP tools loaded: %d", len(mcp_tools_list))
-    else:
-        logger.warning("No MCP tools loaded, agent will run without them")
+    # 4. MCP Tools are created on-demand with proper sessions
+    # See file_agent.py and github_agents.py for examples of session-based MCP tools
+    logger.info("MCP tools will be initialized on-demand with proper sessions when needed")
 
     agno_tools = [
         DuckDuckGoTools(),
@@ -155,10 +217,11 @@ async def initialize_agno_system():
             company_news=True,
         ),
         YouTubeTools(),
+        GithubTools(access_token=os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN", None)),
     ]
-
-    # Add MCP tools to the tools list
-    all_tools = agno_tools + mcp_tools_list
+    
+    # Use agno_tools directly (MCP tools created on-demand with sessions)
+    all_tools = agno_tools
 
     # 4. Create the Native Agno Agent
     agno_agent = Agent(
@@ -177,8 +240,8 @@ async def initialize_agno_system():
         role="Personal AI Assistant",
         memory=memory,
         enable_agentic_memory=False,  # Disabled for simplicity,
-        enable_user_memories=False,  # Disabled for simplicity
-        enable_session_summaries=False,  # Disabled to prevent hanging
+        enable_user_memories=True,  # Disabled for simplicity
+        enable_session_summaries=True,  # Disabled to prevent hanging
         add_memory_references=True,
         add_session_summary_references=False,  # Disabled to prevent hanging
         # Knowledge capabilities
