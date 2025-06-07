@@ -271,7 +271,7 @@ async def initialize_agno_system():
         add_history_to_messages=True,
         num_history_runs=3,
         add_name_to_instructions=True,
-        team=[web_agent, finance_agent, youtube_agent],  # Example agents
+        team=[finance_agent, youtube_agent],  # Example agents
     )
 
     logger.info(

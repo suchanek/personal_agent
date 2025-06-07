@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.4.1"
+version = "0.4.2"
 description = "Personal AI agent with MCP, SQLite memory, and LanceDB vector storage"
 authors = ["Eric G. Suchanek, PhD <suchanek@mac.com>"]
 
