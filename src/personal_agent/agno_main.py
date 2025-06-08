@@ -81,7 +81,7 @@ async def initialize_agno_system():
         """Query the knowledge base using the agno agent."""
         if not agno_agent:
             return "Agent not initialized"
-        logger
+        logger.info("Querying knowledge base: %s", query)
         return await agno_agent.run(f"Search my knowledge base for: {query}")
 
     async def store_interaction(query: str, response: str) -> bool:

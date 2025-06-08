@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from ..core.memory import WeaviateVectorStore
 
 # These will be injected by the main module
-USE_MCP = False
-USE_WEAVIATE = False
+USE_MCP = True
+USE_WEAVIATE = True
 mcp_client: "SimpleMCPClient" = None
 vector_store: "WeaviateVectorStore" = None
 store_interaction = None

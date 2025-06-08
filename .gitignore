@@ -184,3 +184,5 @@ cython_debug/
 # Weaviate database files (should be stored in ~/weaviate_data outside repo)
 weaviate_data/
 .DS_Store
+data/
+
