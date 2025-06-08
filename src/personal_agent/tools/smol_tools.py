@@ -245,14 +245,19 @@ def _sanitize_github_output(result: str) -> str:
 @tool
 def github_search_repositories(query: str, repo: str = "") -> str:
     """
-    Search GitHub repositories or specific repo for code, issues, or documentation.
+    Search GitHub repositories or get detailed repository information.
+
+    This tool can:
+    - Search for repositories globally
+    - Get comprehensive information about a specific repository
+    - Search within a specific repository for code, issues, or PRs
 
     Args:
-        query: Search query
-        repo: Optional specific repository to search within
+        query: Search query or "info" for repository details
+        repo: Optional specific repository in format "owner/repo"
 
     Returns:
-        str: Search results or error description
+        str: Search results or repository information
     """
     if not _mcp_client:
         return "Error: MCP client not initialized"
@@ -266,45 +271,55 @@ def github_search_repositories(query: str, repo: str = "") -> str:
             if not start_result:
                 return "Failed to start MCP GitHub server. Make sure GITHUB_PERSONAL_ACCESS_TOKEN is set."
 
-        # Determine which search tool to use based on query characteristics
-        tool_name = "search_repositories"  # Default
-        params = {}
+        # If query is "info" or similar, provide comprehensive repository info
+        if repo and query.lower() in [
+            "info",
+            "information",
+            "about",
+            "details",
+            "tell me about",
+        ]:
+            return _get_repository_info(server_name, repo)
 
-        # If searching within a specific repo, use search_code for code-specific queries
-        if repo and any(
-            keyword in query.lower()
-            for keyword in [
-                "language:",
-                "def ",
-                "class ",
-                "function",
-                "import ",
-                "const ",
-                "var ",
-            ]
-        ):
-            tool_name = "search_code"
-            params = {"q": f"repo:{repo} {query}"}
-        elif any(
-            keyword in query.lower()
-            for keyword in ["issue", "bug", "feature", "pull request", "pr"]
-        ):
-            tool_name = "search_issues"
-            if repo:
-                params = {"q": f"repo:{repo} {query}"}
+        # Use the correct tools based on available MCP server capabilities
+        if repo:
+            # Search within specific repository
+            if any(
+                keyword in query.lower()
+                for keyword in [
+                    "code",
+                    "function",
+                    "class",
+                    "import",
+                    "def ",
+                    "const ",
+                    "var ",
+                ]
+            ):
+                # Use search_code for code-specific queries
+                result = _mcp_client.call_tool_sync(
+                    server_name, "search_code", {"q": f"repo:{repo} {query}"}
+                )
+            elif any(
+                keyword in query.lower()
+                for keyword in ["issue", "bug", "feature", "pull request", "pr"]
+            ):
+                # Use search_issues for issue-related queries
+                result = _mcp_client.call_tool_sync(
+                    server_name, "search_issues", {"q": f"repo:{repo} {query}"}
+                )
             else:
-                params = {"q": query}
+                # Default to repository search with repo filter
+                result = _mcp_client.call_tool_sync(
+                    server_name,
+                    "search_repositories",
+                    {"query": f"repo:{repo} {query}"},
+                )
         else:
-            # Default repository search
-            if repo:
-                params = {"query": f"repo:{repo} {query}"}
-            else:
-                params = {"query": query}
-
-        logger.debug("Using GitHub tool: %s with params: %s", tool_name, params)
-
-        # Call the appropriate GitHub search tool
-        result = _mcp_client.call_tool_sync(server_name, tool_name, params)
+            # General repository search
+            result = _mcp_client.call_tool_sync(
+                server_name, "search_repositories", {"query": query}
+            )
 
         # Sanitize the result
         result = _sanitize_github_output(result)
@@ -324,6 +339,120 @@ def github_search_repositories(query: str, repo: str = "") -> str:
     except Exception as e:
         logger.error("Error in github_search_repositories: %s", e)
         return f"Error searching GitHub: {str(e)}"
+
+
+@tool
+def github_repository_info(repository: str) -> str:
+    """
+    Get comprehensive information about a GitHub repository.
+
+    This tool provides detailed information about a repository including:
+    - Basic repository details from search
+    - README content
+    - Repository structure
+    - Recent commits and activity
+
+    Args:
+        repository: Repository in format "owner/repo" (e.g., "microsoft/vscode")
+
+    Returns:
+        str: Comprehensive repository information
+    """
+    if not _mcp_client:
+        return "Error: MCP client not initialized"
+
+    try:
+        server_name = "github"
+
+        # Start GitHub server if not already running
+        if server_name not in _mcp_client.active_servers:
+            start_result = _mcp_client.start_server_sync(server_name)
+            if not start_result:
+                return "Failed to start MCP GitHub server. Make sure GITHUB_PERSONAL_ACCESS_TOKEN is set."
+
+        return _get_repository_info(server_name, repository)
+
+    except Exception as e:
+        logger.error("Error in github_repository_info: %s", e)
+        return f"Error getting repository info for {repository}: {str(e)}"
+
+
+def _get_repository_info(server_name: str, repository: str) -> str:
+    """
+    Get comprehensive information about a GitHub repository.
+
+    :param server_name: MCP server name
+    :param repository: Repository in format "owner/repo"
+    :return: Comprehensive repository information
+    """
+    try:
+        # Parse repository
+        if "/" not in repository:
+            return "Error: Repository must be in format 'owner/repo'"
+
+        owner, repo = repository.split("/", 1)
+        info_parts = []
+
+        # 1. Get repository search results for basic info
+        try:
+            search_result = _mcp_client.call_tool_sync(
+                server_name, "search_repositories", {"query": f"repo:{repository}"}
+            )
+            info_parts.append(f"## Repository Info\n{search_result}\n")
+        except Exception as e:
+            info_parts.append(f"⚠️ Could not get repository info: {e}\n")
+
+        # 2. Get README content
+        try:
+            readme_result = _mcp_client.call_tool_sync(
+                server_name,
+                "get_file_contents",
+                {"owner": owner, "repo": repo, "path": "README.md"},
+            )
+            info_parts.append(f"## README\n{readme_result}\n")
+        except Exception:
+            # Try other README formats
+            for readme_name in ["readme.md", "README.rst", "readme.txt", "README"]:
+                try:
+                    readme_result = _mcp_client.call_tool_sync(
+                        server_name,
+                        "get_file_contents",
+                        {"owner": owner, "repo": repo, "path": readme_name},
+                    )
+                    info_parts.append(f"## README ({readme_name})\n{readme_result}\n")
+                    break
+                except:
+                    continue
+            else:
+                info_parts.append("⚠️ No README file found\n")
+
+        # 3. Get root directory structure
+        try:
+            root_contents = _mcp_client.call_tool_sync(
+                server_name,
+                "get_file_contents",
+                {"owner": owner, "repo": repo, "path": ""},
+            )
+            info_parts.append(f"## Repository Structure\n{root_contents}\n")
+        except Exception as e:
+            info_parts.append(f"⚠️ Could not get repository structure: {e}\n")
+
+        # 4. Get recent commits (optional, for activity info)
+        try:
+            commits_result = _mcp_client.call_tool_sync(
+                server_name,
+                "list_commits",
+                {"owner": owner, "repo": repo, "perPage": 5},
+            )
+            info_parts.append(f"## Recent Activity\n{commits_result}\n")
+        except Exception:
+            # Don't fail if commits can't be retrieved
+            pass
+
+        return "\n".join(info_parts)
+
+    except Exception as e:
+        return f"Error getting repository info: {str(e)}"
 
 
 # Memory Tools
@@ -573,6 +702,7 @@ ALL_TOOLS = [
     mcp_create_directory,
     web_search,
     github_search_repositories,
+    github_repository_info,
     store_interaction,
     query_knowledge_base,
     clear_knowledge_base,
