@@ -30,16 +30,16 @@ def create_smolagents_executor(
     vector_store=None,
     tools: Optional[List] = None,
     model: Optional[LiteLLMModel] = None,
-) -> ToolCallingAgent:
+) -> CodeAgent:
     """
-    Create smolagents ToolCallingAgent with all tools and dependencies.
+    Create smolagents CodeAgent with all tools and dependencies.
 
     :param mcp_client: MCP client instance for tool functionality
     :param weaviate_client: Weaviate client for memory functionality
     :param vector_store: Vector store for memory operations
     :param tools: Optional custom list of tools (uses ALL_TOOLS by default)
     :param model: Optional LiteLLM model instance
-    :return: Configured ToolCallingAgent
+    :return: Configured CodeAgent
     """
     if model is None:
         model = create_smolagents_model()
@@ -57,7 +57,6 @@ def create_smolagents_executor(
     if tools is None:
         tools = ALL_TOOLS
 
-    agent = ToolCallingAgent(tools=tools, model=model)
-    # agent = CodeAgent(tools=tools, model=model)
+    agent = CodeAgent(tools=tools, model=model)
     logger.info("Created smolagents CodeAgent with %d tools", len(tools))
     return agent
