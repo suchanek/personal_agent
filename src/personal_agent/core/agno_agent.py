@@ -277,7 +277,7 @@ class AgnoPersonalAgent:
             # Create model
             model = self._create_model()
             logger.info("Created model: %s", self.model_name)
-
+            knowledge = None
             # Prepare tools list starting with ReasoningTools
             tools = []
 
@@ -310,6 +310,10 @@ class AgnoPersonalAgent:
                 show_tool_calls=self.debug,
                 add_history_to_messages=True,  # Enable conversation history
                 num_history_responses=5,  # Keep last 5 exchanges in context
+                # Knowledge capabilities
+                knowledge=knowledge,
+                search_knowledge=False if knowledge else False,
+                add_references=False if knowledge else False,
             )
 
             logger.info(
@@ -444,7 +448,7 @@ async def create_agno_agent(
     vector_store=None,
     model_provider: str = "ollama",
     model_name: str = "qwen2.5:7b-instruct",
-    debug: bool = False,
+    debug: bool = True,
 ) -> AgnoPersonalAgent:
     """
     Create and initialize an agno-based personal agent.
@@ -476,8 +480,8 @@ async def create_agno_agent(
     return agent
 
 
-# Synchronous wrapper for compatibility
-def create_agno_agent_sync(
+# ASynchronous wrapper for compatibility
+async def create_agno_agent_sync(
     weaviate_client=None,
     vector_store=None,
     model_provider: str = "ollama",

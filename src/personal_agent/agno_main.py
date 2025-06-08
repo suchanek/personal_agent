@@ -35,6 +35,7 @@ from .agents.ollama_agents import finance_agent, web_agent, youtube_agent
 
 # Import configuration
 from .config.settings import LLM_MODEL
+from .core.agno_agent import create_agno_agent
 
 # Import utilities
 from .utils import register_cleanup_handlers, setup_logging
@@ -225,45 +226,7 @@ async def initialize_agno_system():
     all_tools = agno_tools
 
     # 4. Create the Native Agno Agent
-    agno_agent = Agent(
-        name="Personal AI Assistant",
-        model=model,
-        description="A sophisticated personal assistant with persistent memory and knowledge capabilities",
-        instructions=[
-            "You are a helpful personal assistant with persistent memory and knowledge.",
-            "Use your memory system to remember important information about users and conversations.",
-            "Search your knowledge base to provide informed responses based on stored facts.",
-            "When users ask about their past interactions, search your memory to provide accurate information.",
-            "Store important facts, preferences, and context for future reference.",
-            "All your data is stored locally using SQLite and LanceDB for maximum privacy and reliability.",
-        ],
-        # Memory capabilities
-        role="Personal AI Assistant",
-        memory=memory,
-        enable_agentic_memory=False,  # Disabled for simplicity,
-        enable_user_memories=True,  # Disabled for simplicity
-        enable_session_summaries=True,  # Disabled to prevent hanging
-        add_memory_references=True,
-        add_session_summary_references=False,  # Disabled to prevent hanging
-        # Knowledge capabilities
-        knowledge=knowledge,
-        search_knowledge=False if knowledge else False,
-        add_references=False if knowledge else False,
-        # Session management
-        storage=storage,
-        # Tool integration
-        tools=all_tools,
-        show_tool_calls=True,
-        # Enhanced features
-        add_datetime_to_instructions=True,
-        read_chat_history=True,
-        markdown=True,
-        debug_mode=True,
-        add_history_to_messages=True,
-        num_history_runs=3,
-        add_name_to_instructions=True,
-        team=[finance_agent, youtube_agent],  # Example agents
-    )
+    agno_agent = await create_agno_agent()
 
     logger.info(
         "✅ SQLite + LanceDB agent created: memory=%s, knowledge=%s, storage=%s, tools=%d",

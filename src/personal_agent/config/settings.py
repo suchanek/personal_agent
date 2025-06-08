@@ -28,6 +28,7 @@ def get_env_var(key: str, fallback: str = "") -> str:
 # Configuration constants
 OLLAMA_URL = "http://localhost:11434"
 USE_MCP = True  # Set to False to bypass MCP for testing
+USE_WEAVIATE = False
 
 ROOT_DIR = get_env_var("ROOT_DIR", ".")  # Root directory for MCP filesystem server
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory

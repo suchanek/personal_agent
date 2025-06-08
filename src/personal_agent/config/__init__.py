@@ -8,6 +8,7 @@ from .settings import (
     OLLAMA_URL,
     ROOT_DIR,
     USE_MCP,
+    USE_WEAVIATE,
     get_env_var,
 )
 
@@ -23,6 +24,7 @@ def get_settings():
         "USE_MCP": USE_MCP,
         "LOG_LEVEL": LOG_LEVEL,
         "MCP_SERVERS": MCP_SERVERS,
+        "USE_WEAVIATE": USE_WEAVIATE,
         "get_env_var": get_env_var,
         "get_settings": get_settings,
     }
