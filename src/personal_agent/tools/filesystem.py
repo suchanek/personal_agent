@@ -16,8 +16,9 @@ USE_WEAVIATE = True
 mcp_client: "SimpleMCPClient" = None
 vector_store: "WeaviateVectorStore" = None
 store_interaction = None
-ROOT_DIR = ""
-DATA_DIR = ""
+
+from ..config import DATA_DIR, HOME_DIR, USE_WEAVIATE
+
 logger = None
 
 
@@ -37,7 +38,14 @@ def mcp_read_file(file_path: str) -> str:
 
     try:
         # Determine which server to use based on path
-        server_name = "filesystem-home"
+        server_name = "filesystem-home"  # Default to home directory access
+
+        # Choose server based on path and desired access level
+        if file_path.startswith(DATA_DIR + "/") or file_path.startswith("data/"):
+            server_name = "filesystem-data"
+        elif file_path.startswith("/") and not file_path.startswith(HOME_DIR):
+            # Use root server for paths outside home directory
+            server_name = "filesystem-root"
 
         # Start filesystem server if not already running
         if server_name not in mcp_client.active_servers:
@@ -45,21 +53,32 @@ def mcp_read_file(file_path: str) -> str:
             if not start_result:
                 return "Failed to start MCP filesystem server."
 
-        # Convert absolute paths to relative paths for the restricted root
-        # The server root is ROOT_DIR, so we need to make paths relative to that
-        if file_path == ROOT_DIR:
-            file_path = "."  # Root directory (though reading a directory as file will likely fail)
-        elif file_path.startswith(ROOT_DIR + "/"):
-            file_path = file_path[len(ROOT_DIR) + 1 :]  # Remove ROOT_DIR prefix
-        elif file_path.startswith("~/"):
-            file_path = file_path[2:]  # Remove "~/" prefix
-        elif file_path.startswith("/"):
-            # If it's an absolute path outside home, we can't access it
-            return f"Error: Path {file_path} is outside the accessible directory ({ROOT_DIR})"
+        # Store original path for logging
+        original_path = file_path
 
-        # Ensure path doesn't start with / for relative paths
-        if file_path.startswith("/"):
-            file_path = file_path[1:]
+        # Expand ~ to actual home directory if needed
+        if file_path.startswith("~/"):
+            file_path = os.path.expanduser(file_path)
+
+        # Convert relative paths to absolute paths
+        if not file_path.startswith("/"):
+            file_path = os.path.abspath(file_path)
+
+        # Validate path access based on server type
+        if server_name == "filesystem-home":
+            # Server allows access to HOME_DIR and subdirectories
+            if not file_path.startswith(HOME_DIR):
+                return f"Error: Path {file_path} is outside the accessible home directory ({HOME_DIR}). Use filesystem-root for full system access."
+        elif server_name == "filesystem-data":
+            # Server allows access to DATA_DIR and subdirectories
+            if not file_path.startswith(DATA_DIR):
+                return f"Error: Path {file_path} is outside the accessible data directory ({DATA_DIR})"
+        elif server_name == "filesystem-root":
+            # Full filesystem access - validate it's an absolute path
+            if not file_path.startswith("/"):
+                return f"Error: Path {file_path} must be an absolute path for root filesystem access"
+
+        # Use absolute path directly - MCP servers expect absolute paths!
 
         logger.debug(
             "Calling read_file with path: %s on server: %s", file_path, server_name
@@ -144,14 +163,19 @@ def mcp_write_file(file_path: str, content: str = None) -> str:
         # Store original path for logging
         original_path = file_path
 
-        # Expand ~ to actual path first
+        # Expand ~ to actual home directory if needed
         if file_path.startswith("~/"):
             file_path = os.path.expanduser(file_path)
 
         # Determine which server to use based on path
-        server_name = "filesystem-home"
+        server_name = "filesystem-home"  # Default to home directory access
+
+        # Choose server based on path and desired access level
         if file_path.startswith(DATA_DIR + "/") or file_path.startswith("data/"):
             server_name = "filesystem-data"
+        elif file_path.startswith("/") and not file_path.startswith(HOME_DIR):
+            # Use root server for paths outside home directory
+            server_name = "filesystem-root"
 
         # Start filesystem server if not already running
         if server_name not in mcp_client.active_servers:
@@ -159,42 +183,34 @@ def mcp_write_file(file_path: str, content: str = None) -> str:
             if not start_result:
                 return "Failed to start MCP filesystem server."
 
-        # Convert absolute paths to relative paths for the restricted root
-        if server_name == "filesystem-home":
-            # The server root is ROOT_DIR
-            if file_path == ROOT_DIR:
-                return "Error: Cannot write to root directory as a file"
-            elif file_path.startswith(ROOT_DIR + "/"):
-                file_path = file_path[
-                    len(ROOT_DIR + "/") :
-                ]  # Remove ROOT_DIR prefix properly
-            elif file_path.startswith("/"):
-                return f"Error: Path {file_path} is outside the accessible directory ({ROOT_DIR})"
-        else:  # filesystem-data
-            # The server root is DATA_DIR
-            if file_path.startswith(DATA_DIR + "/"):
-                file_path = file_path[len(DATA_DIR + "/") :]  # Remove data dir prefix
-            elif file_path.startswith("data/"):
-                file_path = file_path[5:]  # Remove "data/" prefix
+        # Convert relative paths to absolute paths
+        if not file_path.startswith("/"):
+            file_path = os.path.abspath(file_path)
 
-        # Ensure path doesn't start with / for relative paths
-        if file_path.startswith("/"):
-            file_path = file_path[1:]
+        # Validate path access based on server type
+        if server_name == "filesystem-home":
+            # Server allows access to HOME_DIR and subdirectories
+            if not file_path.startswith(HOME_DIR):
+                return f"Error: Path {file_path} is outside the accessible home directory ({HOME_DIR}). Use filesystem-root for full system access."
+        elif server_name == "filesystem-data":
+            # Server allows access to DATA_DIR and subdirectories
+            if not file_path.startswith(DATA_DIR):
+                return f"Error: Path {file_path} is outside the accessible data directory ({DATA_DIR})"
+        elif server_name == "filesystem-root":
+            # Full filesystem access - validate it's an absolute path
+            if not file_path.startswith("/"):
+                return f"Error: Path {file_path} must be an absolute path for root filesystem access"
 
         # Create directory structure if it doesn't exist
         dir_path = os.path.dirname(file_path)
-        if dir_path:
-            full_dir_path = os.path.join(
-                ROOT_DIR if server_name == "filesystem-home" else DATA_DIR, dir_path
-            )
-            if not os.path.exists(full_dir_path):
-                try:
-                    os.makedirs(full_dir_path, exist_ok=True)
-                    logger.info("Created directory structure: %s", full_dir_path)
-                except Exception as e:
-                    logger.warning(
-                        "Could not create directory %s: %s", full_dir_path, e
-                    )
+        if dir_path and not os.path.exists(dir_path):
+            try:
+                os.makedirs(dir_path, exist_ok=True)
+                logger.info("Created directory structure: %s", dir_path)
+            except Exception as e:
+                logger.warning("Could not create directory %s: %s", dir_path, e)
+
+        # Use absolute path directly - MCP servers expect absolute paths!
 
         logger.debug(
             "Calling write_file with original path: %s, converted path: %s on server: %s",
@@ -239,11 +255,16 @@ def mcp_list_directory(directory_path: str) -> str:
 
     try:
         # Determine which server to use based on path
-        server_name = "filesystem-home"
+        server_name = "filesystem-home"  # Default to home directory access
+
+        # Choose server based on path and desired access level
         if directory_path.startswith(DATA_DIR + "/") or directory_path.startswith(
             "data/"
         ):
             server_name = "filesystem-data"
+        elif directory_path.startswith("/") and not directory_path.startswith(HOME_DIR):
+            # Use root server for paths outside home directory
+            server_name = "filesystem-root"
 
         # Start filesystem server if not already running
         if server_name not in mcp_client.active_servers:
@@ -251,41 +272,32 @@ def mcp_list_directory(directory_path: str) -> str:
             if not start_result:
                 return "Failed to start MCP filesystem server."
 
-        # Convert absolute paths to relative paths for the restricted root
-        original_path = directory_path  # Keep for logging
+        # Store original path for logging
+        original_path = directory_path
 
+        # Expand ~ to actual home directory if needed
+        if directory_path.startswith("~"):
+            directory_path = os.path.expanduser(directory_path)
+
+        # Convert relative paths to absolute paths
+        if not directory_path.startswith("/"):
+            directory_path = os.path.abspath(directory_path)
+
+        # Validate path access based on server type
         if server_name == "filesystem-home":
-            # The server root is ROOT_DIR
-            if directory_path in [ROOT_DIR, ROOT_DIR, "~", "$HOME"]:
-                directory_path = "."  # Root directory
-            elif directory_path.startswith(ROOT_DIR + "/"):
-                directory_path = directory_path[
-                    len(ROOT_DIR + "/") :
-                ]  # Remove ROOT_DIR prefix
-                if not directory_path:  # If empty after removing prefix
-                    directory_path = "."
-            elif directory_path.startswith("~/"):
-                directory_path = directory_path[2:]  # Remove "~/" prefix
-            elif directory_path.startswith("/"):
-                return f"Error: Path {directory_path} is outside the accessible directory ({ROOT_DIR})"
-        else:  # filesystem-data
-            # The server root is DATA_DIR
-            if directory_path.startswith(DATA_DIR + "/"):
-                directory_path = directory_path[
-                    len(DATA_DIR + "/") :
-                ]  # Remove data dir prefix
-                if not directory_path:  # If empty after removing prefix
-                    directory_path = "."
-            elif directory_path.startswith("data/"):
-                directory_path = directory_path[5:]  # Remove "data/" prefix
+            # Server allows access to HOME_DIR and subdirectories
+            if not directory_path.startswith(HOME_DIR):
+                return f"Error: Path {directory_path} is outside the accessible home directory ({HOME_DIR}). Use filesystem-root for full system access."
+        elif server_name == "filesystem-data":
+            # Server allows access to DATA_DIR and subdirectories
+            if not directory_path.startswith(DATA_DIR):
+                return f"Error: Path {directory_path} is outside the accessible data directory ({DATA_DIR})"
+        elif server_name == "filesystem-root":
+            # Full filesystem access - validate it's an absolute path
+            if not directory_path.startswith("/"):
+                return f"Error: Path {directory_path} must be an absolute path for root filesystem access"
 
-        # Ensure path doesn't start with / for relative paths, but handle root directory
-        if directory_path.startswith("/"):
-            directory_path = directory_path[1:]
-
-        # If path is empty after processing, it means we want the root directory
-        if not directory_path:
-            directory_path = "."
+        # Use absolute path directly - MCP servers expect absolute paths!
 
         logger.debug(
             "Original path: %s, Converted path: %s, Server: %s",

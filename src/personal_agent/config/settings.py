@@ -31,8 +31,12 @@ OLLAMA_URL = "http://localhost:11434"
 USE_WEAVIATE = True  # Set to False to bypass Weaviate for testing
 USE_MCP = True  # Set to False to bypass MCP for testing
 
-ROOT_DIR = get_env_var("ROOT_DIR", ".")  # Root directory for MCP filesystem server
+ROOT_DIR = get_env_var(
+    "ROOT_DIR", "/"
+)  # Root directory for MCP filesystem server (full access)
+HOME_DIR = get_env_var("HOME_DIR", os.path.expanduser("~"))  # User's home directory
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
+REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
 
 LOG_LEVEL = logging.INFO
 

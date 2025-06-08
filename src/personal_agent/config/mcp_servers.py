@@ -2,14 +2,14 @@
 
 from typing import Any, Dict
 
-from .settings import DATA_DIR, ROOT_DIR, get_env_var
+from .settings import DATA_DIR, HOME_DIR, ROOT_DIR, get_env_var
 
 # MCP Server configurations
 MCP_SERVERS = {
     "filesystem-home": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
-        "description": "Access home directory filesystem operations",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", HOME_DIR],
+        "description": "Access user's home directory filesystem operations",
     },
     "filesystem-data": {
         "command": "npx",
@@ -18,8 +18,8 @@ MCP_SERVERS = {
     },
     "filesystem-root": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
-        "description": "Access root directory filesystem operations",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
+        "description": "Access full filesystem operations (root access)",
     },
     "github": {
         "command": "npx",

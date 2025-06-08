@@ -3,9 +3,11 @@
 from .mcp_servers import MCP_SERVERS, get_mcp_servers
 from .settings import (
     DATA_DIR,
+    HOME_DIR,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
+    REPO_DIR,
     ROOT_DIR,
     USE_MCP,
     USE_WEAVIATE,
@@ -19,7 +21,9 @@ def get_settings():
     """Get configuration settings as a dictionary."""
     return {
         "ROOT_DIR": ROOT_DIR,
+        "HOME_DIR": HOME_DIR,
         "DATA_DIR": DATA_DIR,
+        "REPO_DIR": REPO_DIR,
         "WEAVIATE_URL": WEAVIATE_URL,
         "OLLAMA_URL": OLLAMA_URL,
         "LLM_MODEL": LLM_MODEL,
