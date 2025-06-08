@@ -8,32 +8,17 @@ from .settings import DATA_DIR, ROOT_DIR, get_env_var
 MCP_SERVERS = {
     "filesystem-home": {
         "command": "npx",
-        "args": [
-            "-y",
-            "@modelcontextprotocol/server-filesystem",
-            "--allowed-directories",
-            ROOT_DIR,
-        ],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", ROOT_DIR],
         "description": "Access home directory filesystem operations",
     },
     "filesystem-data": {
         "command": "npx",
-        "args": [
-            "-y",
-            "@modelcontextprotocol/server-filesystem",
-            "--allowed-directories",
-            DATA_DIR,
-        ],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", DATA_DIR],
         "description": "Access data directory for vector database",
     },
     "filesystem-root": {
         "command": "npx",
-        "args": [
-            "-y",
-            "@modelcontextprotocol/server-filesystem",
-            "--allowed-directories",
-            "/",
-        ],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
         "description": "Access root directory filesystem operations",
     },
     "github": {

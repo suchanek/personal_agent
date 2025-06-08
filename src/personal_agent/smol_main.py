@@ -169,5 +169,73 @@ def run_smolagents_web():
     app.run(host="127.0.0.1", port=5001, debug=False)
 
 
+def run_smolagents_cli():
+    """
+    Run smolagents agent in CLI mode with interactive chat.
+
+    :return: None
+    """
+    print("\n🤖 Personal AI Agent - Smolagents CLI Mode")
+    print("=" * 50)
+
+    # Initialize system
+    multi_agent, single_agent, query_kb, store_int, clear_kb = (
+        initialize_smolagents_system()
+    )
+
+    if not multi_agent:
+        print("❌ Failed to initialize agent system")
+        return
+
+    agent_info = multi_agent.get_agent_info()
+    print(f"✅ Agent initialized with specialists: {list(agent_info.keys())}")
+    print("\nEnter your queries (type 'quit' to exit):")
+
+    try:
+        while True:
+            query = input("\n👤 You: ").strip()
+            if query.lower() in ["quit", "exit", "q"]:
+                break
+
+            if not query:
+                continue
+
+            print("🤖 Assistant: ")
+            try:
+                # Use the multi-agent system to process the query
+                response = multi_agent.run(query)
+                print(response)
+
+                # Store interaction in memory
+                store_success = store_int(query, response)
+                if store_success:
+                    print("💾 Interaction stored in memory")
+
+            except Exception as e:
+                print(f"❌ Error: {e}")
+
+    except KeyboardInterrupt:
+        print("\n\n👋 Goodbye!")
+    finally:
+        # Cleanup would be handled by the cleanup handlers
+        print("🧹 Cleaning up...")
+
+
+def cli_main():
+    """
+    Main entry point for CLI mode (used by poetry scripts).
+
+    :return: None
+    """
+    run_smolagents_cli()
+
+
 if __name__ == "__main__":
-    run_smolagents_web()
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "cli":
+        # Run in CLI mode
+        run_smolagents_cli()
+    else:
+        # Run web interface
+        run_smolagents_web()
