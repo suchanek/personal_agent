@@ -204,6 +204,19 @@ For proper operation, you **must** configure filesystem paths and optionally set
    # Brave Search API Key  
    # Get from: https://api.search.brave.com/app/keys
    BRAVE_API_KEY=your_brave_api_key_here
+   
+   # MULTIMODAL AGENTS: API Keys for Media Generation
+   # ModelsLab API Key (for GIF, music, and video generation)
+   # Get from: https://modelslab.com/
+   MODELS_LAB_API_KEY=your_modelslab_api_key_here
+   
+   # ElevenLabs API Key (for text-to-speech audio generation)
+   # Get from: https://elevenlabs.io/
+   ELEVEN_LABS_API_KEY=your_elevenlabs_api_key_here
+   
+   # Giphy API Key (for GIF search and retrieval)
+   # Get from: https://developers.giphy.com/
+   GIPHY_API_KEY=your_giphy_api_key_here
    ```
 
 **Method 2: Export directly in terminal**
@@ -215,6 +228,11 @@ export ROOT_DIR="/Users/$(whoami)"
 # Optional API keys
 export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 export BRAVE_API_KEY="your_api_key_here"
+
+# Multimodal Agents API keys
+export MODELS_LAB_API_KEY="your_modelslab_api_key_here"
+export ELEVEN_LABS_API_KEY="your_elevenlabs_api_key_here"
+export GIPHY_API_KEY="your_giphy_api_key_here"
 ```
 
 ### 6. Test Installation
@@ -478,7 +496,7 @@ poetry run test-tools
 echo $ROOT_DIR
 
 # Verify .env file exists and has correct format
-cat .env | grep -E "(GITHUB|BRAVE)"
+cat .env | grep -E "(GITHUB|BRAVE|MODELS_LAB|ELEVEN_LABS|GIPHY)"
 ```
 
 ## ⚙️ Configuration
@@ -496,6 +514,11 @@ ROOT_DIR="/Users/your_username"        # Your home directory
 # Optional: API keys for enhanced functionality  
 export GITHUB_PERSONAL_ACCESS_TOKEN="your_token_here"
 export BRAVE_API_KEY="your_api_key_here"
+
+# Optional: Multimodal agents API keys for media generation
+export MODELS_LAB_API_KEY="your_modelslab_api_key_here"
+export ELEVEN_LABS_API_KEY="your_elevenlabs_api_key_here"
+export GIPHY_API_KEY="your_giphy_api_key_here"
 
 # Optional: Override default service URLs
 export OLLAMA_URL="http://localhost:11434"

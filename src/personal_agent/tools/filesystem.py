@@ -11,12 +11,10 @@ if TYPE_CHECKING:
 
 # These will be injected by the main module
 USE_MCP = True
-mcp_client: "SimpleMCPClient" = None
+mcp_client = None
 ROOT_DIR = ""
 DATA_DIR = ""
 logger = None
-
-
 
 
 @tool

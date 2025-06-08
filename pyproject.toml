@@ -43,6 +43,9 @@ weaviate-client = "^4.9.3"
 ollama = "^0.4.1"
 sqlalchemy = "^2.0.41"
 watchdog = "^6.0.0"
+elevenlabs = "^2.3.0"
+fal-client = "^0.7.0"
+psycopg = "^3.2.9"
 
 [tool.poetry.scripts]
 # Main entry points for Personal AI Agent (Streamlit-based system)
@@ -52,6 +55,8 @@ personal-agent-streamlit = "personal_agent.streamlit.main:streamlit_main"
 # Convenience aliases
 cli = "personal_agent.streamlit.main:cli_main"
 ocli = "personal_agent.agno_main:cli_main"
+# Agno framework agents
+agno-assist = "personal_agent.agents.agno_assist:main"
 # Setup and testing utilities
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"

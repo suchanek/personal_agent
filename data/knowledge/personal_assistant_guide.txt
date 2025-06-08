@@ -1,36 +1,118 @@
-Personal AI Assistant Knowledge Base
+Personal AI Assistant User Guide
 
-This is your personal AI assistant with advanced capabilities including:
+Welcome to your Personal AI Assistant! This guide will help you get the most out of your AI agent.
 
-1. Memory System
-- Persistent conversation memory using SQLite
-- Automatic storage of user interactions
-- Context retrieval from previous sessions
-- User preference and fact storage
+## Key Features
 
-2. Knowledge Base
-- Document-based knowledge retrieval
-- Weaviate vector search integration
-- Semantic search capabilities
-- Support for text and markdown files
+### 1. Persistent Memory
+Your assistant remembers:
+- Previous conversations and context
+- Your preferences and settings  
+- Important facts you've shared
+- Past decisions and outcomes
 
-3. MCP Tool Integration
-- Model Context Protocol (MCP) server support
-- File system operations
-- GitHub repository access
-- Web search capabilities
-- Custom tool development
+### 2. Knowledge Base
+- Stores and searches your documents
+- Supports text, markdown, and JSON files
+- Provides semantic search capabilities
+- Automatically indexes new content
 
-4. Advanced Features
-- Async operations for better performance
-- Streaming responses with real-time thoughts
-- Session management
+### 3. Integrated Tools
+- **File Operations**: Read, write, create, and manage files
+- **Web Search**: Find information from the internet
+- **GitHub Access**: Search repositories and access code
+- **System Commands**: Execute shell commands safely
+- **Research**: Comprehensive multi-source research
+- **Memory Management**: Store and retrieve facts
+
+### 4. Advanced Capabilities
+- Real-time streaming responses
+- Session state persistence
+- Multi-user support
 - Error handling and recovery
-- Web interface for easy interaction
+- Debug mode for troubleshooting
 
-Usage Guidelines:
-- Be helpful and informative
-- Use memory to provide personalized responses
-- Search knowledge base when relevant
-- Leverage available tools appropriately
-- Maintain conversation context
+## Getting Started
+
+### Basic Usage
+1. **Ask questions naturally** - your assistant understands context
+2. **Request tasks** - file operations, searches, research
+3. **Store information** - the assistant will remember important details
+4. **Build knowledge** - add documents to your knowledge base
+
+### Example Interactions
+- "Remember that my favorite programming language is Python"
+- "Search my files for any documents about machine learning"
+- "Research the latest developments in AI and summarize them"
+- "Create a new project structure for a web application"
+
+### File Management
+- Place documents in `data/knowledge/` for automatic indexing
+- Supports .txt, .md, and .json formats
+- Files are automatically processed and made searchable
+
+### Memory Features
+- Conversations are automatically saved
+- Important facts are extracted and stored
+- Context is maintained across sessions
+- User preferences are learned over time
+
+## Technical Information
+
+### Storage
+- **Memory**: SQLite database (`data/memory.db`)
+- **Sessions**: SQLite database (`data/agents.db`)
+- **Knowledge**: LanceDB vector database (`data/lancedb/`)
+- **Files**: Local directory (`data/knowledge/`)
+
+### Backup & Restore
+- Copy the entire `data/` directory to backup everything
+- Restore by placing the `data/` directory back
+- No external dependencies to manage
+
+### Privacy & Security
+- All data stored locally on your machine
+- No external database connections
+- No data sent to third parties (except for LLM inference)
+- Full control over your information
+
+## Tips & Best Practices
+
+### Effective Communication
+- Be specific about what you want
+- Provide context when starting new topics
+- Ask follow-up questions to dive deeper
+- Use the assistant's memory to your advantage
+
+### Knowledge Management
+- Regularly add important documents to your knowledge base
+- Use descriptive filenames for better organization
+- Keep documents focused and well-structured
+- Clean up outdated information periodically
+
+### Tool Usage
+- Try different tools for various tasks
+- Combine tools for complex workflows
+- Don't hesitate to ask for help with tool usage
+- Experiment with different approaches
+
+### Troubleshooting
+- Check the logs if something seems wrong
+- Use debug mode for detailed information
+- Restart the assistant if needed
+- Verify file permissions if file operations fail
+
+## Getting Help
+
+Your assistant is designed to be helpful and informative. If you need:
+- **Clarification**: Ask for more details or examples
+- **Guidance**: Request step-by-step instructions  
+- **Options**: Ask about different approaches to a problem
+- **Context**: Reference previous conversations or stored facts
+
+Remember: Your assistant learns and adapts to your preferences over time, so don't hesitate to provide feedback and guidance!
+
+---
+Created: 2025-06-07
+Version: Personal AI Agent v2.0
+Architecture: Agno + SQLite + LanceDB
