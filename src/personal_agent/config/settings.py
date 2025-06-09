@@ -37,6 +37,13 @@ OLLAMA_URL = get_env_var("OLLAMA_URL", "http://tesla.local:11434")
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", True)
 USE_MCP = get_env_bool("USE_MCP", True)
 
+# Storage backend configuration
+STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "weaviate")  # "weaviate" or "agno"
+
+# Agno Storage Configuration
+AGNO_STORAGE_DIR = get_env_var("AGNO_STORAGE_DIR", "./data/agno")
+AGNO_KNOWLEDGE_DIR = get_env_var("AGNO_KNOWLEDGE_DIR", "./data/knowledge")
+
 # Directory configurations
 ROOT_DIR = get_env_var("ROOT_DIR", "/")  # Root directory for MCP filesystem server
 HOME_DIR = get_env_var("HOME_DIR", os.path.expanduser("~"))  # User's home directory

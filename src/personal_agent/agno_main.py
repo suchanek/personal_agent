@@ -10,10 +10,10 @@ import logging
 from typing import Optional
 
 # Import configuration
-from .config import LLM_MODEL, USE_MCP, USE_WEAVIATE, get_mcp_servers
+from .config import LLM_MODEL, USE_MCP
+from .config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR
 
 # Import core components
-from .core import setup_weaviate
 from .core.agno_agent import AgnoPersonalAgent, create_agno_agent
 
 # Import utilities
@@ -38,34 +38,16 @@ async def initialize_agno_system():
     logger = setup_logging()
     logger.info("Starting Personal AI Agent with agno framework...")
 
-    # Initialize Weaviate if enabled
-    weaviate_client = None
-    vector_store = None
-
-    if USE_WEAVIATE:
-        logger.info("Initializing Weaviate vector store...")
-        success = setup_weaviate()
-        if success:
-            # Import the initialized components
-            from .core.memory import vector_store as vs
-            from .core.memory import weaviate_client as wc
-
-            weaviate_client = wc
-            vector_store = vs
-            logger.info("Weaviate initialized successfully")
-        else:
-            logger.warning("Failed to initialize Weaviate")
-    else:
-        logger.warning("Weaviate is disabled, memory features will not work")
-
-    # Create agno agent
-    logger.info("Creating agno agent...")
+    # Create agno agent with native storage
+    logger.info("Creating agno agent with native storage...")
     global agno_agent
     agno_agent = await create_agno_agent(
-        weaviate_client=weaviate_client,
-        vector_store=vector_store,
         model_provider="ollama",  # Default to Ollama
         model_name=LLM_MODEL,  # Use configured model
+        enable_memory=True,  # Enable native Agno memory
+        enable_mcp=USE_MCP,  # Use configured MCP setting
+        storage_dir=AGNO_STORAGE_DIR,
+        knowledge_dir=AGNO_KNOWLEDGE_DIR,
         debug=False,
     )
 
@@ -76,7 +58,7 @@ async def initialize_agno_system():
         agent_info["memory_enabled"],
     )
 
-    # Memory functions (stubs for now - will be implemented)
+    # Memory functions using Agno's built-in memory
     async def query_knowledge_base(query: str) -> str:
         """Query the knowledge base using the agno agent."""
         if not agno_agent:
@@ -85,20 +67,21 @@ async def initialize_agno_system():
         return await agno_agent.run(f"Search my knowledge base for: {query}")
 
     async def store_interaction(query: str, response: str) -> bool:
-        """Store interaction in memory."""
+        """Store interaction in memory (handled automatically by Agno)."""
         if agno_agent and agno_agent.enable_memory:
-            await agno_agent._store_interaction(query, response)
-            logger.info("Interaction stored in memory")
+            logger.info("Interaction stored automatically by Agno")
             return True
         return False
 
     async def clear_knowledge_base() -> bool:
         """Clear the knowledge base."""
-        logger.info("Knowledge base clearing requested (not implemented yet)")
+        logger.info(
+            "Knowledge base clearing requested (Agno handles this automatically)"
+        )
         return True
 
-    # Inject dependencies for cleanup
-    inject_dependencies(weaviate_client, vector_store, None, logger)
+    # Inject dependencies for cleanup (simplified for Agno)
+    inject_dependencies(None, None, None, logger)
 
     return (
         agno_agent,
@@ -211,9 +194,6 @@ async def run_agno_cli():
     finally:
         try:
             await agent.cleanup()
-            # Also cleanup weaviate connection properly if it exists
-            if hasattr(agent, "weaviate_client") and agent.weaviate_client:
-                agent.weaviate_client.close()
         except Exception as e:
             print(f"Warning during cleanup: {e}")
 

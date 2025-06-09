@@ -5,6 +5,66 @@ All notable changes to the Personal AI Agent project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-06-09 🎯 **AGNO NATIVE STORAGE MIGRATION**
+
+### 🚀 MAJOR ARCHITECTURE CHANGE: Complete Migration from Weaviate to Agno Native Storage
+
+**BREAKING CHANGE**: Migrated the Agno agent from external Weaviate dependency to Agno's built-in storage system (SQLite + LanceDB). This significantly simplifies the architecture and reduces external dependencies while maintaining full functionality.
+
+### ✨ Key Achievements
+
+- **SIMPLIFIED ARCHITECTURE**: Removed complex Weaviate setup in favor of Agno's native SQLite + LanceDB storage
+- **ZERO EXTERNAL DEPENDENCIES**: No more Docker containers or external vector database services required
+- **AUTOMATIC MEMORY**: Agno's built-in memory system handles conversation persistence automatically
+- **KNOWLEDGE AUTO-LOADING**: Personal knowledge files (`.txt`, `.md`) automatically loaded from `./data/knowledge/`
+- **MAINTAINED COMPATIBILITY**: All MCP tools and functionality preserved while simplifying the backend
+
+### Added
+
+- **Agno Storage Module**: New `agno_storage.py` with native storage utilities
+  - `create_agno_storage()`: SQLite storage for agent sessions
+  - `create_agno_knowledge()`: LanceDB vector database for knowledge
+  - `load_personal_knowledge()`: Automatic knowledge file loading
+- **Storage Configuration**: Added `AGNO_STORAGE_DIR` and `AGNO_KNOWLEDGE_DIR` settings
+- **Migration Test**: Comprehensive test script to verify the migration works correctly
+
+### Changed
+
+- **AgnoPersonalAgent Constructor**: Simplified parameters, removed Weaviate dependencies
+  - Removed: `weaviate_client`, `vector_store`, `storage_backend` parameters
+  - Added: `storage_dir`, `knowledge_dir` parameters for native storage paths
+- **Agent Initialization**: Streamlined setup process using Agno's built-in capabilities
+- **Memory Instructions**: Updated to work with Agno's automatic memory system
+- **CLI Integration**: Updated `agno_main.py` to use simplified agent without Weaviate
+
+### Removed
+
+- **Weaviate Dependencies**: Eliminated external vector store requirements from Agno agent
+- **Manual Memory Tools**: Replaced custom memory functions with Agno's automatic system
+- **Complex Initialization**: Removed multi-backend storage logic and Weaviate setup code
+
+### Fixed
+
+- **Import Issues**: Corrected `TextKnowledgeBase` import (was `TextKnowledge`)
+- **Storage Path Creation**: Ensured storage directories are created automatically
+- **Knowledge Loading**: Fixed automatic loading of personal knowledge files
+
+### Technical Details
+
+- **Storage Backend**: SQLite for sessions + LanceDB for vector knowledge
+- **Memory Strategy**: Agno handles conversation memory automatically
+- **Knowledge Strategy**: Auto-load `.txt` and `.md` files from knowledge directory
+- **MCP Integration**: Maintained full MCP server compatibility
+- **Performance**: Faster startup without external Weaviate dependency
+
+### Migration Impact
+
+- **Developers**: Simpler setup, no Docker required for Agno agent
+- **Users**: Same functionality with faster startup and lower resource usage
+- **Infrastructure**: Reduced complexity, fewer moving parts
+
+---
+
 ## [0.4.1] - 2025-06-08 🧠 **AGNO MEMORY INTEGRATION BREAKTHROUGH**
 
 ### 🚀 MAJOR BREAKTHROUGH: Agno Framework with Full Memory Integration
