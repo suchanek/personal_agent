@@ -1,6 +1,7 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.4.060825"
+version = "0.4.1"
+license = "BSD-3-Clause"
 description = "Personal AI agent with MCP and Weaviate"
 authors = ["Your Name <your.email@example.com>"]
 
@@ -28,7 +29,9 @@ mcp = "^1.9.2"
 
 [tool.poetry.scripts]
 personal-agent = "src.personal_agent.main:main"
-pagl = "src.personal_agent.main:main"
+pagl = "src.personal_agent.main:cli_main"
+personal-agent-langchain-cli = "src.personal_agent.main:cli_main"
+paglc = "src.personal_agent.main:cli_main"
 personal-agent-smolagent = "src.personal_agent.smol_main:run_smolagents_web"
 pags = "src.personal_agent.smol_main:run_smolagents_web"
 personal-agent-smolagent-cli = "src.personal_agent.smol_main:cli_main"
