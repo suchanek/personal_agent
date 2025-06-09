@@ -4,9 +4,11 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from agno.embedder.openai import OpenAIEmbedder
+from agno.embedder.ollama import OllamaEmbedder
 from agno.storage.sqlite import SqliteStorage
 from agno.vectordb.lancedb import LanceDb, SearchType
+
+from ..config import OLLAMA_URL
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,11 @@ def create_agno_knowledge(storage_dir: str = "./data/agno") -> LanceDb:
         uri=str(storage_path / "lancedb"),
         table_name="personal_agent_knowledge",
         search_type=SearchType.hybrid,
-        embedder=OpenAIEmbedder(id="text-embedding-3-small"),
+        embedder=OllamaEmbedder(
+            id="nomic-embed-text",
+            host=OLLAMA_URL,
+            dimensions=768,  # nomic-embed-text has 768 dimensions
+        ),
     )
 
     logger.info("Created Agno LanceDB knowledge at: %s", storage_path / "lancedb")
@@ -76,10 +82,15 @@ def load_personal_knowledge(
             text_knowledge = TextKnowledgeBase(
                 sources=[str(f) for f in text_files], vector_db=vector_db
             )
-            text_knowledge.load()
-            logger.info(
-                "Loaded %d text/markdown files into knowledge base", len(text_files)
-            )
+
+            # Set to True to load the knowledge base (only needs to be done once)
+            load_knowledge = True
+            if load_knowledge:
+                text_knowledge.load()
+                logger.info(
+                    "Loaded %d text/markdown files into knowledge base", len(text_files)
+                )
+
         except Exception as e:
             logger.error("Failed to load text knowledge: %s", e)
 
@@ -87,12 +98,15 @@ def load_personal_knowledge(
     # pdf_files = list(knowledge_path.glob("*.pdf"))
     # if pdf_files:
     #     try:
-    #         from agno.knowledge.pdf import PdfKnowledge
-    #         pdf_knowledge = PdfKnowledge(
+    #         from agno.knowledge.pdf import PdfKnowledgeBase
+    #         pdf_knowledge = PdfKnowledgeBase(
     #             sources=[str(f) for f in pdf_files],
     #             vector_db=vector_db
     #         )
-    #         pdf_knowledge.load()
-    #         logger.info("Loaded %d PDF files into knowledge base", len(pdf_files))
+    #         # Set to True to load the knowledge base (only needs to be done once)
+    #         load_knowledge = True
+    #         if load_knowledge:
+    #             pdf_knowledge.load()
+    #             logger.info("Loaded %d PDF files into knowledge base", len(pdf_files))
     #     except Exception as e:
     #         logger.error("Failed to load PDF knowledge: %s", e)
