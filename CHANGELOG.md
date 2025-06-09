@@ -11,24 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **AGNO FRAMEWORK INTEGRATION**: Successfully implemented Agno framework as third agent option alongside LangChain and SmolaAgents
 - **MEMORY RETRIEVAL FIXED**: Resolved critical issue where agents weren't automatically using memory tools for personal queries
+- **TOOL NAMING BUG DISCOVERED**: Found and fixed ReasoningTools concatenation bug that corrupted function names (e.g., `thinkquery_knowledge_base` instead of `query_knowledge_base`)
 - **AUTOMATIC MEMORY SEARCH**: Agno agent now automatically queries knowledge base for personal information (name, preferences, etc.)
 - **PROPER TOOL INTEGRATION**: Fixed tool compatibility issues between LangChain decorators and Agno framework
-- **ENHANCED AGENT INSTRUCTIONS**: Added explicit memory usage instructions for personal queries
+- **ENHANCED AGENT INSTRUCTIONS**: Added explicit memory usage instructions for personal queries with mandatory language
 
 ### Added
 
 - **Agno Agent Implementation**: Complete `AgnoPersonalAgent` class with MCP and memory integration
 - **Agno CLI Interface**: `personal-agent-agno-cli` command for interactive Agno agent sessions
-- **Agno Memory Tools**: Proper async memory tools compatible with Agno framework architecture
-- **Memory-First Instructions**: Agent instructions that prioritize memory search for personal queries
+- **Dual Memory Tools**: Both `query_knowledge_base` and `get_user_information` functions for comprehensive memory access
+- **Memory-First Instructions**: Agent instructions that prioritize memory search for personal queries with "ABSOLUTE REQUIREMENT" language
 - **Tool Integration Framework**: Seamless integration of LangChain tools with Agno-compatible wrappers
+- **Standalone Async Functions**: Proper async memory tools with explicit `__name__` attributes for Agno compatibility
 
 ### Fixed
 
+- **Critical Tool Naming Bug**: Temporarily disabled ReasoningTools to prevent function name corruption that broke memory tool access
 - **Memory Tool Auto-Usage**: Fixed agents not automatically using memory tools for personal information retrieval
 - **Tool Compatibility**: Resolved LangChain `@tool` decorator incompatibility with Agno framework
-- **Agent Instructions**: Enhanced instructions to explicitly trigger memory searches for personal queries
+- **Agent Instructions Priority**: Moved memory instructions to the top of instruction sequence for highest priority
 - **Async Tool Handling**: Proper async function wrapping for memory tools in Agno environment
+- **Weaviate Initialization Sequence**: Ensured proper `initialize_agno_system()` call before agent creation
+
+### Key Technical Insights
+
+- **ReasoningTools Interference**: ReasoningTools was prefixing "think" to function names, breaking tool discovery
+- **Instruction Order Matters**: Memory instructions must be first in the agent's instruction sequence
+- **Forceful Language Required**: Agent instructions need "MANDATORY" and "DO NOT REASON ABOUT WHETHER TO USE TOOLS" language
+- **Initialization Sequence Critical**: Weaviate must be initialized before agent creation for memory tools to be available
 
 ### Verified Working
 
@@ -37,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ **Memory Storage**: Interaction storage working with proper async handling
 - ✅ **MCP Integration**: 6 MCP servers successfully connected with Agno framework
 - ✅ **CLI Functionality**: Interactive CLI with streaming responses and tool calls
+- ✅ **Memory Tool Verification**: `test_memory_tools.py` confirms memory functionality works correctly
 
 ## [0.4.060825] - 2025-06-08 🎯 **SMOLAGENTS VERSION**
 
