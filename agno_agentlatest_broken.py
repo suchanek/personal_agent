@@ -8,62 +8,59 @@ including native MCP support, async operations, and advanced agent features.
 
 import asyncio
 import logging
+import os
 from textwrap import dedent
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
-from agno.tools.mcp import MCPTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
-from ..core import create_agno_knowledge, create_agno_storage, load_personal_knowledge
+from agno.tools.mcp import MCPTools, MultiMCPTools
 
-# Configure logging
+from ..config import OLLAMA_URL, USE_MCP, USE_WEAVIATE, get_mcp_servers
+
 logger = logging.getLogger(__name__)
 
 
 class AgnoPersonalAgent:
     """
-    Agno-based Personal AI Agent with MCP integration and native storage.
+    Agno-based Personal AI Agent with MCP integration and Weaviate memory.
 
     This class provides a modern async agent implementation using the agno framework
-    with built-in SQLite storage and LanceDB knowledge base.
+    while maintaining compatibility with the existing personal agent ecosystem.
     """
 
     def __init__(
         self,
         model_provider: str = "ollama",
-        model_name: str = LLM_MODEL,
+        model_name: str = "qwen2.5:7b-instruct",
+        weaviate_client=None,
+        vector_store=None,
         enable_memory: bool = True,
         enable_mcp: bool = True,
-        storage_dir: str = "./data/agno",
-        knowledge_dir: str = "./data/knowledge",
         debug: bool = False,
     ):
         """
         Initialize the Agno Personal Agent.
 
-        :param model_provider: LLM provider ('ollama' or 'openai')
-        :param model_name: Model name to use
-        :param enable_memory: Whether to enable memory and knowledge features
-        :param enable_mcp: Whether to enable MCP tool integration
-        :param storage_dir: Directory for Agno storage files
-        :param knowledge_dir: Directory containing knowledge files to load
-        :param debug: Enable debug logging and tool call visibility
+        Args:
+            model_provider: LLM provider ('ollama' or 'openai')
+            model_name: Model name to use
+            weaviate_client: Weaviate client for memory operations
+            vector_store: Vector store for memory operations
+            enable_memory: Whether to enable Weaviate memory features
+            enable_mcp: Whether to enable MCP tool integration
+            debug: Enable debug logging and tool call visibility
         """
         self.model_provider = model_provider
         self.model_name = model_name
-        self.enable_memory = enable_memory
+        self.weaviate_client = weaviate_client
+        self.vector_store = vector_store
+        self.enable_memory = enable_memory and USE_WEAVIATE
         self.enable_mcp = enable_mcp and USE_MCP
-        self.storage_dir = storage_dir
-        self.knowledge_dir = knowledge_dir
         self.debug = debug
-
-        # Agno native storage components
-        self.agno_storage = None
-        self.agno_knowledge = None
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -192,35 +189,52 @@ class AgnoPersonalAgent:
 
         return tools
 
+    def _create_memory_instructions(self) -> str:
+        """Create memory-related instructions for the agent."""
+        if not self.enable_memory:
+            return ""
+
+        return dedent(
+            """\
+            
+            ## Memory System Guidelines
+            
+            You have access to a persistent memory system powered by Weaviate vector database:
+            
+            - **Automatic Storage**: Important interactions are automatically stored for future reference
+            - **Context Retrieval**: Relevant past interactions are retrieved to provide better context
+            - **Topic Organization**: Information is categorized by topics for better organization
+            - **Semantic Search**: Use natural language to find related information from past conversations
+            
+            When responding:
+            1. Consider any retrieved context from past interactions
+            2. Build upon previous conversations and learned preferences
+            3. Reference relevant past information when appropriate
+            4. Maintain continuity across sessions
+        """
+        )
+
     def _create_agent_instructions(self) -> str:
         """Create comprehensive instructions for the agno agent."""
         base_instructions = dedent(
             """\
-            You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
+            You are an advanced personal AI assistant with comprehensive capabilities.
             
             ## Core Guidelines
             
             - **Be Direct**: Execute tasks immediately without asking for confirmation unless critical
-            - **Use Tools FIRST**: Always check available tools before saying you can't do something
-            - **Built-in Memory**: You have automatic memory that persists across conversations
+            - **Use Tools**: Leverage your available tools effectively for GitHub, file operations, web search, and memory
             - **Be Thorough**: When searching or researching, provide complete and organized results
             - **Use Tables**: Display data in tables when appropriate for better readability
             - **Show Reasoning**: Use your reasoning capabilities to break down complex problems
-            - **Maintain Context**: Your memory automatically builds upon previous conversations
-            
-            ## CRITICAL TOOL USAGE RULES
-            
-            1. **For GitHub Tasks**: Use available GitHub tools for repository information
-            2. **For File Operations**: Use filesystem tools for file management
-            3. **For Research**: Use web search tools for current information
-            4. **Never say "I can't" without first trying relevant tools**
+            - **Maintain Context**: Build upon previous conversations using memory
             
             ## Available Capabilities
             
             - **GitHub Integration**: Search repositories, analyze code, get repository information
             - **File System Operations**: Read, write, and manage files and directories  
             - **Web Research**: Search for current information and technical details
-            - **Automatic Memory**: Built-in memory system that persists across sessions
+            - **Memory System**: Store and retrieve information across sessions
             - **Reasoning**: Break down complex problems step by step
             
             ## Response Format
@@ -248,44 +262,36 @@ class AgnoPersonalAgent:
         """
         )
 
-        return base_instructions
+        memory_instructions = self._create_memory_instructions()
+
+        return base_instructions + memory_instructions
 
     async def initialize(self) -> bool:
         """
         Initialize the agno agent with all components.
 
-        :return: True if initialization successful, False otherwise
+        Returns:
+            bool: True if initialization successful, False otherwise
         """
         try:
             # Create model
             model = self._create_model()
             logger.info("Created model: %s", self.model_name)
 
-            # Prepare tools list
+            # Prepare tools list starting with ReasoningTools
             tools = []
 
-            # Initialize Agno native storage and knowledge
-            if self.enable_memory:
-                self.agno_storage = create_agno_storage(self.storage_dir)
-                self.agno_knowledge = create_agno_knowledge(self.storage_dir)
-
-                # Load existing knowledge files
-                load_personal_knowledge(self.agno_knowledge, self.knowledge_dir)
-
-                logger.info("Initialized Agno storage and knowledge backend")
-
             # Add ReasoningTools for better reasoning capabilities
-            # TEMPORARILY DISABLED to debug tool naming issue
-            # try:
-            #     from agno.tools.reasoning import ReasoningTools
+            try:
+                from agno.tools.reasoning import ReasoningTools
 
-            #     reasoning_tools = ReasoningTools(add_instructions=True)
-            #     tools.append(reasoning_tools)
-            #     logger.info("Added ReasoningTools for enhanced reasoning capabilities")
-            # except ImportError:
-            #     logger.warning(
-            #         "ReasoningTools not available, continuing without reasoning capabilities"
-            #     )
+                reasoning_tools = ReasoningTools(add_instructions=True)
+                tools.append(reasoning_tools)
+                logger.info("Added ReasoningTools for enhanced reasoning capabilities")
+            except ImportError:
+                logger.warning(
+                    "ReasoningTools not available, continuing without reasoning capabilities"
+                )
 
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:
@@ -295,33 +301,20 @@ class AgnoPersonalAgent:
             # Create agent instructions
             instructions = self._create_agent_instructions()
 
-            # Create the agno agent with appropriate storage/knowledge
-            agent_kwargs = {
-                "model": model,
-                "tools": tools,
-                "instructions": instructions,
-                "markdown": True,
-                "show_tool_calls": self.debug,
-                "add_history_to_messages": True,  # Enable conversation history
-                "num_history_responses": 5,  # Keep last 5 exchanges in context
-            }
-
-            # Add storage and knowledge if memory is enabled
-            if self.enable_memory:
-                agent_kwargs["storage"] = self.agno_storage
-                agent_kwargs["knowledge"] = self.agno_knowledge
-
-            self.agent = Agent(**agent_kwargs)
-
-            # Calculate tool counts for logging
-            mcp_tool_count = (
-                len(self._get_mcp_tools_as_functions()) if self.enable_mcp else 0
+            # Create the agno agent
+            self.agent = Agent(
+                model=model,
+                tools=tools,
+                instructions=instructions,
+                markdown=True,
+                show_tool_calls=self.debug,
+                add_history_to_messages=True,  # Enable conversation history
+                num_history_responses=5,  # Keep last 5 exchanges in context
             )
 
             logger.info(
-                "Successfully initialized agno agent with native storage: %d total tools (%d MCP)",
+                "Successfully initialized agno agent with %d MCP tool wrapper(s)",
                 len(tools),
-                mcp_tool_count,
             )
             return True
 
@@ -351,28 +344,33 @@ class AgnoPersonalAgent:
             if add_thought_callback:
                 add_thought_callback("🔄 Preparing agno agent...")
 
+            # Add memory context if available
+            enhanced_query = await self._enhance_query_with_memory(query)
+
             if add_thought_callback:
                 if self.enable_memory:
-                    add_thought_callback("🧠 Memory context available via Agno")
+                    add_thought_callback("🧠 Memory context retrieved")
                 add_thought_callback("🚀 Executing agno agent with MCP tools...")
 
             if stream:
                 # For streaming, we'll need to handle this differently
                 # For now, return the complete response
-                response = await self.agent.arun(query)
+                response = await self.agent.arun(enhanced_query)
                 return response.content
             else:
                 if add_thought_callback:
                     add_thought_callback("⚡ Running async reasoning...")
 
-                response = await self.agent.arun(query)
+                response = await self.agent.arun(enhanced_query)
 
                 if add_thought_callback:
                     add_thought_callback("✅ Agent response generated")
 
-                # Memory is automatically handled by Agno
-                if add_thought_callback and self.enable_memory:
-                    add_thought_callback("💾 Memory automatically updated by Agno")
+                # Store interaction in memory if enabled
+                if self.enable_memory and self.vector_store:
+                    if add_thought_callback:
+                        add_thought_callback("💾 Storing in memory...")
+                    await self._store_interaction(query, response.content)
 
                 return response.content
 
@@ -381,6 +379,40 @@ class AgnoPersonalAgent:
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
+
+    async def _enhance_query_with_memory(self, query: str) -> str:
+        """Enhance query with relevant memory context."""
+        if not self.enable_memory or not self.vector_store:
+            return query
+
+        try:
+            # Simple memory retrieval (you can enhance this based on your memory implementation)
+            # This would integrate with your existing memory tools
+            enhanced_query = f"""
+Context from previous interactions: [Retrieved from memory system]
+
+Current query: {query}
+"""
+            return enhanced_query
+        except Exception as e:
+            logger.warning("Failed to enhance query with memory: %s", e)
+            return query
+
+    async def _store_interaction(self, query: str, response: str) -> None:
+        """Store interaction in memory system."""
+        if not self.enable_memory or not self.vector_store:
+            return
+
+        try:
+            # This would integrate with your existing memory storage
+            # For now, we'll just log the intention
+            logger.info(
+                "Would store interaction in memory: query=%s chars, response=%s chars",
+                len(query),
+                len(response),
+            )
+        except Exception as e:
+            logger.warning("Failed to store interaction: %s", e)
 
     async def cleanup(self) -> None:
         """Clean up resources."""
@@ -408,24 +440,20 @@ class AgnoPersonalAgent:
 
 
 async def create_agno_agent(
+    weaviate_client=None,
+    vector_store=None,
     model_provider: str = "ollama",
     model_name: str = "qwen2.5:7b-instruct",
-    enable_memory: bool = True,
-    enable_mcp: bool = True,
-    storage_dir: str = "./data/agno",
-    knowledge_dir: str = "./data/knowledge",
     debug: bool = False,
 ) -> AgnoPersonalAgent:
     """
     Create and initialize an agno-based personal agent.
 
     Args:
+        weaviate_client: Weaviate client for memory operations
+        vector_store: Vector store for memory operations
         model_provider: LLM provider ('ollama' or 'openai')
         model_name: Model name to use
-        enable_memory: Whether to enable memory and knowledge features
-        enable_mcp: Whether to enable MCP tool integration
-        storage_dir: Directory for Agno storage files
-        knowledge_dir: Directory containing knowledge files to load
         debug: Enable debug mode
 
     Returns:
@@ -434,11 +462,11 @@ async def create_agno_agent(
     agent = AgnoPersonalAgent(
         model_provider=model_provider,
         model_name=model_name,
-        enable_memory=enable_memory,
-        enable_mcp=enable_mcp,
-        storage_dir=storage_dir,
-        knowledge_dir=knowledge_dir,
+        weaviate_client=weaviate_client,
+        vector_store=vector_store,
         debug=debug,
+        enable_memory=weaviate_client is not None and vector_store is not None,
+        enable_mcp=USE_MCP,
     )
 
     success = await agent.initialize()
@@ -450,12 +478,10 @@ async def create_agno_agent(
 
 # Synchronous wrapper for compatibility
 def create_agno_agent_sync(
+    weaviate_client=None,
+    vector_store=None,
     model_provider: str = "ollama",
     model_name: str = "qwen2.5:7b-instruct",
-    enable_memory: bool = True,
-    enable_mcp: bool = True,
-    storage_dir: str = "./data/agno",
-    knowledge_dir: str = "./data/knowledge",
     debug: bool = False,
 ) -> AgnoPersonalAgent:
     """
@@ -466,12 +492,10 @@ def create_agno_agent_sync(
     """
     return asyncio.run(
         create_agno_agent(
+            weaviate_client=weaviate_client,
+            vector_store=vector_store,
             model_provider=model_provider,
             model_name=model_name,
-            enable_memory=enable_memory,
-            enable_mcp=enable_mcp,
-            storage_dir=storage_dir,
-            knowledge_dir=knowledge_dir,
             debug=debug,
         )
     )

@@ -1,6 +1,11 @@
 """Core package for Personal Agent."""
 
 from .agent import create_agent_executor
+from .agno_storage import (
+    create_agno_knowledge,
+    create_agno_storage,
+    load_personal_knowledge,
+)
 from .mcp_client import SimpleMCPClient
 from .memory import (
     is_weaviate_connected,
@@ -24,4 +29,7 @@ __all__ = [
     "create_multi_agent_system",
     "create_smolagents_executor",
     "create_smolagents_model",
+    "create_agno_storage",
+    "create_agno_knowledge",
+    "load_personal_knowledge",
 ]
