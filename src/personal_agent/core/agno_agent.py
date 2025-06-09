@@ -18,8 +18,9 @@ from agno.tools.mcp import MCPTools, MultiMCPTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from ..config import OLLAMA_URL, USE_MCP, USE_WEAVIATE, get_mcp_servers
+from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, USE_WEAVIATE, get_mcp_servers
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +35,7 @@ class AgnoPersonalAgent:
     def __init__(
         self,
         model_provider: str = "ollama",
-        model_name: str = "qwen2.5:7b-instruct",
+        model_name: str = LLM_MODEL,
         weaviate_client=None,
         vector_store=None,
         enable_memory: bool = True,
@@ -212,11 +213,19 @@ class AgnoPersonalAgent:
                 langchain_tools
             )
 
-            # Convert LangChain tools to Agno-compatible async functions
+            # Store the LangChain tools as instance variables so async functions can access them
+            self._store_interaction_lc = store_interaction_lc
+            self._query_knowledge_base_lc = query_knowledge_base_lc
+            self._clear_knowledge_base_lc = clear_knowledge_base_lc
+
+            # Create standalone async functions with proper names
+            memory_tools = []
+
+            # Define each function separately to avoid name conflicts
             async def query_knowledge_base(query: str, limit: int = 5) -> str:
-                """Query the personal knowledge base for relevant information about the user, previous conversations, or stored facts."""
+                """ALWAYS use this to answer personal questions like 'what is my name', 'who am I', etc. Contains user's personal information."""
                 try:
-                    result = query_knowledge_base_lc.invoke(
+                    result = self._query_knowledge_base_lc.invoke(
                         {"query": query, "limit": limit}
                     )
                     if isinstance(result, list) and result:
@@ -229,10 +238,28 @@ class AgnoPersonalAgent:
                     logger.error("Error querying knowledge base: %s", e)
                     return f"Error accessing memory: {str(e)}"
 
+            async def get_user_information(query: str = "user information") -> str:
+                """Get information about the user including name, preferences, and personal details."""
+                try:
+                    result = self._query_knowledge_base_lc.invoke(
+                        {"query": query, "limit": 10}
+                    )
+                    if isinstance(result, list) and result:
+                        return "\n".join(result)
+                    elif isinstance(result, str):
+                        return result
+                    else:
+                        return "No user information found."
+                except Exception as e:
+                    logger.error("Error getting user information: %s", e)
+                    return f"Error accessing user information: {str(e)}"
+
             async def store_memory_fact(text: str, topic: str = "general") -> str:
                 """Store important information or facts in the personal knowledge base for future reference."""
                 try:
-                    result = store_interaction_lc.invoke({"text": text, "topic": topic})
+                    result = self._store_interaction_lc.invoke(
+                        {"text": text, "topic": topic}
+                    )
                     return (
                         result
                         if isinstance(result, str)
@@ -245,7 +272,7 @@ class AgnoPersonalAgent:
             async def clear_memory() -> str:
                 """Clear all data from the personal knowledge base."""
                 try:
-                    result = clear_knowledge_base_lc.invoke({})
+                    result = self._clear_knowledge_base_lc.invoke({})
                     return (
                         result
                         if isinstance(result, str)
@@ -255,8 +282,19 @@ class AgnoPersonalAgent:
                     logger.error("Error clearing memory: %s", e)
                     return f"Error clearing memory: {str(e)}"
 
-            # Return the async functions directly - Agno will handle them as tools
-            memory_tools = [query_knowledge_base, store_memory_fact, clear_memory]
+            # Explicitly set function names and add to tools list
+            query_knowledge_base.__name__ = "query_knowledge_base"
+            get_user_information.__name__ = "get_user_information"
+            store_memory_fact.__name__ = "store_memory_fact"
+            clear_memory.__name__ = "clear_memory"
+
+            memory_tools = [
+                query_knowledge_base,
+                get_user_information,
+                store_memory_fact,
+                clear_memory,
+            ]
+
             logger.info(
                 "Created %d memory tools from existing LangChain tools",
                 len(memory_tools),
@@ -276,43 +314,44 @@ class AgnoPersonalAgent:
         return dedent(
             """\
             
-            ## Memory System Guidelines
+            ## ABSOLUTE REQUIREMENT: Memory Tool Usage
             
-            You have access to a persistent memory system powered by Weaviate vector database:
+            **CRITICAL RULE**: For ANY personal query, you MUST use query_knowledge_base FIRST.
             
-            - **Automatic Storage**: Important interactions are automatically stored for future reference
-            - **Context Retrieval**: Relevant past interactions are retrieved to provide better context
-            - **Topic Organization**: Information is categorized by topics for better organization
-            - **Semantic Search**: Use natural language to find related information from past conversations
+            ### Trigger Patterns (MANDATORY tool usage):
+            - "what is my name" → IMMEDIATELY call query_knowledge_base("user name")
+            - "who am I" → IMMEDIATELY call query_knowledge_base("user identity")  
+            - "tell me about me" → IMMEDIATELY call query_knowledge_base("user information")
+            - "my birthday" → IMMEDIATELY call query_knowledge_base("birthday date birth")
+            - "my preferences" → IMMEDIATELY call query_knowledge_base("preferences favorite")
+            - "programming languages" → IMMEDIATELY call query_knowledge_base("programming languages")
             
-            ## IMPORTANT: Always Use Memory for Personal Queries
+            ### WORKFLOW (NON-NEGOTIABLE):
+            1. Detect personal query pattern
+            2. IMMEDIATELY call query_knowledge_base with relevant search terms  
+            3. Use results to provide complete answer
+            4. NEVER say "I don't have access" without calling query_knowledge_base first
             
-            When users ask personal questions like:
-            - "What is my name?"
-            - "What do you know about me?"
-            - "Tell me about myself"
-            - "What are my preferences?"
-            - "When was I born?"
-            - "What are my favorite programming languages?"
+            ### Example Response for "what is my name?":
+            Step 1: Call query_knowledge_base("user name") 
+            Step 2: Parse results and respond: "Your name is [NAME]"
             
-            **ALWAYS query_knowledge_base FIRST** before responding. The user's personal information
-            is stored in the knowledge base and should be retrieved to provide accurate answers.
+            **DO NOT REASON ABOUT WHETHER TO USE TOOLS - JUST USE THEM**
             
-            Example workflow for "What is my name?":
-            1. Use query_knowledge_base("user name") 
-            2. Use the retrieved information to answer
-            3. Do not say you don't have access to personal information if memory tools are available
-            
-            When responding:
-            1. Consider any retrieved context from past interactions
-            2. Build upon previous conversations and learned preferences
-            3. Reference relevant past information when appropriate
-            4. Maintain continuity across sessions
+            Available tools:
+            - query_knowledge_base(query, limit=5): Search user information
+            - store_memory_fact(text, topic): Store new information  
+            - clear_memory(): Clear all data
         """
         )
 
     def _create_agent_instructions(self) -> str:
         """Create comprehensive instructions for the agno agent."""
+        # Put memory instructions FIRST for highest priority
+        memory_instructions = (
+            self._create_memory_instructions() if self.enable_memory else ""
+        )
+
         base_instructions = dedent(
             """\
             You are an advanced personal AI assistant with comprehensive capabilities.
@@ -320,18 +359,27 @@ class AgnoPersonalAgent:
             ## Core Guidelines
             
             - **Be Direct**: Execute tasks immediately without asking for confirmation unless critical
-            - **Use Tools**: Leverage your available tools effectively for GitHub, file operations, web search, and memory
+            - **Use Tools FIRST**: Always check available tools before saying you can't do something
+            - **Memory Priority**: For personal questions, ALWAYS query memory first using query_knowledge_base
             - **Be Thorough**: When searching or researching, provide complete and organized results
             - **Use Tables**: Display data in tables when appropriate for better readability
             - **Show Reasoning**: Use your reasoning capabilities to break down complex problems
             - **Maintain Context**: Build upon previous conversations using memory
+            
+            ## CRITICAL TOOL USAGE RULES
+            
+            1. **For Personal Questions**: MUST use query_knowledge_base before responding
+            2. **For GitHub Tasks**: Use available GitHub tools for repository information
+            3. **For File Operations**: Use filesystem tools for file management
+            4. **For Research**: Use web search tools for current information
+            5. **Never say "I can't" without first trying relevant tools**
             
             ## Available Capabilities
             
             - **GitHub Integration**: Search repositories, analyze code, get repository information
             - **File System Operations**: Read, write, and manage files and directories  
             - **Web Research**: Search for current information and technical details
-            - **Memory System**: Store and retrieve information across sessions
+            - **Memory System**: Store and retrieve information across sessions - USE THIS FOR PERSONAL QUERIES
             - **Reasoning**: Break down complex problems step by step
             
             ## Response Format
@@ -359,9 +407,7 @@ class AgnoPersonalAgent:
         """
         )
 
-        memory_instructions = self._create_memory_instructions()
-
-        return base_instructions + memory_instructions
+        return memory_instructions + base_instructions
 
     async def initialize(self) -> bool:
         """
@@ -375,26 +421,27 @@ class AgnoPersonalAgent:
             model = self._create_model()
             logger.info("Created model: %s", self.model_name)
 
-            # Prepare tools list starting with ReasoningTools
+            # Prepare tools list
             tools = []
 
-            # Add ReasoningTools for better reasoning capabilities
-            try:
-                from agno.tools.reasoning import ReasoningTools
-
-                reasoning_tools = ReasoningTools(add_instructions=True)
-                tools.append(reasoning_tools)
-                logger.info("Added ReasoningTools for enhanced reasoning capabilities")
-            except ImportError:
-                logger.warning(
-                    "ReasoningTools not available, continuing without reasoning capabilities"
-                )
-
-            # Add memory tools as proper Agno tools
+            # Add memory tools FIRST to avoid naming conflicts
             if self.enable_memory:
                 memory_tools = await self._get_memory_tools()
                 tools.extend(memory_tools)
                 logger.info("Added %d memory tools", len(memory_tools))
+
+            # Add ReasoningTools for better reasoning capabilities
+            # TEMPORARILY DISABLED to debug tool naming issue
+            # try:
+            #     from agno.tools.reasoning import ReasoningTools
+
+            #     reasoning_tools = ReasoningTools(add_instructions=True)
+            #     tools.append(reasoning_tools)
+            #     logger.info("Added ReasoningTools for enhanced reasoning capabilities")
+            # except ImportError:
+            #     logger.warning(
+            #         "ReasoningTools not available, continuing without reasoning capabilities"
+            #     )
 
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:

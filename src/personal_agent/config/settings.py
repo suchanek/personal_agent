@@ -25,20 +25,27 @@ def get_env_var(key: str, fallback: str = "") -> str:
         return os.getenv(key, fallback)
 
 
-# Configuration constants
-WEAVIATE_URL = "http://localhost:8080"
-OLLAMA_URL = "http://localhost:11434"
-USE_WEAVIATE = True  # Set to False to bypass Weaviate for testing
-USE_MCP = True  # Set to False to bypass MCP for testing
+def get_env_bool(key: str, fallback: bool = True) -> bool:
+    """Get boolean environment variable with proper parsing."""
+    value = get_env_var(key, str(fallback))
+    return value.lower() in ("true", "1", "yes", "on")
 
-ROOT_DIR = get_env_var(
-    "ROOT_DIR", "/"
-)  # Root directory for MCP filesystem server (full access)
+
+# Configuration constants - All configurable via environment variables
+WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
+OLLAMA_URL = get_env_var("OLLAMA_URL", "http://tesla.local:11434")
+USE_WEAVIATE = get_env_bool("USE_WEAVIATE", True)
+USE_MCP = get_env_bool("USE_MCP", True)
+
+# Directory configurations
+ROOT_DIR = get_env_var("ROOT_DIR", "/")  # Root directory for MCP filesystem server
 HOME_DIR = get_env_var("HOME_DIR", os.path.expanduser("~"))  # User's home directory
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
 REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
 
-LOG_LEVEL = logging.INFO
+# Logging configuration
+LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
-# LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
-LLM_MODEL = "qwen3:1.7B"
+# LLM Model configuration
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7B")

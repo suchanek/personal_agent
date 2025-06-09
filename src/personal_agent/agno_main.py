@@ -10,7 +10,7 @@ import logging
 from typing import Optional
 
 # Import configuration
-from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
+from .config import LLM_MODEL, USE_MCP, USE_WEAVIATE, get_mcp_servers
 
 # Import core components
 from .core import setup_weaviate
@@ -65,7 +65,7 @@ async def initialize_agno_system():
         weaviate_client=weaviate_client,
         vector_store=vector_store,
         model_provider="ollama",  # Default to Ollama
-        model_name="qwen2.5:7b-instruct",  # Default model
+        model_name=LLM_MODEL,  # Use configured model
         debug=False,
     )
 
