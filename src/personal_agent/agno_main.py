@@ -58,26 +58,20 @@ async def initialize_agno_system():
         agent_info["memory_enabled"],
     )
 
-    # Memory functions using Agno's built-in memory
+    # Memory functions (legacy compatibility - Agno handles memory automatically)
     async def query_knowledge_base(query: str) -> str:
-        """Query the knowledge base using the agno agent."""
-        if not agno_agent:
-            return "Agent not initialized"
-        logger.info("Querying knowledge base: %s", query)
-        return await agno_agent.run(f"Search my knowledge base for: {query}")
+        """Query the knowledge base (legacy compatibility - not used)."""
+        logger.info("Legacy memory function called - Agno handles this automatically")
+        return "Memory is handled automatically by Agno"
 
     async def store_interaction(query: str, response: str) -> bool:
-        """Store interaction in memory (handled automatically by Agno)."""
-        if agno_agent and agno_agent.enable_memory:
-            logger.info("Interaction stored automatically by Agno")
-            return True
-        return False
+        """Store interaction (legacy compatibility - not used)."""
+        logger.info("Legacy memory function called - Agno handles this automatically")
+        return True
 
     async def clear_knowledge_base() -> bool:
-        """Clear the knowledge base."""
-        logger.info(
-            "Knowledge base clearing requested (Agno handles this automatically)"
-        )
+        """Clear the knowledge base (legacy compatibility - not used)."""
+        logger.info("Legacy memory function called - Agno handles this automatically")
         return True
 
     # Inject dependencies for cleanup (simplified for Agno)
@@ -143,7 +137,7 @@ def run_agno_web():
     app.run(host="127.0.0.1", port=5002, debug=False)
 
 
-async def run_agno_cli():
+async def run_agno_cli(query: str = None):
     """
     Run agno agent in CLI mode with streaming and reasoning.
     """
@@ -155,6 +149,15 @@ async def run_agno_cli():
 
     print(f"✅ Agent initialized: {agent.get_agent_info()}")
     print("\nEnter your queries (type 'quit' to exit):")
+    if query is not None:
+        response = await agent.agent.arun(query)
+        print(f"🤖 Assistant: {response}")
+        try:
+            await agent.cleanup()
+        except Exception as e:
+            print(f"Warning during cleanup: {e}")
+
+        return
 
     try:
         while True:
@@ -175,7 +178,7 @@ async def run_agno_cli():
                     stream_intermediate_steps=True,
                 )
 
-                # Since aprint_response already handles the output, we get response separately for storage
+                # Since aprint_response already handles the output, we get response separately if needed
                 response_result = await agent.agent.arun(query)
                 response_content = (
                     response_result.content
@@ -183,8 +186,7 @@ async def run_agno_cli():
                     else str(response_result)
                 )
 
-                # Store interaction
-                await store_int(query, response_content)
+                # Memory is handled automatically by Agno - no manual storage needed
 
             except Exception as e:
                 print(f"Error: {e}")
