@@ -18,7 +18,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
-from ..core import create_agno_knowledge, create_agno_storage, load_personal_knowledge
+from ..core import create_agno_knowledge, create_agno_memory, create_agno_storage
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -64,6 +64,7 @@ class AgnoPersonalAgent:
         # Agno native storage components
         self.agno_storage = None
         self.agno_knowledge = None
+        self.agno_memory = None
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -210,13 +211,27 @@ class AgnoPersonalAgent:
             
             ## CRITICAL TOOL USAGE RULES
             
-            1. **For GitHub Tasks**: Use available GitHub tools for repository information
-            2. **For File Operations**: Use filesystem tools for file management
-            3. **For Research**: Use web search tools for current information
-            4. **Never say "I can't" without first trying relevant tools**
+            1. **For Personal Questions**: ALWAYS use knowledge base search tools first (e.g., "what is my name?", "who am I?", "my preferences")
+            2. **For GitHub Tasks**: Use available GitHub tools for repository information
+            3. **For File Operations**: Use filesystem tools for file management
+            4. **For Research**: Use web search tools for current information
+            5. **Never say "I can't" without first trying relevant tools**
+            
+            ## Knowledge Base Usage
+            
+            **MANDATORY**: For any question about the user (name, preferences, personal info), you MUST:
+            1. Use available knowledge search tools (like asearch_knowledge_base)
+            2. Search for relevant keywords
+            3. Only say information is unavailable AFTER searching
+            
+            **Examples of when to search knowledge base:**
+            - "What is my name?" → Search for "name", "user", "identity"
+            - "Who am I?" → Search for "user information", "identity", "profile"
+            - "My preferences?" → Search for "preferences", "settings", "likes"
             
             ## Available Capabilities
             
+            - **Knowledge Base Search**: Search personal knowledge and memory for information about the user
             - **GitHub Integration**: Search repositories, analyze code, get repository information
             - **File System Operations**: Read, write, and manage files and directories  
             - **Web Research**: Search for current information and technical details
@@ -267,10 +282,31 @@ class AgnoPersonalAgent:
             # Initialize Agno native storage and knowledge
             if self.enable_memory:
                 self.agno_storage = create_agno_storage(self.storage_dir)
-                self.agno_knowledge = create_agno_knowledge(self.storage_dir)
+                self.agno_memory = create_agno_memory(self.storage_dir)
+                self.agno_knowledge = await create_agno_knowledge(
+                    self.storage_dir, self.knowledge_dir
+                )
 
-                # Load existing knowledge files
-                load_personal_knowledge(self.agno_knowledge, self.knowledge_dir)
+                # Add KnowledgeTools for explicit knowledge base interaction
+                if self.agno_knowledge:
+                    try:
+                        from agno.tools.knowledge import KnowledgeTools
+
+                        knowledge_tools = KnowledgeTools(
+                            knowledge=self.agno_knowledge,
+                            search=True,
+                            think=True,
+                            analyze=True,
+                            add_instructions=True,
+                        )
+                        tools.append(knowledge_tools)
+                        logger.info(
+                            "Added KnowledgeTools for knowledge base interaction"
+                        )
+                    except ImportError:
+                        logger.warning(
+                            "KnowledgeTools not available, relying on automatic search"
+                        )
 
                 logger.info("Initialized Agno storage and knowledge backend")
 
@@ -304,12 +340,19 @@ class AgnoPersonalAgent:
                 "show_tool_calls": self.debug,
                 "add_history_to_messages": True,  # Enable conversation history
                 "num_history_responses": 5,  # Keep last 5 exchanges in context
+                "read_chat_history": True,  # Enable reading chat history
+                "enable_agentic_memory": True,  # Enable automatic memory capabilities
+                "enable_user_memories": True,  # Enable user-specific memory storage
+                "add_memory_references": True,  # Add memory references in responses
+                "search_knowledge": True,  # Enable automatic knowledge search
+                "update_knowledge": True,  # Allow knowledge updates
             }
 
             # Add storage and knowledge if memory is enabled
             if self.enable_memory:
                 agent_kwargs["storage"] = self.agno_storage
                 agent_kwargs["knowledge"] = self.agno_knowledge
+                agent_kwargs["memory"] = self.agno_memory
 
             self.agent = Agent(**agent_kwargs)
 

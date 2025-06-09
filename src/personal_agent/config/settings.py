@@ -37,18 +37,22 @@ OLLAMA_URL = get_env_var("OLLAMA_URL", "http://tesla.local:11434")
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", True)
 USE_MCP = get_env_bool("USE_MCP", True)
 
-# Storage backend configuration
-STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "weaviate")  # "weaviate" or "agno"
-
-# Agno Storage Configuration
-AGNO_STORAGE_DIR = get_env_var("AGNO_STORAGE_DIR", "./data/agno")
-AGNO_KNOWLEDGE_DIR = get_env_var("AGNO_KNOWLEDGE_DIR", "./data/knowledge")
-
 # Directory configurations
 ROOT_DIR = get_env_var("ROOT_DIR", "/")  # Root directory for MCP filesystem server
 HOME_DIR = get_env_var("HOME_DIR", os.path.expanduser("~"))  # User's home directory
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
 REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
+
+# Storage backend configuration
+STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
+
+# Agno Storage Configuration (expand DATA_DIR variable)
+AGNO_STORAGE_DIR = os.path.expandvars(
+    get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/agno")
+)
+AGNO_KNOWLEDGE_DIR = os.path.expandvars(
+    get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/knowledge")
+)
 
 # Logging configuration
 LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()

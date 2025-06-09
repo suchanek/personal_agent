@@ -5,11 +5,22 @@ All notable changes to the Personal AI Agent project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2025-06-09 🎯 **AGNO NATIVE STORAGE MIGRATION**
+## [0.5] - 2025-06-09 🎯 **AGNO NATIVE STORAGE MIGRATION**
 
 ### 🚀 MAJOR ARCHITECTURE CHANGE: Complete Migration from Weaviate to Agno Native Storage
 
 **BREAKING CHANGE**: Migrated the Agno agent from external Weaviate dependency to Agno's built-in storage system (SQLite + LanceDB). This significantly simplifies the architecture and reduces external dependencies while maintaining full functionality.
+
+### 🔧 Latest Improvements (Final Phase)
+
+**RESOLVED**: Agent now automatically uses internal knowledge base search capabilities for personal queries.
+
+- **Memory System Integration**: Added proper `SqliteMemoryDb` configuration using Agno's v2 memory system
+- **Knowledge Tools Integration**: Successfully integrated `KnowledgeTools` for explicit knowledge base search
+- **Automatic Tool Usage**: Agent now properly invokes `get_chat_history` and `aupdate_user_memory` tools for knowledge queries
+- **Embedding Dimension Fix**: Corrected OllamaEmbedder configuration to use 768 dimensions (was 4096)
+- **Async Function Compatibility**: Converted all knowledge loading functions to proper async implementation
+- **Test Validation**: Comprehensive testing confirms agent uses tools automatically for personal information queries
 
 ### ✨ Key Achievements
 
@@ -18,67 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AUTOMATIC MEMORY**: Agno's built-in memory system handles conversation persistence automatically
 - **KNOWLEDGE AUTO-LOADING**: Personal knowledge files (`.txt`, `.md`) automatically loaded from `./data/knowledge/`
 - **MAINTAINED COMPATIBILITY**: All MCP tools and functionality preserved while simplifying the backend
-
-### 📦 Added
-
-- **New Storage Module** (`agno_storage.py`): Centralized utilities for Agno storage management
-  - `create_agno_storage()`: SQLite storage for agent sessions
-  - `create_agno_knowledge()`: LanceDB vector database with Ollama embeddings
-  - `load_personal_knowledge()`: Automatic loading of text/markdown knowledge files
-- **Configuration Updates**: Added `AGNO_STORAGE_DIR` and `AGNO_KNOWLEDGE_DIR` settings
-- **Migration Test**: Comprehensive test script to verify the new architecture works correctly
-
-### 🔧 Changed
-
-- **AgnoPersonalAgent Class**: Complete refactor to use native Agno storage
-  - Removed all Weaviate-specific parameters (`weaviate_client`, `vector_store`, `storage_backend`)
-  - Simplified constructor to focus on core functionality
-  - Integrated with Agno's automatic memory system
-- **Agent Instructions**: Updated to work with Agno's built-in memory instead of manual tools
-- **CLI Integration**: Updated `agno_main.py` to use simplified agent initialization
-- **Embeddings**: Migrated from LangChain `OllamaEmbeddings` to Agno's native `OllamaEmbedder`
-  - Uses `nomic-embed-text` model with 768 dimensions
-  - Connects to local Ollama instance via `OLLAMA_URL`
-
-### ❌ Removed
-
-- **Weaviate Dependencies**: Eliminated all Weaviate client and vector store code
-- **Memory Tool Functions**: Removed manual `_get_memory_tools()` method (handled automatically by Agno)
-- **Complex Memory Instructions**: Simplified to leverage Agno's automatic memory
-- **Storage Backend Logic**: No more switching between different storage backends
-- **Manual Memory Management**: Agno handles interaction storage automatically
-
-### 🐛 Fixed
-
-- **Import Issues**: Resolved `TextKnowledgeBase` import problems in knowledge loading
-- **Knowledge Loading**: Fixed one-time knowledge base loading pattern
-- **Error Handling**: Improved error handling for knowledge file loading failures
-
-### 🔄 Migration Guide
-
-For existing installations:
-
-1. **No Action Required**: The migration is backward compatible
-2. **Data Directory**: Knowledge files in `./data/knowledge/` will be automatically loaded
-3. **Environment**: Existing `.env` configuration works without changes
-4. **MCP Tools**: All MCP integrations continue to work as before
-
-### 📊 Performance & Benefits
-
-- **Startup Time**: Significantly faster - no external database connection required
-- **Resource Usage**: Lower memory footprint without Weaviate client overhead
-- **Maintenance**: Zero external service dependencies to manage
-- **Development**: Simplified local development - just run the agent
-- **Knowledge Management**: Automatic file-based knowledge loading
-
-### 🧪 Testing
-
-- **Migration Test**: Comprehensive test validates the complete migration
-- **Knowledge Loading**: Tested with various file formats (`.txt`, `.md`)
-- **Memory Persistence**: Verified conversation history preservation
-- **MCP Integration**: Confirmed all MCP tools continue working
-
-This release represents a major architectural improvement that maintains all functionality while dramatically simplifying the system. The agent now runs entirely self-contained with Agno's native storage, making it much easier to deploy and maintain.
 
 ### Added
 
@@ -109,6 +59,11 @@ This release represents a major architectural improvement that maintains all fun
 - **Import Issues**: Corrected `TextKnowledgeBase` import (was `TextKnowledge`)
 - **Storage Path Creation**: Ensured storage directories are created automatically
 - **Knowledge Loading**: Fixed automatic loading of personal knowledge files
+- **Memory Integration**: Added proper `SqliteMemoryDb` configuration to eliminate "MemoryDb not provided" warnings
+- **Knowledge Tools**: Integrated `KnowledgeTools` for explicit knowledge base search capabilities
+- **Embedding Configuration**: Fixed embedding dimension mismatch (4096 vs 768) in OllamaEmbedder
+- **Async Functions**: Converted knowledge loading functions to proper async implementation
+- **Tool Integration**: Agent now properly uses internal tools (`get_chat_history`, `aupdate_user_memory`) for knowledge queries
 
 ### Technical Details
 
