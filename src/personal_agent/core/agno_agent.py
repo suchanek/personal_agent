@@ -14,10 +14,9 @@ from typing import Any, Dict, List, Optional
 
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from agno.tools.mcp import MCPTools, MultiMCPTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
-from agno.tools.mcp import MCPTools, MultiMCPTools
 
 from ..config import OLLAMA_URL, USE_MCP, USE_WEAVIATE, get_mcp_servers
 
@@ -189,6 +188,86 @@ class AgnoPersonalAgent:
 
         return tools
 
+    async def _get_memory_tools(self) -> List:
+        """
+        Get memory tools as proper Agno tools.
+
+        Returns:
+            List: List of Agno-compatible memory tools converted from existing LangChain tools
+        """
+        if not self.enable_memory or not self.vector_store:
+            return []
+
+        try:
+            # Import the existing well-tested memory tools
+            from ..tools.memory_tools import create_memory_tools
+
+            # Create the LangChain tools with our vector store
+            langchain_tools = create_memory_tools(
+                weaviate_client_instance=self.weaviate_client,
+                vector_store_instance=self.vector_store,
+            )
+
+            store_interaction_lc, query_knowledge_base_lc, clear_knowledge_base_lc = (
+                langchain_tools
+            )
+
+            # Convert LangChain tools to Agno-compatible async functions
+            async def query_knowledge_base(query: str, limit: int = 5) -> str:
+                """Query the personal knowledge base for relevant information about the user, previous conversations, or stored facts."""
+                try:
+                    result = query_knowledge_base_lc.invoke(
+                        {"query": query, "limit": limit}
+                    )
+                    if isinstance(result, list) and result:
+                        return "\n".join(result)
+                    elif isinstance(result, str):
+                        return result
+                    else:
+                        return "No relevant information found in memory."
+                except Exception as e:
+                    logger.error("Error querying knowledge base: %s", e)
+                    return f"Error accessing memory: {str(e)}"
+
+            async def store_memory_fact(text: str, topic: str = "general") -> str:
+                """Store important information or facts in the personal knowledge base for future reference."""
+                try:
+                    result = store_interaction_lc.invoke({"text": text, "topic": topic})
+                    return (
+                        result
+                        if isinstance(result, str)
+                        else "Information stored successfully."
+                    )
+                except Exception as e:
+                    logger.error("Error storing memory fact: %s", e)
+                    return f"Error storing in memory: {str(e)}"
+
+            async def clear_memory() -> str:
+                """Clear all data from the personal knowledge base."""
+                try:
+                    result = clear_knowledge_base_lc.invoke({})
+                    return (
+                        result
+                        if isinstance(result, str)
+                        else "Memory cleared successfully."
+                    )
+                except Exception as e:
+                    logger.error("Error clearing memory: %s", e)
+                    return f"Error clearing memory: {str(e)}"
+
+            # Return the async functions directly - Agno will handle them as tools
+            memory_tools = [query_knowledge_base, store_memory_fact, clear_memory]
+            logger.info(
+                "Created %d memory tools from existing LangChain tools",
+                len(memory_tools),
+            )
+
+            return memory_tools
+
+        except Exception as e:
+            logger.error("Failed to create memory tools: %s", e)
+            return []
+
     def _create_memory_instructions(self) -> str:
         """Create memory-related instructions for the agent."""
         if not self.enable_memory:
@@ -205,6 +284,24 @@ class AgnoPersonalAgent:
             - **Context Retrieval**: Relevant past interactions are retrieved to provide better context
             - **Topic Organization**: Information is categorized by topics for better organization
             - **Semantic Search**: Use natural language to find related information from past conversations
+            
+            ## IMPORTANT: Always Use Memory for Personal Queries
+            
+            When users ask personal questions like:
+            - "What is my name?"
+            - "What do you know about me?"
+            - "Tell me about myself"
+            - "What are my preferences?"
+            - "When was I born?"
+            - "What are my favorite programming languages?"
+            
+            **ALWAYS query_knowledge_base FIRST** before responding. The user's personal information
+            is stored in the knowledge base and should be retrieved to provide accurate answers.
+            
+            Example workflow for "What is my name?":
+            1. Use query_knowledge_base("user name") 
+            2. Use the retrieved information to answer
+            3. Do not say you don't have access to personal information if memory tools are available
             
             When responding:
             1. Consider any retrieved context from past interactions
@@ -293,13 +390,21 @@ class AgnoPersonalAgent:
                     "ReasoningTools not available, continuing without reasoning capabilities"
                 )
 
+            # Add memory tools as proper Agno tools
+            if self.enable_memory:
+                memory_tools = await self._get_memory_tools()
+                tools.extend(memory_tools)
+                logger.info("Added %d memory tools", len(memory_tools))
+
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:
                 mcp_tool_functions = self._get_mcp_tools_as_functions()
                 tools.extend(mcp_tool_functions)
 
-            # Create agent instructions
-            instructions = self._create_agent_instructions()
+            # Create agent instructions with memory emphasis
+            base_instructions = self._create_agent_instructions()
+            memory_instructions = self._create_memory_instructions()
+            instructions = base_instructions + memory_instructions
 
             # Create the agno agent
             self.agent = Agent(
@@ -313,8 +418,10 @@ class AgnoPersonalAgent:
             )
 
             logger.info(
-                "Successfully initialized agno agent with %d MCP tool wrapper(s)",
+                "Successfully initialized agno agent with %d total tools (%d memory + %d MCP)",
                 len(tools),
+                len(await self._get_memory_tools()) if self.enable_memory else 0,
+                len(self._get_mcp_tools_as_functions()) if self.enable_mcp else 0,
             )
             return True
 

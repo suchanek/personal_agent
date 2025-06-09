@@ -4,6 +4,7 @@ Smolagents-compatible web interface module for the Personal AI Agent.
 This module provides a Flask-based web interface that works with smolagents
 instead of LangChain, maintaining the same UI and functionality.
 """
+
 # pylint: disable=W0718,C0103,C0301,
 import json
 import logging
@@ -1094,19 +1095,34 @@ def get_main_template():
                 }, 100);
             });
 
+            // Check if page loaded with a response - means processing is complete
+            window.addEventListener('load', function() {
+                const responseContent = document.querySelector('.response-content');
+                if (responseContent && responseContent.textContent.trim()) {
+                    // Page loaded with response - processing is complete
+                    setTimeout(() => {
+                        processing.classList.remove('active');
+                        console.log('Page loaded with response - processing complete');
+                    }, 500);
+                }
+            });
+
             // Monitor processing state to reset thought to "Ready" when complete
             const observer = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                         const target = mutation.target;
                         if (target.id === 'processing' && !target.classList.contains('active')) {
-                            // Processing completed, reset thought to Ready
+                            // Processing completed, reset thought to Ready after a longer delay
                             const thoughtContent = document.getElementById('thought-content');
                             if (thoughtContent && thoughtContent.textContent !== 'Ready') {
                                 setTimeout(() => {
-                                    thoughtContent.textContent = 'Ready';
-                                    console.log('Reset thought to Ready state');
-                                }, 1000); // Small delay to let any final thoughts show
+                                    // Only reset if we're not currently streaming new thoughts
+                                    if (thoughtContent.textContent !== 'Ready') {
+                                        thoughtContent.textContent = 'Ready';
+                                        console.log('Reset thought to Ready state');
+                                    }
+                                }, 3000); // Longer delay to let all thoughts show
                             }
                         }
                     }

@@ -3,7 +3,7 @@
 import logging
 from typing import List, Optional
 
-from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent, tool
+from smolagents import CodeAgent, LiteLLMModel
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_WEAVIATE
 from ..tools.smol_tools import ALL_TOOLS, set_mcp_client, set_memory_components

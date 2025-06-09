@@ -5,7 +5,40 @@ All notable changes to the Personal AI Agent project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.060825] - 2025-06-08 🎯 **CURRENT FOCUS: SMOLAGENTS VERSION**
+## [0.4.1] - 2025-06-08 🧠 **AGNO MEMORY INTEGRATION BREAKTHROUGH**
+
+### 🚀 MAJOR BREAKTHROUGH: Agno Framework with Full Memory Integration
+
+- **AGNO FRAMEWORK INTEGRATION**: Successfully implemented Agno framework as third agent option alongside LangChain and SmolaAgents
+- **MEMORY RETRIEVAL FIXED**: Resolved critical issue where agents weren't automatically using memory tools for personal queries
+- **AUTOMATIC MEMORY SEARCH**: Agno agent now automatically queries knowledge base for personal information (name, preferences, etc.)
+- **PROPER TOOL INTEGRATION**: Fixed tool compatibility issues between LangChain decorators and Agno framework
+- **ENHANCED AGENT INSTRUCTIONS**: Added explicit memory usage instructions for personal queries
+
+### Added
+
+- **Agno Agent Implementation**: Complete `AgnoPersonalAgent` class with MCP and memory integration
+- **Agno CLI Interface**: `personal-agent-agno-cli` command for interactive Agno agent sessions
+- **Agno Memory Tools**: Proper async memory tools compatible with Agno framework architecture
+- **Memory-First Instructions**: Agent instructions that prioritize memory search for personal queries
+- **Tool Integration Framework**: Seamless integration of LangChain tools with Agno-compatible wrappers
+
+### Fixed
+
+- **Memory Tool Auto-Usage**: Fixed agents not automatically using memory tools for personal information retrieval
+- **Tool Compatibility**: Resolved LangChain `@tool` decorator incompatibility with Agno framework
+- **Agent Instructions**: Enhanced instructions to explicitly trigger memory searches for personal queries
+- **Async Tool Handling**: Proper async function wrapping for memory tools in Agno environment
+
+### Verified Working
+
+- ✅ **Name Retrieval**: Agent correctly retrieves "Eric" from memory when asked "what is my name?"
+- ✅ **Personal Information**: Successfully accesses stored DOB (4/11/1960) and preferences (Python, Lisp, C)
+- ✅ **Memory Storage**: Interaction storage working with proper async handling
+- ✅ **MCP Integration**: 6 MCP servers successfully connected with Agno framework
+- ✅ **CLI Functionality**: Interactive CLI with streaming responses and tool calls
+
+## [0.4.060825] - 2025-06-08 🎯 **SMOLAGENTS VERSION**
 
 ### 🚀 MAJOR BREAKTHROUGH: MCP Filesystem Integration + Smolagents Stabilization
 
