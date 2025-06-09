@@ -1,4 +1,4 @@
-"""Agent with Storage - An agent that can store sessions in a database
+  """Agent with Storage - An agent that can store sessions in a database
 
 Install dependencies: `pip install openai lancedb tantivy sqlalchemy agno`
 """
