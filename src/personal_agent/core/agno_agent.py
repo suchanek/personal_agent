@@ -9,16 +9,26 @@ including native MCP support, async operations, and advanced agent features.
 import asyncio
 import logging
 from textwrap import dedent
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
+from agno.tools.yfinance import YFinanceTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
-from ..core import create_agno_knowledge, create_agno_storage, load_personal_knowledge
+from ..core import (
+    create_agno_knowledge,
+    create_agno_memory,
+    create_agno_storage,
+    load_agno_knowledge,
+    load_pdf_knowledge,
+    load_personal_knowledge,
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -64,6 +74,7 @@ class AgnoPersonalAgent:
         # Agno native storage components
         self.agno_storage = None
         self.agno_knowledge = None
+        self.agno_memory = None
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -198,11 +209,27 @@ class AgnoPersonalAgent:
             """\
             You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
             
+            ## 🚨 CRITICAL MANDATORY RULE - READ THIS FIRST 🚨
+            
+            **FOR ANY PERSONAL QUESTION, YOU MUST USE THE 'search' FUNCTION IMMEDIATELY:**
+            
+            Examples that REQUIRE immediate search:
+            - "What is my name?" → IMMEDIATELY call search("name user Eric identity")
+            - "What's my name?" → IMMEDIATELY call search("name user Eric identity")
+            - "Who am I?" → IMMEDIATELY call search("user information identity profile")  
+            - "What do you know about me?" → IMMEDIATELY call search("user personal information profile")
+            - "Tell me about me" → IMMEDIATELY call search("user personal information Eric")
+            - "My preferences?" → IMMEDIATELY call search("preferences settings likes interests")
+            - "My skills?" → IMMEDIATELY call search("skills programming abilities")
+            - "Tell me about Eric" → IMMEDIATELY call search("Eric user information profile")
+            
+            **NEVER** say "I don't have access to personal information" or ask for clarification without calling search() first!
+            
             ## Core Guidelines
             
             - **Be Direct**: Execute tasks immediately without asking for confirmation unless critical
-            - **Use Tools FIRST**: Always check available tools before saying you can't do something
             - **Built-in Memory**: You have automatic memory that persists across conversations
+            - **Use Tools**: Always check available tools before saying you can't do something
             - **Be Thorough**: When searching or researching, provide complete and organized results
             - **Use Tables**: Display data in tables when appropriate for better readability
             - **Show Reasoning**: Use your reasoning capabilities to break down complex problems
@@ -210,23 +237,25 @@ class AgnoPersonalAgent:
             
             ## CRITICAL TOOL USAGE RULES
             
-            1. **For Personal Questions**: ALWAYS use knowledge base search tools first (e.g., "what is my name?", "who am I?", "my preferences")
+            1. **For Personal Questions**: ALWAYS use 'search' function first with relevant keywords
             2. **For GitHub Tasks**: Use available GitHub tools for repository information
             3. **For File Operations**: Use filesystem tools for file management
             4. **For Research**: Use web search tools for current information
             5. **Never say "I can't" without first trying relevant tools**
             
-            ## Knowledge Base Usage
+            ## Knowledge Base Usage - STEP BY STEP
             
-            **MANDATORY**: For any question about the user (name, preferences, personal info), you MUST:
-            1. Use available knowledge search tools (like asearch_knowledge_base)
-            2. Search for relevant keywords
-            3. Only say information is unavailable AFTER searching
+            **WORKFLOW FOR PERSONAL QUERIES:**
+            1. **Detect personal question** → Recognize questions about the user
+            2. **IMMEDIATELY call search()** → Use relevant keywords from the question
+            3. **Review search results** → Check what information was found
+            4. **Provide complete answer** → Use the found information to answer
+            5. **If nothing found** → Only then say information is not available
             
-            **Examples of when to search knowledge base:**
-            - "What is my name?" → Search for "name", "user", "identity"
-            - "Who am I?" → Search for "user information", "identity", "profile"
-            - "My preferences?" → Search for "preferences", "settings", "likes"
+            ### Available Knowledge Functions:
+            - **search(query)** - Search the knowledge base for information (USE THIS FOR PERSONAL QUESTIONS!)
+            - **think(query)** - Use reasoning capabilities  
+            - **analyze(query)** - Analyze information from knowledge base
             
             ## Available Capabilities
             
@@ -264,9 +293,10 @@ class AgnoPersonalAgent:
 
         return base_instructions
 
-    async def initialize(self) -> bool:
+    async def initialize(self, recreate: bool = False) -> bool:
         """
         Initialize the agno agent with all components.
+        :param recreate: Whether to recreate the agent knowledge bases
 
         :return: True if initialization successful, False otherwise
         """
@@ -276,17 +306,35 @@ class AgnoPersonalAgent:
             logger.info("Created model: %s", self.model_name)
 
             # Prepare tools list
-            tools = []
+            tools = [DuckDuckGoTools(), YFinanceTools()]
 
-            # Initialize Agno native storage and knowledge
+            # Initialize Agno native storage and knowledge following the working example pattern
             if self.enable_memory:
                 self.agno_storage = create_agno_storage(self.storage_dir)
-                self.agno_knowledge = create_agno_knowledge(self.storage_dir)
+                logger.info("Created Agno storage at: %s", self.storage_dir)
 
-                # Load existing knowledge files
-                load_personal_knowledge(self.agno_knowledge, self.knowledge_dir)
+                # Create knowledge base (sync creation)
+                self.agno_knowledge = create_agno_knowledge(
+                    self.storage_dir, self.knowledge_dir
+                )
 
+                # Load knowledge base content (async loading) - matches working example
+                if self.agno_knowledge:
+                    await load_agno_knowledge(self.agno_knowledge, recreate=recreate)
+                    logger.info("Loaded Agno knowledge base content")
+
+                    # Add KnowledgeTools for agent to search its knowledge base
+                    knowledge_tools = KnowledgeTools(knowledge=self.agno_knowledge)
+                    tools.append(knowledge_tools)
+                    logger.info("Added KnowledgeTools to agent")
+
+                self.agno_memory = create_agno_memory(self.storage_dir)
+                logger.info("Created Agno memory storage at: %s", self.storage_dir)
                 logger.info("Initialized Agno storage and knowledge backend")
+            else:
+                logger.info(
+                    "Memory disabled, skipping storage and knowledge initialization"
+                )
 
             # Add ReasoningTools for better reasoning capabilities
             # TEMPORARILY DISABLED to debug tool naming issue
@@ -309,7 +357,7 @@ class AgnoPersonalAgent:
             # Create agent instructions
             instructions = self._create_agent_instructions()
 
-            # Create the agno agent with appropriate storage/knowledge
+            # Create the agno agent with appropriate storage/knowledge - match working example
             agent_kwargs = {
                 "model": model,
                 "tools": tools,
@@ -318,17 +366,22 @@ class AgnoPersonalAgent:
                 "show_tool_calls": self.debug,
                 "add_history_to_messages": True,  # Enable conversation history
                 "num_history_responses": 5,  # Keep last 5 exchanges in context
-                "enable_agentic_memory": True,  # Enable automatic memory capabilities
-                "enable_user_memories": True,  # Enable user-specific memory storage
-                "add_memory_references": True,  # Add memory references in responses
-                "search_knowledge": True,  # Enable automatic knowledge search
-                "update_knowledge": True,  # Allow knowledge updates
             }
 
-            # Add storage and knowledge if memory is enabled
-            if self.enable_memory:
-                agent_kwargs["storage"] = self.agno_storage
+            # Add knowledge base and enable search - exactly like working example
+            if self.enable_memory and self.agno_knowledge:
                 agent_kwargs["knowledge"] = self.agno_knowledge
+                agent_kwargs["search_knowledge"] = True  # This is the key setting!
+                logger.info(
+                    "Agent configured with knowledge base and search_knowledge=True"
+                )
+
+            # Add storage and memory if available
+            if self.enable_memory:
+                if self.agno_storage:
+                    agent_kwargs["storage"] = self.agno_storage
+                if self.agno_memory:
+                    agent_kwargs["memory"] = self.agno_memory
 
             self.agent = Agent(**agent_kwargs)
 
