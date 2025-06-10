@@ -9,9 +9,10 @@ including native MCP support, async operations, and advanced agent features.
 import asyncio
 import logging
 from textwrap import dedent
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from agno.agent import Agent
+from agno.knowledge.text import TextKnowledgeBase
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.knowledge import KnowledgeTools
@@ -21,14 +22,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
-from ..core import (
-    create_agno_knowledge,
-    create_agno_memory,
-    create_agno_storage,
-    load_agno_knowledge,
-    load_pdf_knowledge,
-    load_personal_knowledge,
-)
+from .agno_storage import create_agno_knowledge, load_agno_knowledge
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -547,3 +541,81 @@ def create_agno_agent_sync(
             debug=debug,
         )
     )
+
+
+def create_simple_personal_agent(
+    storage_dir: str = None,
+    knowledge_dir: str = None,
+    model_provider: str = "ollama",
+    model_name: str = LLM_MODEL,
+) -> tuple[Agent, Optional[TextKnowledgeBase]]:
+    """
+    Create a simple personal agent following the working pattern from knowledge_agent_example.py
+
+    This function creates an agent with knowledge base integration using the simple
+    pattern that avoids async initialization complexity.
+
+    :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
+    :param knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :return: Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
+    """
+    # Create knowledge base (synchronous creation)
+    knowledge_base = create_agno_knowledge(storage_dir, knowledge_dir)
+
+    # Create the model
+    if model_provider == "openai":
+        model = OpenAIChat(id=model_name)
+    elif model_provider == "ollama":
+        model = OpenAIChat(
+            id=model_name,
+            api_key="ollama",  # Dummy key for local Ollama
+            base_url=f"{OLLAMA_URL}/v1",
+        )
+    else:
+        raise ValueError(f"Unsupported model provider: {model_provider}")
+
+    # Create agent with simple pattern
+    agent = Agent(
+        name="Personal AI Agent",
+        model=model,
+        knowledge=knowledge_base,
+        search_knowledge=True,  # Enable automatic knowledge search
+        show_tool_calls=True,  # Show what tools the agent uses
+        markdown=True,  # Format responses in markdown
+        instructions=[
+            "You are a personal AI assistant with access to the user's knowledge base.",
+            "Always search your knowledge base when asked about personal information.",
+            "Provide detailed responses based on the information you find.",
+            "If you can't find specific information, say so clearly.",
+            "Include relevant details from the knowledge base in your responses.",
+        ],
+    )
+
+    logger.info("✅ Created simple personal agent")
+    if knowledge_base:
+        logger.info(f"   Knowledge base: Enabled")
+        logger.info(f"   Search enabled: {agent.search_knowledge}")
+    else:
+        logger.info(f"   Knowledge base: None (no knowledge files found)")
+
+    return agent, knowledge_base
+
+
+async def load_agent_knowledge(
+    knowledge_base: TextKnowledgeBase, recreate: bool = False
+) -> None:
+    """
+    Load knowledge base content asynchronously.
+
+    This should be called after creating the agent to load the knowledge content.
+
+    :param knowledge_base: Knowledge base instance to load
+    :param recreate: Whether to recreate the knowledge base from scratch
+    """
+    if knowledge_base:
+        await load_agno_knowledge(knowledge_base, recreate=recreate)
+        logger.info("✅ Knowledge base loaded successfully")
+    else:
+        logger.info("No knowledge base to load")
