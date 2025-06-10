@@ -5,13 +5,15 @@ This module orchestrates all components using the agno framework for modern
 async agent operations while maintaining compatibility with existing infrastructure.
 """
 
+import argparse
 import asyncio
 import logging
+import os
 from typing import Optional
 
 # Import configuration
 from .config import LLM_MODEL, USE_MCP
-from .config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR
+from .config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, OLLAMA_URL
 
 # Import core components
 from .core.agno_agent import AgnoPersonalAgent, create_agno_agent
@@ -27,16 +29,25 @@ agno_agent: Optional[AgnoPersonalAgent] = None
 logger: Optional[logging.Logger] = None
 
 
-async def initialize_agno_system():
+async def initialize_agno_system(use_remote_ollama: bool = False):
     """
     Initialize all system components for agno framework.
 
-    Returns:
-        Tuple of (agno_agent, memory_functions)
+    :param use_remote_ollama: Whether to use the remote Ollama server instead of local
+    :return: Tuple of (agno_agent, memory_functions)
     """
     global logger
     logger = setup_logging()
     logger.info("Starting Personal AI Agent with agno framework...")
+
+    # Update Ollama URL if requested
+    ollama_url = OLLAMA_URL
+    if use_remote_ollama:
+        ollama_url = "http://tesla.local:11434"
+        os.environ["OLLAMA_URL"] = ollama_url
+        logger.info(f"Using remote Ollama server at: {ollama_url}")
+    else:
+        logger.info(f"Using local Ollama server at: {ollama_url}")
 
     # Create agno agent with native storage
     logger.info("Creating agno agent with native storage...")
@@ -49,6 +60,7 @@ async def initialize_agno_system():
         storage_dir=AGNO_STORAGE_DIR,
         knowledge_dir=AGNO_KNOWLEDGE_DIR,
         debug=True,
+        ollama_base_url=ollama_url,  # Pass the selected Ollama URL
     )
 
     agent_info = agno_agent.get_agent_info()
@@ -85,19 +97,19 @@ async def initialize_agno_system():
     )
 
 
-def create_agno_web_app():
+def create_agno_web_app(use_remote_ollama: bool = False):
     """
     Create and configure the Flask web application with agno.
 
-    Returns:
-        Configured Flask application
+    :param use_remote_ollama: Whether to use the remote Ollama server instead of local
+    :return: Configured Flask application
     """
     # Get logger instance first
     logger_instance = setup_logging()
 
     # Initialize agno system (run async initialization)
     agno_agent_instance, query_kb_func, store_int_func, clear_kb_func = asyncio.run(
-        initialize_agno_system()
+        initialize_agno_system(use_remote_ollama)
     )
 
     # Create Flask app
@@ -120,32 +132,48 @@ def create_agno_web_app():
     return app
 
 
-def run_agno_web():
+def run_agno_web(use_remote_ollama: bool = False):
     """
     Run the agno web application.
+
+    :param use_remote_ollama: Whether to use the remote Ollama server instead of local
     """
-    app = create_agno_web_app()
+    app = create_agno_web_app(use_remote_ollama)
 
     # Run the app
     print("\n🚀 Starting Personal AI Agent with Agno Framework...")
     print("🌐 Web interface will be available at: http://127.0.0.1:5002")
     print("📚 Features: Native MCP integration, Async operations, Enhanced memory")
     print("⚡ Framework: Agno with native MCP + Ollama")
+    if use_remote_ollama:
+        print("🖥️  Using remote Ollama at: http://tesla.local:11434")
+    else:
+        print("🖥️  Using local Ollama at: http://localhost:11434")
     print("🔧 Mode: Modern async agent with advanced capabilities")
     print("\nPress Ctrl+C to stop the server.\n")
 
     app.run(host="127.0.0.1", port=5002, debug=False)
 
 
-async def run_agno_cli(query: str = None):
+async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
     """
     Run agno agent in CLI mode with streaming and reasoning.
+
+    :param query: Initial query to run
+    :param use_remote_ollama: Whether to use the remote Ollama server instead of local
     """
     print("\n🤖 Personal AI Agent - Agno CLI Mode")
     print("=" * 50)
 
+    if use_remote_ollama:
+        print("🖥️  Using remote Ollama at: http://tesla.local:11434")
+    else:
+        print("🖥️  Using local Ollama at: http://localhost:11434")
+
     # Initialize system
-    agent, query_kb, store_int, clear_kb = await initialize_agno_system()
+    agent, query_kb, store_int, clear_kb = await initialize_agno_system(
+        use_remote_ollama
+    )
 
     print(f"✅ Agent initialized: {agent.get_agent_info()}")
     print("\nEnter your queries (type 'quit' to exit):")
@@ -204,15 +232,22 @@ def cli_main():
     """
     Main entry point for CLI mode (used by poetry scripts).
     """
-    asyncio.run(run_agno_cli())
+    parser = argparse.ArgumentParser(
+        description="Run the Personal AI Agent with Agno Framework"
+    )
+    parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
+    parser.add_argument(
+        "--remote-ollama", action="store_true", help="Use remote Ollama server"
+    )
+    args = parser.parse_args()
+
+    if args.cli:
+        # Run in CLI mode
+        asyncio.run(run_agno_cli(use_remote_ollama=args.remote_ollama))
+    else:
+        # Run web interface
+        run_agno_web(use_remote_ollama=args.remote_ollama)
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1 and sys.argv[1] == "cli":
-        # Run in CLI mode
-        asyncio.run(run_agno_cli())
-    else:
-        # Run web interface
-        run_agno_web()
+    cli_main()
