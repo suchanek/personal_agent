@@ -50,6 +50,7 @@ class AgnoPersonalAgent:
         storage_dir: str = "./data/agno",
         knowledge_dir: str = "./data/knowledge",
         debug: bool = False,
+        ollama_base_url: str = OLLAMA_URL,
     ):
         """
         Initialize the Agno Personal Agent.
@@ -61,6 +62,7 @@ class AgnoPersonalAgent:
         :param storage_dir: Directory for Agno storage files
         :param knowledge_dir: Directory containing knowledge files to load
         :param debug: Enable debug logging and tool call visibility
+        :param ollama_base_url: Base URL for Ollama API
         """
         self.model_provider = model_provider
         self.model_name = model_name
@@ -69,6 +71,7 @@ class AgnoPersonalAgent:
         self.storage_dir = storage_dir
         self.knowledge_dir = knowledge_dir
         self.debug = debug
+        self.ollama_base_url = ollama_base_url
 
         # Agno native storage components
         self.agno_storage = None
@@ -97,7 +100,7 @@ class AgnoPersonalAgent:
             return OpenAIChat(
                 id=self.model_name,
                 api_key="ollama",  # Dummy key for local Ollama
-                base_url=f"{OLLAMA_URL}/v1",
+                base_url=f"{self.ollama_base_url}/v1",
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
@@ -484,6 +487,7 @@ async def create_agno_agent(
     storage_dir: str = "./data/agno",
     knowledge_dir: str = "./data/knowledge",
     debug: bool = False,
+    ollama_base_url: str = OLLAMA_URL,
 ) -> AgnoPersonalAgent:
     """
     Create and initialize an agno-based personal agent.
@@ -496,6 +500,7 @@ async def create_agno_agent(
         storage_dir: Directory for Agno storage files
         knowledge_dir: Directory containing knowledge files to load
         debug: Enable debug mode
+        ollama_base_url: Base URL for Ollama API
 
     Returns:
         AgnoPersonalAgent: Initialized agent instance
@@ -508,6 +513,7 @@ async def create_agno_agent(
         storage_dir=storage_dir,
         knowledge_dir=knowledge_dir,
         debug=debug,
+        ollama_base_url=ollama_base_url,
     )
 
     success = await agent.initialize()
@@ -526,12 +532,21 @@ def create_agno_agent_sync(
     storage_dir: str = "./data/agno",
     knowledge_dir: str = "./data/knowledge",
     debug: bool = False,
+    ollama_base_url: str = OLLAMA_URL,
 ) -> AgnoPersonalAgent:
     """
     Synchronous wrapper for creating agno agent.
 
-    Returns:
-        AgnoPersonalAgent: Initialized agent instance
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param enable_memory: Whether to enable memory and knowledge features
+    :param enable_mcp: Whether to enable MCP tool integration
+    :param storage_dir: Directory for Agno storage files
+    :param knowledge_dir: Directory containing knowledge files to load
+    :param debug: Enable debug mode
+    :param ollama_base_url: Base URL for Ollama API
+
+    :return: Initialized agent instance
     """
     return asyncio.run(
         create_agno_agent(
@@ -542,6 +557,7 @@ def create_agno_agent_sync(
             storage_dir=storage_dir,
             knowledge_dir=knowledge_dir,
             debug=debug,
+            ollama_base_url=ollama_base_url,
         )
     )
 
