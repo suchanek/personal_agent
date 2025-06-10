@@ -48,7 +48,7 @@ async def initialize_agno_system():
         enable_mcp=USE_MCP,  # Use configured MCP setting
         storage_dir=AGNO_STORAGE_DIR,
         knowledge_dir=AGNO_KNOWLEDGE_DIR,
-        debug=False,
+        debug=True,
     )
 
     agent_info = agno_agent.get_agent_info()

@@ -22,7 +22,12 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
-from .agno_storage import create_agno_knowledge, load_agno_knowledge
+from .agno_storage import (
+    create_agno_knowledge,
+    create_agno_memory,
+    create_agno_storage,
+    load_agno_knowledge,
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -317,10 +322,8 @@ class AgnoPersonalAgent:
                     await load_agno_knowledge(self.agno_knowledge, recreate=recreate)
                     logger.info("Loaded Agno knowledge base content")
 
-                    # Add KnowledgeTools for agent to search its knowledge base
-                    knowledge_tools = KnowledgeTools(knowledge=self.agno_knowledge)
-                    tools.append(knowledge_tools)
-                    logger.info("Added KnowledgeTools to agent")
+                    # Knowledge tools will be automatically added via search_knowledge=True
+                    # DO NOT manually add KnowledgeTools to avoid naming conflicts
 
                 self.agno_memory = create_agno_memory(self.storage_dir)
                 logger.info("Created Agno memory storage at: %s", self.storage_dir)
