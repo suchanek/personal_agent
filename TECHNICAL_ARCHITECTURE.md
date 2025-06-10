@@ -64,6 +64,7 @@ The Personal AI Agent is a sophisticated, self-contained AI assistant built usin
 ### 🔧 **Core Components**
 
 #### **1. Agno Agent Framework**
+
 - **Framework**: Native Python Agno framework
 - **Model Provider**: Ollama (OpenAI-compatible interface)
 - **Model**: qwen3:1.7B (local inference)
@@ -71,6 +72,7 @@ The Personal AI Agent is a sophisticated, self-contained AI assistant built usin
 - **Pattern**: Simple `Agent(knowledge=kb, search_knowledge=True)`
 
 #### **2. Knowledge Management**
+
 - **Storage**: LanceDB (local, file-based vector database)
 - **Embeddings**: nomic-embed-text (768 dimensions)
 - **Search**: Hybrid (vector similarity + full-text with tantivy)
@@ -78,6 +80,7 @@ The Personal AI Agent is a sophisticated, self-contained AI assistant built usin
 - **Location**: `/Users/egs/data/knowledge/`
 
 #### **3. Memory System**
+
 - **Conversation Memory**: SQLite (`data/memory.db`)
 - **Session Storage**: SQLite (`data/agents.db`)
 - **Vector Storage**: LanceDB (`data/lancedb/`)
@@ -85,6 +88,7 @@ The Personal AI Agent is a sophisticated, self-contained AI assistant built usin
 - **Context**: Automatic context building and retrieval
 
 #### **4. MCP Tool Ecosystem**
+
 ```yaml
 MCP Servers (6 active):
   github:
@@ -140,12 +144,14 @@ MCP Servers (6 active):
 ### 🎯 **Core Features**
 
 #### **1. Knowledge-Aware Responses**
+
 - **Personal Information Retrieval**: Automatically searches knowledge base for user information
 - **Contextual Understanding**: Combines knowledge base data with conversation context
 - **Technical Specification Queries**: Provides detailed system architecture information
 - **Project Status Updates**: Tracks development progress and migration status
 
 #### **2. Tool Integration**
+
 - **GitHub Operations**: Repository analysis, code review, issue tracking
 - **File Management**: Local file operations, directory traversal, content analysis
 - **Web Research**: Real-time information gathering and fact-checking
@@ -153,12 +159,14 @@ MCP Servers (6 active):
 - **Database Access**: PostgreSQL queries and data analysis
 
 #### **3. Memory and Learning**
+
 - **Persistent Memory**: Retains conversation history across sessions
 - **Context Building**: Automatically builds relevant context for responses
 - **User Preferences**: Learns and adapts to user patterns and preferences
 - **Knowledge Evolution**: Updates knowledge base with new information
 
 #### **4. Multi-Interface Support**
+
 - **CLI Mode**: Interactive command-line interface (`poetry run paga_cli`)
 - **Web Interface**: Browser-based interaction and monitoring
 - **API Endpoints**: RESTful API for integration
@@ -167,6 +175,7 @@ MCP Servers (6 active):
 ### 🚀 **Advanced Capabilities**
 
 #### **1. Intelligent Search**
+
 ```python
 # Automatic knowledge search for personal queries
 Query: "What is my name?"
@@ -175,11 +184,13 @@ Query: "What is my name?"
 ```
 
 #### **2. Multi-Tool Coordination**
+
 - **GitHub + Knowledge**: Correlates repository data with personal projects
 - **Web + Memory**: Researches topics while maintaining conversation context
 - **Files + Knowledge**: Analyzes local files with knowledge base context
 
 #### **3. Technical Analysis**
+
 - **System Architecture**: Explains its own technical implementation
 - **Migration Tracking**: Documents transition from Weaviate to Agno
 - **Performance Metrics**: Monitors response times and resource usage
@@ -197,6 +208,7 @@ Query: "What is my name?"
 | **Concurrent Users** | 1 (Personal) | Designed for single user |
 
 ### 🔄 **Operational Metrics**
+
 - **Knowledge Base**: 6 documents, 4 files actively indexed
 - **Vector Dimensions**: 768 (nomic-embed-text)
 - **Search Results**: Typically 3-6 relevant documents per query
@@ -272,12 +284,14 @@ agent_info = agent.get_agent_info()
 ## Future Roadmap
 
 ### 🎯 **Short-term Goals**
+
 - [ ] Enhanced web interface with real-time chat
 - [ ] Additional MCP server integrations
 - [ ] Knowledge base auto-updates from interactions
 - [ ] Performance optimization and caching
 
 ### 🚀 **Long-term Vision**
+
 - [ ] Multi-user support with isolated knowledge bases
 - [ ] Advanced reasoning capabilities
 - [ ] Custom tool development framework
