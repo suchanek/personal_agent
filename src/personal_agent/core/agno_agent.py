@@ -18,7 +18,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
-from ..core import create_agno_knowledge, create_agno_memory, create_agno_storage
+from ..core import create_agno_knowledge, create_agno_storage, load_personal_knowledge
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -64,7 +64,6 @@ class AgnoPersonalAgent:
         # Agno native storage components
         self.agno_storage = None
         self.agno_knowledge = None
-        self.agno_memory = None
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -282,31 +281,10 @@ class AgnoPersonalAgent:
             # Initialize Agno native storage and knowledge
             if self.enable_memory:
                 self.agno_storage = create_agno_storage(self.storage_dir)
-                self.agno_memory = create_agno_memory(self.storage_dir)
-                self.agno_knowledge = await create_agno_knowledge(
-                    self.storage_dir, self.knowledge_dir
-                )
+                self.agno_knowledge = create_agno_knowledge(self.storage_dir)
 
-                # Add KnowledgeTools for explicit knowledge base interaction
-                if self.agno_knowledge:
-                    try:
-                        from agno.tools.knowledge import KnowledgeTools
-
-                        knowledge_tools = KnowledgeTools(
-                            knowledge=self.agno_knowledge,
-                            search=True,
-                            think=True,
-                            analyze=True,
-                            add_instructions=True,
-                        )
-                        tools.append(knowledge_tools)
-                        logger.info(
-                            "Added KnowledgeTools for knowledge base interaction"
-                        )
-                    except ImportError:
-                        logger.warning(
-                            "KnowledgeTools not available, relying on automatic search"
-                        )
+                # Load existing knowledge files
+                load_personal_knowledge(self.agno_knowledge, self.knowledge_dir)
 
                 logger.info("Initialized Agno storage and knowledge backend")
 
@@ -340,7 +318,6 @@ class AgnoPersonalAgent:
                 "show_tool_calls": self.debug,
                 "add_history_to_messages": True,  # Enable conversation history
                 "num_history_responses": 5,  # Keep last 5 exchanges in context
-                "read_chat_history": True,  # Enable reading chat history
                 "enable_agentic_memory": True,  # Enable automatic memory capabilities
                 "enable_user_memories": True,  # Enable user-specific memory storage
                 "add_memory_references": True,  # Add memory references in responses
@@ -352,7 +329,6 @@ class AgnoPersonalAgent:
             if self.enable_memory:
                 agent_kwargs["storage"] = self.agno_storage
                 agent_kwargs["knowledge"] = self.agno_knowledge
-                agent_kwargs["memory"] = self.agno_memory
 
             self.agent = Agent(**agent_kwargs)
 

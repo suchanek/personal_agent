@@ -1,371 +1,3 @@
-# Changelog
-
-All notable changes to the Personal AI Agent project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [0.5] - 2025-06-09 🎯 **AGNO NATIVE STORAGE MIGRATION**
-
-### 🚀 MAJOR ARCHITECTURE CHANGE: Complete Migration from Weaviate to Agno Native Storage
-
-**BREAKING CHANGE**: Migrated the Agno agent from external Weaviate dependency to Agno's built-in storage system (SQLite + LanceDB). This significantly simplifies the architecture and reduces external dependencies while maintaining full functionality.
-
-### 🔧 Latest Improvements (Final Phase)
-
-**RESOLVED**: Agent now automatically uses internal knowledge base search capabilities for personal queries.
-
-- **Memory System Integration**: Added proper `SqliteMemoryDb` configuration using Agno's v2 memory system
-- **Knowledge Tools Integration**: Successfully integrated `KnowledgeTools` for explicit knowledge base search
-- **Automatic Tool Usage**: Agent now properly invokes `get_chat_history` and `aupdate_user_memory` tools for knowledge queries
-- **Embedding Dimension Fix**: Corrected OllamaEmbedder configuration to use 768 dimensions (was 4096)
-- **Async Function Compatibility**: Converted all knowledge loading functions to proper async implementation
-- **Test Validation**: Comprehensive testing confirms agent uses tools automatically for personal information queries
-
-### ✨ Key Achievements
-
-- **SIMPLIFIED ARCHITECTURE**: Removed complex Weaviate setup in favor of Agno's native SQLite + LanceDB storage
-- **ZERO EXTERNAL DEPENDENCIES**: No more Docker containers or external vector database services required
-- **AUTOMATIC MEMORY**: Agno's built-in memory system handles conversation persistence automatically
-- **KNOWLEDGE AUTO-LOADING**: Personal knowledge files (`.txt`, `.md`) automatically loaded from `./data/knowledge/`
-- **MAINTAINED COMPATIBILITY**: All MCP tools and functionality preserved while simplifying the backend
-
-### Added
-
-- **Agno Storage Module**: New `agno_storage.py` with native storage utilities
-  - `create_agno_storage()`: SQLite storage for agent sessions
-  - `create_agno_knowledge()`: LanceDB vector database for knowledge
-  - `load_personal_knowledge()`: Automatic knowledge file loading
-- **Storage Configuration**: Added `AGNO_STORAGE_DIR` and `AGNO_KNOWLEDGE_DIR` settings
-- **Migration Test**: Comprehensive test script to verify the migration works correctly
-
-### Changed
-
-- **AgnoPersonalAgent Constructor**: Simplified parameters, removed Weaviate dependencies
-  - Removed: `weaviate_client`, `vector_store`, `storage_backend` parameters
-  - Added: `storage_dir`, `knowledge_dir` parameters for native storage paths
-- **Agent Initialization**: Streamlined setup process using Agno's built-in capabilities
-- **Memory Instructions**: Updated to work with Agno's automatic memory system
-- **CLI Integration**: Updated `agno_main.py` to use simplified agent without Weaviate
-
-### Removed
-
-- **Weaviate Dependencies**: Eliminated external vector store requirements from Agno agent
-- **Manual Memory Tools**: Replaced custom memory functions with Agno's automatic system
-- **Complex Initialization**: Removed multi-backend storage logic and Weaviate setup code
-
-### Fixed
-
-- **Import Issues**: Corrected `TextKnowledgeBase` import (was `TextKnowledge`)
-- **Storage Path Creation**: Ensured storage directories are created automatically
-- **Knowledge Loading**: Fixed automatic loading of personal knowledge files
-- **Memory Integration**: Added proper `SqliteMemoryDb` configuration to eliminate "MemoryDb not provided" warnings
-- **Knowledge Tools**: Integrated `KnowledgeTools` for explicit knowledge base search capabilities
-- **Embedding Configuration**: Fixed embedding dimension mismatch (4096 vs 768) in OllamaEmbedder
-- **Async Functions**: Converted knowledge loading functions to proper async implementation
-- **Tool Integration**: Agent now properly uses internal tools (`get_chat_history`, `aupdate_user_memory`) for knowledge queries
-
-### Technical Details
-
-- **Storage Backend**: SQLite for sessions + LanceDB for vector knowledge
-- **Memory Strategy**: Agno handles conversation memory automatically
-- **Knowledge Strategy**: Auto-load `.txt` and `.md` files from knowledge directory
-- **MCP Integration**: Maintained full MCP server compatibility
-- **Performance**: Faster startup without external Weaviate dependency
-
-### Technical Implementation Details
-
-- **Storage Backend**: SQLite database for session management (`./data/agno/agent_sessions.db`)
-- **Knowledge Backend**: LanceDB vector database for semantic search (`./data/agno/lancedb/`)
-- **Embedding Model**: OpenAI `text-embedding-3-small` for knowledge vectorization
-- **Search Type**: Hybrid search combining semantic and keyword matching
-- **Auto-Loading**: Scans `./data/knowledge/` for `.txt` and `.md` files on startup
-
-### Migration Impact
-
-- **Deployment Simplified**: No more Docker containers or external services required
-- **Setup Time**: Reduced from minutes to seconds (no Weaviate container startup)
-- **Memory Usage**: Lower memory footprint without external vector database
-- **Maintenance**: Eliminated Weaviate configuration and troubleshooting
-- **Portability**: Fully self-contained with embedded storage
-
-### Compatibility Notes
-
-- **MCP Tools**: All MCP server integrations remain unchanged
-- **Web Interface**: Frontend compatibility maintained
-- **CLI Mode**: Full functionality preserved with enhanced streaming
-- **Knowledge Format**: Existing `.txt` and `.md` knowledge files work without modification
-- **Configuration**: Environment variables for storage paths (`AGNO_STORAGE_DIR`, `AGNO_KNOWLEDGE_DIR`)
-
-### Performance Improvements
-
-- **Startup Speed**: 80% faster initialization without external dependencies
-- **Memory Efficiency**: Automatic memory management by Agno framework
-- **Knowledge Search**: LanceDB provides fast hybrid semantic search
-- **Session Persistence**: SQLite ensures reliable conversation history
-
-### Developer Experience
-
-- **Simplified Testing**: No Docker setup required for development
-- **Error Reduction**: Fewer moving parts means fewer potential failure points
-- **Debug Mode**: Enhanced tool call visibility and logging
-- **Local Development**: Fully functional without internet connectivity
-
-This migration represents a significant advancement in the Personal AI Agent's architecture, moving from a complex multi-service setup to a streamlined, self-contained solution while maintaining all functionality and improving performance.
-
----
-
-## [0.4.1] - 2025-06-08 🧠 **AGNO MEMORY INTEGRATION BREAKTHROUGH**
-
-### 🚀 MAJOR BREAKTHROUGH: Agno Framework with Full Memory Integration
-
-- **AGNO FRAMEWORK INTEGRATION**: Successfully implemented Agno framework as third agent option alongside LangChain and SmolaAgents
-- **MEMORY RETRIEVAL FIXED**: Resolved critical issue where agents weren't automatically using memory tools for personal queries
-- **TOOL NAMING BUG DISCOVERED**: Found and fixed ReasoningTools concatenation bug that corrupted function names (e.g., `thinkquery_knowledge_base` instead of `query_knowledge_base`)
-- **AUTOMATIC MEMORY SEARCH**: Agno agent now automatically queries knowledge base for personal information (name, preferences, etc.)
-- **PROPER TOOL INTEGRATION**: Fixed tool compatibility issues between LangChain decorators and Agno framework
-- **ENHANCED AGENT INSTRUCTIONS**: Added explicit memory usage instructions for personal queries with mandatory language
-
-### Added
-
-- **Agno Agent Implementation**: Complete `AgnoPersonalAgent` class with MCP and memory integration
-- **Agno CLI Interface**: `personal-agent-agno-cli` command for interactive Agno agent sessions
-- **Dual Memory Tools**: Both `query_knowledge_base` and `get_user_information` functions for comprehensive memory access
-- **Memory-First Instructions**: Agent instructions that prioritize memory search for personal queries with "ABSOLUTE REQUIREMENT" language
-- **Tool Integration Framework**: Seamless integration of LangChain tools with Agno-compatible wrappers
-- **Standalone Async Functions**: Proper async memory tools with explicit `__name__` attributes for Agno compatibility
-
-### Fixed
-
-- **Critical Tool Naming Bug**: Temporarily disabled ReasoningTools to prevent function name corruption that broke memory tool access
-- **Memory Tool Auto-Usage**: Fixed agents not automatically using memory tools for personal information retrieval
-- **Tool Compatibility**: Resolved LangChain `@tool` decorator incompatibility with Agno framework
-- **Agent Instructions Priority**: Moved memory instructions to the top of instruction sequence for highest priority
-- **Async Tool Handling**: Proper async function wrapping for memory tools in Agno environment
-- **Weaviate Initialization Sequence**: Ensured proper `initialize_agno_system()` call before agent creation
-
-### Key Technical Insights
-
-- **ReasoningTools Interference**: ReasoningTools was prefixing "think" to function names, breaking tool discovery
-- **Instruction Order Matters**: Memory instructions must be first in the agent's instruction sequence
-- **Forceful Language Required**: Agent instructions need "MANDATORY" and "DO NOT REASON ABOUT WHETHER TO USE TOOLS" language
-- **Initialization Sequence Critical**: Weaviate must be initialized before agent creation for memory tools to be available
-
-### Verified Working
-
-- ✅ **Name Retrieval**: Agent correctly retrieves "Eric" from memory when asked "what is my name?"
-- ✅ **Personal Information**: Successfully accesses stored DOB (4/11/1960) and preferences (Python, Lisp, C)
-- ✅ **Memory Storage**: Interaction storage working with proper async handling
-- ✅ **MCP Integration**: 6 MCP servers successfully connected with Agno framework
-- ✅ **CLI Functionality**: Interactive CLI with streaming responses and tool calls
-- ✅ **Memory Tool Verification**: `test_memory_tools.py` confirms memory functionality works correctly
-
-## [0.4.060825] - 2025-06-08 🎯 **SMOLAGENTS VERSION**
-
-### 🚀 MAJOR BREAKTHROUGH: MCP Filesystem Integration + Smolagents Stabilization
-
-- **CURRENT DEVELOPMENT TARGET**: This version represents the stable smolagents implementation with working MCP integration
-- **CRITICAL DISCOVERY**: MCP filesystem servers expect absolute paths, not relative paths - this was the key breakthrough
-- **User-Agnostic Configuration**: Eliminated hardcoded `/home/egs` paths, now uses proper environment variables
-- **Smolagents Integration**: Fully functional smolagents framework with reliable MCP filesystem and GitHub tools
-- **Comprehensive GitHub Tools**: Debugged and catalogued all 26 available GitHub MCP server endpoints
-
-### Added
-
-- **Robust MCP Filesystem Integration**: Complete overhaul with absolute path handling for all filesystem operations
-- **GitHub Repository Information Tools**: Added `github_repository_info` for comprehensive repo analysis via MCP
-- **Environment Variable Support**: Added HOME_DIR, ROOT_DIR, and REPO_DIR configuration in settings.py
-- **Comprehensive Test Suites**: Created extensive testing for filesystem operations and GitHub tools
-- **Path Access Validation**: Implemented security controls for different filesystem server access levels
-- **Cross-Platform Path Handling**: Enhanced tilde expansion and relative path conversion
-
-### Fixed
-
-- **MCP Filesystem Path Handling**: Fixed critical issue where relative path conversion was causing failures
-- **GitHub MCP Tool Endpoints**: Replaced non-existent `get_repository` with working `github_search_repositories`
-- **Tilde Expansion**: Fixed directory listing to properly handle `~` path expansion
-- **Server Selection Logic**: Improved automatic selection between filesystem-home/data/root servers
-- **Access Control**: Added proper validation to ensure paths are within allowed server directories
-
-### Changed
-
-- **Filesystem Tools Architecture**: Complete rewrite of `mcp_read_file`, `mcp_write_file`, `mcp_list_directory`
-- **Environment Configuration**: Updated `.env` with ROOT_DIR=/ and proper HOME_DIR mapping for flexible access
-- **MCP Server Configurations**: Enhanced server configs to use environment variables instead of hardcoded paths
-- **Path Mapping Strategy**: Switched from relative path conversion to direct absolute path usage
-- **Error Handling**: Improved validation and user-friendly error messages for path access issues
-
-### Technical Details
-
-- **Absolute Path Discovery**: MCP servers use configured root directory for access control only, not path conversion
-- **Server Access Levels**: filesystem-home (HOME_DIR), filesystem-data (DATA_DIR), filesystem-root (full system)
-- **Path Validation**: Comprehensive security checks ensure paths are within appropriate server boundaries
-- **Directory Creation**: Automatic directory structure creation for write operations when needed
-
-## [0.4.1] - 2025-06-07
-
-### 🔧 CRITICAL FIXES
-
-- **MCPTools Session Management**: Fixed broken MCPTools initialization that was failing due to missing session parameter
-- **Agno Framework Integration**: Replaced custom SimpleMCPClient with native Agno MCPTools for proper streaming support
-- **Agent Initialization**: Resolved agent startup failures with session-based MCP tool architecture
-
-### Added
-
-- **Session-Based MCP Utilities**: New `create_filesystem_mcp_tools()` and `create_github_mcp_tools()` functions with proper session management
-- **File Agent Module**: New `agents/file_agent.py` demonstrating correct MCP session usage pattern
-- **GitHub Agents Module**: New `agents/github_agents.py` with GitHub-specific MCP integration
-- **Real-Time Streaming Interface**: Enhanced Streamlit interface with real-time agent response streaming
-- **Comprehensive Filesystem Tools**: Expanded filesystem operations in static MCP tools implementation
-- **Development Testing Tools**: Added multiple debug and test files for MCP functionality validation
-
-### Changed
-
-- **MCP Architecture**: Moved from direct MCPTools instantiation to on-demand creation with proper sessions
-- **Tool Integration**: Main agent now uses reliable tools (DuckDuckGo, YFinance, YouTube, GitHub) with MCP available on-demand
-- **Error Handling**: Improved graceful fallback when MCP servers are unavailable
-- **Streamlit Interface**: Enhanced with real-time streaming capabilities and better user experience
-- **Agent Configuration**: Updated team agent configurations in `agents/ollama_agents.py`
-
-### Fixed
-
-- **Session Parameter Error**: Resolved `MCPTools()` constructor requiring session parameter in `agno_main.py`
-- **Streaming Integration**: Fixed SimpleMCPClient compatibility issues with Agno's streaming architecture
-- **Import Dependencies**: Cleaned up unused imports and undefined variable references
-- **Tool Initialization**: Eliminated agent initialization failures caused by broken MCP tool setup
-- **Memory Integration**: Improved SQLite + LanceDB integration with proper error handling
-
-### Removed
-
-- **Broken MCP Client**: Eliminated custom SimpleMCPClient in favor of native Agno MCPTools
-- **Direct MCPTools Instantiation**: Removed problematic direct initialization without sessions
-- **Legacy Test Files**: Cleaned up outdated test files and moved relevant tests to `tests/` directory
-
-### Technical Details
-
-- **Session Management**: All MCP tools now use `stdio_client` and `ClientSession` for proper server communication
-- **Architecture Pattern**: Follows session-based pattern from `file_agent.py` throughout the codebase
-- **Tool Availability**: MCP tools created with proper sessions when specifically needed
-- **Zero Dependencies**: Maintains SQLite + LanceDB architecture with no external database requirements
-
-## [0.4.0] - 2025-06-05
-
-### 🚀 BREAKING CHANGES
-
-- **Architecture Consolidation**: Replaced dynamic MCP tool creation with static tool implementations
-- **Framework Archival**: Archived LangChain and smolagents frameworks to `archive/legacy_frameworks/`
-- **Dependency Removal**: Eliminated all Weaviate dependencies in favor of native Agno memory
-- **Entry Point Consolidation**: Single `agno_main.py` entry point replaces multiple framework options
-
-### Added
-
-- **Static MCP Tools**: New `agno_static_tools.py` with `@tool` decorators and direct MCP client calls
-- **Archive Structure**: Comprehensive archival system for legacy frameworks in `archive/legacy_frameworks/`
-  - LangChain: `main.py`, `core/agent.py`, `core/memory.py`, `web/interface.py`, `utils/store_fact.py`
-  - Smolagents: `smol_main.py`, `core/smol_agent.py`, `core/multi_agent_system.py`, `tools/smol_tools.py`, `web/smol_interface.py`, `utils/smol_blog.py`
-- **Version Module**: New `__version__.py` for centralized version management
-- **Ollama Agents**: New `agents/ollama_agents.py` module for enhanced agent configurations
-
-### Changed
-
-- **Package Description**: Updated from "Multi-agent framework powered by HuggingFace smolagents" to "Personal AI agent with MCP, SQLite memory, and LanceDB vector storage"
-- **Tool Implementation**: Replaced 120+ lines of dynamic `get_mcp_tools_as_functions()` with clean static tool factory pattern
-- **Parameter Handling**: Fixed GitHub search tool with `Optional[str]` parameter and proper None handling
-- **Package Structure**: Simplified imports and removed legacy framework references from `__init__.py`
-- **Memory Tools**: Gracefully disabled Weaviate functionality with informative user messages
-
-### Removed
-
-- **Dynamic Tool Creation**: Eliminated problematic temporary agent creation approach
-- **Weaviate Dependencies**: Removed all references to Weaviate vector database
-- **Legacy Framework Integration**: Removed active imports and usage of archived frameworks
-- **Backup Files**: Cleaned up `agno_main_backup.py` and `agno_main_sqlite.py` duplicates
-
-### Fixed
-
-- **Tool Calling Performance**: GitHub search now executes in ~0.34s (previously had validation errors)
-- **Import Errors**: Resolved all import issues caused by framework consolidation
-- **Parameter Validation**: Fixed Pydantic validation with proper Optional type handling
-- **Package Installation**: Package now imports successfully without errors
-
-### Technical Details
-
-- **Core Framework**: Agno ^1.5.8 (replaces langchain + smolagents)
-- **Storage**: SQLite + LanceDB (replaces Weaviate)
-- **MCP Integration**: mcp ^1.9.2 for tool protocol support
-- **Static Tools**: Closure-based tool factory pattern with proper MCP client integration
-- **Performance**: Verified GitHub search functionality with sub-second execution times
-
-### Migration Notes
-
-- Legacy framework code preserved in `archive/legacy_frameworks/` for reference
-- All functionality maintained while improving performance and simplifying architecture
-- Static tool approach provides better reliability and debugging capabilities
-- Native Agno memory system replaces Weaviate for better integration
-
-## [agnodev2] - 2025-06-04
-
-### Added
-
-- SQLite + LanceDB local storage architecture for zero external dependencies
-- Streamlit web interface replacing Flask implementation
-- Knowledge auto-creation functionality with essential knowledge files
-- File-based backup/restore capabilities for data directory
-- Privacy-first local data storage with no external database requirements
-
-### Changed
-
-- **BREAKING**: Migrated from Weaviate vector database to SQLite + LanceDB
-- **BREAKING**: Replaced Flask web interface with Streamlit (port 8501)
-- Updated README.md to reflect new local storage architecture
-- Removed Docker dependency from prerequisites
-- Updated installation instructions to remove Weaviate setup
-- Modified environment variables (removed DATA_DIR and WEAVIATE_URL)
-- Updated troubleshooting section for local storage
-
-### Removed
-
-- Docker-based Weaviate database dependency
-- Flask web interface and related API endpoints
-- Complex database management requirements
-
-### Fixed
-
-- Simplified setup process with automatic storage initialization
-- Eliminated external service dependencies for improved reliability
-
-### Migration Notes
-
-- Legacy Weaviate installations can be migrated using built-in tools
-- Knowledge base now auto-creates essential files on first run
-- All data stored locally in `data/` directory for easy backup
-
-## [agnodev1 - Unreleased]
-
-### Added
-
-- Native Agno framework implementation as third complete system
-- Built-in Memory(SqliteMemoryDb) integration with agno Agent
-- TextKnowledgeBase with hybrid search capabilities
-- Native agno Weaviate vector database integration
-- Enhanced knowledge base functionality with document storage
-
-### Changed
-
-- Migrated from custom AgnoPersonalAgent wrapper to native agno Agent framework
-- Updated MCP tools integration to use native agno `@tool` decorator
-- Replaced custom `WeaviateVectorStore` with native `agno.vectordb.weaviate.Weaviate`
-- Changed agno implementation port from 5002 to 5003
-- Updated web interface to use native agno `arun()` method for agent execution
-
-### Fixed
-
-- Resolved type mismatch issues with Weaviate vector database integration
-- Fixed `Function.from_callable()` usage in MCP tools registration
-- Enabled both memory AND knowledge systems (previously only memory worked)
-
-## [Previous Releases] - Project History
-
 # Personal AI Agent - Project Summary
 
 ## 🎉 Project Status: COMPLETE & FULLY OPERATIONAL
@@ -389,6 +21,40 @@ A comprehensive Personal AI Agent system with **THREE COMPLETE IMPLEMENTATIONS**
 - **Framework**: HuggingFace Smolagents Multi-Agent Framework
 - **Web Interface**: `src/personal_agent/web/smol_interface.py`
 - **Status**: Complete alternative implementation with MCP bridge
+
+**3. Agno System (Latest Implementation)**
+
+- **Entry Point**: `run_agno.py` → `src/personal_agent/agno_main.py`
+- **Framework**: Native Agno Agent with built-in memory and knowledge capabilities
+- **Web Interface**: `src/personal_agent/web/agno_interface.py`
+- **Status**: Latest implementation with native agno integration and enhanced knowledge base
+
+#### 🏗️ Shared Infrastructure
+
+Both systems utilize the same core components:
+
+- **Ollama Local LLM** (qwen2.5:7b-instruct)
+- **Weaviate Vector Database** for persistent memory
+- **Model Context Protocol (MCP)** integration with 6 servers
+- **Modular Architecture** with organized code structure under `src/`
+- **Identical Tool Arsenal** - All 13 tools available in both systems
+
+### 🛠️ Complete Tool Arsenal (13 Tools)
+
+#### Memory & Knowledge Management (3 tools)
+
+1. **`store_interaction`** - Store conversations in vector database
+2. **`query_knowledge_base`** - Semantic search through memories  
+3. **`clear_knowledge_base`** - Reset stored knowledge
+
+#### File System Operations (4 tools)
+
+4. **`mcp_read_file`** - Read any file content
+5. **`mcp_write_file`** - Create/update files
+6. **`mcp_list_directory`** - Browse directory contents
+7. **`intelligent_file_search`** - Smart file discovery with memory integration
+
+#### External Data Sources (5 tools)
 
 8. **`mcp_github_search`** - Search GitHub repos, code, issues, docs (with OUTPUT_PARSING_FAILURE fix)
 9. **`mcp_brave_search`** - Real-time web search via Brave API
@@ -581,7 +247,7 @@ A comprehensive Personal AI Agent system with **THREE COMPLETE IMPLEMENTATIONS**
   - **Web Interface**: Updated to use native agno `arun()` method for agent execution
 - **Application Status**: Full native agno integration achieved
   - Application shows `memory=True, knowledge=True, tools=6` instead of previous `knowledge=False`
-  - Web interface accessible at <http://127.0.0.1:5003> with complete functionality
+  - Web interface accessible at http://127.0.0.1:5003 with complete functionality
   - Changed port from 5002 to 5003 for the agno implementation
 - **Code Quality**: Significant simplification through native framework adoption
   - Removed custom AgnoPersonalAgent wrapper complexity
