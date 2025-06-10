@@ -7,12 +7,14 @@ import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add the src directory to the path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent.core import create_simple_personal_agent, load_agent_knowledge
 
 
 async def test_simple_queries():
+    """Test simple knowledge search queries without special characters."""
     # Create agent
     agent, knowledge_base = create_simple_personal_agent()
 

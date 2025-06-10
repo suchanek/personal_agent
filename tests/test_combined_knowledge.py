@@ -20,42 +20,46 @@ async def test_combined_knowledge():
         model_provider="ollama",
         model_name=LLM_MODEL,
         enable_memory=True,
-        enable_mcp=False,  # Focus on knowledge base testing
-        storage_dir="{DATA_DIR}/data/agno",
-        knowledge_dir="{DATA_DIR}/data/knowledge",
-        debug=True,
+        enable_mcp=False,  # Disable MCP for cleaner output
+        debug=True,  # Enable debug to see tool calls
     )
 
-    success = await agent.initialize()
+    success = await agent.initialize(recreate=False)
     if not success:
         print("❌ Failed to initialize agent")
-        return
+        return False
 
-    print("✅ Agent initialized successfully with combined knowledge base")
+    print("✅ Agent initialized successfully")
     print()
 
-    # Test queries about knowledge base contents
-    queries = [
-        "What knowledge sources do you have available?",
-        "Search your knowledge for any information about Eric",
-        "What types of documents are in your knowledge base?",
-        "What can you tell me about the user from your knowledge?",
+    # Test knowledge base queries
+    test_queries = [
+        "What do you know about Eric?",
+        "What is in your knowledge base?",
+        "Search your knowledge base for AI",
+        "What kind of information do you have about projects?",
     ]
 
-    for i, query in enumerate(queries, 1):
-        print(f"🔍 Query {i}: {query}")
+    for i, query in enumerate(test_queries, 1):
+        print(f"\n🔍 Query {i}: {query}")
         print("-" * 60)
 
         try:
             response = await agent.run(query)
             print(f"Response: {response}")
+            print("-" * 60)
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Query failed: {e}")
+            print("-" * 60)
 
-        print()
-        print("=" * 80)
-        print()
+    print("\n✅ Combined knowledge base test completed")
+    return True
+
+
+async def main():
+    """Run the test asynchronously."""
+    await test_combined_knowledge()
 
 
 if __name__ == "__main__":
-    asyncio.run(test_combined_knowledge())
+    asyncio.run(main())

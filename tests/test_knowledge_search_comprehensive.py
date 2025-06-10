@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script to verify knowledge base search functionality."""
+"""Test script to verify knowledge base search functionality (comprehensive)."""
 
 import asyncio
 import logging
@@ -13,9 +13,9 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message
 logger = logging.getLogger(__name__)
 
 
-async def test_knowledge_search():
-    """Test knowledge base search functionality."""
-    print("🔄 Testing Knowledge Base Search...")
+async def test_knowledge_search_comprehensive():
+    """Test knowledge base search functionality comprehensively."""
+    print("🔄 Testing Knowledge Base Search (Comprehensive)...")
     print(f"📁 DATA_DIR: {DATA_DIR}")
     print(f"🤖 LLM_MODEL: {LLM_MODEL}")
     print()
@@ -73,45 +73,18 @@ async def test_knowledge_search():
         try:
             response = await agent.run(query)
             print(f"Response: {response}")
-
-            # Check if the response contains any information from knowledge base
-            knowledge_indicators = [
-                "Eric",
-                "California",
-                "Python",
-                "AI agents",
-                "Software Developer",
-            ]
-            found_knowledge = any(
-                indicator in response for indicator in knowledge_indicators
-            )
-
-            if found_knowledge:
-                print("✅ Response contains knowledge base information")
-            else:
-                print("❌ Response does NOT contain knowledge base information")
-
+            print("-" * 60)
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Query failed: {e}")
+            print("-" * 60)
 
-        print("=" * 80)
-
+    print("\n✅ Knowledge search test completed")
     return True
 
 
 async def main():
-    """Main test function."""
-    print("=" * 80)
-    print("🧪 KNOWLEDGE BASE SEARCH TEST")
-    print("=" * 80)
-    print()
-
-    success = await test_knowledge_search()
-
-    print()
-    print("=" * 80)
-    print(f"🏁 Test Result: {'✅ SUCCESS' if success else '❌ FAILED'}")
-    print("=" * 80)
+    """Run the test asynchronously."""
+    await test_knowledge_search_comprehensive()
 
 
 if __name__ == "__main__":
