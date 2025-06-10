@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from agno.embedder.ollama import OllamaEmbedder
+from agno.knowledge.pdf import PDFKnowledgeBase
 from agno.knowledge.text import TextKnowledgeBase
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 from agno.memory.v2.memory import Memory
@@ -95,7 +96,7 @@ async def create_agno_knowledge(
 
 
 async def load_personal_knowledge(
-    vector_db: LanceDb, knowledge_dir: str = None
+    vector_db: LanceDb, knowledge_dir: str = None, recreate: bool = False
 ) -> Optional[TextKnowledgeBase]:
     """Load personal knowledge files into the vector database.
 
@@ -121,20 +122,23 @@ async def load_personal_knowledge(
     if text_files:
         try:
             logger.info(
-                "Found %d knowledge files in %s", len(text_files), knowledge_path
+                "Found %d knowledge text files in %s", len(text_files), knowledge_path
             )
 
             # Initialize the TextKnowledgeBase following the working example pattern
             text_knowledge = TextKnowledgeBase(
                 path=knowledge_path,
                 vector_db=vector_db,
-                num_documents=5,  # Add num_documents parameter like in the example
+                num_documents=len(
+                    text_files
+                ),  # Add num_documents parameter like in the example
+                recreate=recreate,  # Use recreate parameter to control loading
             )
 
-            logger.info("Loading knowledge base...")
+            logger.info("Loading text knowledge base...")
             # Use aload with recreate=False like in the working example
             # Let Agno handle whether to recreate or not based on existing data
-            await text_knowledge.aload(recreate=False)
+            await text_knowledge.aload(recreate=recreate)
 
             logger.info(
                 "Successfully loaded %d text/markdown files into knowledge base",
@@ -146,21 +150,49 @@ async def load_personal_knowledge(
             logger.error("Failed to load text knowledge: %s", e)
             return None
 
-    return None
 
-    # TODO: Add PDF loading support if needed
-    # pdf_files = list(knowledge_path.glob("*.pdf"))
-    # if pdf_files:
-    #     try:
-    #         from agno.knowledge.pdf import PdfKnowledgeBase
-    #         pdf_knowledge = PdfKnowledgeBase(
-    #             sources=[str(f) for f in pdf_files],
-    #             vector_db=vector_db
-    #         )
-    #         # Set to True to load the knowledge base (only needs to be done once)
-    #         load_knowledge = True
-    #         if load_knowledge:
-    #             pdf_knowledge.load()
-    #             logger.info("Loaded %d PDF files into knowledge base", len(pdf_files))
-    #     except Exception as e:
-    #         logger.error("Failed to load PDF knowledge: %s", e)
+# TODO: Add PDF loading support if needed
+async def load_pdf_knowledge(
+    vector_db: LanceDb, knowledge_dir: str = None, recreate: bool = False
+) -> Optional[PDFKnowledgeBase]:
+    """Load personal knowledge files into the vector database.
+
+    :param vector_db: Vector database instance
+    :param knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
+    :return: Configured TextKnowledgeBase instance or None if no knowledge found
+    """
+    from agno.knowledge.text import PdfKnowledgeBase
+
+    if knowledge_dir is None:
+        knowledge_dir = f"{DATA_DIR}/knowledge"
+
+    knowledge_path = Path(knowledge_dir)
+    if not knowledge_path.exists():
+        logger.info(
+            "No knowledge directory found at %s, skipping knowledge loading",
+            knowledge_path,
+        )
+        return None
+
+    pdf_files = list(knowledge_path.glob("*.pdf"))
+    if pdf_files:
+        try:
+            pdf_knowledge = PdfKnowledgeBase(
+                sources=[str(f) for f in pdf_files], vector_db=vector_db
+            )
+            # Set to True to load the knowledge base (only needs to be done once)
+            load_knowledge = True
+            if load_knowledge:
+                await pdf_knowledge.aload(recreate=recreate)
+                logger.info("Loaded %d PDF files into knowledge base", len(pdf_files))
+                return pdf_knowledge
+
+        except Exception as e:
+            logger.error("Failed to load PDF knowledge: %s", e)
+            return None
+    else:
+        logger.error("No PDF files to load.")
+        return None
+
+
+# end of file
