@@ -127,10 +127,10 @@ async def load_agno_knowledge(
     logger.info("Knowledge base loaded successfully")
 
 
-async def create_combined_knowledge_base(
-    storage_dir: str = None, knowledge_dir: str = None, recreate: bool = False
+def create_combined_knowledge_base(
+    storage_dir: str = None, knowledge_dir: str = None
 ) -> Optional[CombinedKnowledgeBase]:
-    """Create a combined knowledge base with text and PDF sources.
+    """Create a combined knowledge base with text and PDF sources (synchronous creation).
 
     :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
     :param knowledge_dir: Directory containing knowledge files to load (defaults to DATA_DIR/knowledge)
@@ -186,8 +186,6 @@ async def create_combined_knowledge_base(
             vector_db=text_vector_db,
             num_documents=len(text_files),
         )
-        # Load the text knowledge base
-        await text_kb.aload(recreate=recreate)
         knowledge_sources.append(text_kb)
         logger.info("Created TextKnowledgeBase with %d files", len(text_files))
 
@@ -204,8 +202,6 @@ async def create_combined_knowledge_base(
             path=knowledge_path,
             vector_db=pdf_vector_db,
         )
-        # Load the PDF knowledge base
-        await pdf_kb.aload(recreate=recreate)
         knowledge_sources.append(pdf_kb)
         logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
 
@@ -223,9 +219,6 @@ async def create_combined_knowledge_base(
             vector_db=combined_vector_db,
         )
 
-        logger.info("Loading combined knowledge base...")
-        await combined_kb.aload(recreate=recreate)
-
         logger.info(
             "Successfully created combined knowledge base with %d sources (%d text, %d PDF)",
             len(knowledge_sources),
@@ -236,6 +229,19 @@ async def create_combined_knowledge_base(
         return combined_kb
 
     return None
+
+
+async def load_combined_knowledge_base(
+    knowledge_base: CombinedKnowledgeBase, recreate: bool = False
+) -> None:
+    """Load combined knowledge base content (async loading).
+
+    :param knowledge_base: CombinedKnowledgeBase instance to load
+    :param recreate: Whether to recreate the knowledge base from scratch
+    """
+    logger.info("Loading combined knowledge base content...")
+    await knowledge_base.aload(recreate=recreate)
+    logger.info("Combined knowledge base loaded successfully")
 
 
 def load_personal_knowledge(
