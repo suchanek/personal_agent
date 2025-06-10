@@ -14,8 +14,9 @@ from agno.storage.sqlite import SqliteStorage
 from agno.vectordb.lancedb import LanceDb, SearchType
 
 from ..config import DATA_DIR, OLLAMA_URL
+from ..utils import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 
 def create_agno_storage(storage_dir: str = None) -> SqliteStorage:

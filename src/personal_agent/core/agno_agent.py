@@ -15,13 +15,13 @@ from agno.agent import Agent
 from agno.knowledge.text import TextKnowledgeBase
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
-from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
 from agno.tools.yfinance import YFinanceTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..utils import setup_logging
 from .agno_storage import (
     create_agno_knowledge,
     create_agno_memory,
@@ -30,7 +30,7 @@ from .agno_storage import (
 )
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 
 class AgnoPersonalAgent:
@@ -364,6 +364,10 @@ class AgnoPersonalAgent:
                 "instructions": instructions,
                 "markdown": True,
                 "show_tool_calls": self.debug,
+                "name": "Personal AI Agent",
+                "agent_id": "personal_agent",  # Changed 'id' to 'agent_id' for consistency
+                "enable_agentic_memory": self.enable_memory,
+                "enable_user_memories": self.enable_memory,
                 "add_history_to_messages": True,  # Enable conversation history
                 "num_history_responses": 5,  # Keep last 5 exchanges in context
             }

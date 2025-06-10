@@ -34,7 +34,8 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
 # Configuration constants - All configurable via environment variables
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
-USE_WEAVIATE = get_env_bool("USE_WEAVIATE", True)
+REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://tesla.local:11434")
+USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 USE_MCP = get_env_bool("USE_MCP", True)
 
 # Directory configurations

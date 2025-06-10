@@ -13,20 +13,30 @@ from typing import Optional
 
 # Import configuration
 from .config import LLM_MODEL, USE_MCP
-from .config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, OLLAMA_URL
+from .config.settings import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    OLLAMA_URL,
+    REMOTE_OLLAMA_URL,
+)
 
 # Import core components
 from .core.agno_agent import AgnoPersonalAgent, create_agno_agent
 
 # Import utilities
-from .utils import inject_dependencies, register_cleanup_handlers, setup_logging
+from .utils import (
+    configure_all_rich_logging,
+    inject_dependencies,
+    register_cleanup_handlers,
+    setup_logging,
+)
 
 # Import agno web interface (will be created)
 from .web.agno_interface import create_app, register_routes
 
 # Global variables for cleanup
 agno_agent: Optional[AgnoPersonalAgent] = None
-logger: Optional[logging.Logger] = None
+logger: Optional[logging.Logger] = setup_logging()
 
 
 async def initialize_agno_system(use_remote_ollama: bool = False):
@@ -37,13 +47,16 @@ async def initialize_agno_system(use_remote_ollama: bool = False):
     :return: Tuple of (agno_agent, memory_functions)
     """
     global logger
+
+    # Set up Rich logging for all components including agno
+    configure_all_rich_logging()
     logger = setup_logging()
     logger.info("Starting Personal AI Agent with agno framework...")
 
     # Update Ollama URL if requested
     ollama_url = OLLAMA_URL
     if use_remote_ollama:
-        ollama_url = "http://tesla.local:11434"
+        ollama_url = REMOTE_OLLAMA_URL
         os.environ["OLLAMA_URL"] = ollama_url
         logger.info(f"Using remote Ollama server at: {ollama_url}")
     else:
@@ -52,6 +65,7 @@ async def initialize_agno_system(use_remote_ollama: bool = False):
     # Create agno agent with native storage
     logger.info("Creating agno agent with native storage...")
     global agno_agent
+
     agno_agent = await create_agno_agent(
         model_provider="ollama",  # Default to Ollama
         model_name=LLM_MODEL,  # Use configured model
@@ -104,7 +118,8 @@ def create_agno_web_app(use_remote_ollama: bool = False):
     :param use_remote_ollama: Whether to use the remote Ollama server instead of local
     :return: Configured Flask application
     """
-    # Get logger instance first
+    # Set up Rich logging for all components including agno
+    configure_all_rich_logging()
     logger_instance = setup_logging()
 
     # Initialize agno system (run async initialization)
@@ -232,6 +247,12 @@ def cli_main():
     """
     Main entry point for CLI mode (used by poetry scripts).
     """
+    # Set up Rich logging for all components including agno
+    from .utils import configure_all_rich_logging, setup_logging
+
+    configure_all_rich_logging()
+    logger = setup_logging()
+
     parser = argparse.ArgumentParser(
         description="Run the Personal AI Agent with Agno Framework"
     )
@@ -241,12 +262,16 @@ def cli_main():
     )
     args = parser.parse_args()
 
-    if args.cli:
-        # Run in CLI mode
-        asyncio.run(run_agno_cli(use_remote_ollama=args.remote_ollama))
-    else:
-        # Run web interface
-        run_agno_web(use_remote_ollama=args.remote_ollama)
+    # Check if this function is being called from the paga_cli script
+    # If it is, or if the --cli flag is set, run in CLI mode
+    # This simple approach should be sufficient for most cases
+
+    # Always run in CLI mode when the function name is cli_main
+    # Since this is specifically the CLI entry point in pyproject.toml
+    logger.info("Starting Personal AI Agent in CLI mode")
+
+    # Run in CLI mode
+    asyncio.run(run_agno_cli(use_remote_ollama=args.remote_ollama))
 
 
 if __name__ == "__main__":

@@ -275,6 +275,97 @@ def set_logger_level_for_module(pkg_name, level=""):
     return registered_loggers
 
 
+def setup_agno_rich_logging(level: int = LOG_LEVEL) -> None:
+    """
+    Configure agno framework loggers to use Rich handlers.
+
+    This function applies Rich logging configuration to all agno-related loggers
+    to ensure consistent formatting and styling throughout the application.
+
+    :param level: The logging level to set for agno loggers
+    :type level: int
+    """
+    from rich.logging import RichHandler
+
+    # List of agno-related logger namespaces
+    agno_namespaces = [
+        "agno",
+        "agno.agent",
+        "agno.models",
+        "agno.tools",
+        "agno.knowledge",
+        "agno.memory",
+        "agno.storage",
+        "agno.vectordb",
+        "agno.embedder",
+    ]
+
+    # Rich formatter for agno logs
+    rich_formatter = logging.Formatter(
+        "PersonalAgent: %(levelname)s %(asctime)s - %(name)s.%(funcName)s - %(message)s"
+    )
+
+    for namespace in agno_namespaces:
+        logger = logging.getLogger(namespace)
+
+        # Clear existing handlers to avoid duplicates
+        logger.handlers.clear()
+
+        # Add Rich handler
+        rich_handler = RichHandler(rich_tracebacks=True)
+        rich_handler.setLevel(level)
+        rich_handler.setFormatter(rich_formatter)
+        logger.addHandler(rich_handler)
+
+        # Set logger level
+        logger.setLevel(level)
+
+        # Prevent propagation to avoid duplicate logs
+        logger.propagate = False
+
+    # Also configure the root agno logger
+    agno_root_logger = logging.getLogger("agno")
+    if not agno_root_logger.handlers:
+        rich_handler = RichHandler(rich_tracebacks=True)
+        rich_handler.setLevel(level)
+        rich_handler.setFormatter(rich_formatter)
+        agno_root_logger.addHandler(rich_handler)
+        agno_root_logger.setLevel(level)
+        agno_root_logger.propagate = False
+
+
+def configure_all_rich_logging(level: int = LOG_LEVEL) -> None:
+    """
+    Configure all logging in the application to use Rich handlers.
+
+    This includes both personal agent loggers and agno framework loggers.
+
+    :param level: The logging level to set
+    :type level: int
+    """
+    # Set up Rich logging filters first
+    setup_logging_filters()
+
+    # Configure agno framework logging
+    setup_agno_rich_logging(level)
+
+    # Configure root logger with Rich handler
+    root_logger = logging.getLogger()
+
+    # Clear existing handlers
+    root_logger.handlers.clear()
+
+    # Add Rich handler to root logger
+    rich_handler = RichHandler(rich_tracebacks=True)
+    rich_formatter = logging.Formatter(
+        "PersonalAgent: %(levelname)s %(asctime)s - %(name)s.%(funcName)s - %(message)s"
+    )
+    rich_handler.setLevel(level)
+    rich_handler.setFormatter(rich_formatter)
+    root_logger.addHandler(rich_handler)
+    root_logger.setLevel(level)
+
+
 if __name__ == "__main__":
     import doctest
 
