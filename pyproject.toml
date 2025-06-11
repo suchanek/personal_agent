@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.5.0"
+version = "0.5.2"
 license = "BSD-3-Clause"
-description = "Personal AI agent with MCP and Weaviate"
-authors = ["Your Name <your.email@example.com>"]
+description = "Personal AI agent with MCP and sqlite support, using Agno for advanced capabilities."
+authors = ["Eric Suchanek <suchanek@mac.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
@@ -29,18 +29,18 @@ mcp = "^1.9.2"
 pgvector = "^0.4.1"
 
 [tool.poetry.scripts]
-personal-agent = "src.personal_agent.main:main"
-pagl_cli = "src.personal_agent.main:cli_main"
+# Main simplified entry points
+personal-agent = "main:main"
+paga_cli = "src.personal_agent.main:cli_main"
+paga_web = "src.personal_agent.main:web_main"
+
+# Legacy entry points for compatibility
+personal-agent-langchain = "src.personal_agent.main:main"
 personal-agent-langchain-cli = "src.personal_agent.main:cli_main"
-paglc = "src.personal_agent.main:cli_main"
 personal-agent-smolagent = "src.personal_agent.smol_main:run_smolagents_web"
-pags = "src.personal_agent.smol_main:run_smolagents_web"
 personal-agent-smolagent-cli = "src.personal_agent.smol_main:cli_main"
-pags_cli = "src.personal_agent.smol_main:cli_main"
-personal-agent-agno = "src.personal_agent.web.agno_interface:main"
-paga = "src.personal_agent.web.agno_interface:main"
-personal-agent-agno-cli = "src.personal_agent.agno_main:cli_main"
-paga_cli = "src.personal_agent.agno_main:cli_main"
+
+# Utility scripts
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"

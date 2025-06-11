@@ -157,7 +157,7 @@ def run_agno_web(use_remote_ollama: bool = False):
 
     # Run the app
     print("\n🚀 Starting Personal AI Agent with Agno Framework...")
-    print("🌐 Web interface will be available at: http://127.0.0.1:5002")
+    print("🌐 Web interface will be available at: http://127.0.0.1:5003")
     print("📚 Features: Native MCP integration, Async operations, Enhanced memory")
     print("⚡ Framework: Agno with native MCP + Ollama")
     if use_remote_ollama:
@@ -167,7 +167,7 @@ def run_agno_web(use_remote_ollama: bool = False):
     print("🔧 Mode: Modern async agent with advanced capabilities")
     print("\nPress Ctrl+C to stop the server.\n")
 
-    app.run(host="127.0.0.1", port=5002, debug=False)
+    app.run(host="127.0.0.1", port=5003, debug=False)
 
 
 async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):

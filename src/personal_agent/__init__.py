@@ -3,18 +3,29 @@
 This module serves as the main entry point for the Personal AI Agent package,
 providing a comprehensive suite of AI-powered tools and capabilities including:
 
-- Multi-agent framework powered by HuggingFace smolagents
-- Model Context Protocol (MCP) integration with 6 servers
-- Weaviate vector database for persistent memory
-- 13 integrated tools spanning memory management, file operations, and web research
-- Flask web interface for easy interaction
-- Modular architecture with organized code structure
+- **Primary System**: Agno framework with native async operations and SQLite storage
+- **Knowledge Base**: LanceDB-powered vector search with automatic text indexing
+- **Model Context Protocol (MCP)**: Integration with 6+ servers for external tool access
+- **Multiple LLM Support**: Ollama (local) and OpenAI with model-agnostic design
+- **Web Interface**: Flask-based UI with real-time thoughts and tool call streaming
+- **Memory Management**: Persistent conversations and automatic knowledge retention
+- **Legacy Support**: Maintains compatibility with LangChain and smolagents frameworks
 
-The package supports both LangChain ReAct and smolagents frameworks, with the
-smolagents implementation being the primary interface for production use.
+**Current Architecture**:
+- **Agno Framework**: Primary system with enhanced performance and native MCP support (Port 5003)
+- **Legacy Systems**: LangChain ReAct (Port 5001) and smolagents (Port 5001) for compatibility
+- **Unified Entry**: Single `personal_agent.py` script with `--web`, `--cli`, `--query` modes
 
-Author: Personal Agent Development Team
-Last modified: June 2, 2025
+**Key Features**:
+- 🔄 Real-time agent reasoning display with live streaming
+- 🧠 Automatic knowledge base with search and memory capabilities
+- ⚡ Modern async/await architecture for improved performance
+- 🔧 Native MCP integration for seamless external tool access
+- 💭 Session-based conversations with persistent memory
+- 🛠️ 13+ integrated tools for GitHub, filesystem, web search, and more
+
+Author: Eric Suchanek
+Last modified: December 10, 2024
 """
 
 import logging
@@ -22,6 +33,14 @@ import logging
 # Import core components
 from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
 from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
+
+# Import agno components (primary system)
+from .core.agno_agent import (
+    AgnoPersonalAgent,
+    create_agno_agent,
+    create_agno_agent_sync,
+    create_simple_personal_agent,
+)
 from .core.memory import is_weaviate_connected, vector_store, weaviate_client
 
 # Import tools
@@ -46,7 +65,7 @@ from .utils.logging import (
 from .web import create_app, register_routes
 
 # Package version
-__version__ = "0.3.0"
+__version__ = "0.5.2"
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -62,9 +81,19 @@ _logger = setup_logging()
 _logger.info("Initializing Personal AI Agent package...")
 
 
-# Main entry points
-from .main import create_web_app, initialize_system, main
-from .smol_main import run_smolagents_web
+# Agno entry points (primary system)
+from .agno_main import cli_main as agno_cli_main
+from .agno_main import (
+    create_agno_web_app,
+    initialize_agno_system,
+    run_agno_cli,
+    run_agno_web,
+)
+
+# Main entry points (legacy systems)
+from .main import cli_main, create_web_app, initialize_system, main
+from .smol_main import cli_main as smol_cli_main
+from .smol_main import run_smolagents_cli, run_smolagents_web
 
 
 def print_configuration() -> str:
@@ -74,7 +103,6 @@ def print_configuration() -> str:
     """
     import os
 
-    from .config import get_mcp_servers
     from .config.settings import (
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
@@ -188,7 +216,7 @@ def print_configuration() -> str:
                 f"  • Knowledge Files: {txt_files} txt, {md_files} md, {pdf_files} pdf"
             )
 
-    except Exception as e:
+    except OSError as e:
         storage_status.extend(
             [
                 "💿 STORAGE STATUS:",
@@ -221,6 +249,11 @@ __all__ = [
     "is_weaviate_connected",
     "vector_store",
     "weaviate_client",
+    # Agno components (primary system)
+    "AgnoPersonalAgent",
+    "create_agno_agent",
+    "create_agno_agent_sync",
+    "create_simple_personal_agent",
     # Configuration
     "USE_MCP",
     "USE_WEAVIATE",
@@ -244,11 +277,20 @@ __all__ = [
     # Web interface
     "create_app",
     "register_routes",
-    # Main entry points
+    # Legacy entry points
     "main",
+    "cli_main",
     "create_web_app",
     "initialize_system",
     "run_smolagents_web",
+    "run_smolagents_cli",
+    "smol_cli_main",
+    # Agno entry points (primary system)
+    "initialize_agno_system",
+    "create_agno_web_app",
+    "run_agno_web",
+    "run_agno_cli",
+    "agno_cli_main",
     "print_configuration",
     # Package info
     "__version__",

@@ -51,9 +51,8 @@ class AgnoPersonalAgent:
         knowledge_dir: str = "./data/knowledge",
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
-    ):
-        """
-        Initialize the Agno Personal Agent.
+    ) -> None:
+        """Initialize the Agno Personal Agent.
 
         :param model_provider: LLM provider ('ollama' or 'openai')
         :param model_name: Model name to use
@@ -91,8 +90,12 @@ class AgnoPersonalAgent:
             self.enable_mcp,
         )
 
-    def _create_model(self):
-        """Create the appropriate model instance based on provider."""
+    def _create_model(self) -> OpenAIChat:
+        """Create the appropriate model instance based on provider.
+
+        :return: Configured model instance
+        :raises ValueError: If unsupported model provider is specified
+        """
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
@@ -105,8 +108,11 @@ class AgnoPersonalAgent:
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
-    def _get_mcp_tools_as_functions(self) -> List:
-        """Get MCP server runners as callable tools for the main agent."""
+    def _get_mcp_tools_as_functions(self) -> List[Any]:
+        """Get MCP server runners as callable tools for the main agent.
+
+        :return: List of callable MCP tool functions
+        """
         if not self.enable_mcp or not self.mcp_servers:
             return []
 
@@ -123,10 +129,28 @@ class AgnoPersonalAgent:
 
             # Create the actual tool function with closure
             def make_mcp_tool(
-                name: str, cmd: str, tool_args: List, tool_env: Dict, desc: str
-            ):
+                name: str,
+                cmd: str,
+                tool_args: List[str],
+                tool_env: Dict[str, str],
+                desc: str,
+            ) -> Any:
+                """Create MCP tool function with proper closure.
+
+                :param name: MCP server name
+                :param cmd: Command to run the server
+                :param tool_args: Arguments for the server command
+                :param tool_env: Environment variables for the server
+                :param desc: Description of the tool
+                :return: Async function that can be called as a tool
+                """
+
                 async def mcp_tool(query: str) -> str:
-                    """MCP tool function that creates session on-demand."""
+                    """MCP tool function that creates session on-demand.
+
+                    :param query: Query to send to the MCP server
+                    :return: Response from the MCP server
+                    """
                     try:
                         # Prepare environment - convert GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN if needed
                         server_env = tool_env.copy() if tool_env else {}
@@ -195,7 +219,14 @@ class AgnoPersonalAgent:
 
                 # Set function metadata
                 mcp_tool.__name__ = f"use_{name.replace('-', '_')}_server"
-                mcp_tool.__doc__ = f"Use {name} MCP server for: {desc}\n\nArgs:\n    query: The query or task to execute using {name}\n\nReturns:\n    str: Result from the MCP server"
+                mcp_tool.__doc__ = f"""Use {name} MCP server for: {desc}
+
+Args:
+    query: The query or task to execute using {name}
+
+Returns:
+    str: Result from the MCP server
+"""
 
                 return mcp_tool
 
@@ -206,7 +237,10 @@ class AgnoPersonalAgent:
         return tools
 
     def _create_agent_instructions(self) -> str:
-        """Create comprehensive instructions for the agno agent."""
+        """Create comprehensive instructions for the agno agent.
+
+        :return: Formatted instruction string for the agent
+        """
         base_instructions = dedent(
             """\
             You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
@@ -296,10 +330,9 @@ class AgnoPersonalAgent:
         return base_instructions
 
     async def initialize(self, recreate: bool = False) -> bool:
-        """
-        Initialize the agno agent with all components.
-        :param recreate: Whether to recreate the agent knowledge bases
+        """Initialize the agno agent with all components.
 
+        :param recreate: Whether to recreate the agent knowledge bases
         :return: True if initialization successful, False otherwise
         """
         try:
@@ -357,7 +390,7 @@ class AgnoPersonalAgent:
             # Create agent instructions
             instructions = self._create_agent_instructions()
 
-            # Create the agno agent with appropriate storage/knowledge - match working example
+            # Create the agno agent with optimized configuration
             agent_kwargs = {
                 "model": model,
                 "tools": tools,
@@ -366,19 +399,17 @@ class AgnoPersonalAgent:
                 "show_tool_calls": self.debug,
                 "name": "Personal AI Agent",
                 "agent_id": "personal_agent",  # Changed 'id' to 'agent_id' for consistency
-                "enable_agentic_memory": self.enable_memory,
+                "enable_agentic_memory": False,
                 "enable_user_memories": self.enable_memory,
                 "add_history_to_messages": True,  # Enable conversation history
                 "num_history_responses": 5,  # Keep last 5 exchanges in context
             }
 
-            # Add knowledge base and enable search - exactly like working example
+            # Add knowledge base and enable search (if available)
             if self.enable_memory and self.agno_knowledge:
                 agent_kwargs["knowledge"] = self.agno_knowledge
-                agent_kwargs["search_knowledge"] = True  # This is the key setting!
-                logger.info(
-                    "Agent configured with knowledge base and search_knowledge=True"
-                )
+                # agent_kwargs["search_knowledge"] = True  # Enable knowledge search
+                logger.info("Agent configured with knowledge base search")
 
             # Add storage and memory if available
             if self.enable_memory:
@@ -408,16 +439,12 @@ class AgnoPersonalAgent:
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
     ) -> str:
-        """
-        Run a query through the agno agent.
+        """Run a query through the agno agent.
 
-        Args:
-            query: User query to process
-            stream: Whether to stream the response
-            add_thought_callback: Optional callback for adding thoughts during processing
-
-        Returns:
-            str: Agent response
+        :param query: User query to process
+        :param stream: Whether to stream the response
+        :param add_thought_callback: Optional callback for adding thoughts during processing
+        :return: Agent response
         """
         if not self.agent:
             raise RuntimeError("Agent not initialized. Call initialize() first.")
@@ -459,7 +486,10 @@ class AgnoPersonalAgent:
             return f"Error processing request: {str(e)}"
 
     async def cleanup(self) -> None:
-        """Clean up resources."""
+        """Clean up resources.
+
+        :return: None
+        """
         try:
             # With the new on-demand pattern, MCP tools are created and cleaned up
             # automatically within their async context managers
@@ -470,12 +500,16 @@ class AgnoPersonalAgent:
             logger.error("Error during agno agent cleanup: %s", e)
 
     def get_agent_info(self) -> Dict[str, Any]:
-        """Get information about the agent configuration."""
+        """Get information about the agent configuration.
+
+        :return: Dictionary containing agent configuration details
+        """
         return {
             "framework": "agno",
             "model_provider": self.model_provider,
             "model_name": self.model_name,
             "memory_enabled": self.enable_memory,
+            "knowledge_enabled": self.agno_knowledge is not None,
             "mcp_enabled": self.enable_mcp,
             "mcp_servers": len(self.mcp_servers),
             "debug_mode": self.debug,
@@ -493,21 +527,17 @@ async def create_agno_agent(
     debug: bool = False,
     ollama_base_url: str = OLLAMA_URL,
 ) -> AgnoPersonalAgent:
-    """
-    Create and initialize an agno-based personal agent.
+    """Create and initialize an agno-based personal agent.
 
-    Args:
-        model_provider: LLM provider ('ollama' or 'openai')
-        model_name: Model name to use
-        enable_memory: Whether to enable memory and knowledge features
-        enable_mcp: Whether to enable MCP tool integration
-        storage_dir: Directory for Agno storage files
-        knowledge_dir: Directory containing knowledge files to load
-        debug: Enable debug mode
-        ollama_base_url: Base URL for Ollama API
-
-    Returns:
-        AgnoPersonalAgent: Initialized agent instance
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param enable_memory: Whether to enable memory and knowledge features
+    :param enable_mcp: Whether to enable MCP tool integration
+    :param storage_dir: Directory for Agno storage files
+    :param knowledge_dir: Directory containing knowledge files to load
+    :param debug: Enable debug mode
+    :param ollama_base_url: Base URL for Ollama API
+    :return: Initialized agent instance
     """
     agent = AgnoPersonalAgent(
         model_provider=model_provider,
@@ -572,8 +602,7 @@ def create_simple_personal_agent(
     model_provider: str = "ollama",
     model_name: str = LLM_MODEL,
 ) -> tuple[Agent, Optional[TextKnowledgeBase]]:
-    """
-    Create a simple personal agent following the working pattern from knowledge_agent_example.py
+    """Create a simple personal agent following the working pattern from knowledge_agent_example.py
 
     This function creates an agent with knowledge base integration using the simple
     pattern that avoids async initialization complexity.
@@ -629,13 +658,13 @@ def create_simple_personal_agent(
 async def load_agent_knowledge(
     knowledge_base: TextKnowledgeBase, recreate: bool = False
 ) -> None:
-    """
-    Load knowledge base content asynchronously.
+    """Load knowledge base content asynchronously.
 
     This should be called after creating the agent to load the knowledge content.
 
     :param knowledge_base: Knowledge base instance to load
     :param recreate: Whether to recreate the knowledge base from scratch
+    :return: None
     """
     if knowledge_base:
         await load_agno_knowledge(knowledge_base, recreate=recreate)

@@ -15,11 +15,9 @@ import threading
 import time
 from datetime import datetime
 from io import StringIO
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 from flask import Flask, Response, render_template_string, request
-
-from ..core.memory import is_weaviate_connected
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -62,6 +60,17 @@ def add_thought(thought: str, session_id: str = "default"):
 
     # Store only the latest thought for this session
     current_thoughts[session_id] = thought_data
+
+    # Always add to queue for all active sessions to see
+    if active_sessions:
+        thoughts_queue.put(thought_data)
+        if logger:
+            logger.info(f"Added latest thought for session {session_id}: {thought}")
+    else:
+        if logger:
+            logger.info(
+                f"Stored latest thought for inactive session {session_id}: {thought}"
+            )
 
     # Always add to queue for all active sessions to see
     if active_sessions:
@@ -188,6 +197,77 @@ def run_async_in_thread(coroutine):
     return result_container["result"]
 
 
+def parse_agent_response(response_text):
+    """
+    Parse agent response to separate thinking process from actual response.
+
+    :param response_text: Raw agent response that may contain thinking tags
+    :return: dict with 'thinking' and 'response' content
+    """
+    if not response_text or not isinstance(response_text, str):
+        return {"thinking": "", "response": response_text or ""}
+
+    thinking_content = ""
+    actual_response = response_text
+
+    # Look for various thinking patterns and extract them
+    import re
+
+    # Pattern 1: <thinking>...</thinking> tags
+    thinking_pattern = r"<thinking>(.*?)</thinking>"
+    thinking_matches = re.findall(
+        thinking_pattern, response_text, re.DOTALL | re.IGNORECASE
+    )
+    if thinking_matches:
+        thinking_content = "\n".join(thinking_matches).strip()
+        # Remove thinking blocks from the actual response
+        actual_response = re.sub(
+            thinking_pattern, "", response_text, flags=re.DOTALL | re.IGNORECASE
+        )
+
+    # Pattern 2: Look for content after </thinking> tags
+    if "</thinking>" in response_text.lower():
+        parts = response_text.split("</thinking>")
+        if len(parts) > 1:
+            # Everything after the last </thinking> tag is the response
+            actual_response = parts[-1].strip()
+            # Everything before and including thinking tags is thinking content
+            thinking_part = "</thinking>".join(parts[:-1])
+            if thinking_part:
+                # Extract just the thinking content without tags
+                thinking_matches = re.findall(
+                    r"<thinking>(.*?)(?=</thinking>|$)",
+                    thinking_part,
+                    re.DOTALL | re.IGNORECASE,
+                )
+                if thinking_matches:
+                    thinking_content = "\n".join(thinking_matches).strip()
+
+    # Pattern 3: Look for <response>...</response> tags for the actual response
+    response_pattern = r"<response>(.*?)</response>"
+    response_matches = re.findall(
+        response_pattern, actual_response, re.DOTALL | re.IGNORECASE
+    )
+    if response_matches:
+        actual_response = "\n".join(response_matches).strip()
+
+    # Clean up the actual response
+    actual_response = actual_response.strip()
+
+    # Remove any remaining XML-like tags
+    actual_response = re.sub(
+        r"</?(?:thinking|response)>", "", actual_response, flags=re.IGNORECASE
+    )
+    actual_response = actual_response.strip()
+
+    # If we couldn't extract any clear response content, use the original
+    if not actual_response:
+        actual_response = response_text
+        thinking_content = ""
+
+    return {"thinking": thinking_content, "response": actual_response}
+
+
 def index():
     """
     Main route for the agent interface using agno framework.
@@ -200,6 +280,44 @@ def index():
     response = None
     context = None
     agent_thoughts = []
+    tool_calls = []
+
+    # Get agent information for display
+    agent_info = agno_agent.get_agent_info() if agno_agent else {}
+
+    # Get status of associated agents/services
+    agents = [
+        {
+            "name": "Personal AI Agent",
+            "status": "Active" if agent_info.get("initialized", False) else "Inactive",
+            "type": "Primary",
+            "icon": "robot",
+        },
+        {
+            "name": "Knowledge Base",
+            "status": (
+                "Connected"
+                if agent_info.get("knowledge_enabled", False)
+                else "Disconnected"
+            ),
+            "type": "Service",
+            "icon": "database",
+        },
+        {
+            "name": "MCP Tools",
+            "status": "Active" if agent_info.get("mcp_enabled", False) else "Inactive",
+            "count": agent_info.get("mcp_servers", 0),
+            "type": "Service",
+            "icon": "plug",
+        },
+        {
+            "name": f"{agent_info.get('model_provider', 'LLM').title()} Model",
+            "status": "Connected",
+            "type": "Model",
+            "model": agent_info.get("model_name", "Unknown"),
+            "icon": "brain",
+        },
+    ]
 
     if request.method == "POST":
         user_input = request.form.get("query", "")
@@ -238,7 +356,9 @@ def index():
                 context = None  # Let Agno handle memory internally
 
                 if logger:
-                    logger.info("Starting agno agent processing with automatic memory")
+                    logger.info(
+                        "Starting agno agent processing with CLI-style direct query"
+                    )
 
                 # Add processing thoughts
                 add_thought("🧠 Analyzing request with agno reasoning", session_id)
@@ -272,25 +392,25 @@ def index():
                             add_thought("🔧 Analyzing with MCP tools", session_id)
                             time.sleep(0.5)
 
-                            # Prepare context string for agent
-                            context_str = (
-                                "\n".join(context)
-                                if context
-                                else "No relevant context found."
-                            )
+                            # Initialize tool calls and agent thoughts if they're empty
+                            nonlocal tool_calls, agent_thoughts
+                            if not tool_calls:
+                                tool_calls = []
+                            if not agent_thoughts:
+                                agent_thoughts = []
 
+                            # Add initial thinking entry
+                            agent_thoughts.append("🧠 Starting agent reasoning process")
+
+                            # Since Agno handles memory internally, we don't need to pass context
+                            # Skip creating a context string and let the agent use its own knowledge base
                             if logger:
                                 logger.info(
-                                    f"Prepared context string with {len(context_str)} characters"
+                                    "Using direct query approach like CLI mode - Agno will use its knowledge base automatically"
                                 )
 
-                            # Create enhanced prompt with context
-                            enhanced_prompt = f"""Previous Context:
-{context_str}
-
-User Request: {user_input}
-
-Please help the user with their request. Use available MCP tools as needed and provide a helpful, comprehensive response."""
+                            # Using the same simple approach as CLI mode - directly pass the user's query
+                            query = user_input
 
                             # Use agno agent with async execution and thought callback
                             if logger:
@@ -301,18 +421,149 @@ Please help the user with their request. Use available MCP tools as needed and p
                             loop = asyncio.new_event_loop()
                             asyncio.set_event_loop(loop)
                             try:
-                                # Create thought callback for this session
+                                # Create thought callback for this session and tool capture
                                 def thought_callback(thought: str):
+                                    # Declare all nonlocal variables at the top
+                                    nonlocal tool_calls, agent_thoughts
+
+                                    # Enhanced tool call detection patterns
+                                    tool_indicators = [
+                                        "search_knowledge",
+                                        "github",
+                                        "brave_search",
+                                        "filesystem",
+                                        "duckduckgo",
+                                        "puppeteer",
+                                        "mcp_",
+                                        "tool:",
+                                        "Tool:",
+                                        "using tool",
+                                        "calling",
+                                        "invoke",
+                                        "execute",
+                                    ]
+
+                                    # Check for various tool call patterns
+                                    is_tool_call = False
+                                    tool_name = ""
+                                    params_text = ""
+
+                                    # Pattern 1: function_name(param=value, param2=value2)
+                                    if (
+                                        "(" in thought
+                                        and "=" in thought
+                                        and ")" in thought
+                                    ):
+                                        for indicator in tool_indicators:
+                                            if indicator in thought.lower():
+                                                tool_name = thought.split("(")[
+                                                    0
+                                                ].strip()
+                                                params_text = thought.split("(")[
+                                                    1
+                                                ].split(")")[0]
+                                                is_tool_call = True
+                                                break
+
+                                    # Pattern 2: "Using tool: tool_name" or "Calling tool_name"
+                                    elif any(
+                                        phrase in thought.lower()
+                                        for phrase in [
+                                            "using tool",
+                                            "calling",
+                                            "invoke",
+                                            "execute",
+                                        ]
+                                    ):
+                                        # Extract tool name after the action word
+                                        for phrase in [
+                                            "using tool:",
+                                            "calling",
+                                            "invoke",
+                                            "execute",
+                                        ]:
+                                            if phrase in thought.lower():
+                                                tool_name = (
+                                                    thought.lower()
+                                                    .split(phrase)[-1]
+                                                    .strip()
+                                                )
+                                                is_tool_call = True
+                                                break
+
+                                    # Pattern 3: Look for MCP server names or specific tool names
+                                    elif any(
+                                        indicator in thought.lower()
+                                        for indicator in tool_indicators
+                                    ):
+                                        tool_name = thought.strip()
+                                        is_tool_call = True
+
+                                    if is_tool_call and tool_name:
+                                        tool_calls.append(
+                                            {
+                                                "name": tool_name,
+                                                "parameters": params_text,
+                                                "timestamp": datetime.now().isoformat(),
+                                            }
+                                        )
+
+                                        # Also add to agent thoughts for visibility
+                                        agent_thoughts.append(
+                                            f"🔧 Using tool: {tool_name}"
+                                        )
+
+                                        if logger:
+                                            logger.info(
+                                                f"Detected tool call: {tool_name}({params_text})"
+                                            )
+
+                                    # Handle <think> blocks for thinking display
+                                    if "<think>" in thought and "</think>" in thought:
+                                        # Extract thinking content
+                                        thinking_text = (
+                                            thought.split("<think>")[1]
+                                            .split("</think>")[0]
+                                            .strip()
+                                        )
+                                        if thinking_text:
+                                            agent_thoughts.append(f"🤔 {thinking_text}")
+
+                                        if logger:
+                                            logger.info(
+                                                f"Detected thinking: {thinking_text}"
+                                            )
+
+                                    # General reasoning detection (only if not already captured as tool or thinking)
+                                    elif not is_tool_call and any(
+                                        x in thought.lower()
+                                        for x in [
+                                            "reasoning",
+                                            "thinking",
+                                            "considering",
+                                            "analyzing",
+                                            "planning",
+                                            "strategy",
+                                        ]
+                                    ):
+                                        agent_thoughts.append(f"� {thought}")
+
+                                        if logger:
+                                            logger.info(
+                                                f"Detected reasoning: {thought}"
+                                            )
+
+                                    # Always add the thought to the stream
                                     add_thought(thought, session_id)
 
                                 if logger:
                                     logger.info(
-                                        "Starting agno agent run with enhanced prompt"
+                                        "Starting agno agent run with direct query (CLI-style)"
                                     )
 
                                 agent_response = loop.run_until_complete(
                                     agno_agent.run(
-                                        enhanced_prompt,
+                                        query,
                                         add_thought_callback=thought_callback,
                                     )
                                 )
@@ -458,16 +709,117 @@ Please help the user with their request. Use available MCP tools as needed and p
             # Reset thought status to Ready after processing is complete
             add_thought("Ready", session_id)
 
-    # Check Weaviate connection status
-    weaviate_status = is_weaviate_connected()
+    # Parse response to separate thinking from actual response
+    actual_response = response
+    thinking_content = None
+
+    if response:
+        # Additional tool call detection from response text
+        response_lines = response.split("\n")
+        for line in response_lines:
+            line = line.strip()
+            # Look for tool usage patterns in the response
+            tool_patterns = [
+                "search_knowledge",
+                "github",
+                "brave_search",
+                "filesystem",
+                "puppeteer",
+                "Using tool:",
+                "Tool used:",
+                "Calling",
+                "Executing",
+            ]
+
+            for pattern in tool_patterns:
+                if pattern.lower() in line.lower():
+                    # Extract tool name
+                    if "(" in line and ")" in line:
+                        tool_name = line.split("(")[0].strip()
+                        params = line.split("(")[1].split(")")[0]
+                    else:
+                        tool_name = line.strip()
+                        params = ""
+
+                    # Check if this tool call is already captured
+                    if not any(
+                        tc["name"].lower() == tool_name.lower() for tc in tool_calls
+                    ):
+                        tool_calls.append(
+                            {
+                                "name": tool_name,
+                                "parameters": params,
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
+                        if logger:
+                            logger.info(
+                                f"Additional tool call detected from response: {tool_name}"
+                            )
+                    break
+
+        # Try to extract thinking content and actual response
+        if "<thinking>" in response and "</thinking>" in response:
+            # Extract thinking content
+            thinking_start = response.find("<thinking>")
+            thinking_end = response.find("</thinking>") + len("</thinking>")
+            thinking_content = response[thinking_start:thinking_end]
+
+            # Remove thinking tags and extract content
+            thinking_text = response[
+                thinking_start + len("<thinking>") : thinking_end - len("</thinking>")
+            ].strip()
+
+            # Remove thinking section from actual response
+            actual_response = response[:thinking_start] + response[thinking_end:]
+            actual_response = actual_response.strip()
+
+            # Add extracted thinking to agent thoughts if not empty
+            if thinking_text:
+                agent_thoughts.append(f"🤔 Extracted: {thinking_text}")
+
+        elif "<think>" in response and "</think>" in response:
+            # Alternative thinking tag format
+            thinking_start = response.find("<think>")
+            thinking_end = response.find("</think>") + len("</think>")
+            thinking_content = response[thinking_start:thinking_end]
+
+            # Remove thinking tags and extract content
+            thinking_text = response[
+                thinking_start + len("<think>") : thinking_end - len("</think>")
+            ].strip()
+
+            # Remove thinking section from actual response
+            actual_response = response[:thinking_start] + response[thinking_end:]
+            actual_response = actual_response.strip()
+
+            # Add extracted thinking to agent thoughts if not empty
+            if thinking_text:
+                agent_thoughts.append(f"🤔 Extracted: {thinking_text}")
+
+        # Look for response tags to extract clean response
+        if "<response>" in actual_response and "</response>" in actual_response:
+            response_start = actual_response.find("<response>")
+            response_end = actual_response.find("</response>") + len("</response>")
+            actual_response = actual_response[
+                response_start + len("<response>") : response_end - len("</response>")
+            ].strip()
+
+        # If actual response is empty or just whitespace, use original response
+        if not actual_response or actual_response.isspace():
+            actual_response = response
 
     return render_template_string(
         get_main_template(),
-        response=response,
+        response=actual_response,
+        thinking_response=thinking_content,
         context=context,
         agent_thoughts=agent_thoughts,
         is_multi_agent=True,  # agno supports multiple capabilities
-        weaviate_connected=weaviate_status,
+        knowledge_connected=agent_info.get("knowledge_enabled", False),
+        agents=agents,
+        agent_info=agent_info,
+        tool_calls=tool_calls,
     )
 
 
@@ -519,8 +871,8 @@ def agent_info_route():
             mcp_servers = agent_info.get("mcp_servers", 0)
             available_tools.append(f"MCP Servers: {mcp_servers}")
 
-            if agent_info.get("memory_enabled"):
-                available_tools.append("Weaviate Memory")
+            if agent_info.get("knowledge_enabled"):
+                available_tools.append("Knowledge Base")
 
             available_tools.extend(
                 ["Async Processing", "Multi-tool Coordination", "Context Enhancement"]
@@ -602,6 +954,9 @@ def get_main_template():
                 --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
                 --brain-connected: #10b981;
                 --brain-disconnected: #ef4444;
+                --status-connected: #10b981;
+                --status-disconnected: #ef4444;
+                --status-pending: #f59e0b;
             }
 
             * {
@@ -616,6 +971,7 @@ def get_main_template():
                 color: var(--text-primary);
                 line-height: 1.6;
                 min-height: 100vh;
+                padding-top: 60px;
             }
 
             .status-bar {
@@ -645,6 +1001,10 @@ def get_main_template():
                 align-items: center;
                 gap: 0.5rem;
                 color: var(--text-secondary);
+                padding: 0.25rem 0.5rem;
+                border-radius: 0.5rem;
+                background: rgba(0, 0, 0, 0.03);
+                border: 1px solid rgba(0, 0, 0, 0.05);
             }
 
             .status-indicator {
@@ -653,6 +1013,18 @@ def get_main_template():
                 border-radius: 50%;
                 background: var(--success-color);
                 animation: pulse 2s infinite;
+            }
+
+            .status-indicator.connected {
+                background: var(--status-connected);
+            }
+
+            .status-indicator.disconnected {
+                background: var(--status-disconnected);
+            }
+
+            .status-indicator.pending {
+                background: var(--status-pending);
             }
 
             @keyframes pulse {
@@ -689,14 +1061,92 @@ def get_main_template():
             }
 
             .container {
-                max-width: 95%;
+                width: 100%;
+                max-width: 1400px;
                 margin: 0 auto;
-                padding: 5rem 2rem 2rem;
+                padding: 2rem;
+                display: grid;
+                grid-template-columns: 1fr minmax(300px, 350px);
+                grid-gap: 2rem;
+                align-items: start;
+            }
+
+            .main-content {
+                grid-column: 1;
+            }
+
+            .sidebar {
+                grid-column: 2;
+                background: var(--surface);
+                border-radius: 1rem;
+                box-shadow: var(--shadow);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                padding: 1.5rem;
+                height: fit-content;
+                position: sticky;
+                top: 80px;
+            }
+
+            .sidebar-title {
+                font-size: 1.25rem;
+                font-weight: 600;
+                margin-bottom: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                color: var(--primary-color);
+            }
+
+            .agent-list {
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .agent-item {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem;
+                background: var(--surface-alt);
+                border-radius: 0.5rem;
+                border-left: 3px solid var(--primary-color);
+                font-size: 0.875rem;
+            }
+
+            .agent-icon {
+                margin-right: 0.75rem;
+                color: var(--primary-color);
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(37, 99, 235, 0.1);
+                border-radius: 50%;
+                padding: 4px;
+            }
+
+            .agent-details {
+                flex: 1;
+            }
+
+            .agent-name {
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.25rem;
+            }
+
+            .agent-status {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                color: var(--text-secondary);
+                font-size: 0.75rem;
             }
 
             .header {
                 text-align: center;
-                margin-bottom: 3rem;
+                margin-bottom: 2rem;
                 color: white;
             }
 
@@ -742,8 +1192,6 @@ def get_main_template():
             }
 
             .content {
-                max-width: 90%;
-                margin: 0 auto;
                 background: var(--surface);
                 padding: 2rem;
                 border-radius: 1rem;
@@ -761,9 +1209,10 @@ def get_main_template():
 
             .form-group label {
                 display: block;
-                margin-bottom: 0.5rem;
+                margin-bottom: 0.75rem;
                 font-weight: 600;
                 color: var(--text-primary);
+                font-size: 1rem;
             }
 
             .form-input {
@@ -835,6 +1284,71 @@ def get_main_template():
                 line-height: 1.7;
                 white-space: pre-wrap;
                 word-wrap: break-word;
+                font-size: 1rem;
+            }
+
+            .response-content pre,
+            .response-content code {
+                background-color: rgba(0, 0, 0, 0.05);
+                border-radius: 0.5rem;
+                padding: 1rem;
+                overflow-x: auto;
+                font-family: 'Fira Code', 'Courier New', monospace;
+                font-size: 0.9rem;
+                margin: 1rem 0;
+            }
+
+            .response-content code {
+                padding: 0.2rem 0.5rem;
+                margin: 0;
+            }
+
+            /* Thoughts Response Section */
+            .thoughts-response-section {
+                margin-top: 1.5rem;
+                padding: 2rem;
+                background: rgba(139, 69, 19, 0.05);
+                border-radius: 1rem;
+                border-left: 4px solid var(--warning-color);
+            }
+
+            .thoughts-response-header {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+                font-weight: 600;
+                color: var(--warning-color);
+            }
+
+            .thoughts-response-content {
+                color: var(--text-secondary);
+                line-height: 1.7;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                font-size: 0.95rem;
+            }
+
+            .thought-line {
+                margin-bottom: 0.75rem;
+                padding: 0.75rem;
+                background: rgba(255, 255, 255, 0.7);
+                border-radius: 0.5rem;
+                border-left: 3px solid var(--warning-color);
+                line-height: 1.6;
+                font-size: 0.95rem;
+            }
+
+            .thought-line:last-child {
+                margin-bottom: 0;
+            }
+
+            .no-thoughts {
+                font-style: italic;
+                color: var(--text-secondary);
+                opacity: 0.7;
+                text-align: center;
+                padding: 1rem;
             }
 
             .context-section {
@@ -905,6 +1419,45 @@ def get_main_template():
                 animation: fadeIn 0.3s ease-in;
             }
 
+            .system-info {
+                background: rgba(37, 99, 235, 0.05);
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin: 1rem 0;
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .system-info-title {
+                font-weight: 600;
+                color: var(--primary-color);
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            
+            .system-info-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 0.5rem 0;
+                border-bottom: 1px dashed rgba(0, 0, 0, 0.05);
+            }
+            
+            .system-info-item:last-child {
+                border-bottom: none;
+            }
+            
+            .system-info-label {
+                font-weight: 500;
+            }
+            
+            .system-info-value {
+                color: var(--text-primary);
+            }
+
             @keyframes fadeIn {
                 from { opacity: 0; transform: translateY(10px); }
                 to { opacity: 1; transform: translateY(0); }
@@ -915,6 +1468,17 @@ def get_main_template():
                 color: var(--text-secondary);
                 opacity: 0.7;
                 margin-top: 0.25rem;
+            }
+
+            @media (max-width: 1200px) {
+                .container {
+                    grid-template-columns: 1fr;
+                }
+                
+                .sidebar {
+                    grid-column: 1;
+                    position: static;
+                }
             }
 
             @media (max-width: 768px) {
@@ -933,11 +1497,10 @@ def get_main_template():
                 }
 
                 .container {
-                    padding: 5rem 1rem 2rem;
+                    padding: 1rem;
                 }
 
                 .content {
-                    max-width: 100%;
                     padding: 1.5rem;
                 }
 
@@ -950,6 +1513,7 @@ def get_main_template():
                 .status-left,
                 .status-right {
                     justify-content: center;
+                    flex-wrap: wrap;
                 }
             }
 
@@ -968,7 +1532,120 @@ def get_main_template():
             }
 
             .brain-icon {
-                color: {{ 'var(--brain-connected)' if weaviate_connected else 'var(--brain-disconnected)' }};
+                color: {{ 'var(--status-connected)' if knowledge_connected else 'var(--status-disconnected)' }};
+            }
+            
+            /* Tool Calls Summary Section */
+            .tool-calls-section {
+                margin-top: 1.5rem;
+                padding: 1.5rem;
+                background: rgba(5, 150, 105, 0.05);
+                border-radius: 0.75rem;
+                border: 1px solid rgba(5, 150, 105, 0.1);
+            }
+            
+            .tool-calls-header {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+                font-weight: 600;
+                color: var(--success-color);
+                font-size: 0.875rem;
+            }
+            
+            .tool-call-item {
+                padding: 0.75rem;
+                background: rgba(255, 255, 255, 0.5);
+                border-radius: 0.5rem;
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+                border-left: 3px solid var(--success-color);
+            }
+            
+            /* Tool Calls Section */
+            .tool-calls-section {
+                margin-top: 1.5rem;
+                padding: 1rem;
+                background: rgba(37, 99, 235, 0.05);
+                border-radius: 0.5rem;
+                border: 1px solid rgba(37, 99, 235, 0.1);
+                display: block !important;
+            }
+
+            .tool-calls-header {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+                font-weight: 600;
+                color: var(--primary-color);
+                font-size: 0.8rem;
+            }
+            
+            .tool-calls-content {
+                max-height: 200px;
+                overflow-y: auto;
+            }
+            
+            .tool-call-item {
+                padding: 0.4rem;
+                margin-bottom: 0.4rem;
+                border-left: 2px solid var(--success-color);
+                background: rgba(255, 255, 255, 0.5);
+                border-radius: 0.25rem;
+                font-size: 0.75rem;
+            }
+            
+            .tool-call-name {
+                font-weight: 600;
+                color: var(--text-primary);
+                font-size: 0.75rem;
+            }
+            
+            .tool-call-params {
+                color: var(--text-secondary);
+                font-family: 'Fira Code', 'Courier New', monospace;
+                font-size: 0.7rem;
+                margin-top: 0.2rem;
+                word-break: break-all;
+            }
+            
+            /* Thinking Section */
+            .thinking-section {
+                margin-top: 1rem;
+                padding: 1rem;
+                background: rgba(37, 99, 235, 0.05);
+                border-radius: 0.5rem;
+                border: 1px solid rgba(37, 99, 235, 0.1);
+                display: block !important;
+            }
+            
+            .thinking-header {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+                font-weight: 600;
+                color: var(--primary-color);
+                font-size: 0.8rem;
+            }
+            
+            .thinking-content {
+                color: var(--text-secondary);
+                line-height: 1.4;
+                font-size: 0.75rem;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 200px;
+                overflow-y: auto;
+            }
+            
+            .thinking-content div {
+                margin-bottom: 0.3rem;
+                padding: 0.3rem;
+                background: rgba(255, 255, 255, 0.5);
+                border-radius: 0.25rem;
             }
         </style>
     </head>
@@ -976,16 +1653,20 @@ def get_main_template():
         <div class="status-bar">
             <div class="status-left">
                 <div class="status-item">
-                    <div class="status-indicator"></div>
+                    <div class="status-indicator connected"></div>
                     <span>Agno Framework Active</span>
                 </div>
                 <div class="status-item">
-                    <i class="fas fa-brain brain-icon"></i>
-                    <span>Memory: {{ 'Connected' if weaviate_connected else 'Disconnected' }}</span>
+                    <i class="fas fa-database" style="color: {{ 'var(--status-connected)' if knowledge_connected else 'var(--status-disconnected)' }}"></i>
+                    <span>Knowledge Base: {{ 'Connected' if knowledge_connected else 'Disconnected' }}</span>
                 </div>
                 <div class="status-item">
-                    <i class="fas fa-plug"></i>
-                    <span>MCP Tools Ready</span>
+                    <i class="fas fa-plug" style="color: {{ 'var(--status-connected)' if agent_info.get('mcp_enabled', False) else 'var(--status-disconnected)' }}"></i>
+                    <span>MCP Tools: {{ agent_info.get('mcp_servers', 0) }} Server{% if agent_info.get('mcp_servers', 0) != 1 %}s{% endif %}</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-robot" style="color: var(--status-connected)"></i>
+                    <span>{{ agent_info.get('model_provider', 'LLM').title() }}: {{ agent_info.get('model_name', 'Unknown') }}</span>
                 </div>
             </div>
             <div class="status-right">
@@ -995,92 +1676,191 @@ def get_main_template():
                 </a>
                 <a href="/clear" class="nav-button">
                     <i class="fas fa-trash-alt"></i>
-                    <span>Clear Memory</span>
+                    <span>Clear Knowledge Base</span>
                 </a>
             </div>
         </div>
 
         <div class="container">
-            <div class="header">
-                <h1>
-                    <div class="header-icon">
-                        <i class="fas fa-robot"></i>
-                    </div>
-                    Personal AI Agent
-                </h1>
-                <p>Powered by modern async agent framework with native MCP integration</p>
-                <div class="framework-badge">
-                    <i class="fas fa-rocket"></i>
-                    <span>Agno Framework</span>
-                </div>
-            </div>
-
-            <div class="content">
-                <form method="post" class="form-container">
-                    <div class="form-group">
-                        <label for="query">Your Request</label>
-                        <textarea 
-                            id="query" 
-                            name="query" 
-                            class="form-input form-textarea"
-                            placeholder="Ask me anything... I can help with research, analysis, coding, and more using my MCP-powered tools."
-                            required
-                        ></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="topic">Topic Category (optional)</label>
-                        <input 
-                            type="text" 
-                            id="topic" 
-                            name="topic" 
-                            class="form-input"
-                            placeholder="e.g., research, coding, analysis, general"
-                            value="general"
-                        >
-                    </div>
-
-                    <input type="hidden" name="session_id" value="default">
-                    
-                    <button type="submit" class="submit-button" id="submitBtn">
-                        <i class="fas fa-paper-plane"></i>
-                        <span>Send Request</span>
-                    </button>
-                </form>
-
-                {% if response %}
-                <div class="response-section">
-                    <div class="response-header">
-                        <i class="fas fa-robot"></i>
-                        <span>Agno Agent Response</span>
-                    </div>
-                    <div class="response-content">{{ response }}</div>
-                    
-                    {% if context %}
-                    <div class="context-section">
-                        <div class="context-header">
-                            <i class="fas fa-brain"></i>
-                            <span>Context from Memory</span>
+            <div class="main-content">
+                <div class="header">
+                    <h1>
+                        <div class="header-icon">
+                            <i class="fas fa-robot"></i>
                         </div>
-                        <div class="context-content">
-                            {% for ctx in context %}
-                            <div>{{ ctx }}</div>
-                            {% endfor %}
+                        Personal AI Agent
+                    </h1>
+                    <p>Powered by modern async agent framework with native MCP integration</p>
+                    <div class="framework-badge">
+                        <i class="fas fa-rocket"></i>
+                        <span>Agno Framework</span>
+                    </div>
+                </div>
+
+                <div class="content">
+                    <form method="post" class="form-container">
+                        <div class="form-group">
+                            <label for="query">Your Request</label>
+                            <textarea 
+                                id="query" 
+                                name="query" 
+                                class="form-input form-textarea"
+                                placeholder="Ask me anything... I can help with research, analysis, coding, and more using my MCP-powered tools."
+                                required
+                            ></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="topic">Topic Category (optional)</label>
+                            <input 
+                                type="text" 
+                                id="topic" 
+                                name="topic" 
+                                class="form-input"
+                                placeholder="e.g., research, coding, analysis, general"
+                                value="general"
+                            >
+                        </div>
+
+                        <input type="hidden" name="session_id" value="default">
+                        
+                        <button type="submit" class="submit-button" id="submitBtn">
+                            <i class="fas fa-paper-plane"></i>
+                            <span>Send Request</span>
+                        </button>
+                    </form>
+
+                    {% if response %}
+                    <!-- Actual Response Section -->
+                    <div class="response-section">
+                        <div class="response-header">
+                            <i class="fas fa-comment-dots"></i>
+                            <span>Response</span>
+                        </div>
+                        <div class="response-content">{{ response }}</div>
+                    </div>
+
+                    <!-- Thinking Process Section -->
+                    <div class="thoughts-response-section">
+                        <div class="thoughts-response-header">
+                            <i class="fas fa-brain"></i>
+                            <span>Agent Thoughts</span>
+                        </div>
+                        <div class="thoughts-response-content">
+                            {% if thinking_response %}
+                                {{ thinking_response }}
+                            {% elif agent_thoughts and agent_thoughts|length > 0 %}
+                                {% for thought in agent_thoughts %}
+                                <div class="thought-line">{{ thought }}</div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="no-thoughts">No detailed thinking process captured for this interaction</div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endif %}
+                        
+                        {% if context %}
+                        <div class="context-section">
+                            <div class="context-header">
+                                <i class="fas fa-brain"></i>
+                                <span>Context from Knowledge Base</span>
+                            </div>
+                            <div class="context-content">
+                                {% for ctx in context %}
+                                <div>{{ ctx }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
                 </div>
-                {% endif %}
             </div>
-        </div>
 
-        <div class="thoughts-panel" id="thoughtsPanel">
-            <div class="thoughts-header">
-                <i class="fas fa-brain"></i>
-                <span>Agent Thoughts</span>
-            </div>
-            <div class="thoughts-content" id="thoughtsContent">
-                <!-- Thoughts will be populated here -->
+            <div class="sidebar">
+                <div class="sidebar-title">
+                    <i class="fas fa-server"></i>
+                    <span>Agent Services</span>
+                </div>
+                <div class="agent-list">
+                    {% for agent in agents %}
+                    <div class="agent-item">
+                        <div class="agent-icon">
+                            <i class="fas fa-{{ agent.icon }}"></i>
+                        </div>
+                        <div class="agent-details">
+                            <div class="agent-name">{{ agent.name }}</div>
+                            <div class="agent-status">
+                                <div class="status-indicator {% if agent.status == 'Active' or agent.status == 'Connected' %}connected{% elif agent.status == 'Pending' %}pending{% else %}disconnected{% endif %}"></div>
+                                <span>{{ agent.status }}</span>
+                                {% if agent.get('model') %}
+                                <span class="agent-model">({{ agent.model }})</span>
+                                {% endif %}
+                                {% if agent.get('count') %}
+                                <span class="agent-count">({{ agent.count }} servers)</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="system-info">
+                    <div class="system-info-title">
+                        <i class="fas fa-info-circle"></i>
+                        <span>System Information</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Framework:</span>
+                        <span class="system-info-value">{{ agent_info.get('framework', 'Agno') }}</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Model Provider:</span>
+                        <span class="system-info-value">{{ agent_info.get('model_provider', 'Unknown') }}</span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="system-info-label">Debug Mode:</span>
+                        <span class="system-info-value">{{ 'Enabled' if agent_info.get('debug_mode', False) else 'Disabled' }}</span>
+                    </div>
+                </div>
+
+                <!-- Tool Calls Section -->
+                <div class="tool-calls-section">
+                    <div class="tool-calls-header">
+                        <i class="fas fa-tools"></i>
+                        <span>Tool Calls</span>
+                    </div>
+                    <div class="tool-calls-content">
+                        {% if tool_calls and tool_calls|length > 0 %}
+                            {% for tool in tool_calls %}
+                            <div class="tool-call-item">
+                                <div class="tool-call-name">• {{ tool.name }}</div>
+                                <div class="tool-call-params">{{ tool.parameters }}</div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="tool-call-item">
+                                <div class="tool-call-name">No tools used in this interaction</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Thinking Section -->
+                <div class="thinking-section">
+                    <div class="thinking-header">
+                        <i class="fas fa-brain"></i>
+                        <span>Agent Thinking</span>
+                    </div>
+                    <div class="thinking-content">
+                        {% if agent_thoughts and agent_thoughts|length > 0 %}
+                            {% for thought in agent_thoughts %}
+                            <div>{{ thought }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <div>No detailed thinking process captured for this interaction</div>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1088,98 +1868,21 @@ def get_main_template():
             // Form submission handling
             const form = document.querySelector('form');
             const submitBtn = document.getElementById('submitBtn');
-            let sessionId = 'default';
             
             form.addEventListener('submit', function(e) {
                 // Generate new session ID for this interaction
-                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 console.log('Form submitted, new session ID:', sessionId);
                 
                 // Update hidden session field
                 document.querySelector('input[name="session_id"]').value = sessionId;
                 
-                // Show thoughts panel
-                const thoughtsPanel = document.getElementById('thoughtsPanel');
-                thoughtsPanel.style.display = 'block';
-                
                 // Change button to loading state
                 submitBtn.innerHTML = '<div class="loading"></div><span>Processing...</span>';
                 submitBtn.disabled = true;
                 
-                // Start listening for thoughts after small delay
-                setTimeout(() => {
-                    startThoughtStream();
-                }, 200);
-                
                 // Allow form to submit normally (don't prevent default)
             });
-
-            function startThoughtStream() {
-                const thoughtsContent = document.getElementById('thoughtsContent');
-                
-                // Clear existing thoughts
-                thoughtsContent.innerHTML = '';
-                
-                // Create EventSource for streaming with current session ID
-                const eventSource = new EventSource(`/stream_thoughts?session_id=${sessionId}`);
-                
-                eventSource.onmessage = function(event) {
-                    try {
-                        const data = JSON.parse(event.data);
-                        
-                        if (data.type === 'connected') {
-                            console.log('Connected to thought stream');
-                            return;
-                        }
-                        
-                        if (data.type === 'keep-alive') {
-                            return;
-                        }
-                        
-                        if (data.thought && data.thought !== 'Ready') {
-                            addThoughtToPanel(data.thought, data.timestamp);
-                        } else if (data.thought === 'Ready') {
-                            // Processing complete - reset form and hide thoughts panel
-                            eventSource.close();
-                            
-                            // Reset submit button
-                            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Request</span>';
-                            submitBtn.disabled = false;
-                            
-                            // Hide thoughts panel after a delay
-                            setTimeout(() => {
-                                document.getElementById('thoughtsPanel').style.display = 'none';
-                            }, 2000);
-                        }
-                    } catch (e) {
-                        console.error('Error parsing thought data:', e);
-                    }
-                };
-                
-                eventSource.onerror = function(event) {
-                    console.error('Thought stream error:', event);
-                    eventSource.close();
-                    
-                    // Reset button on error
-                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Request</span>';
-                    submitBtn.disabled = false;
-                };
-            }
-
-            function addThoughtToPanel(thought, timestamp) {
-                const thoughtsContent = document.getElementById('thoughtsContent');
-                const thoughtElement = document.createElement('div');
-                thoughtElement.className = 'thought-item';
-                
-                const time = new Date(timestamp).toLocaleTimeString();
-                thoughtElement.innerHTML = `
-                    <div>${thought}</div>
-                    <div class="thought-time">${time}</div>
-                `;
-                
-                thoughtsContent.appendChild(thoughtElement);
-                thoughtsContent.scrollTop = thoughtsContent.scrollHeight;
-            }
 
             // Auto-resize textarea
             document.getElementById('query').addEventListener('input', function() {
@@ -1303,68 +2006,6 @@ def get_error_template():
                 max-width: 500px;
                 width: 100%;
             }
-            .error-icon {
-                color: #dc2626;
-                font-size: 4rem;
-                margin-bottom: 1rem;
-            }
-            .error-title {
-                font-size: 2rem;
-                font-weight: 700;
-                margin-bottom: 1rem;
-                color: #1e293b;
-            }
-            .error-message {
-                color: #64748b;
-                margin-bottom: 2rem;
-                line-height: 1.6;
-                word-break: break-word;
-            }
-            .back-button {
-                display: inline-flex;
-                align-items: center;
-                gap: 0.5rem;
-                background: #2563eb;
-                color: white;
-                padding: 1rem 2rem;
-                border-radius: 0.75rem;
-                text-decoration: none;
-                font-weight: 600;
-                transition: all 0.2s;
-            }
-            .back-button:hover {
-                background: #1d4ed8;
-                transform: translateY(-2px);
-            }
-        </style>
-    </head>
-    <body>
-        <div class="error-container">
-            <i class="fas fa-exclamation-triangle error-icon"></i>
-            <h1 class="error-title">Error</h1>
-            <p class="error-message">{{ error }}</p>
-            <a href="/" class="back-button">
-                <i class="fas fa-arrow-left"></i>
-                <span>Back to Agent</span>
-            </a>
-        </div>
-    </body>
-    </html>
-    """
-
-
-def get_agent_info_template():
-    """Get the agent info page template."""
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Agent Info - Personal AI Agent</title>
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-        <style>
-            body {
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: #1e293b;
@@ -1500,8 +2141,7 @@ def get_agent_info_template():
                     <ul class="tools-list">
                         <li><i class="fas fa-rocket"></i> Async/Await Operations</li>
                         <li><i class="fas fa-plug"></i> Native MCP Integration</li>
-                        <li><i class="fas fa-brain"></i> Weaviate Memory System</li>
-                        <li><i class="fas fa-sync"></i> Real-time Thought Streaming</li>
+                        <li><i class="fas fa-database"></i> Knowledge Base System</li>
                         <li><i class="fas fa-tools"></i> Multi-tool Coordination</li>
                         <li><i class="fas fa-shield-alt"></i> Error Handling & Recovery</li>
                     </ul>
