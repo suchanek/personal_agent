@@ -3,9 +3,19 @@
 Simplified storage module that provides factory functions for Agno's native
 memory and storage components, following the agentic memory pattern where
 the LLM intelligently manages memory creation and prevents duplicates naturally.
+
+Primary functions:
+- create_agno_storage(): SQLite storage for agent sessions
+- create_agno_memory(): Memory instance with SQLite backend for persistent memory
+- create_combined_knowledge_base(): Unified knowledge base handling both text and PDF sources
+- load_combined_knowledge_base(): Async loading for combined knowledge base
+
+Removed redundant functions (v0.5.3):
+- create_agno_knowledge(), load_agno_knowledge(): Redundant with combined knowledge base
+- load_personal_knowledge(), load_personal_knowledge_async(): Redundant text-only functions
+- load_pdf_knowledge(), load_pdf_knowledge_async(): Redundant PDF-only functions
 """
 
-import logging
 from pathlib import Path
 from typing import Optional
 
@@ -77,64 +87,9 @@ def create_agno_memory(storage_dir: str = None) -> Memory:
     return memory
 
 
-def create_agno_knowledge(
-    storage_dir: str = None, knowledge_dir: str = None
-) -> Optional[TextKnowledgeBase]:
-    """Create LanceDB knowledge base for agent (synchronous creation).
-
-    :param storage_dir: Directory for knowledge files (defaults to DATA_DIR/agno)
-    :param knowledge_dir: Directory containing knowledge files to load (defaults to DATA_DIR/knowledge)
-    :return: Configured TextKnowledgeBase instance or None if no knowledge found
-    """
-    if storage_dir is None:
-        storage_dir = f"{DATA_DIR}/agno"
-    if knowledge_dir is None:
-        knowledge_dir = f"{DATA_DIR}/knowledge"
-
-    storage_path = Path(storage_dir)
-    storage_path.mkdir(parents=True, exist_ok=True)
-
-    knowledge_path = Path(knowledge_dir)
-    knowledge_path.mkdir(parents=True, exist_ok=True)
-
-    # Check if knowledge files exist
-    text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md"))
-    if not text_files:
-        logger.info("No knowledge files found in %s", knowledge_path)
-        return None
-
-    logger.info("Found %d knowledge text files in %s", len(text_files), knowledge_path)
-
-    # Create vector database
-    vector_db = LanceDb(
-        uri=str(storage_path / "lancedb"),
-        table_name="personal_agent_knowledge",
-        search_type=SearchType.hybrid,
-        embedder=OllamaEmbedder(id="nomic-embed-text", host=OLLAMA_URL, dimensions=768),
-    )
-
-    # Create knowledge base (sync creation)
-    knowledge_base = TextKnowledgeBase(
-        path=knowledge_path,
-        vector_db=vector_db,
-        num_documents=len(text_files),
-    )
-
-    logger.info("Created TextKnowledgeBase with %d files", len(text_files))
-    return knowledge_base
-
-
-async def load_agno_knowledge(
-    knowledge_base: TextKnowledgeBase, recreate: bool = False
-) -> None:
-    """Load knowledge base content (async loading).
-
-    :param knowledge_base: TextKnowledgeBase instance to load
-    :param recreate: Whether to recreate the knowledge base from scratch
-    """
-    logger.info("Loading knowledge base content...")
-    await knowledge_base.aload(recreate=recreate)
-    logger.info("Knowledge base loaded successfully")
+# REMOVED: create_agno_knowledge() and load_agno_knowledge() functions
+# These functions were redundant with create_combined_knowledge_base()
+# which properly handles both text and PDF sources in a unified manner.
 
 
 def create_combined_knowledge_base(
@@ -254,113 +209,13 @@ async def load_combined_knowledge_base(
     logger.info("Combined knowledge base loaded successfully")
 
 
-def load_personal_knowledge(
-    vector_db: LanceDb, knowledge_dir: str = None
-) -> Optional[TextKnowledgeBase]:
-    """Create personal knowledge base (synchronous creation only).
-
-    :param vector_db: Vector database instance
-    :param knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
-    :return: Configured TextKnowledgeBase instance or None if no knowledge found
-    """
-    if knowledge_dir is None:
-        knowledge_dir = f"{DATA_DIR}/knowledge"
-
-    knowledge_path = Path(knowledge_dir)
-    if not knowledge_path.exists():
-        logger.info(
-            "No knowledge directory found at %s, skipping knowledge loading",
-            knowledge_path,
-        )
-        return None
-
-    # Load text files
-    text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md"))
-    if text_files:
-        logger.info(
-            "Found %d knowledge text files in %s", len(text_files), knowledge_path
-        )
-
-        # Initialize the TextKnowledgeBase (sync creation)
-        text_knowledge = TextKnowledgeBase(
-            path=knowledge_path,
-            vector_db=vector_db,
-            num_documents=len(text_files),
-        )
-
-        logger.info("Created TextKnowledgeBase with %d files", len(text_files))
-        return text_knowledge
-
-    logger.info("No text files found in %s", knowledge_path)
-    return None
+# REMOVED: load_personal_knowledge() and load_personal_knowledge_async() functions
+# These functions were redundant with create_combined_knowledge_base()
+# which properly handles both text and PDF sources in a unified manner.
 
 
-async def load_personal_knowledge_async(
-    knowledge_base: TextKnowledgeBase, recreate: bool = False
-) -> None:
-    """Load personal knowledge base content (async loading).
-
-    :param knowledge_base: TextKnowledgeBase instance to load
-    :param recreate: Whether to recreate the knowledge base from scratch
-    """
-    try:
-        logger.info("Loading text knowledge base...")
-        await knowledge_base.aload(recreate=recreate)
-        logger.info("Successfully loaded text knowledge base")
-    except Exception as e:
-        logger.error("Failed to load text knowledge: %s", e)
-        raise
-
-
-# TODO: Add PDF loading support if needed
-def load_pdf_knowledge(
-    vector_db: LanceDb, knowledge_dir: str = None
-) -> Optional[PDFKnowledgeBase]:
-    """Create PDF knowledge base (synchronous creation only).
-
-    :param vector_db: Vector database instance
-    :param knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
-    :return: Configured PDFKnowledgeBase instance or None if no knowledge found
-    """
-    if knowledge_dir is None:
-        knowledge_dir = f"{DATA_DIR}/knowledge"
-
-    knowledge_path = Path(knowledge_dir)
-    if not knowledge_path.exists():
-        logger.info(
-            "No knowledge directory found at %s, skipping knowledge loading",
-            knowledge_path,
-        )
-        return None
-
-    pdf_files = list(knowledge_path.glob("*.pdf"))
-    if pdf_files:
-        pdf_knowledge = PDFKnowledgeBase(
-            path=knowledge_path,
-            vector_db=vector_db,
-        )
-        logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
-        return pdf_knowledge
-    else:
-        logger.info("No PDF files found in %s", knowledge_path)
-        return None
-
-
-async def load_pdf_knowledge_async(
-    knowledge_base: PDFKnowledgeBase, recreate: bool = False
-) -> None:
-    """Load PDF knowledge base content (async loading).
-
-    :param knowledge_base: PDFKnowledgeBase instance to load
-    :param recreate: Whether to recreate the knowledge base from scratch
-    """
-    try:
-        logger.info("Loading PDF knowledge base...")
-        await knowledge_base.aload(recreate=recreate)
-        logger.info("Successfully loaded PDF knowledge base")
-    except Exception as e:
-        logger.error("Failed to load PDF knowledge: %s", e)
-        raise
-
+# REMOVED: load_pdf_knowledge() and load_pdf_knowledge_async() functions
+# These functions were redundant with create_combined_knowledge_base()
+# which properly handles both text and PDF sources in a unified manner.
 
 # end of file

@@ -11,7 +11,7 @@ from textwrap import dedent
 from typing import Any, Dict, List, Optional
 
 from agno.agent import Agent
-from agno.knowledge.text import TextKnowledgeBase
+from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
@@ -23,10 +23,10 @@ from mcp.client.stdio import stdio_client
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
 from ..utils import setup_logging
 from .agno_storage import (
-    create_agno_knowledge,
     create_agno_memory,
     create_agno_storage,
-    load_agno_knowledge,
+    create_combined_knowledge_base,
+    load_combined_knowledge_base,
 )
 
 # Configure logging
@@ -325,14 +325,16 @@ Returns:
                 logger.info("Created Agno storage at: %s", self.storage_dir)
 
                 # Create knowledge base (sync creation)
-                self.agno_knowledge = create_agno_knowledge(
+                self.agno_knowledge = create_combined_knowledge_base(
                     self.storage_dir, self.knowledge_dir
                 )
 
                 # Load knowledge base content (async loading) - matches working example
                 if self.agno_knowledge:
-                    await load_agno_knowledge(self.agno_knowledge, recreate=recreate)
-                    logger.info("Loaded Agno knowledge base content")
+                    await load_combined_knowledge_base(
+                        self.agno_knowledge, recreate=recreate
+                    )
+                    logger.info("Loaded Agno combined knowledge base content")
 
                     # Knowledge tools will be automatically added via search_knowledge=True
                     # DO NOT manually add KnowledgeTools to avoid naming conflicts
@@ -574,7 +576,7 @@ def create_simple_personal_agent(
     knowledge_dir: str = None,
     model_provider: str = "ollama",
     model_name: str = LLM_MODEL,
-) -> tuple[Agent, Optional[TextKnowledgeBase]]:
+) -> tuple[Agent, Optional[CombinedKnowledgeBase]]:
     """Create a simple personal agent following the working pattern from knowledge_agent_example.py
 
     This function creates an agent with knowledge base integration using the simple
@@ -587,7 +589,7 @@ def create_simple_personal_agent(
     :return: Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
     """
     # Create knowledge base (synchronous creation)
-    knowledge_base = create_agno_knowledge(storage_dir, knowledge_dir)
+    knowledge_base = create_combined_knowledge_base(storage_dir, knowledge_dir)
 
     # Create the model
     if model_provider == "openai":
@@ -627,7 +629,7 @@ def create_simple_personal_agent(
 
 
 async def load_agent_knowledge(
-    knowledge_base: TextKnowledgeBase, recreate: bool = False
+    knowledge_base: CombinedKnowledgeBase, recreate: bool = False
 ) -> None:
     """Load knowledge base content asynchronously.
 
@@ -638,7 +640,7 @@ async def load_agent_knowledge(
     :return: None
     """
     if knowledge_base:
-        await load_agno_knowledge(knowledge_base, recreate=recreate)
+        await load_combined_knowledge_base(knowledge_base, recreate=recreate)
         logger.info("✅ Knowledge base loaded successfully")
     else:
         logger.info("No knowledge base to load")
