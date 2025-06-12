@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from agno.agent import Agent
 from agno.knowledge.text import TextKnowledgeBase
+from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.mcp import MCPTools
@@ -102,11 +103,10 @@ class AgnoPersonalAgent:
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
-            # Use OpenAI-compatible interface for Ollama
-            return OpenAIChat(
+            # Use Ollama-compatible interface for Ollama
+            return Ollama(
                 id=self.model_name,
-                api_key="ollama",  # Dummy key for local Ollama
-                base_url=f"{self.ollama_base_url}/v1",
+                host=self.ollama_base_url,
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
@@ -248,22 +248,6 @@ Returns:
             """\
             You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
             
-            ## 🚨 CRITICAL MANDATORY RULE - READ THIS FIRST 🚨
-            
-            **FOR ANY PERSONAL QUESTION, YOU MUST USE THE 'search' FUNCTION IMMEDIATELY:**
-            
-            Examples that REQUIRE immediate search:
-            - "What is my name?" → IMMEDIATELY call search("name user Eric identity")
-            - "What's my name?" → IMMEDIATELY call search("name user Eric identity")
-            - "Who am I?" → IMMEDIATELY call search("user information identity profile")  
-            - "What do you know about me?" → IMMEDIATELY call search("user personal information profile")
-            - "Tell me about me" → IMMEDIATELY call search("user personal information Eric")
-            - "My preferences?" → IMMEDIATELY call search("preferences settings likes interests")
-            - "My skills?" → IMMEDIATELY call search("skills programming abilities")
-            - "Tell me about Eric" → IMMEDIATELY call search("Eric user information profile")
-            
-            **NEVER** say "I don't have access to personal information" or ask for clarification without calling search() first!
-            
             ## Core Guidelines
             
             - **Be Direct**: Execute tasks immediately without asking for confirmation unless critical
@@ -281,16 +265,7 @@ Returns:
             3. **For File Operations**: Use filesystem tools for file management
             4. **For Research**: Use web search tools for current information
             5. **Never say "I can't" without first trying relevant tools**
-            
-            ## Knowledge Base Usage - STEP BY STEP
-            
-            **WORKFLOW FOR PERSONAL QUERIES:**
-            1. **Detect personal question** → Recognize questions about the user
-            2. **IMMEDIATELY call search()** → Use relevant keywords from the question
-            3. **Review search results** → Check what information was found
-            4. **Provide complete answer** → Use the found information to answer
-            5. **If nothing found** → Only then say information is not available
-            
+                        
             ### Available Knowledge Functions:
             - **search(query)** - Search the knowledge base for information (USE THIS FOR PERSONAL QUESTIONS!)
             - **think(query)** - Use reasoning capabilities  
@@ -403,8 +378,8 @@ Returns:
                 "name": "Personal AI Agent",
                 "agent_id": "personal_agent",  # Changed 'id' to 'agent_id' for consistency
                 "user_id": self.user_id,  # Add user_id for memory operations
-                "enable_agentic_memory": False,
-                "enable_user_memories": self.enable_memory,
+                "enable_agentic_memory": self.enable_memory,
+                "enable_user_memories": False,  # Enable user memories
                 "add_history_to_messages": True,  # Enable conversation history
                 "num_history_responses": 5,  # Keep last 5 exchanges in context
             }
@@ -629,10 +604,8 @@ def create_simple_personal_agent(
     if model_provider == "openai":
         model = OpenAIChat(id=model_name)
     elif model_provider == "ollama":
-        model = OpenAIChat(
+        model = Ollama(
             id=model_name,
-            api_key="ollama",  # Dummy key for local Ollama
-            base_url=f"{OLLAMA_URL}/v1",
         )
     else:
         raise ValueError(f"Unsupported model provider: {model_provider}")

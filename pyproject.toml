@@ -27,6 +27,7 @@ yfinance = "^0.2.61"
 agno = "^1.5.8"
 mcp = "^1.9.2"
 pgvector = "^0.4.1"
+ollama = "^0.5.1"
 
 [tool.poetry.scripts]
 personal-agent = "src.personal_agent.main:main"

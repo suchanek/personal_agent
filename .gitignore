@@ -185,4 +185,5 @@ cython_debug/
 weaviate_data/
 .DS_Store
 data/
+cookbook/
 
