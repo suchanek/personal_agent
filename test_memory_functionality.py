@@ -9,6 +9,8 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List
 
+from rich import print
+
 from src.personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,

@@ -10,7 +10,10 @@ from pathlib import Path
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from personal_agent.core.agno_storage import create_agno_knowledge
+from personal_agent.core.agno_storage import (
+    create_combined_knowledge_base,
+    load_combined_knowledge_base,
+)
 
 
 async def test_knowledge_base():
@@ -21,7 +24,7 @@ async def test_knowledge_base():
     try:
         # Create knowledge base
         print("✅ Creating Agno knowledge base...")
-        knowledge_db = await create_agno_knowledge(
+        knowledge_db = create_combined_knowledge_base(
             "/Users/egs/data/agno", "/Users/egs/data/knowledge"
         )
 
@@ -31,6 +34,12 @@ async def test_knowledge_base():
 
         print(f"✅ Knowledge base created: {type(knowledge_db)}")
 
+        # Load the knowledge base content
+        print("📚 Loading knowledge base content...")
+        # Try synchronous loading instead of async
+        knowledge_db.load(recreate=True)
+        print("✅ Knowledge base content loaded")
+
         # Test search
         print("✅ Testing search for 'Eric'...")
         try:
@@ -39,19 +48,31 @@ async def test_knowledge_base():
             print(f"🔍 Search results: {search_results}")
 
             # Try different search terms
-            for term in ["Eric", "Suchanek", "user name", "Name:"]:
-                results = knowledge_db.search(term)
-                print(f"🔍 Search '{term}': {len(results) if results else 0} results")
-                if results:
-                    # Handle different result types
-                    first_result = results[0] if isinstance(results, list) else results
-                    if hasattr(first_result, "content"):
-                        content = first_result.content[:100]
-                    elif hasattr(first_result, "page_content"):
-                        content = first_result.page_content[:100]
-                    else:
-                        content = str(first_result)[:100]
-                    print(f"   → {content}...")
+            for term in [
+                "Eric",
+                "Suchanek",
+                "user name",
+                "Name",
+            ]:  # Removed "Name:" to avoid syntax error
+                try:
+                    results = knowledge_db.search(term)
+                    print(
+                        f"🔍 Search '{term}': {len(results) if results else 0} results"
+                    )
+                    if results:
+                        # Handle different result types
+                        first_result = (
+                            results[0] if isinstance(results, list) else results
+                        )
+                        if hasattr(first_result, "content"):
+                            content = first_result.content[:100]
+                        elif hasattr(first_result, "page_content"):
+                            content = first_result.page_content[:100]
+                        else:
+                            content = str(first_result)[:100]
+                        print(f"   → {content}...")
+                except Exception as search_error:
+                    print(f"🔍 Search '{term}': Error - {search_error}")
 
         except Exception as e:
             print(f"❌ Search error: {e}")
