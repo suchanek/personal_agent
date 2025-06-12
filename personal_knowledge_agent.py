@@ -20,9 +20,10 @@ from pathlib import Path
 from agno.agent import Agent
 from agno.embedder.ollama import OllamaEmbedder
 from agno.knowledge.text import TextKnowledgeBase
+from agno.models.ollama import Ollama
 from agno.vectordb.lancedb import LanceDb, SearchType
 
-from src.personal_agent.config import DATA_DIR, OLLAMA_URL
+from src.personal_agent.config import DATA_DIR, LLM_MODEL, OLLAMA_URL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
@@ -87,6 +88,11 @@ def create_personal_knowledge_agent() -> tuple[Agent, TextKnowledgeBase]:
         search_knowledge=True,  # This enables automatic knowledge search
         show_tool_calls=True,  # Show what tools the agent uses
         markdown=True,  # Format responses in markdown
+        enable_agentic_memory=True,
+        model=Ollama(
+            id=LLM_MODEL,
+            host=OLLAMA_URL,
+        ),
         instructions=[
             "You are a personal AI assistant with access to my knowledge base.",
             "Always search your knowledge base when asked about personal information.",
