@@ -2,6 +2,8 @@
 
 from .mcp_servers import MCP_SERVERS, get_mcp_servers
 from .settings import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
     DATA_DIR,
     HOME_DIR,
     LLM_MODEL,
@@ -11,6 +13,7 @@ from .settings import (
     ROOT_DIR,
     USE_MCP,
     USE_WEAVIATE,
+    USER_ID,
     WEAVIATE_URL,
     get_env_var,
 )
@@ -20,6 +23,7 @@ from .settings import (
 def get_settings():
     """Get configuration settings as a dictionary."""
     return {
+        "USER_ID": USER_ID,
         "ROOT_DIR": ROOT_DIR,
         "HOME_DIR": HOME_DIR,
         "DATA_DIR": DATA_DIR,
@@ -33,20 +37,27 @@ def get_settings():
         "MCP_SERVERS": MCP_SERVERS,
         "get_env_var": get_env_var,
         "get_settings": get_settings,
+        "AGNO_STORAGE_DIR": AGNO_STORAGE_DIR,
+        "AGNO_KNOWLEDGE_DIR": AGNO_KNOWLEDGE_DIR,
     }
 
 
 __all__ = [
-    "ROOT_DIR",
+    "AGNO_KNOWLEDGE_DIR",
+    "AGNO_STORAGE_DIR",
     "DATA_DIR",
-    "WEAVIATE_URL",
-    "OLLAMA_URL",
+    "HOME_DIR",
     "LLM_MODEL",
-    "USE_WEAVIATE",
-    "USE_MCP",
-    "get_env_var",
+    "LOG_LEVEL",
     "MCP_SERVERS",
+    "OLLAMA_URL",
+    "REPO_DIR",
+    "ROOT_DIR",
+    "USE_MCP",
+    "USE_WEAVIATE",
+    "USER_ID",
+    "WEAVIATE_URL",
+    "get_env_var",
     "get_mcp_servers",
     "get_settings",
-    "LOG_LEVEL",
 ]

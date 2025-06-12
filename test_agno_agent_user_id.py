@@ -5,7 +5,14 @@ Test script to verify that AgnoPersonalAgent properly handles user_id for memory
 
 import asyncio
 
-from src.personal_agent.config import LLM_MODEL, OLLAMA_URL
+from src.personal_agent.config import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    DATA_DIR,
+    LLM_MODEL,
+    OLLAMA_URL,
+    USER_ID,
+)
 from src.personal_agent.core.agno_agent import AgnoPersonalAgent
 
 
@@ -15,14 +22,14 @@ async def test_user_id_memory():
     print("=" * 60)
 
     # Create agent with specific user_id
-    test_user_id = "test_user_123"
+    test_user_id = USER_ID
     agent = AgnoPersonalAgent(
         model_provider="ollama",
         model_name=LLM_MODEL,
         enable_memory=True,
         enable_mcp=False,  # Disable MCP for focused test
-        storage_dir="./tmp/test_agno_user_id",
-        knowledge_dir="./data/knowledge",
+        storage_dir=AGNO_STORAGE_DIR,
+        knowledge_dir=AGNO_KNOWLEDGE_DIR,
         debug=True,
         ollama_base_url=OLLAMA_URL,
         user_id=test_user_id,
@@ -57,7 +64,7 @@ async def test_user_id_memory():
     print(f"\n💬 Testing memory interaction with user_id: {test_user_id}")
     try:
         response = await agent.run(
-            "My name is Test User and I like testing AI agents.",
+            f"My name is {USER_ID} and I like testing AI agents.",
             add_thought_callback=lambda thought: print(f"💭 {thought}"),
         )
         print(f"🤖 Response: {response}")

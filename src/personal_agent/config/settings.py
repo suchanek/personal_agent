@@ -35,6 +35,7 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
 REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://tesla.local:11434")
+
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 USE_MCP = get_env_bool("USE_MCP", True)
 
@@ -61,3 +62,6 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
 # LLM Model configuration
 LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7B")
+
+# User configuration
+USER_ID = get_env_var("USER_ID", "default_user")  # Default user ID for agent

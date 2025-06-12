@@ -260,7 +260,6 @@ Returns:
             
             ## CRITICAL TOOL USAGE RULES
             
-            1. **For Personal Questions**: ALWAYS use 'search' function first with relevant keywords
             2. **For GitHub Tasks**: Use available GitHub tools for repository information
             3. **For File Operations**: Use filesystem tools for file management
             4. **For Research**: Use web search tools for current information
@@ -273,7 +272,6 @@ Returns:
             
             ## Available Capabilities
             
-            - **Knowledge Base Search**: Search personal knowledge and memory for information about the user
             - **GitHub Integration**: Search repositories, analyze code, get repository information
             - **File System Operations**: Read, write, and manage files and directories  
             - **Web Research**: Search for current information and technical details
@@ -368,36 +366,27 @@ Returns:
             # Create agent instructions
             instructions = self._create_agent_instructions()
 
-            # Create the agno agent with optimized configuration
-            agent_kwargs = {
-                "model": model,
-                "tools": tools,
-                "instructions": instructions,
-                "markdown": True,
-                "show_tool_calls": self.debug,
-                "name": "Personal AI Agent",
-                "agent_id": "personal_agent",  # Changed 'id' to 'agent_id' for consistency
-                "user_id": self.user_id,  # Add user_id for memory operations
-                "enable_agentic_memory": self.enable_memory,
-                "enable_user_memories": False,  # Enable user memories
-                "add_history_to_messages": True,  # Enable conversation history
-                "num_history_responses": 5,  # Keep last 5 exchanges in context
-            }
+            # Create the agno agent with direct parameter passing for visibility
+            self.agent = Agent(
+                model=model,
+                tools=tools,
+                instructions=instructions,
+                markdown=True,
+                show_tool_calls=self.debug,
+                name="Personal AI Agent",
+                agent_id="personal_agent",
+                user_id=self.user_id,
+                enable_agentic_memory=self.enable_memory,
+                enable_user_memories=False,
+                add_history_to_messages=True,
+                num_history_responses=5,
+                knowledge=self.agno_knowledge if self.enable_memory else None,
+                storage=self.agno_storage if self.enable_memory else None,
+                memory=self.agno_memory if self.enable_memory else None,
+            )
 
-            # Add knowledge base and enable search (if available)
             if self.enable_memory and self.agno_knowledge:
-                agent_kwargs["knowledge"] = self.agno_knowledge
-                # agent_kwargs["search_knowledge"] = True  # Enable knowledge search
                 logger.info("Agent configured with knowledge base search")
-
-            # Add storage and memory if available
-            if self.enable_memory:
-                if self.agno_storage:
-                    agent_kwargs["storage"] = self.agno_storage
-                if self.agno_memory:
-                    agent_kwargs["memory"] = self.agno_memory
-
-            self.agent = Agent(**agent_kwargs)
 
             # Calculate tool counts for logging
             mcp_tool_count = (
@@ -504,7 +493,7 @@ async def create_agno_agent(
     enable_mcp: bool = True,
     storage_dir: str = "./data/agno",
     knowledge_dir: str = "./data/knowledge",
-    debug: bool = False,
+    debug: bool = True,
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = "default_user",
 ) -> AgnoPersonalAgent:

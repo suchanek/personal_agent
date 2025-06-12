@@ -18,6 +18,7 @@ from .config.settings import (
     AGNO_STORAGE_DIR,
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
+    USER_ID,
 )
 
 # Import core components
@@ -74,6 +75,7 @@ async def initialize_agno_system(use_remote_ollama: bool = False):
         storage_dir=AGNO_STORAGE_DIR,
         knowledge_dir=AGNO_KNOWLEDGE_DIR,
         debug=True,
+        user_id=USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
     )
 
