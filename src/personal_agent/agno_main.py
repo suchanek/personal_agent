@@ -198,7 +198,7 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
     console = Console()
     console.print("✅ [bold green]Agent Successfully Initialized![/bold green]")
     agent.print_agent_info(console)
-    
+
     print("\nEnter your queries (type 'quit' to exit):")
     if query is not None:
         response = await agent.agent.arun(query)

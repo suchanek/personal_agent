@@ -7,8 +7,13 @@ including native MCP support, async operations, and advanced agent features.
 """
 
 import asyncio
+import os
 from textwrap import dedent
 from typing import Any, Dict, List, Optional
+
+# Set Rust logging to ERROR level before importing agno components
+if "RUST_LOG" not in os.environ:
+    os.environ["RUST_LOG"] = "error"
 
 from agno.agent import Agent
 from agno.knowledge.combined import CombinedKnowledgeBase
