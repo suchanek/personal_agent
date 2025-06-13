@@ -1,7 +1,44 @@
 #!/usr/bin/env python3
 """
-Test script to verify agentic memory functionality with the Personal AI Agent.
-This script tests memory creation, retention, and intelligent recall through multiple interactions.
+Comprehensive Test Suite for Agentic Memory Functionality.
+
+This module provides an exhaustive test suite for verifying the agentic memory capabilities
+of the Personal AI Agent using the Agno framework. The tests validate that the agent can
+intelligently create, store, recall, update, and integrate memories across conversations.
+
+Key Features Tested:
+    - Basic memory creation and storage of personal information
+    - Accurate recall of previously stored memories
+    - Intelligent integration and connection of different memories
+    - Dynamic updating of existing memories with new information
+    - Prevention of duplicate memory storage
+    - Contextual usage of memories in conversations
+
+Test Categories:
+    1. Basic Memory Creation: Tests fundamental memory storage capabilities
+    2. Memory Recall: Verifies accurate retrieval of stored information
+    3. Memory Integration: Tests intelligent connection of related memories
+    4. Memory Updates: Validates dynamic updating of existing memories
+    5. Duplicate Prevention: Ensures intelligent handling of similar information
+    6. Contextual Memory: Tests contextual usage of memories in responses
+
+The test suite generates comprehensive reports including:
+    - Success/failure rates for each test category
+    - Detailed interaction logs with timestamps
+    - Performance metrics (response times)
+    - JSON export of all test results
+
+Usage:
+    python test_memory_functionality.py
+
+Requirements:
+    - Agno framework with memory enabled
+    - Ollama server running with configured model
+    - Personal Agent properly configured
+
+Author: Personal Agent Development Team
+Created: 2025-06-13
+Version: 1.0.0
 """
 
 import asyncio
@@ -10,6 +47,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from rich import print
+from rich.console import Console
 
 from src.personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,
@@ -58,11 +96,10 @@ class MemoryTestSuite:
         print("✅ Agent initialized successfully!")
 
         # Verify agent configuration
-        agent_info = self.agent.get_agent_info()
         print(f"📊 Agent Configuration:")
-        for key, value in agent_info.items():
-            print(f"  - {key}: {value}")
-
+        # Verify agent configuration with nice formatting
+        console = Console()
+        self.agent.print_agent_info(console)
         return True
 
     async def run_interaction(self, message: str, test_name: str) -> Dict[str, Any]:

@@ -9,6 +9,7 @@ Last update: 2025-06-02 23:17:39
 """
 
 import logging
+import os
 import warnings
 
 from rich.logging import RichHandler
@@ -77,7 +78,7 @@ def configure_master_logger(
 
 
 def setup_logging_filters() -> None:
-    """Set up logging configuration with Rich handler."""
+    """Set up logging configuration with Rich handler and configure agno loggers."""
     # Suppress warnings
     warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
     warnings.filterwarnings(
@@ -104,6 +105,56 @@ def setup_logging_filters() -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)
 
+    # Suppress LanceDB/Lance warnings (these come from Rust library)
+    logging.getLogger("rust").setLevel(logging.WARNING)
+
+    # Configure agno framework loggers to use Rich handlers
+    agno_loggers = [
+        "agno",
+        "agno.agent",
+        "agno.models",
+        "agno.tools",
+        "agno.knowledge",
+        "agno.knowledge.text",
+        "agno.knowledge.pdf",
+        "agno.knowledge.combined",
+        "agno.memory",
+        "agno.storage",
+        "agno.vectordb",
+        "agno.vectordb.lancedb",  # Add specific LanceDB logger
+        "agno.embedder",
+        "agno.info",  # This handles the INFO messages we're seeing
+        # Add Lance loggers to get Rich formatting
+        "lance",
+        "lance.dataset",
+        "lance.dataset.scanner",
+        "lancedb",
+        "rust",
+    ]
+
+    # Rich formatter for agno logs
+    rich_formatter = logging.Formatter(
+        "PersonalAgent: %(levelname)s %(asctime)s - %(name)s - %(message)s"
+    )
+
+    for logger_name in agno_loggers:
+        logger = logging.getLogger(logger_name)
+
+        # Clear existing handlers to avoid duplicates
+        logger.handlers.clear()
+
+        # Add Rich handler
+        rich_handler = RichHandler(rich_tracebacks=True)
+        rich_handler.setLevel(LOG_LEVEL)
+        rich_handler.setFormatter(rich_formatter)
+        logger.addHandler(rich_handler)
+
+        # Set logger level
+        logger.setLevel(LOG_LEVEL)
+
+        # Prevent propagation to avoid duplicate logs
+        logger.propagate = False
+
     return None
 
 
@@ -126,6 +177,11 @@ def setup_logging(
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
+    rust_logger = logging.getLogger("rust")
+    rust_logger.setLevel(logging.ERROR)
+    # Suppress warnings from the Rust library
+    if "RUST_LOG" not in os.environ:
+        os.environ["RUST_LOG"] = "error"
 
     # Clear existing handlers
     logger.handlers.clear()

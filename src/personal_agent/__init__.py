@@ -18,6 +18,11 @@ Last modified: June 2, 2025
 """
 
 import logging
+import os
+
+# Set Rust logging to ERROR level to suppress Lance warnings before any imports
+if "RUST_LOG" not in os.environ:
+    os.environ["RUST_LOG"] = "error"
 
 # Import core components
 from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
@@ -72,8 +77,6 @@ def print_configuration() -> str:
 
     :return: Configuration information as formatted string
     """
-    import os
-
     from .config import get_mcp_servers
     from .config.settings import (
         AGNO_KNOWLEDGE_DIR,
