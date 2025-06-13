@@ -15,7 +15,7 @@ import time
 from weaviate import WeaviateClient
 
 from ..core.mcp_client import SimpleMCPClient
-from ..utils.logging import setup_logging
+from ..utils.pag_logging import setup_logging
 
 # Use logging.INFO as default to avoid circular import
 DEFAULT_LOG_LEVEL = logging.INFO

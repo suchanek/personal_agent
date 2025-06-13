@@ -34,7 +34,7 @@ from .tools import get_all_tools
 
 # Import utilities
 from .utils import cleanup, inject_dependencies, register_cleanup_handlers
-from .utils.logging import (
+from .utils.pag_logging import (
     configure_master_logger,
     disable_stream_handlers_for_namespace,
     list_all_loggers,
