@@ -11,6 +11,8 @@ import logging
 import os
 from typing import Optional
 
+from rich.console import Console
+
 # Import configuration
 from .config import LLM_MODEL, USE_MCP
 from .config.settings import (
@@ -192,7 +194,11 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
         use_remote_ollama
     )
 
-    print(f"✅ Agent initialized: {agent.get_agent_info()}")
+    # Print formatted agent info
+    console = Console()
+    console.print("✅ [bold green]Agent Successfully Initialized![/bold green]")
+    agent.print_agent_info(console)
+    
     print("\nEnter your queries (type 'quit' to exit):")
     if query is not None:
         response = await agent.agent.arun(query)

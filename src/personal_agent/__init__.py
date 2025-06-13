@@ -63,7 +63,7 @@ _logger.info("Initializing Personal AI Agent package...")
 
 
 # Main entry points
-from .main import create_web_app, initialize_system, main
+from .agno_main import cli_main
 from .smol_main import run_smolagents_web
 
 

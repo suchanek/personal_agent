@@ -13,9 +13,9 @@ import warnings
 
 from rich.logging import RichHandler
 
-from personal_agent.config.settings import LOG_LEVEL
-
+# Use logging.WARNING as default to avoid circular import
 DEFAULT_LOG_LEVEL = logging.WARNING
+LOG_LEVEL = logging.INFO  # Default fallback for LOG_LEVEL
 
 
 def set_logging_level_for_all_handlers(log_level: int):
