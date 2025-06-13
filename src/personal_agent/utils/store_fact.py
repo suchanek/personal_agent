@@ -29,7 +29,7 @@ from weaviate.connect import ConnectionParams
 from weaviate.util import generate_uuid5
 
 from ..config import OLLAMA_URL, USE_WEAVIATE, WEAVIATE_URL
-from ..utils.logging import setup_logging
+from ..utils.pag_logging import setup_logging
 
 # Setup logging
 logger = setup_logging(name=__name__)

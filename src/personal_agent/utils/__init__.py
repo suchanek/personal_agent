@@ -6,7 +6,7 @@ Last update: 2025-06-02 23:17:39
 """
 
 from .cleanup import cleanup, inject_dependencies, register_cleanup_handlers
-from .logging import (
+from .pag_logging import (
     configure_all_rich_logging,
     configure_master_logger,
     disable_stream_handlers_for_namespace,
