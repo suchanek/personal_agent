@@ -86,7 +86,7 @@ async def initialize_agno_system(use_remote_ollama: bool = False):
         agent_info["memory_enabled"],
     )
 
-    # Memory functions (legacy compatibility - Agno handles memory automatically)
+    # KB functions (legacy compatibility - Agno handles memory automatically)
     async def query_knowledge_base(query: str) -> str:
         """Query the knowledge base (legacy compatibility - not used)."""
         logger.info("Legacy memory function called - Agno handles this automatically")

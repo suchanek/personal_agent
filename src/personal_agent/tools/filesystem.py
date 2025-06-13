@@ -1,5 +1,6 @@
 """Filesystem tools for the Personal Agent using MCP."""
 
+# pylint: disable=w0718,c0103,c0301
 import json
 import os
 from typing import TYPE_CHECKING
@@ -23,7 +24,7 @@ logger = None
 
 
 @tool
-def mcp_read_file(file_path: str) -> str:
+def mcp_read_file(file_path: str = ".") -> str:
     """Read file content using MCP filesystem server."""
     # Handle case where file_path might be a JSON string from LangChain
     if isinstance(file_path, str) and file_path.startswith("{"):
@@ -107,7 +108,7 @@ def mcp_read_file(file_path: str) -> str:
 
 
 @tool
-def mcp_write_file(file_path: str, content: str = None) -> str:
+def mcp_write_file(file_path: str = ".", content: str = None) -> str:
     """Write content to file using MCP filesystem server."""
     # Log the raw inputs for debugging
     logger.debug(
@@ -240,7 +241,7 @@ def mcp_write_file(file_path: str, content: str = None) -> str:
 
 
 @tool
-def mcp_list_directory(directory_path: str) -> str:
+def mcp_list_directory(directory_path: str = ".") -> str:
     """List directory contents using MCP filesystem server."""
     # Handle case where directory_path might be a JSON string from LangChain
     if isinstance(directory_path, str) and directory_path.startswith("{"):
@@ -329,7 +330,9 @@ def mcp_list_directory(directory_path: str) -> str:
 
 
 @tool
-def intelligent_file_search(search_query: str, directory: str = "/") -> str:
+def intelligent_file_search(
+    search_query: str = "Describe the files in this listing", directory: str = "/"
+) -> str:
     """Search for files and enhance results with memory context."""
     if not USE_MCP or mcp_client is None:
         return "MCP is disabled, cannot search files."
@@ -348,6 +351,10 @@ def intelligent_file_search(search_query: str, directory: str = "/") -> str:
                 if memory_results != ["No relevant context found."]
                 else []
             )
+        else:
+            # @todo
+            # integrate with our pylance system to query the database
+            pass
 
         # Use MCP to list directory contents and search for relevant files
         directory_listing = mcp_list_directory.invoke({"directory_path": directory})
@@ -378,7 +385,11 @@ def intelligent_file_search(search_query: str, directory: str = "/") -> str:
 
 
 @tool
-def create_and_save_file(file_path: str, content: str, create_dirs: bool = True) -> str:
+def create_and_save_file(
+    file_path: str = "./pai.txt",
+    content: str = "Default output for create and save file\n",
+    create_dirs: bool = True,
+) -> str:
     """Create directories if needed and save file content. This is the preferred tool for creating new files."""
     # Handle case where parameters might be JSON strings from LangChain
     if isinstance(file_path, str) and file_path.startswith("{"):

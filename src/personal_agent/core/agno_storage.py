@@ -205,7 +205,11 @@ async def load_combined_knowledge_base(
     :param recreate: Whether to recreate the knowledge base from scratch
     """
     logger.info("Loading combined knowledge base content...")
-    await knowledge_base.aload(recreate=recreate)
+
+    # Use synchronous load in an async context - this matches agno framework patterns
+    # The synchronous load method is more stable than aload which can return async generators
+    knowledge_base.load(recreate=recreate)
+
     logger.info("Combined knowledge base loaded successfully")
 
 

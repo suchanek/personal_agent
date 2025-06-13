@@ -14,7 +14,7 @@ logger = setup_logging()
 def create_agno_memory_tools(weaviate_client_instance, vector_store_instance):
     """Create Agno-compatible memory tools with injected dependencies."""
 
-    async def store_interaction(text: str, topic: str = "general") -> str:
+    async def store_interaction_weaviate(text: str, topic: str = "general") -> str:
         """Store user interaction in Weaviate.
 
         Args:
@@ -77,7 +77,7 @@ def create_agno_memory_tools(weaviate_client_instance, vector_store_instance):
                 logger.error("Error storing interaction: %s", e)
                 return f"Error storing interaction: {e}"
 
-    async def query_knowledge_base(query: str, limit: int = 3) -> str:
+    async def query_knowledge_base_weaviate(query: str, limit: int = 3) -> str:
         """Query Weaviate for relevant context.
 
         Args:
@@ -114,7 +114,7 @@ def create_agno_memory_tools(weaviate_client_instance, vector_store_instance):
             logger.error("Error querying knowledge base: %s", e)
             return f"Error querying knowledge base: {e}"
 
-    async def clear_knowledge_base() -> str:
+    async def clear_knowledge_base_weaviate() -> str:
         """Clear all data from Weaviate.
 
         Returns:
@@ -139,11 +139,11 @@ def create_agno_memory_tools(weaviate_client_instance, vector_store_instance):
                 return "Knowledge base was already empty."
 
         except Exception as e:
-            logger.error("Error clearing knowledge base: %s", e)
+            logger.error("Error clearing weaviate knowledge base: %s", e)
             return f"Error clearing knowledge base: {e}"
 
     # Set function metadata for Agno compatibility
-    store_interaction.__name__ = "store_interaction"
+    store_interaction.__name__ = "store_interaction_weaviate"
     store_interaction.__doc__ = """Store user interaction in Weaviate.
     
     Args:
@@ -153,7 +153,7 @@ def create_agno_memory_tools(weaviate_client_instance, vector_store_instance):
     Returns:
         str: Success or error message"""
 
-    query_knowledge_base.__name__ = "query_knowledge_base"
+    query_knowledge_base.__name__ = "query_knowledge_base_weaviate"
     query_knowledge_base.__doc__ = """Query Weaviate for relevant context.
     
     Args:
@@ -169,4 +169,8 @@ def create_agno_memory_tools(weaviate_client_instance, vector_store_instance):
     Returns:
         str: Success or error message"""
 
-    return store_interaction, query_knowledge_base, clear_knowledge_base
+    return (
+        store_interaction_weaviate,
+        query_knowledge_base_weaviate,
+        clear_knowledge_base_weaviate,
+    )
