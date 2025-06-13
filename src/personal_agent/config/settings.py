@@ -50,7 +50,7 @@ STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
 
 # Agno Storage Configuration (expand DATA_DIR variable)
 AGNO_STORAGE_DIR = os.path.expandvars(
-    get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/agno")
+    get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}")
 )
 AGNO_KNOWLEDGE_DIR = os.path.expandvars(
     get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/knowledge")
