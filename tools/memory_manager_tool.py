@@ -133,7 +133,7 @@ class MemoryManager:
             table.add_column("ID", style="dim", width=12)
             table.add_column("Memory", style="white", width=60)
             table.add_column("Topics", style="blue", width=20)
-            table.add_column("Created", style="green", width=12)
+            table.add_column("Last Updated", style="green", width=12)
 
             for memory in memories:
                 # Truncate long memories
@@ -146,13 +146,13 @@ class MemoryManager:
                 if len(topics_str) > 20:
                     topics_str = topics_str[:17] + "..."
 
-                # Format created date
+                # Format created date - check for last_updated field
                 created_str = "N/A"
-                if hasattr(memory, "created_at") and memory.created_at:
-                    if isinstance(memory.created_at, datetime):
-                        created_str = memory.created_at.strftime("%m/%d %H:%M")
+                if hasattr(memory, "last_updated") and memory.last_updated:
+                    if isinstance(memory.last_updated, datetime):
+                        created_str = memory.last_updated.strftime("%m/%d %H:%M")
                     else:
-                        created_str = str(memory.created_at)[:10]
+                        created_str = str(memory.last_updated)[:10]
 
                 table.add_row(
                     str(memory.memory_id)[:12] if memory.memory_id else "N/A",

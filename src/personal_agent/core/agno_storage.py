@@ -1,14 +1,20 @@
 """Agno native storage and knowledge management utilities.
 
-Simplified storage module that provides factory functions for Agno's native
-memory and storage components, following the agentic memory pattern where
-the LLM intelligently manages memory creation and prevents duplicates naturally.
+Enhanced storage module that provides factory functions for Agno's native
+memory and storage components, featuring intelligent duplicate prevention
+and advanced memory management capabilities.
 
 Primary functions:
 - create_agno_storage(): SQLite storage for agent sessions
-- create_agno_memory(): Memory instance with SQLite backend for persistent memory
+- create_agno_memory(): AntiDuplicateMemory instance with intelligent duplicate prevention
 - create_combined_knowledge_base(): Unified knowledge base handling both text and PDF sources
 - load_combined_knowledge_base(): Async loading for combined knowledge base
+
+Memory Management (v0.6.1):
+- Enhanced with AntiDuplicateMemory class for automatic duplicate detection and prevention
+- Configures delete_memories=True and clear_memories=True for intelligent memory curation
+- Addresses memory duplication issues commonly found with Ollama models
+- Provides semantic and exact duplicate detection with configurable similarity thresholds
 
 Removed redundant functions (v0.5.3):
 - create_agno_knowledge(), load_agno_knowledge(): Redundant with combined knowledge base
@@ -24,12 +30,12 @@ from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.knowledge.pdf import PDFKnowledgeBase
 from agno.knowledge.text import TextKnowledgeBase
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
-from agno.memory.v2.memory import Memory
 from agno.storage.sqlite import SqliteStorage
 from agno.vectordb.lancedb import LanceDb, SearchType
 
 from ..config import DATA_DIR, OLLAMA_URL
 from ..utils import setup_logging
+from .anti_duplicate_memory import AntiDuplicateMemory
 
 logger = setup_logging(__name__)
 
@@ -49,6 +55,7 @@ def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
     storage = SqliteStorage(
         table_name="personal_agent_sessions",
         db_file=str(storage_path / "agent_sessions.db"),
+        auto_upgrade_schema=True,
     )
 
     logger.info(
@@ -57,15 +64,24 @@ def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
     return storage
 
 
-def create_agno_memory(storage_dir: str = None) -> Memory:
-    """Create Memory instance with SQLite backend for persistent memory.
+def create_agno_memory(storage_dir: str = None) -> AntiDuplicateMemory:
+    """Create AntiDuplicateMemory instance with SQLite backend for persistent memory.
 
-    Uses Agno's native agentic memory approach where the LLM intelligently
-    decides what information to store as memories, naturally preventing
-    duplicates through smart content evaluation.
+    Uses Agno's enhanced agentic memory approach with intelligent duplicate detection
+    and prevention. The LLM decides what information to store as memories while
+    the AntiDuplicateMemory class prevents duplicate creation through semantic
+    and exact duplicate detection.
+
+    Features:
+    - Automatic duplicate detection and prevention (similarity threshold: 0.8)
+    - Memory deletion capabilities (delete_memories=True)
+    - Memory clearing capabilities (clear_memories=True)
+    - Semantic similarity analysis using difflib
+    - Combined memory detection and handling
+    - Debug mode available for analysis
 
     :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
-    :return: Configured Memory instance
+    :return: Configured AntiDuplicateMemory instance with duplicate prevention enabled
     """
     if storage_dir is None:
         storage_dir = f"{DATA_DIR}/agno"
@@ -76,13 +92,16 @@ def create_agno_memory(storage_dir: str = None) -> Memory:
     memory_db = SqliteMemoryDb(
         table_name="personal_agent_memory",
         db_file=str(storage_path / "agent_memory.db"),
-        
+    )
+    # Create AntiDuplicateMemory instance with SQLite backend
+    # delete_memories=True allows the agent to clear memories when needed
+    # clear_memories=True allows the agent to clear all memories on initialization
+    memory = AntiDuplicateMemory(
+        db=memory_db, delete_memories=True, clear_memories=True
     )
 
-    memory = Memory(db=memory_db)
-
     logger.info(
-        "Created Agno Memory with SQLite backend at: %s",
+        "Created AntiDuplicateMemory with SQLite backend at: %s",
         storage_path / "agent_memory.db",
     )
     return memory

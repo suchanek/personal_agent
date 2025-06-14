@@ -166,7 +166,7 @@ class AgnoPersonalAgent:
 
                 if memory_id is None:
                     # Memory was rejected by anti-duplicate system
-                    logger.info(
+                    logger.warning(
                         "Memory rejected by anti-duplicate system: %s...", content[:50]
                     )
                     return f"🚫 Memory rejected (duplicate detected): {content[:50]}..."
@@ -441,7 +441,21 @@ Returns:
             6. **Be Proactive**: Suggest related actions or improvements when relevant
             
             ## Tool Usage Strategy
-            
+            - **If the user asks for an immediate response from a tool do not reason about it, just use the tool directly.**
+            - **If the user asks for a complex task, break it down into smaller steps and use tools progressively.**
+            - **If the user asks for personal information, always check your memory first.**
+            - **If the user asks for current information, use web search tools.**
+            - **If the user asks for technical details, use reasoning tools to analyze the problem.**
+            - **If the user asks for file operations, use filesystem tools to read/write files.**
+            - **If the user asks for repository information, use GitHub tools to fetch details.**
+            - **If the user asks for financial data, use YFinance tools to get stock prices.**
+            - **If the user asks for Python code execution, use Python tools to run code snippets.**
+            - **If the user asks for shell commands, use Shell tools to execute commands.**
+            - **If the user asks for web automation, use Puppeteer tools to interact with web pages.**
+            - **If the user asks for web search, use DuckDuckGo tools to find information.**
+            - **If the user asks for financial data, use YFinance tools to get stock prices.**
+            - **If the user asks for web scraping, use Puppeteer tools to extract data from websites.**
+            - **If the user asks for web search, use DuckDuckGo tools to find information.**
             - **Progressive Enhancement**: Start with simple operations, add complexity as needed
             - **Cross-Reference**: Validate information across multiple sources
             - **Context Building**: Use memory to enhance responses with relevant background
@@ -467,7 +481,7 @@ Returns:
                 DuckDuckGoTools(),
                 YFinanceTools(),
                 PythonTools(),
-                ShellTools(base_dir="/tmp"),  # Configured for security
+                ShellTools(base_dir="/"),  # Configured for security
                 PersonalAgentFilesystemTools(),
                 PersonalAgentWebTools(),
             ]
