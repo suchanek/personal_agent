@@ -11,6 +11,8 @@ This tool provides comprehensive memory database management capabilities includi
 - Export memories to JSON
 
 Usage:
+    python memory_manager_tool.py                                       # Interactive mode (default)
+    python memory_manager_tool.py interactive                           # Interactive mode (explicit)
     python memory_manager_tool.py --help
     python memory_manager_tool.py list-users
     python memory_manager_tool.py list-memories --user-id test_user
@@ -32,10 +34,10 @@ from typing import Dict, List, Optional
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 from agno.memory.v2.memory import Memory
 from agno.memory.v2.schema import UserMemory
-from agno.models.openai import OpenAIChat
+from agno.models.ollama import Ollama
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 # Add src to path for imports
@@ -66,7 +68,7 @@ class MemoryManager:
             table_name="personal_agent_memory",  # Use the same table name as the actual agent
             db_file=str(self.db_path),
         )
-        self.memory = Memory(model=OpenAIChat(id="gpt-4o-mini"), db=self.db)
+        self.memory = Memory(model=Ollama(id="llama3.1:8b"), db=self.db)
 
         console.print(
             f"[green]Memory Manager initialized with database:[/green] {self.db_path}"
@@ -513,6 +515,147 @@ class MemoryManager:
             return False
 
 
+def interactive_mode(manager: MemoryManager):
+    """Run the memory manager in interactive mode with a menu-driven interface.
+
+    :param manager: MemoryManager instance to use
+    """
+    console.print("\n[bold green]🧠 Memory Manager - Interactive Mode[/bold green]")
+
+    while True:
+        try:
+            # Display menu
+            console.print("\n[bold cyan]Available Commands:[/bold cyan]")
+            console.print(
+                "  [cyan]1.[/cyan] list-users     - List all users in the database"
+            )
+            console.print(
+                "  [cyan]2.[/cyan] list-memories  - List memories for a specific user"
+            )
+            console.print(
+                "  [cyan]3.[/cyan] search         - Search memories by content"
+            )
+            console.print(
+                "  [cyan]4.[/cyan] delete-memory  - Delete a specific memory by ID"
+            )
+            console.print(
+                "  [cyan]5.[/cyan] clear-user     - Delete all memories for a user"
+            )
+            console.print("  [cyan]6.[/cyan] stats          - Show database statistics")
+            console.print(
+                "  [cyan]7.[/cyan] export         - Export memories to JSON file"
+            )
+            console.print("  [cyan]8.[/cyan] help           - Show detailed help")
+            console.print("  [cyan]9.[/cyan] quit           - Exit interactive mode")
+
+            choice = Prompt.ask(
+                "\n[bold yellow]Enter your choice (1-9 or command name)[/bold yellow]",
+                default="6",
+            )
+
+            # Convert number choices to command names
+            if choice == "1":
+                choice = "list-users"
+            elif choice == "2":
+                choice = "list-memories"
+            elif choice == "3":
+                choice = "search"
+            elif choice == "4":
+                choice = "delete-memory"
+            elif choice == "5":
+                choice = "clear-user"
+            elif choice == "6":
+                choice = "stats"
+            elif choice == "7":
+                choice = "export"
+            elif choice == "8":
+                choice = "help"
+            elif choice == "9":
+                choice = "quit"
+
+            if choice == "quit":
+                console.print("[yellow]Goodbye![/yellow]")
+                break
+
+            elif choice == "help":
+                show_help()
+
+            elif choice == "list-users":
+                manager.list_users()
+
+            elif choice == "list-memories":
+                user_id = Prompt.ask("[cyan]Enter User ID[/cyan]")
+                limit_str = Prompt.ask(
+                    "[cyan]Enter limit (optional)[/cyan]", default=""
+                )
+                limit = int(limit_str) if limit_str.isdigit() else None
+                manager.list_memories(user_id=user_id, limit=limit)
+
+            elif choice == "search":
+                query = Prompt.ask("[cyan]Enter search query[/cyan]")
+                user_id = Prompt.ask(
+                    "[cyan]Enter User ID (optional)[/cyan]", default=""
+                )
+                limit_str = Prompt.ask("[cyan]Enter limit[/cyan]", default="10")
+                limit = int(limit_str) if limit_str.isdigit() else 10
+                user_id = user_id if user_id else None
+                manager.search_memories(query=query, user_id=user_id, limit=limit)
+
+            elif choice == "delete-memory":
+                memory_id = Prompt.ask("[cyan]Enter Memory ID to delete[/cyan]")
+                manager.delete_memory(memory_id=memory_id)
+
+            elif choice == "clear-user":
+                user_id = Prompt.ask("[cyan]Enter User ID to clear all memories[/cyan]")
+                manager.clear_user_memories(user_id=user_id)
+
+            elif choice == "stats":
+                manager.get_stats()
+
+            elif choice == "export":
+                user_id = Prompt.ask(
+                    "[cyan]Enter User ID (optional)[/cyan]", default=""
+                )
+                output_file = Prompt.ask(
+                    "[cyan]Enter output filename[/cyan]", default="memories_export.json"
+                )
+                user_id = user_id if user_id else None
+                manager.export_memories(user_id=user_id, output_file=output_file)
+
+        except KeyboardInterrupt:
+            console.print(
+                "\n[yellow]Operation cancelled. Type 'quit' to exit.[/yellow]"
+            )
+        except EOFError:
+            console.print("\n[yellow]EOF detected. Exiting interactive mode.[/yellow]")
+            break
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+
+
+def show_help():
+    """Display help information for interactive mode."""
+    help_text = """
+[bold]Available Commands:[/bold]
+
+[cyan]list-users[/cyan]     - List all users in the database
+[cyan]list-memories[/cyan]  - List memories for a specific user
+[cyan]search[/cyan]         - Search memories by content
+[cyan]delete-memory[/cyan]  - Delete a specific memory by ID
+[cyan]clear-user[/cyan]     - Delete all memories for a user
+[cyan]stats[/cyan]          - Show database statistics
+[cyan]export[/cyan]         - Export memories to JSON file
+[cyan]help[/cyan]           - Show this help message
+[cyan]quit[/cyan]           - Exit interactive mode
+
+[bold]Examples:[/bold]
+• Use [cyan]list-users[/cyan] to see all users, then [cyan]list-memories[/cyan] to view their memories
+• Use [cyan]search[/cyan] to find memories containing specific words
+• Use [cyan]stats[/cyan] to get an overview of your memory database
+"""
+    console.print(help_text)
+
+
 def main():
     """Main CLI interface."""
     parser = argparse.ArgumentParser(
@@ -572,10 +715,18 @@ def main():
         "--output", default="memories_export.json", help="Output file path"
     )
 
+    # Interactive command
+    subparsers.add_parser("interactive", help="Run in interactive mode")
+
     args = parser.parse_args()
 
+    # If no command is provided, default to interactive mode
     if not args.command:
-        parser.print_help()
+        console.print(
+            "[yellow]No command specified. Starting interactive mode...[/yellow]"
+        )
+        manager = MemoryManager(db_path=args.db_path)
+        interactive_mode(manager)
         return
 
     # Initialize memory manager
@@ -605,6 +756,9 @@ def main():
 
         elif args.command == "export":
             manager.export_memories(user_id=args.user_id, output_file=args.output)
+
+        elif args.command == "interactive":
+            interactive_mode(manager)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled by user[/yellow]")
