@@ -41,7 +41,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
 from personal_agent.utils import setup_logging
