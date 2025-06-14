@@ -46,6 +46,7 @@ from .agno_storage import (
     create_combined_knowledge_base,
     load_combined_knowledge_base,
 )
+from .anti_duplicate_memory import AntiDuplicateMemory
 
 # Configure logging
 logger = setup_logging(__name__)
@@ -115,39 +116,138 @@ class AgnoPersonalAgent:
 
     async def _get_memory_tools(self) -> List:
         """Create memory tools as native async functions compatible with Agno.
-        
+
         This method creates the crucial store_user_memory and query_memory tools
         that enable the agent to actually create and retrieve memories.
         """
         if not self.enable_memory or not self.agno_memory:
             logger.warning("Memory not enabled or memory not initialized")
             return []
-        
+
         tools = []
-        
+
         async def store_user_memory(content: str, topics: List[str] = None) -> str:
             """Store information as a user memory.
-            
+
             Args:
                 content: The information to store as a memory
                 topics: Optional list of topics/categories for the memory
-                
+
             Returns:
                 str: Success or error message
             """
             try:
                 from agno.memory.v2.memory import UserMemory
-                
+
                 if topics is None:
                     topics = ["general"]
-                
+
                 memory_obj = UserMemory(memory=content, topics=topics)
                 memory_id = self.agno_memory.add_user_memory(
-                    memory=memory_obj,
-                    user_id=self.user_id
+                    memory=memory_obj, user_id=self.user_id
                 )
-                
-                logger.info("Stored user memory: %s... (ID: %s)", content[:50], memory_id)
+
+                logger.info(
+                    "Stored user memory: %s... (ID: %s)", content[:50], memory_id
+                )
+                return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+
+            except Exception as e:
+                logger.error("Error storing user memory: %s", e)
+                return f"❌ Error storing memory: {str(e)}"
+
+        async def query_memory(query: str, limit: int = 5) -> str:
+            """Search user memories using semantic search.
+
+            Args:
+                query: The query to search for in memories
+                limit: Maximum number of memories to return
+
+            Returns:
+                str: Found memories or message if none found
+            """
+            try:
+                memories = self.agno_memory.search_user_memories(
+                    user_id=self.user_id,
+                    query=query,
+                    retrieval_method="agentic",
+                    limit=limit,
+                )
+
+                if not memories:
+                    logger.info("No memories found for query: %s", query)
+                    return f"🔍 No memories found for: {query}"
+
+                # Format memories for display
+                result = f"🧠 Found {len(memories)} memories for '{query}':\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                logger.info("Found %d memories for query: %s", len(memories), query)
+                return result
+
+            except Exception as e:
+                logger.error("Error querying memories: %s", e)
+                return f"❌ Error searching memories: {str(e)}"
+
+        async def get_recent_memories(limit: int = 10) -> str:
+            """Get the most recent user memories.
+
+            Args:
+                limit: Maximum number of recent memories to return
+
+            Returns:
+                str: Recent memories or message if none found
+            """
+            try:
+                memories = self.agno_memory.search_user_memories(
+                    user_id=self.user_id, limit=limit, retrieval_method="last_n"
+                )
+
+                if not memories:
+                    return "📝 No memories found."
+
+                # Format memories for display
+                result = f"📝 Recent {len(memories)} memories:\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                logger.info("Retrieved %d recent memories", len(memories))
+                return result
+
+            except Exception as e:
+                logger.error("Error getting recent memories: %s", e)
+                return f"❌ Error getting recent memories: {str(e)}"
+
+        # Add tools to the list
+        tools.append(store_user_memory)
+        tools.append(query_memory)
+        tools.append(get_recent_memories)
+
+        logger.info("Created %d memory tools", len(tools))
+        return tools
+
+    async def _get_mcp_tools(self) -> List:
+        """Create MCP tools as native async functions compatible with Agno.
+
+        Returns:
+            List of MCP tool functions
+        """
+        if not self.enable_mcp or not self.mcp_servers:
+            logger.info("MCP not enabled or no MCP servers configured")
+            return []
+
+        tools = []
+
+        for server_name, config in self.mcp_servers.items():
+            logger.info("Setting up MCP tool for server: %s", server_name)
+
             command = config.get("command", "npx")
             args = config.get("args", [])
             env = config.get("env", {})
@@ -163,22 +263,10 @@ class AgnoPersonalAgent:
                 tool_env: Dict[str, str],
                 desc: str,
             ) -> Any:
-                """Create MCP tool function with proper closure.
-
-                :param name: MCP server name
-                :param cmd: Command to run the server
-                :param tool_args: Arguments for the server command
-                :param tool_env: Environment variables for the server
-                :param desc: Description of the tool
-                :return: Async function that can be called as a tool
-                """
+                """Create MCP tool function with proper closure."""
 
                 async def mcp_tool(query: str) -> str:
-                    """MCP tool function that creates session on-demand.
-
-                    :param query: Query to send to the MCP server
-                    :return: Response from the MCP server
-                    """
+                    """MCP tool function that creates session on-demand."""
                     try:
                         # Prepare environment - convert GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN if needed
                         server_env = tool_env.copy() if tool_env else {}
@@ -380,7 +468,20 @@ Returns:
                     # DO NOT manually add KnowledgeTools to avoid naming conflicts
 
                 self.agno_memory = create_agno_memory(self.storage_dir)
-                logger.info("Created Agno memory storage at: %s", self.storage_dir)
+
+                # Wrap with anti-duplicate memory system
+                if self.agno_memory:
+                    self.agno_memory = AntiDuplicateMemory(
+                        base_memory=self.agno_memory,
+                        similarity_threshold=0.85,  # 85% similarity threshold
+                    )
+                    logger.info(
+                        "Created Agno memory with anti-duplicate protection at: %s",
+                        self.storage_dir,
+                    )
+                else:
+                    logger.error("Failed to create base memory system")
+
                 logger.info("Initialized Agno storage and knowledge backend")
             else:
                 logger.info(
@@ -402,8 +503,16 @@ Returns:
 
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:
-                mcp_tool_functions = self._get_mcp_tools_as_functions()
+                mcp_tool_functions = await self._get_mcp_tools()
                 tools.extend(mcp_tool_functions)
+
+            # Get memory tools - CRITICAL: This was missing!
+            if self.enable_memory:
+                memory_tool_functions = await self._get_memory_tools()
+                tools.extend(memory_tool_functions)
+                logger.info(
+                    "Added %d memory tools to agent", len(memory_tool_functions)
+                )
 
             # Create agent instructions
             instructions = self._create_agent_instructions()
@@ -435,14 +544,16 @@ Returns:
                 logger.info("Agent configured with knowledge base search")
 
             # Calculate tool counts for logging
-            mcp_tool_count = (
-                len(self._get_mcp_tools_as_functions()) if self.enable_mcp else 0
+            mcp_tool_count = len(await self._get_mcp_tools()) if self.enable_mcp else 0
+            memory_tool_count = (
+                len(await self._get_memory_tools()) if self.enable_memory else 0
             )
 
             logger.info(
-                "Successfully initialized agno agent with native storage: %d total tools (%d MCP)",
+                "Successfully initialized agno agent with native storage: %d total tools (%d MCP, %d memory)",
                 len(tools),
                 mcp_tool_count,
+                memory_tool_count,
             )
             return True
 
