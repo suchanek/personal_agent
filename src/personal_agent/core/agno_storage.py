@@ -76,6 +76,7 @@ def create_agno_memory(storage_dir: str = None) -> Memory:
     memory_db = SqliteMemoryDb(
         table_name="personal_agent_memory",
         db_file=str(storage_path / "agent_memory.db"),
+        
     )
 
     memory = Memory(db=memory_db)

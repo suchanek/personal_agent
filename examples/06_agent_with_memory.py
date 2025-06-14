@@ -14,7 +14,8 @@ from agno.memory.v2.memory import Memory
 from agno.models.openai import OpenAIChat
 from agno.storage.sqlite import SqliteStorage
 from rich.pretty import pprint
-from utils import print_chat_history
+
+# from utils import print_chat_history
 
 memory_db = SqliteMemoryDb(table_name="memory", db_file="tmp/memory.db")
 
@@ -49,7 +50,7 @@ agent.print_response(
 
 # -*- Print the chat history
 session_runs = memory.runs[session_id]
-print_chat_history(session_runs)
+print(session_runs)
 
 memories = memory.get_user_memories(user_id=john_doe_id)
 print("John Doe's memories:")
@@ -64,7 +65,7 @@ agent.print_response(
 
 # -*- Print the chat history
 session_runs = memory.runs[session_id]
-print_chat_history(session_runs)
+print(session_runs)
 
 # You can also get the user memories from the agent
 memories = agent.get_user_memories(user_id=john_doe_id)

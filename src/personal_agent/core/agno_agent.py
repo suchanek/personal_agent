@@ -11,9 +11,14 @@ import os
 from textwrap import dedent
 from typing import Any, Dict, List, Optional
 
-# Set Rust logging to ERROR level before importing agno components
+# Set logging levels for better telemetry
 if "RUST_LOG" not in os.environ:
-    os.environ["RUST_LOG"] = "error"
+    # Enable more verbose Rust logging for debugging
+    os.environ["RUST_LOG"] = "debug"
+
+# Enable Ollama debug logging
+if "OLLAMA_DEBUG" not in os.environ:
+    os.environ["OLLAMA_DEBUG"] = "1"
 
 from agno.agent import Agent
 from agno.knowledge.combined import CombinedKnowledgeBase
@@ -108,35 +113,41 @@ class AgnoPersonalAgent:
             self.user_id,
         )
 
-    def _create_model(self) -> OpenAIChat:
-        """Create the appropriate model instance based on provider.
-
-        :return: Configured model instance
-        :raises ValueError: If unsupported model provider is specified
+    async def _get_memory_tools(self) -> List:
+        """Create memory tools as native async functions compatible with Agno.
+        
+        This method creates the crucial store_user_memory and query_memory tools
+        that enable the agent to actually create and retrieve memories.
         """
-        if self.model_provider == "openai":
-            return OpenAIChat(id=self.model_name)
-        elif self.model_provider == "ollama":
-            # Use Ollama-compatible interface for Ollama
-            return Ollama(
-                id=self.model_name,
-                host=self.ollama_base_url,
-            )
-        else:
-            raise ValueError(f"Unsupported model provider: {self.model_provider}")
-
-    def _get_mcp_tools_as_functions(self) -> List[Any]:
-        """Get MCP server runners as callable tools for the main agent.
-
-        :return: List of callable MCP tool functions
-        """
-        if not self.enable_mcp or not self.mcp_servers:
+        if not self.enable_memory or not self.agno_memory:
+            logger.warning("Memory not enabled or memory not initialized")
             return []
-
+        
         tools = []
-
-        for server_name, config in self.mcp_servers.items():
-            # Create async function for each MCP server
+        
+        async def store_user_memory(content: str, topics: List[str] = None) -> str:
+            """Store information as a user memory.
+            
+            Args:
+                content: The information to store as a memory
+                topics: Optional list of topics/categories for the memory
+                
+            Returns:
+                str: Success or error message
+            """
+            try:
+                from agno.memory.v2.memory import UserMemory
+                
+                if topics is None:
+                    topics = ["general"]
+                
+                memory_obj = UserMemory(memory=content, topics=topics)
+                memory_id = self.agno_memory.add_user_memory(
+                    memory=memory_obj,
+                    user_id=self.user_id
+                )
+                
+                logger.info("Stored user memory: %s... (ID: %s)", content[:50], memory_id)
             command = config.get("command", "npx")
             args = config.get("args", [])
             env = config.get("env", {})
@@ -261,6 +272,14 @@ Returns:
         base_instructions = dedent(
             """\
             You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
+            
+            ## MEMORY-FIRST PRIORITY RULES
+            
+            **CRITICAL**: For ANY personal questions about the user:
+            1. **ALWAYS check your memory FIRST** - you have automatic user memories available
+            2. **DO NOT use web search** for personal information (name, location, preferences, etc.)
+            3. **Your built-in memory contains all personal details** - trust it over external sources
+            4. **Only use web search** for current events, technical info, or general knowledge
             
             ## Core Guidelines
             
@@ -399,13 +418,17 @@ Returns:
                 name="Personal AI Agent",
                 agent_id="personal_agent",
                 user_id=self.user_id,
-                enable_agentic_memory=self.enable_memory,
-                enable_user_memories=False,
-                add_history_to_messages=True,
+                enable_agentic_memory=False,  # Disable to avoid conflicts with user_memories
+                enable_user_memories=self.enable_memory,  # Enable user memories for personal info
+                add_history_to_messages=False,
                 num_history_responses=5,
                 knowledge=self.agno_knowledge if self.enable_memory else None,
                 storage=self.agno_storage if self.enable_memory else None,
                 memory=self.agno_memory if self.enable_memory else None,
+                # Enable telemetry and verbose logging
+                debug_mode=self.debug,
+                # Enable streaming for intermediate steps
+                stream_intermediate_steps=False,
             )
 
             if self.enable_memory and self.agno_knowledge:
