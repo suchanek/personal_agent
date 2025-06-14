@@ -9,8 +9,9 @@ intelligent duplicate detection and prevention capabilities.
 import difflib
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -43,6 +44,8 @@ class AntiDuplicateMemory(Memory):
         enable_semantic_dedup: bool = True,
         enable_exact_dedup: bool = True,
         debug_mode: bool = False,
+        delete_memories: bool = True,
+        clear_memories: bool = True,
     ):
         """
         Initialize the anti-duplicate memory manager.
@@ -53,8 +56,15 @@ class AntiDuplicateMemory(Memory):
         :param enable_semantic_dedup: Enable semantic duplicate detection
         :param enable_exact_dedup: Enable exact duplicate detection
         :param debug_mode: Enable debug logging
+        :param delete_memories: Allow the agent to delete memories when needed
+        :param clear_memories: Allow the agent to clear all memories
         """
-        super().__init__(db=db, model=model)
+        super().__init__(
+            db=db,
+            model=model,
+            delete_memories=delete_memories,
+            clear_memories=clear_memories,
+        )
         self.similarity_threshold = similarity_threshold
         self.enable_semantic_dedup = enable_semantic_dedup
         self.enable_exact_dedup = enable_exact_dedup
@@ -441,7 +451,7 @@ class AntiDuplicateMemory(Memory):
         if stats["combined_memories"] > 0:
             print(f"\n🔗 COMBINED MEMORIES:")
             for idx in stats["combined_memory_indices"]:
-                print(f"  • [{idx}] {memories[idx].memory}")
+                print(f"   Memory: '{memories[idx].memory}'")
 
         if (
             stats["exact_duplicates"] == 0
@@ -472,3 +482,117 @@ def create_anti_duplicate_memory(
         enable_exact_dedup=True,
         debug_mode=debug_mode,
     )
+
+
+def main():
+    """
+    Main function to demonstrate AntiDuplicateMemory analysis capabilities.
+
+    Analyzes the current memory database and displays statistics about
+    memory quality, duplicates, and potential issues.
+    """
+    import sys
+    from pathlib import Path
+
+    # Add parent directories to path for imports
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent.parent
+    sys.path.insert(0, str(project_root / "src"))
+
+    from agno.memory.v2.db.sqlite import SqliteMemoryDb
+
+    from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
+
+    print("🧠 Anti-Duplicate Memory Analysis Tool")
+    print("=" * 50)
+
+    # Create database connection
+    db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
+
+    if not db_path.exists():
+        print(f"❌ Memory database not found at: {db_path}")
+        print("   Run an agent first to create some memories.")
+        return
+
+    print(f"📂 Database: {db_path}")
+
+    memory_db = SqliteMemoryDb(
+        table_name="personal_agent_memory",
+        db_file=str(db_path),
+    )
+
+    # Create AntiDuplicateMemory instance
+    anti_dup_memory = AntiDuplicateMemory(
+        db=memory_db,
+        similarity_threshold=0.8,
+        enable_semantic_dedup=True,
+        enable_exact_dedup=True,
+        debug_mode=True,
+    )
+
+    try:
+        # Get list of all users
+        all_memories = memory_db.read_memories()
+        users = list(set(m.user_id for m in all_memories if m.user_id))
+
+        if not users:
+            print("❌ No memories found in the database.")
+            return
+
+        print(f"\n👥 Found {len(users)} user(s): {', '.join(users)}")
+
+        # Analyze each user
+        for user_id in users:
+            print(f"\n" + "=" * 60)
+            print(f"🔍 ANALYZING USER: {user_id}")
+            print("=" * 60)
+
+            # Get basic stats
+            stats = anti_dup_memory.get_memory_stats(user_id=user_id)
+
+            if stats.get("total_memories", 0) == 0:
+                print(f"   No memories found for user: {user_id}")
+                continue
+
+            # Print detailed analysis
+            anti_dup_memory.print_memory_analysis(user_id=user_id)
+
+            # Show sample memories
+            memories = anti_dup_memory.get_user_memories(user_id=user_id)
+            if memories:
+                print(f"\n📝 SAMPLE MEMORIES (showing first 5):")
+                for i, memory in enumerate(memories[:5], 1):
+                    memory_text = (
+                        memory.memory[:100] + "..."
+                        if len(memory.memory) > 100
+                        else memory.memory
+                    )
+                    topics = getattr(memory, "topics", []) or []
+                    topics_str = f" [Topics: {', '.join(topics)}]" if topics else ""
+                    print(f"   {i}. {memory_text}{topics_str}")
+
+                if len(memories) > 5:
+                    print(f"   ... and {len(memories) - 5} more memories")
+
+        # Overall database summary
+        print(f"\n" + "=" * 60)
+        print("📊 OVERALL DATABASE SUMMARY")
+        print("=" * 60)
+        print(f"Total memories across all users: {len(all_memories)}")
+        print(f"Total users: {len(users)}")
+
+        # Database size
+        db_size = db_path.stat().st_size
+        print(f"Database file size: {db_size:,} bytes ({db_size/1024:.1f} KB)")
+
+        print(f"\n✅ Analysis complete!")
+
+    except Exception as e:
+        print(f"❌ Error during analysis: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
