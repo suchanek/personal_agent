@@ -9,7 +9,7 @@ including native MCP support, async operations, and advanced agent features.
 import asyncio
 import os
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 # Set logging levels for better telemetry
 if "RUST_LOG" not in os.environ:
@@ -114,6 +114,23 @@ class AgnoPersonalAgent:
             self.user_id,
         )
 
+    def _create_model(self) -> Union[OpenAIChat, Ollama]:
+        """Create the appropriate model instance based on provider.
+
+        :return: Configured model instance
+        :raises ValueError: If unsupported model provider is specified
+        """
+        if self.model_provider == "openai":
+            return OpenAIChat(id=self.model_name)
+        elif self.model_provider == "ollama":
+            # Use Ollama-compatible interface for Ollama
+            return Ollama(
+                id=self.model_name,
+                host=self.ollama_base_url,
+            )
+        else:
+            raise ValueError(f"Unsupported model provider: {self.model_provider}")
+
     async def _get_memory_tools(self) -> List:
         """Create memory tools as native async functions compatible with Agno.
 
@@ -147,10 +164,18 @@ class AgnoPersonalAgent:
                     memory=memory_obj, user_id=self.user_id
                 )
 
-                logger.info(
-                    "Stored user memory: %s... (ID: %s)", content[:50], memory_id
-                )
-                return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+                if memory_id is None:
+                    # Memory was rejected by anti-duplicate system
+                    logger.info(
+                        "Memory rejected by anti-duplicate system: %s...", content[:50]
+                    )
+                    return f"🚫 Memory rejected (duplicate detected): {content[:50]}..."
+                else:
+                    # Memory was successfully stored
+                    logger.info(
+                        "Stored user memory: %s... (ID: %s)", content[:50], memory_id
+                    )
+                    return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
 
             except Exception as e:
                 logger.error("Error storing user memory: %s", e)
@@ -469,11 +494,22 @@ Returns:
 
                 self.agno_memory = create_agno_memory(self.storage_dir)
 
-                # Wrap with anti-duplicate memory system
+                # Wrap with anti-duplicate memory system if memory was created successfully
                 if self.agno_memory:
+                    # Create model for the anti-duplicate memory
+                    memory_model = self._create_model()
+
+                    # Extract the database from the regular memory
+                    memory_db = self.agno_memory.db
+
+                    # Create anti-duplicate memory with proper parameters
                     self.agno_memory = AntiDuplicateMemory(
-                        base_memory=self.agno_memory,
+                        db=memory_db,
+                        model=memory_model,
                         similarity_threshold=0.85,  # 85% similarity threshold
+                        enable_semantic_dedup=True,
+                        enable_exact_dedup=True,
+                        debug_mode=self.debug,
                     )
                     logger.info(
                         "Created Agno memory with anti-duplicate protection at: %s",
@@ -829,7 +865,7 @@ Returns:
 
 async def create_agno_agent(
     model_provider: str = "ollama",
-    model_name: str = "qwen2.5:7b-instruct",
+    model_name: str = LLM_MODEL,
     enable_memory: bool = True,
     enable_mcp: bool = True,
     storage_dir: str = "./data/agno",
@@ -875,7 +911,7 @@ async def create_agno_agent(
 # Synchronous wrapper for compatibility
 def create_agno_agent_sync(
     model_provider: str = "ollama",
-    model_name: str = "qwen2.5:7b-instruct",
+    model_name: str = LLM_MODEL,
     enable_memory: bool = True,
     enable_mcp: bool = True,
     storage_dir: str = "./data/agno",
