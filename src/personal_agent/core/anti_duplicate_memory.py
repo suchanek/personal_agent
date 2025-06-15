@@ -444,7 +444,11 @@ class AntiDuplicateMemory(Memory):
             if self.debug_mode:
                 print(f"🚫 REJECTED: {reason}")
                 print(f"   Memory: '{memory.memory}'")
-            return None
+            
+            # Return a fake success ID to prevent agent confusion
+            # The memory wasn't actually stored, but from the agent's perspective,
+            # the desired state (memory exists) is achieved
+            return "duplicate-detected-fake-id"
 
         # Memory is unique, proceed with addition
         logger.info("Adding unique memory for user %s: '%s'", user_id, memory.memory)

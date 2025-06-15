@@ -222,19 +222,12 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
             print("🤖 Assistant: ")
             try:
                 # Use agno's async print_response with streaming for better UX
+                # This handles both display AND processing - no need for separate arun()
                 await agent.agent.aprint_response(
                     query,
                     stream=True,
                     show_full_reasoning=True,
                     stream_intermediate_steps=True,
-                )
-
-                # Since aprint_response already handles the output, we get response separately if needed
-                response_result = await agent.agent.arun(query)
-                response_content = (
-                    response_result.content
-                    if hasattr(response_result, "content")
-                    else str(response_result)
                 )
 
                 # Memory is handled automatically by Agno - no manual storage needed
