@@ -574,6 +574,75 @@ class AntiDuplicateMemory(Memory):
                 print(f"❌ Failed to delete memory {memory_id}: {e}")
             return False
 
+    def retrieve_memory(
+        self, 
+        user_id: str, 
+        query: Optional[str] = None, 
+        n_memories: Optional[int] = None, 
+        topic: Optional[str] = None
+    ) -> List[UserMemory]:
+        """
+        Retrieve memories with flexible filtering options.
+        
+        :param user_id: User ID to retrieve memories for
+        :param query: Optional search query for semantic search
+        :param n_memories: Optional limit on number of memories (if None, returns all)
+        :param topic: Optional topic filter (if None, returns all topics)
+        :return: List of UserMemory objects matching criteria
+        """
+        try:
+            # Determine retrieval method and parameters
+            if query:
+                # Use semantic search when query is provided
+                memories = self.search_user_memories(
+                    user_id=user_id,
+                    query=query,
+                    retrieval_method="agentic",
+                    limit=n_memories or 1000  # Use n_memories as limit, default to large number
+                )
+            else:
+                # Use recent memories when no query provided
+                memories = self.search_user_memories(
+                    user_id=user_id,
+                    limit=n_memories or 1000,  # Use n_memories as limit, default to large number
+                    retrieval_method="last_n"
+                )
+            
+            # Filter by topic if specified
+            if topic:
+                filtered_memories = []
+                for memory in memories:
+                    # Check if memory has topics and if the specified topic is in them
+                    if hasattr(memory, 'topics') and memory.topics:
+                        # Handle case where topics might be a string or list
+                        memory_topics = memory.topics
+                        if isinstance(memory_topics, str):
+                            memory_topics = [memory_topics]
+                        
+                        # Case-insensitive topic matching
+                        if any(topic.lower() in t.lower() for t in memory_topics):
+                            filtered_memories.append(memory)
+                    # Also check if topic appears in the memory content itself
+                    elif topic.lower() in memory.memory.lower():
+                        filtered_memories.append(memory)
+                
+                memories = filtered_memories
+            
+            # Apply n_memories limit if specified and we haven't already limited
+            if n_memories and len(memories) > n_memories:
+                memories = memories[:n_memories]
+            
+            logger.info(
+                "Retrieved %d memories for user %s (query: %s, topic: %s, limit: %s)",
+                len(memories), user_id, query or "None", topic or "None", n_memories or "None"
+            )
+            
+            return memories
+            
+        except Exception as e:
+            logger.error("Error retrieving memories for user %s: %s", user_id, e)
+            return []
+
     def get_memory_stats(self, user_id: str = USER_ID) -> dict:
         """
         Get statistics about memory quality and duplicates.

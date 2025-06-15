@@ -29,17 +29,18 @@ from mcp.client.stdio import stdio_client
 from rich.console import Console
 from rich.table import Table
 
-from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..config.rate_limiting import get_duckduckgo_rate_limits
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentWebTools,
 )
+from ..tools.rate_limited_duckduckgo import RateLimitedDuckDuckGoTools
 from ..utils import setup_logging
 from .agno_storage import (
     create_agno_memory,
@@ -230,7 +231,7 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_memory(query: str, limit: int = 5) -> str:
+        async def query_memory(query: str, limit: int = 5000) -> str:
             """Search user memories using semantic search.
 
             Args:
@@ -299,10 +300,85 @@ class AgnoPersonalAgent:
                 logger.error("Error getting recent memories: %s", e)
                 return f"❌ Error getting recent memories: {str(e)}"
 
+        async def retrieve_memory(
+            query: str = None, 
+            user_id: str = None, 
+            n_memories: int = None, 
+            topic: str = None
+        ) -> str:
+            """Retrieve memories with flexible filtering options.
+            
+            Args:
+                query: Optional search query for semantic search
+                user_id: User ID (defaults to current user)
+                n_memories: Optional limit on number of memories
+                topic: Optional topic filter
+                
+            Returns:
+                str: Formatted list of matching memories
+            """
+            try:
+                # Use current user if not specified
+                target_user_id = user_id or self.user_id
+                
+                # Validate parameters
+                if n_memories is not None and n_memories <= 0:
+                    return "❌ Error: n_memories must be greater than 0"
+                
+                # Call the retrieve_memory method from AntiDuplicateMemory
+                memories = self.agno_memory.retrieve_memory(
+                    user_id=target_user_id,
+                    query=query,
+                    n_memories=n_memories,
+                    topic=topic
+                )
+                
+                if not memories:
+                    # Create descriptive message based on parameters
+                    filters = []
+                    if query:
+                        filters.append(f"query '{query}'")
+                    if topic:
+                        filters.append(f"topic '{topic}'")
+                    if n_memories:
+                        filters.append(f"limit {n_memories}")
+                    
+                    filter_desc = " with " + ", ".join(filters) if filters else ""
+                    return f"🔍 No memories found{filter_desc}."
+                
+                # Format memories for display
+                filter_info = []
+                if query:
+                    filter_info.append(f"query: '{query}'")
+                if topic:
+                    filter_info.append(f"topic: '{topic}'")
+                if n_memories:
+                    filter_info.append(f"limit: {n_memories}")
+                
+                filter_desc = f" ({', '.join(filter_info)})" if filter_info else ""
+                result = f"🧠 Retrieved {len(memories)} memories{filter_desc}:\n\n"
+                
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if hasattr(memory, 'topics') and memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+                
+                logger.info(
+                    "Retrieved %d memories for user %s (query: %s, topic: %s, limit: %s)",
+                    len(memories), target_user_id, query or "None", topic or "None", n_memories or "None"
+                )
+                return result
+                
+            except Exception as e:
+                logger.error("Error retrieving memories: %s", e)
+                return f"❌ Error retrieving memories: {str(e)}"
+
         # Add tools to the list
         tools.append(store_user_memory)
         tools.append(query_memory)
         tools.append(get_recent_memories)
+        tools.append(retrieve_memory)
 
         logger.info("Created %d memory tools", len(tools))
         return tools
@@ -445,10 +521,12 @@ Returns:
             5. **After getting financial data**: Use web search for additional context/analysis
             6. **For commodities like Gold/Oil**: Get prices with YFinance, then search for analysis
             
-            **MEMORY USAGE RULES**:
-            - **Store personal info ONCE** using store_user_memory
+            **MEMORY USAGE RULES - IMMEDIATE ACTION REQUIRED**:
+            - **When asked to store/remember something**: IMMEDIATELY call store_user_memory tool - NO reasoning, NO explanation
+            - **Just store it and confirm**: Use store_user_memory(content, topics) then return simple confirmation
             - **Query personal info** using query_memory or get_recent_memories
             - **Do NOT web search** for personal details stored in memory
+            - **Do NOT explain what you're storing** - just store it and say "Stored successfully"
             
             **WEB RESEARCH RULES**:
             - **For current events/news**: Use DuckDuckGo search tools
@@ -515,9 +593,12 @@ Returns:
             model = self._create_model()
             logger.info("Created model: %s", self.model_name)
 
+            # Get rate limiting configuration
+            rate_limit_config = get_duckduckgo_rate_limits()
+
             # Prepare tools list
             tools = [
-                DuckDuckGoTools(),
+                RateLimitedDuckDuckGoTools(**rate_limit_config),
                 YFinanceTools(),
                 PythonTools(),
                 ShellTools(base_dir="/"),  # Configured for security
@@ -563,6 +644,7 @@ Returns:
                         enable_semantic_dedup=True,
                         enable_exact_dedup=True,
                         debug_mode=self.debug,
+                        enable_optimizations=True,
                     )
                     logger.info(
                         "Created Agno memory with anti-duplicate protection at: %s",

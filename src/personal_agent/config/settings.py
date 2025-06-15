@@ -63,5 +63,23 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 # LLM Model configuration
 LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7B")
 
+# API Keys configuration
+GITHUB_PERSONAL_ACCESS_TOKEN = get_env_var("GITHUB_PERSONAL_ACCESS_TOKEN", "")
+BRAVE_API_KEY = get_env_var("BRAVE_API_KEY", "")
+MODELS_LAB_API_KEY = get_env_var("MODELS_LAB_API_KEY", "")
+ELEVEN_LABS_API_KEY = get_env_var("ELEVEN_LABS_API_KEY", "")
+GIPHY_API_KEY = get_env_var("GIPHY_API_KEY", "")
+
 # User configuration
 USER_ID = get_env_var("USER_ID", "default_user")  # Default user ID for agent
+
+# Rate Limiting Configuration
+# DuckDuckGo Search Rate Limiting
+DUCKDUCKGO_SEARCH_DELAY = float(get_env_var("DUCKDUCKGO_SEARCH_DELAY", "3.0"))
+DUCKDUCKGO_MAX_RETRIES = int(get_env_var("DUCKDUCKGO_MAX_RETRIES", "3"))
+DUCKDUCKGO_RETRY_DELAY = float(get_env_var("DUCKDUCKGO_RETRY_DELAY", "10.0"))
+
+# Default API Rate Limiting (for other tools)
+DEFAULT_API_DELAY = float(get_env_var("DEFAULT_API_DELAY", "1.0"))
+DEFAULT_MAX_RETRIES = int(get_env_var("DEFAULT_MAX_RETRIES", "3"))
+DEFAULT_RETRY_DELAY = float(get_env_var("DEFAULT_RETRY_DELAY", "5.0"))
