@@ -18,6 +18,11 @@ Last modified: June 2, 2025
 """
 
 import logging
+import os
+
+# Set Rust logging to ERROR level to suppress Lance warnings before any imports
+if "RUST_LOG" not in os.environ:
+    os.environ["RUST_LOG"] = "error"
 
 # Import core components
 from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
@@ -29,7 +34,7 @@ from .tools import get_all_tools
 
 # Import utilities
 from .utils import cleanup, inject_dependencies, register_cleanup_handlers
-from .utils.logging import (
+from .utils.pag_logging import (
     configure_master_logger,
     disable_stream_handlers_for_namespace,
     list_all_loggers,
@@ -63,8 +68,152 @@ _logger.info("Initializing Personal AI Agent package...")
 
 
 # Main entry points
-from .main import create_web_app, initialize_system, main
+from .agno_main import cli_main
 from .smol_main import run_smolagents_web
+
+
+def print_configuration() -> str:
+    """Print comprehensive configuration information for the Personal AI Agent.
+
+    :return: Configuration information as formatted string
+    """
+    from .config import get_mcp_servers
+    from .config.settings import (
+        AGNO_KNOWLEDGE_DIR,
+        AGNO_STORAGE_DIR,
+        DATA_DIR,
+        HOME_DIR,
+        LLM_MODEL,
+        LOG_LEVEL_STR,
+        OLLAMA_URL,
+        REPO_DIR,
+        ROOT_DIR,
+        STORAGE_BACKEND,
+        USE_MCP,
+        USE_WEAVIATE,
+        WEAVIATE_URL,
+    )
+
+    config_lines = [
+        "=" * 80,
+        "🤖 PERSONAL AI AGENT CONFIGURATION",
+        "=" * 80,
+        "",
+        "📊 CORE SETTINGS:",
+        f"  • Package Version: {__version__}",
+        f"  • LLM Model: {LLM_MODEL}",
+        f"  • Storage Backend: {STORAGE_BACKEND}",
+        f"  • Log Level: {LOG_LEVEL_STR}",
+        "",
+        "🌐 SERVICE ENDPOINTS:",
+        f"  • Ollama URL: {OLLAMA_URL}",
+        f"  • Weaviate URL: {WEAVIATE_URL}",
+        "",
+        "🔧 FEATURE FLAGS:",
+        f"  • Weaviate Enabled: {'✅' if USE_WEAVIATE else '❌'} ({USE_WEAVIATE})",
+        f"  • MCP Enabled: {'✅' if USE_MCP else '❌'} ({USE_MCP})",
+        "",
+        "📁 DIRECTORY CONFIGURATION:",
+        f"  • Root Directory: {ROOT_DIR}",
+        f"  • Home Directory: {HOME_DIR}",
+        f"  • Data Directory: {DATA_DIR}",
+        f"  • Repository Directory: {REPO_DIR}",
+        "",
+        "💾 AGNO STORAGE PATHS:",
+        f"  • Agent Sessions: {AGNO_STORAGE_DIR}/agent_sessions.db",
+        f"  • Knowledge Database: {AGNO_STORAGE_DIR}/lancedb/",
+        f"  • Knowledge Files: {AGNO_KNOWLEDGE_DIR}/",
+        "",
+    ]
+
+    # MCP Servers configuration
+    if USE_MCP:
+        mcp_servers = get_mcp_servers()
+        config_lines.extend(
+            [
+                "🔌 MCP SERVERS:",
+                f"  • Total Servers: {len(mcp_servers)}",
+            ]
+        )
+
+        for server_name, config in mcp_servers.items():
+            status = "✅" if config.get("enabled", True) else "❌"
+            command = config.get("command", "unknown")
+            config_lines.append(f"  • {server_name}: {status} ({command})")
+
+        config_lines.append("")
+    else:
+        config_lines.extend(
+            [
+                "🔌 MCP SERVERS:",
+                "  • MCP is disabled",
+                "",
+            ]
+        )
+
+    # Environment status
+    config_lines.extend(
+        [
+            "🌍 ENVIRONMENT STATUS:",
+            f"  • Python Path: {os.sys.executable}",
+            f"  • Working Directory: {os.getcwd()}",
+            f"  • Environment Variables Loaded: {'✅' if os.getenv('DATA_DIR') else '❌'}",
+            "",
+        ]
+    )
+
+    # Storage status checks
+    storage_status = []
+    try:
+        from pathlib import Path
+
+        # Check if directories exist
+        data_exists = Path(DATA_DIR).exists()
+        agno_storage_exists = Path(AGNO_STORAGE_DIR).exists()
+        knowledge_exists = Path(AGNO_KNOWLEDGE_DIR).exists()
+
+        storage_status.extend(
+            [
+                "💿 STORAGE STATUS:",
+                f"  • Data Directory: {'✅' if data_exists else '❌'} ({DATA_DIR})",
+                f"  • Agno Storage: {'✅' if agno_storage_exists else '❌'} ({AGNO_STORAGE_DIR})",
+                f"  • Knowledge Directory: {'✅' if knowledge_exists else '❌'} ({AGNO_KNOWLEDGE_DIR})",
+            ]
+        )
+
+        # Count knowledge files if directory exists
+        if knowledge_exists:
+            knowledge_path = Path(AGNO_KNOWLEDGE_DIR)
+            txt_files = len(list(knowledge_path.glob("*.txt")))
+            md_files = len(list(knowledge_path.glob("*.md")))
+            pdf_files = len(list(knowledge_path.glob("*.pdf")))
+            storage_status.append(
+                f"  • Knowledge Files: {txt_files} txt, {md_files} md, {pdf_files} pdf"
+            )
+
+    except Exception as e:
+        storage_status.extend(
+            [
+                "💿 STORAGE STATUS:",
+                f"  • Error checking storage: {e}",
+            ]
+        )
+
+    config_lines.extend(storage_status)
+    config_lines.extend(
+        [
+            "",
+            "=" * 80,
+            "🚀 Configuration loaded successfully!",
+            "=" * 80,
+        ]
+    )
+
+    # Join and print
+    config_text = "\n".join(config_lines)
+    print(config_text)
+    return config_text
+
 
 # Export public API
 __all__ = [
@@ -103,6 +252,7 @@ __all__ = [
     "create_web_app",
     "initialize_system",
     "run_smolagents_web",
+    "print_configuration",
     # Package info
     "__version__",
 ]

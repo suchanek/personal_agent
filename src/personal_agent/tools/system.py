@@ -19,7 +19,7 @@ logger = None
 
 
 @tool
-def mcp_shell_command(command: str, timeout: int = 30) -> str:
+def mcp_shell_command(command: str = "echo \"Hello, World!\"", timeout: int = 30) -> str:
     """Execute shell commands safely using subprocess (MCP shell server unavailable)."""
     # Handle case where parameters might be JSON strings from LangChain
     if isinstance(command, str) and command.startswith("{"):

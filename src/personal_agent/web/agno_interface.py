@@ -231,62 +231,14 @@ def index():
 
             # Start streaming thoughts
             add_thought("🤔 Thinking about your request...", session_id)
-            add_thought("🔍 Searching memory for context...", session_id)
+            add_thought("🧠 Agno agent processing with automatic memory", session_id)
 
             try:
-                # Query knowledge base for context using agno agent
+                # Agno handles memory automatically - no manual context retrieval needed
+                context = None  # Let Agno handle memory internally
+
                 if logger:
-                    logger.info("Starting knowledge base query for context")
-
-                context = None
-                if query_knowledge_base_func:
-                    try:
-                        if logger:
-                            logger.info("Executing async knowledge base query")
-
-                        # Use async function via thread
-                        context_result = run_async_in_thread(
-                            query_knowledge_base_func(user_input)
-                        )
-
-                        if (
-                            context_result
-                            and context_result != "No relevant context found."
-                            and "not initialized" not in context_result.lower()
-                        ):
-                            context = (
-                                [context_result]
-                                if isinstance(context_result, str)
-                                else context_result
-                            )
-                            if logger:
-                                logger.info(
-                                    f"Knowledge base query successful - found {len(context)} context items"
-                                )
-                        else:
-                            context = ["No relevant context found."]
-                            if logger:
-                                logger.info(
-                                    "Knowledge base query returned no relevant context"
-                                )
-
-                    except Exception as e:
-                        logger.warning("Could not query knowledge base: %s", e)
-                        context = ["No context available."]
-                else:
-                    context = ["Memory not available."]
-
-                # Update thoughts after context search
-                if (
-                    context
-                    and context != ["No relevant context found."]
-                    and context != ["Memory not available."]
-                ):
-                    add_thought("✅ Found relevant context in memory", session_id)
-                else:
-                    add_thought(
-                        "📝 No previous context found, starting fresh", session_id
-                    )
+                    logger.info("Starting agno agent processing with automatic memory")
 
                 # Add processing thoughts
                 add_thought("🧠 Analyzing request with agno reasoning", session_id)

@@ -119,6 +119,71 @@ def create_web_app():
     return app
 
 
+def cli_main():
+    """CLI entry point for the Personal AI Agent."""
+    # Register cleanup handlers
+    register_cleanup_handlers()
+
+    logger_instance = setup_logging()
+    logger_instance.info("Starting Personal AI Agent CLI...")
+
+    try:
+        # Initialize the system
+        tools = initialize_system()
+
+        if not agent_executor:
+            logger_instance.error("Failed to initialize agent executor")
+            return
+
+        print("\n🤖 Personal AI Agent CLI")
+        print("Type 'quit', 'exit', or press Ctrl+C to stop")
+        print("=" * 50)
+
+        while True:
+            try:
+                # Get user input
+                user_input = input("\n💬 You: ").strip()
+
+                if user_input.lower() in ["quit", "exit", "q"]:
+                    print("👋 Goodbye!")
+                    break
+
+                if not user_input:
+                    continue
+
+                # Process the query using the agent executor
+                print("🔍 Agent: ", end="", flush=True)
+
+                try:
+                    # Execute the agent with the user's input
+                    response = agent_executor.invoke({"input": user_input})
+
+                    # Extract the output from the response
+                    if isinstance(response, dict) and "output" in response:
+                        answer = response["output"]
+                    else:
+                        answer = str(response)
+
+                    print(answer)
+
+                except Exception as e:
+                    logger_instance.error("Error processing query: %s", e)
+                    print(f"❌ Sorry, I encountered an error: {e}")
+
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
+                break
+            except EOFError:
+                print("\n👋 Goodbye!")
+                break
+
+    except Exception as e:
+        logger_instance.error("Error in CLI: %s", e)
+        print(f"❌ Fatal error: {e}")
+    finally:
+        cleanup()
+
+
 def main():
     """Main entry point for the Personal AI Agent."""
     # Register cleanup handlers
