@@ -313,7 +313,7 @@ class MemoryManager:
                 return False
 
             # Delete the memory
-            self.db.delete(memory_to_delete.id)
+            self.db.delete_memory(memory_to_delete.id)
             console.print(f"[green]✅ Successfully deleted memory: {memory_id}[/green]")
             return True
 
@@ -349,7 +349,7 @@ class MemoryManager:
             deleted_count = 0
             for memory in user_memories:
                 try:
-                    self.db.delete(memory.id)
+                    self.db.delete_memory(memory.id)
                     deleted_count += 1
                 except Exception as e:
                     console.print(f"[red]Error deleting memory {memory.id}: {e}[/red]")
