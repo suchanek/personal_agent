@@ -10,11 +10,14 @@ straightforward design focused on query input and response display.
 import asyncio
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, Callable, Optional
+import uuid
+from typing import TYPE_CHECKING, Callable, Optional
 
-from flask import Flask, render_template_string, request
+from flask import Flask, jsonify, render_template_string, request, session
 
+from ..config.settings import USER_ID
 from ..core.memory import is_memory_connected
+from ..utils.pag_logging import setup_logging
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -24,12 +27,16 @@ if TYPE_CHECKING:
 # These will be injected by the main module
 app: Flask = None
 agno_agent: "AgnoPersonalAgent" = None
-logger: "Logger" = None
+logger: "Logger" = setup_logging()
 
 # Memory function references (async functions from agno)
 query_knowledge_base_func: Optional[Callable[[str], str]] = None
 store_interaction_func: Optional[Callable[[str, str], bool]] = None
 clear_knowledge_base_func: Optional[Callable[[], bool]] = None
+
+# Conversation storage (in-memory for now)
+conversations = {}
+current_user_id = USER_ID  # Default user ID
 
 
 def create_app() -> Flask:
@@ -39,6 +46,7 @@ def create_app() -> Flask:
     :return: Configured Flask application
     """
     flask_app = Flask(__name__)
+    flask_app.secret_key = "your-secret-key-here"  # Required for sessions
     return flask_app
 
 
@@ -74,6 +82,20 @@ def register_routes(
     app.add_url_rule("/", "index", index, methods=["GET", "POST"])
     app.add_url_rule("/clear", "clear_kb", clear_kb_route)
     app.add_url_rule("/agent_info", "agent_info", agent_info_route)
+    app.add_url_rule(
+        "/new_conversation",
+        "new_conversation",
+        new_conversation_route,
+        methods=["POST"],
+    )
+    app.add_url_rule("/get_conversations", "get_conversations", get_conversations_route)
+    app.add_url_rule(
+        "/switch_conversation/<session_id>",
+        "switch_conversation",
+        switch_conversation_route,
+        methods=["POST"],
+    )
+    app.add_url_rule("/set_user_id", "set_user_id", set_user_id_route, methods=["POST"])
 
     logger.info("All agno interface routes registered successfully")
 
@@ -126,6 +148,16 @@ def index():
     if logger:
         logger.info(f"Index route accessed - method: {request.method}")
 
+    # Initialize session if needed
+    if "session_id" not in session:
+        session["session_id"] = str(uuid.uuid4())
+        conversations[session["session_id"]] = {
+            "messages": [],
+            "title": "New Conversation",
+            "created_at": None,
+        }
+
+    current_session_id = session["session_id"]
     response = None
     error_message = None
 
@@ -133,7 +165,9 @@ def index():
         user_input = request.form.get("query", "").strip()
 
         if logger:
-            logger.info(f"POST request received - user_input: '{user_input[:100]}{'...' if len(user_input) > 100 else ''}'")
+            logger.info(
+                f"POST request received - user_input: '{user_input[:100]}{'...' if len(user_input) > 100 else ''}'"
+            )
 
         if user_input:
             try:
@@ -156,7 +190,9 @@ Please help the user with their request. Use available MCP tools as needed and p
 
                         # Use agno agent with async execution
                         if logger:
-                            logger.info("Creating new event loop for agno agent execution")
+                            logger.info(
+                                "Creating new event loop for agno agent execution"
+                            )
 
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
@@ -170,17 +206,23 @@ Please help the user with their request. Use available MCP tools as needed and p
                             result_container["response"] = agent_response
 
                             if logger:
-                                logger.info(f"Agno agent completed successfully - response length: {len(str(agent_response))}")
+                                logger.info(
+                                    f"Agno agent completed successfully - response length: {len(str(agent_response))}"
+                                )
 
                         finally:
                             loop.close()
                             if logger:
-                                logger.info("Event loop closed after agno agent execution")
+                                logger.info(
+                                    "Event loop closed after agno agent execution"
+                                )
 
                     except Exception as e:
                         result_container["error"] = e
                         if logger:
-                            logger.error(f"Error during agno agent processing: {str(e)}")
+                            logger.error(
+                                f"Error during agno agent processing: {str(e)}"
+                            )
                     finally:
                         result_container["done"] = True
 
@@ -208,19 +250,41 @@ Please help the user with their request. Use available MCP tools as needed and p
                 if response is None:
                     if logger:
                         logger.error("Agent thread completed but returned no response")
-                    raise RuntimeError("Agno agent execution timed out or returned no response")
+                    raise RuntimeError(
+                        "Agno agent execution timed out or returned no response"
+                    )
 
                 if logger:
-                    logger.info(f"Successfully received response from agent thread - length: {len(str(response))}")
+                    logger.info(
+                        f"Successfully received response from agent thread - length: {len(str(response))}"
+                    )
+
+                # Store interaction in conversation history
+                if current_session_id in conversations:
+                    conversations[current_session_id]["messages"].append(
+                        {"user": user_input, "agent": response, "timestamp": None}
+                    )
+
+                    # Update conversation title if it's the first message
+                    if conversations[current_session_id]["title"] == "New Conversation":
+                        # Use first few words of user input as title
+                        title_words = user_input.split()[:5]
+                        conversations[current_session_id]["title"] = " ".join(
+                            title_words
+                        ) + ("..." if len(title_words) == 5 else "")
 
                 # Store interaction AFTER getting response
                 if store_interaction_func:
                     try:
                         if logger:
-                            logger.info("Storing interaction in memory using async function")
+                            logger.info(
+                                "Storing interaction in memory using async function"
+                            )
 
                         # Use async function via thread
-                        run_async_in_thread(store_interaction_func(user_input, response))
+                        run_async_in_thread(
+                            store_interaction_func(user_input, response)
+                        )
 
                         if logger:
                             logger.info("Interaction successfully stored in memory")
@@ -229,14 +293,18 @@ Please help the user with their request. Use available MCP tools as needed and p
                         logger.warning("Could not store interaction: %s", e)
                 else:
                     if logger:
-                        logger.warning("No store_interaction_func available - skipping memory storage")
+                        logger.warning(
+                            "No store_interaction_func available - skipping memory storage"
+                        )
 
             except Exception as e:
                 logger.error("Error processing query: %s", str(e))
                 error_message = f"Error processing request: {str(e)}"
 
             if logger:
-                logger.info(f"Request processing completed - user_input: '{user_input[:50]}...', response_length: {len(str(response)) if response else 0}")
+                logger.info(
+                    f"Request processing completed - user_input: '{user_input[:50]}...', response_length: {len(str(response)) if response else 0}"
+                )
 
         else:
             error_message = "Please enter a query."
@@ -244,11 +312,18 @@ Please help the user with their request. Use available MCP tools as needed and p
     # Check memory connection status
     memory_status = is_memory_connected()
 
+    # Get conversation history for current session
+    conversation_history = conversations.get(current_session_id, {}).get("messages", [])
+
     return render_template_string(
         get_main_template(),
         response=response,
         error_message=error_message,
         memory_connected=memory_status,
+        current_user_id=current_user_id,
+        current_session_id=current_session_id,
+        conversation_history=conversation_history,
+        conversations=conversations,
     )
 
 
@@ -325,19 +400,25 @@ def agent_info_route():
                             tools_count = server_info["tool_count"]
                         else:
                             tools_count = len(tools) if tools else "Unknown"
-                        
+
                         if tools_count == 0 or tools_count == "Unknown":
                             available_tools.append(f"{server_name}: Connected")
                         else:
-                            available_tools.append(f"{server_name}: {tools_count} tools")
+                            available_tools.append(
+                                f"{server_name}: {tools_count} tools"
+                            )
                     else:
                         available_tools.append(f"{server_name}: Active")
             elif isinstance(mcp_servers, int) and mcp_servers > 0:
                 available_tools.append(f"MCP Servers: {mcp_servers}")
-            
+
             # Only add memory system if it's actually enabled and not Weaviate
             memory_type = raw_agent_info.get("memory_type", "")
-            if raw_agent_info.get("memory_enabled") and memory_type and "weaviate" not in memory_type.lower():
+            if (
+                raw_agent_info.get("memory_enabled")
+                and memory_type
+                and "weaviate" not in memory_type.lower()
+            ):
                 available_tools.append(f"{memory_type} Memory System")
 
             available_tools.extend(
@@ -355,8 +436,57 @@ def agent_info_route():
         agent_type=agent_type,
         agent_info=agent_info,
         available_tools=available_tools,
-        mcp_servers_count=len(raw_agent_info.get("mcp_servers", {})) if isinstance(raw_agent_info.get("mcp_servers"), dict) else raw_agent_info.get("mcp_servers", 0),
+        mcp_servers_count=(
+            len(raw_agent_info.get("mcp_servers", {}))
+            if isinstance(raw_agent_info.get("mcp_servers"), dict)
+            else raw_agent_info.get("mcp_servers", 0)
+        ),
     )
+
+
+def new_conversation_route():
+    """Create a new conversation session."""
+    new_session_id = str(uuid.uuid4())
+    conversations[new_session_id] = {
+        "messages": [],
+        "title": "New Conversation",
+        "created_at": None,
+    }
+    session["session_id"] = new_session_id
+
+    if logger:
+        logger.info(f"Created new conversation: {new_session_id}")
+
+    return jsonify({"success": True, "session_id": new_session_id})
+
+
+def get_conversations_route():
+    """Get all conversations for the current user."""
+    return jsonify({"conversations": conversations})
+
+
+def switch_conversation_route(session_id):
+    """Switch to a different conversation."""
+    if session_id in conversations:
+        session["session_id"] = session_id
+        if logger:
+            logger.info(f"Switched to conversation: {session_id}")
+        return jsonify({"success": True})
+    else:
+        return jsonify({"success": False, "error": "Conversation not found"}), 404
+
+
+def set_user_id_route():
+    """Set the current user ID."""
+    global current_user_id
+    data = request.get_json()
+    if data and "user_id" in data:
+        current_user_id = data["user_id"]
+        if logger:
+            logger.info(f"User ID set to: {current_user_id}")
+        return jsonify({"success": True, "user_id": current_user_id})
+    else:
+        return jsonify({"success": False, "error": "Invalid user ID"}), 400
 
 
 def get_main_template():
@@ -387,6 +517,7 @@ def get_main_template():
                 --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                 --brain-connected: #10b981;
                 --brain-disconnected: #ef4444;
+                --sidebar-width: 300px;
             }
 
             * {
@@ -401,6 +532,127 @@ def get_main_template():
                 color: var(--text-primary);
                 line-height: 1.6;
                 min-height: 100vh;
+                display: flex;
+            }
+
+            .sidebar {
+                width: var(--sidebar-width);
+                background: var(--surface);
+                border-right: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                position: fixed;
+                left: 0;
+                top: 0;
+                z-index: 1000;
+            }
+
+            .sidebar-header {
+                padding: 1.5rem;
+                border-bottom: 1px solid var(--border-color);
+                background: var(--primary-color);
+                color: white;
+            }
+
+            .user-info {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.2rem;
+            }
+
+            .user-details h3 {
+                font-size: 1rem;
+                font-weight: 600;
+                margin-bottom: 0.25rem;
+            }
+
+            .user-details p {
+                font-size: 0.875rem;
+                opacity: 0.8;
+            }
+
+            .conversations-list {
+                flex: 1;
+                overflow-y: auto;
+                padding: 1rem;
+            }
+
+            .conversation-item {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                margin-bottom: 0.5rem;
+                cursor: pointer;
+                transition: all 0.2s;
+                border: 1px solid transparent;
+            }
+
+            .conversation-item:hover {
+                background: var(--background);
+                border-color: var(--border-color);
+            }
+
+            .conversation-item.active {
+                background: var(--primary-color);
+                color: white;
+            }
+
+            .conversation-title {
+                font-weight: 500;
+                font-size: 0.875rem;
+                margin-bottom: 0.25rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .conversation-preview {
+                font-size: 0.75rem;
+                opacity: 0.7;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .new-conversation-btn {
+                margin: 1rem;
+                padding: 1rem;
+                background: var(--success-color);
+                color: white;
+                border: none;
+                border-radius: 0.5rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+            }
+
+            .new-conversation-btn:hover {
+                background: #047857;
+                transform: translateY(-1px);
+            }
+
+            .main-content {
+                margin-left: var(--sidebar-width);
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
             }
 
             .status-bar {
@@ -471,18 +723,49 @@ def get_main_template():
                 border-color: var(--primary-color);
             }
 
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 2rem;
-            }
-
-            .main-content {
-                display: grid;
-                grid-template-columns: 1fr;
-                gap: 2rem;
+            .chat-container {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
                 max-width: 800px;
                 margin: 0 auto;
+                padding: 2rem;
+                width: 100%;
+            }
+
+            .conversation-history {
+                flex: 1;
+                overflow-y: auto;
+                margin-bottom: 2rem;
+                padding: 1rem;
+                background: var(--surface);
+                border-radius: 1rem;
+                border: 1px solid var(--border-color);
+                max-height: 60vh;
+            }
+
+            .message {
+                margin-bottom: 1.5rem;
+                padding: 1rem;
+                border-radius: 0.75rem;
+            }
+
+            .message.user {
+                background: var(--primary-color);
+                color: white;
+                margin-left: 2rem;
+            }
+
+            .message.agent {
+                background: var(--background);
+                border: 1px solid var(--border-color);
+                margin-right: 2rem;
+            }
+
+            .message-content {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                line-height: 1.6;
             }
 
             .query-section {
@@ -596,8 +879,17 @@ def get_main_template():
             }
 
             @media (max-width: 768px) {
-                .container {
-                    padding: 1rem;
+                .sidebar {
+                    transform: translateX(-100%);
+                    transition: transform 0.3s;
+                }
+
+                .sidebar.open {
+                    transform: translateX(0);
+                }
+
+                .main-content {
+                    margin-left: 0;
                 }
 
                 .status-bar {
@@ -615,11 +907,59 @@ def get_main_template():
                 .response-section {
                     padding: 1.5rem;
                 }
+
+                .chat-container {
+                    padding: 1rem;
+                }
+
+                .message.user {
+                    margin-left: 1rem;
+                }
+
+                .message.agent {
+                    margin-right: 1rem;
+                }
             }
         </style>
     </head>
     <body>
-        <div class="status-bar">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <h3 id="current-user-id">{{ current_user_id }}</h3>
+                        <p>Personal AI Agent</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="conversations-list" id="conversations-list">
+                {% for session_id, conversation in conversations.items() %}
+                <div class="conversation-item {% if session_id == current_session_id %}active{% endif %}" 
+                     onclick="switchConversation('{{ session_id }}')">
+                    <div class="conversation-title">{{ conversation.title }}</div>
+                    <div class="conversation-preview">
+                        {% if conversation.messages %}
+                            {{ conversation.messages[-1].user[:50] }}...
+                        {% else %}
+                            No messages yet
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <button class="new-conversation-btn" onclick="startNewConversation()">
+                <i class="fas fa-plus"></i>
+                Start New Conversation
+            </button>
+        </div>
+
+        <div class="main-content">
+            <div class="status-bar">
             <div class="status-left">
                 <div class="status-item">
                     <div class="status-indicator"></div>
@@ -646,9 +986,21 @@ def get_main_template():
             </div>
         </div>
 
-        <div class="container">
-            <div class="main-content">
-                <div class="query-section">
+        <div class="chat-container">
+            {% if conversation_history %}
+            <div class="conversation-history">
+                {% for message in conversation_history %}
+                <div class="message user">
+                    <div class="message-content">{{ message.user }}</div>
+                </div>
+                <div class="message agent">
+                    <div class="message-content">{{ message.agent }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="query-section">
                     <h2 class="section-title">
                         <i class="fas fa-comment-dots"></i>
                         Ask Your Agent
@@ -679,16 +1031,16 @@ def get_main_template():
                     </form>
                 </div>
 
-                {% if response %}
-                <div class="response-section">
-                    <h2 class="section-title">
-                        <i class="fas fa-robot"></i>
-                        Agent Response
-                    </h2>
-                    <div class="response-content">{{ response }}</div>
-                </div>
-                {% endif %}
+            {% if response %}
+            <div class="response-section">
+                <h2 class="section-title">
+                    <i class="fas fa-robot"></i>
+                    Agent Response
+                </h2>
+                <div class="response-content">{{ response }}</div>
             </div>
+            {% endif %}
+        </div>
         </div>
 
         <script>
@@ -713,6 +1065,55 @@ def get_main_template():
             window.addEventListener('load', function() {
                 textarea.focus();
             });
+
+            // Conversation management functions
+            function startNewConversation() {
+                fetch('/new_conversation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+
+            function switchConversation(sessionId) {
+                fetch(`/switch_conversation/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+
+            // Mobile sidebar toggle
+            function toggleSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                sidebar.classList.toggle('open');
+            }
+
+            // Add mobile menu button for small screens
+            if (window.innerWidth <= 768) {
+                const statusBar = document.querySelector('.status-bar');
+                const menuBtn = document.createElement('button');
+                menuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+                menuBtn.className = 'nav-button';
+                menuBtn.onclick = toggleSidebar;
+                statusBar.querySelector('.status-left').prepend(menuBtn);
+            }
         </script>
     </body>
     </html>
