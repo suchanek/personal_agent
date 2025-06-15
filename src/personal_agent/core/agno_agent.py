@@ -7,60 +7,98 @@ including native MCP support, async operations, and advanced agent features.
 """
 
 import asyncio
-import logging
 import os
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+
+# Set logging levels for better telemetry
+if "RUST_LOG" not in os.environ:
+    # Enable more verbose Rust logging for debugging
+    os.environ["RUST_LOG"] = "debug"
+
+# Enable Ollama debug logging
+if "OLLAMA_DEBUG" not in os.environ:
+    os.environ["OLLAMA_DEBUG"] = "1"
 
 from agno.agent import Agent
+from agno.knowledge.combined import CombinedKnowledgeBase
+from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
+from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.mcp import MCPTools
+from agno.tools.python import PythonTools
+from agno.tools.shell import ShellTools
+from agno.tools.yfinance import YFinanceTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from rich.console import Console
+from rich.table import Table
 
-from agno.tools.mcp import MCPTools, MultiMCPTools
+from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..tools.personal_agent_tools import (
+    PersonalAgentFilesystemTools,
+    PersonalAgentWebTools,
+)
+from ..utils import setup_logging
+from .agno_storage import (
+    create_agno_memory,
+    create_agno_storage,
+    create_combined_knowledge_base,
+    load_combined_knowledge_base,
+)
+from .anti_duplicate_memory import AntiDuplicateMemory
 
-from ..config import OLLAMA_URL, USE_MCP, USE_WEAVIATE, get_mcp_servers
-
-logger = logging.getLogger(__name__)
+# Configure logging
+logger = setup_logging(__name__)
 
 
 class AgnoPersonalAgent:
     """
-    Agno-based Personal AI Agent with MCP integration and Weaviate memory.
+    Agno-based Personal AI Agent with MCP integration and native storage.
 
     This class provides a modern async agent implementation using the agno framework
-    while maintaining compatibility with the existing personal agent ecosystem.
+    with built-in SQLite storage and LanceDB knowledge base.
     """
 
     def __init__(
         self,
         model_provider: str = "ollama",
-        model_name: str = "qwen2.5:7b-instruct",
-        weaviate_client=None,
-        vector_store=None,
+        model_name: str = LLM_MODEL,
         enable_memory: bool = True,
         enable_mcp: bool = True,
+        storage_dir: str = "./data/agno",
+        knowledge_dir: str = "./data/knowledge",
         debug: bool = False,
-    ):
-        """
-        Initialize the Agno Personal Agent.
+        ollama_base_url: str = OLLAMA_URL,
+        user_id: str = "default_user",
+        recreate: bool = False,
+    ) -> None:
+        """Initialize the Agno Personal Agent.
 
-        Args:
-            model_provider: LLM provider ('ollama' or 'openai')
-            model_name: Model name to use
-            weaviate_client: Weaviate client for memory operations
-            vector_store: Vector store for memory operations
-            enable_memory: Whether to enable Weaviate memory features
-            enable_mcp: Whether to enable MCP tool integration
-            debug: Enable debug logging and tool call visibility
+        :param model_provider: LLM provider ('ollama' or 'openai')
+        :param model_name: Model name to use
+        :param enable_memory: Whether to enable memory and knowledge features
+        :param enable_mcp: Whether to enable MCP tool integration
+        :param storage_dir: Directory for Agno storage files
+        :param knowledge_dir: Directory containing knowledge files to load
+        :param debug: Enable debug logging and tool call visibility
+        :param ollama_base_url: Base URL for Ollama API
+        :param user_id: User identifier for memory operations
         """
         self.model_provider = model_provider
         self.model_name = model_name
-        self.weaviate_client = weaviate_client
-        self.vector_store = vector_store
-        self.enable_memory = enable_memory and USE_WEAVIATE
+        self.enable_memory = enable_memory
         self.enable_mcp = enable_mcp and USE_MCP
+        self.storage_dir = storage_dir
+        self.knowledge_dir = knowledge_dir
         self.debug = debug
+        self.ollama_base_url = ollama_base_url
+        self.user_id = user_id
+
+        # Agno native storage components
+        self.agno_storage = None
+        self.agno_knowledge = None
+        self.agno_memory = None
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -69,35 +107,198 @@ class AgnoPersonalAgent:
         self.agent = None
 
         logger.info(
-            "Initialized AgnoPersonalAgent with model=%s, memory=%s, mcp=%s",
+            "Initialized AgnoPersonalAgent with model=%s, memory=%s, mcp=%s, user_id=%s",
             f"{model_provider}:{model_name}",
             self.enable_memory,
             self.enable_mcp,
+            self.user_id,
         )
 
-    def _create_model(self):
-        """Create the appropriate model instance based on provider."""
+    def _create_model(self) -> Union[OpenAIChat, Ollama]:
+        """Create the appropriate model instance based on provider.
+
+        :return: Configured model instance
+        :raises ValueError: If unsupported model provider is specified
+        """
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
-            # Use OpenAI-compatible interface for Ollama
-            return OpenAIChat(
+            # Use Ollama-compatible interface for Ollama
+            return Ollama(
                 id=self.model_name,
-                api_key="ollama",  # Dummy key for local Ollama
-                base_url=f"{OLLAMA_URL}/v1",
+                host=self.ollama_base_url,
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
-    def _get_mcp_tools_as_functions(self) -> List:
-        """Get MCP server runners as callable tools for the main agent."""
+    async def _get_memory_tools(self) -> List:
+        """Create memory tools as native async functions compatible with Agno.
+
+        This method creates the crucial store_user_memory and query_memory tools
+        that enable the agent to actually create and retrieve memories.
+        """
+        if not self.enable_memory or not self.agno_memory:
+            logger.warning("Memory not enabled or memory not initialized")
+            return []
+
+        tools = []
+
+        async def store_user_memory(content: str, topics: List[str] = None) -> str:
+            """Store information as a user memory.
+
+            Args:
+                content: The information to store as a memory
+                topics: Optional list of topics/categories for the memory
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                import json
+
+                from agno.memory.v2.memory import UserMemory
+
+                if topics is None:
+                    topics = ["general"]
+
+                # Fix: Handle case where topics comes in as string representation of list
+                # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
+                if isinstance(topics, str):
+                    try:
+                        # Try to parse as JSON first
+                        topics = json.loads(topics)
+                        logger.debug("Converted topics from string to list: %s", topics)
+                    except (json.JSONDecodeError, ValueError):
+                        # If that fails, treat as a single topic
+                        topics = [topics]
+                        logger.debug(
+                            "Treating topics string as single topic: %s", topics
+                        )
+
+                # Ensure topics is a list
+                if not isinstance(topics, list):
+                    topics = [str(topics)]
+
+                memory_obj = UserMemory(memory=content, topics=topics)
+                memory_id = self.agno_memory.add_user_memory(
+                    memory=memory_obj, user_id=self.user_id
+                )
+
+                if memory_id == "duplicate-detected-fake-id":
+                    # Memory was a duplicate but we return success to avoid agent confusion
+                    logger.info(
+                        "Memory already exists (duplicate detected): %s...", content[:50]
+                    )
+                    return f"✅ Memory already exists: {content[:50]}..."
+                elif memory_id is None:
+                    # Unexpected error case
+                    logger.warning(
+                        "Memory storage failed unexpectedly: %s...", content[:50]
+                    )
+                    return f"❌ Error storing memory: {content[:50]}..."
+                else:
+                    # Memory was successfully stored (new memory)
+                    logger.info(
+                        "Stored user memory: %s... (ID: %s)", content[:50], memory_id
+                    )
+                    return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+
+            except Exception as e:
+                logger.error("Error storing user memory: %s", e)
+                return f"❌ Error storing memory: {str(e)}"
+
+        async def query_memory(query: str, limit: int = 5) -> str:
+            """Search user memories using semantic search.
+
+            Args:
+                query: The query to search for in memories
+                limit: Maximum number of memories to return
+
+            Returns:
+                str: Found memories or message if none found
+            """
+            try:
+                memories = self.agno_memory.search_user_memories(
+                    user_id=self.user_id,
+                    query=query,
+                    retrieval_method="agentic",
+                    limit=limit,
+                )
+
+                if not memories:
+                    logger.info("No memories found for query: %s", query)
+                    return f"🔍 No memories found for: {query}"
+
+                # Format memories for display
+                result = f"🧠 Found {len(memories)} memories for '{query}':\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                logger.info("Found %d memories for query: %s", len(memories), query)
+                return result
+
+            except Exception as e:
+                logger.error("Error querying memories: %s", e)
+                return f"❌ Error searching memories: {str(e)}"
+
+        async def get_recent_memories(limit: int = 10) -> str:
+            """Get the most recent user memories.
+
+            Args:
+                limit: Maximum number of recent memories to return
+
+            Returns:
+                str: Recent memories or message if none found
+            """
+            try:
+                memories = self.agno_memory.search_user_memories(
+                    user_id=self.user_id, limit=limit, retrieval_method="last_n"
+                )
+
+                if not memories:
+                    return "📝 No memories found."
+
+                # Format memories for display
+                result = f"📝 Recent {len(memories)} memories:\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                logger.info("Retrieved %d recent memories", len(memories))
+                return result
+
+            except Exception as e:
+                logger.error("Error getting recent memories: %s", e)
+                return f"❌ Error getting recent memories: {str(e)}"
+
+        # Add tools to the list
+        tools.append(store_user_memory)
+        tools.append(query_memory)
+        tools.append(get_recent_memories)
+
+        logger.info("Created %d memory tools", len(tools))
+        return tools
+
+    async def _get_mcp_tools(self) -> List:
+        """Create MCP tools as native async functions compatible with Agno.
+
+        Returns:
+            List of MCP tool functions
+        """
         if not self.enable_mcp or not self.mcp_servers:
+            logger.info("MCP not enabled or no MCP servers configured")
             return []
 
         tools = []
 
         for server_name, config in self.mcp_servers.items():
-            # Create async function for each MCP server
+            logger.info("Setting up MCP tool for server: %s", server_name)
+
             command = config.get("command", "npx")
             args = config.get("args", [])
             env = config.get("env", {})
@@ -107,8 +308,14 @@ class AgnoPersonalAgent:
 
             # Create the actual tool function with closure
             def make_mcp_tool(
-                name: str, cmd: str, tool_args: List, tool_env: Dict, desc: str
-            ):
+                name: str,
+                cmd: str,
+                tool_args: List[str],
+                tool_env: Dict[str, str],
+                desc: str,
+            ) -> Any:
+                """Create MCP tool function with proper closure."""
+
                 async def mcp_tool(query: str) -> str:
                     """MCP tool function that creates session on-demand."""
                     try:
@@ -179,7 +386,14 @@ class AgnoPersonalAgent:
 
                 # Set function metadata
                 mcp_tool.__name__ = f"use_{name.replace('-', '_')}_server"
-                mcp_tool.__doc__ = f"Use {name} MCP server for: {desc}\n\nArgs:\n    query: The query or task to execute using {name}\n\nReturns:\n    str: Result from the MCP server"
+                mcp_tool.__doc__ = f"""Use {name} MCP server for: {desc}
+
+Args:
+    query: The query or task to execute using {name}
+
+Returns:
+    str: Result from the MCP server
+"""
 
                 return mcp_tool
 
@@ -189,132 +403,220 @@ class AgnoPersonalAgent:
 
         return tools
 
-    def _create_memory_instructions(self) -> str:
-        """Create memory-related instructions for the agent."""
-        if not self.enable_memory:
-            return ""
-
-        return dedent(
-            """\
-            
-            ## Memory System Guidelines
-            
-            You have access to a persistent memory system powered by Weaviate vector database:
-            
-            - **Automatic Storage**: Important interactions are automatically stored for future reference
-            - **Context Retrieval**: Relevant past interactions are retrieved to provide better context
-            - **Topic Organization**: Information is categorized by topics for better organization
-            - **Semantic Search**: Use natural language to find related information from past conversations
-            
-            When responding:
-            1. Consider any retrieved context from past interactions
-            2. Build upon previous conversations and learned preferences
-            3. Reference relevant past information when appropriate
-            4. Maintain continuity across sessions
-        """
-        )
-
     def _create_agent_instructions(self) -> str:
-        """Create comprehensive instructions for the agno agent."""
+        """Create comprehensive instructions for the agno agent.
+
+        :return: Formatted instruction string for the agent
+        """
         base_instructions = dedent(
             """\
-            You are an advanced personal AI assistant with comprehensive capabilities.
+            You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
+            
+            ## MEMORY USAGE RULES - CRITICAL
+            
+            **MEMORY STORAGE**: When the user provides new personal information:
+            1. **Store it ONCE using store_user_memory** - do NOT call this tool multiple times
+            2. **Acknowledge the storage** - confirm you've saved the information
+            3. **Do NOT over-think** - simple facts should be stored immediately
+            
+            **MEMORY RETRIEVAL**: When asked about personal information:
+            1. **Use query_memory to search** for relevant information
+            2. **Use get_recent_memories** to see recent context
+            3. **Do NOT use web search** for personal details
             
             ## Core Guidelines
             
-            - **Be Direct**: Execute tasks immediately without asking for confirmation unless critical
-            - **Use Tools**: Leverage your available tools effectively for GitHub, file operations, web search, and memory
-            - **Be Thorough**: When searching or researching, provide complete and organized results
-            - **Use Tables**: Display data in tables when appropriate for better readability
-            - **Show Reasoning**: Use your reasoning capabilities to break down complex problems
-            - **Maintain Context**: Build upon previous conversations using memory
+            - **Be Direct**: Execute tasks immediately without excessive reasoning
+            - **One Tool Call Per Task**: Don't repeat the same tool call multiple times
+            - **Built-in Memory**: You have persistent memory across conversations
+            - **Use Tools Efficiently**: Choose the right tool and use it once
+            - **Be Thorough**: When searching or researching, provide complete results
+            - **Show Reasoning**: Use reasoning for complex problems, not simple storage
+            
+            ## CRITICAL TOOL USAGE RULES
+            
+            1. **For Memory Storage**: Use store_user_memory ONCE per new fact
+            2. **For Memory Retrieval**: Use query_memory or get_recent_memories
+            3. **For GitHub Tasks**: Use available GitHub tools for repository information
+            4. **For File Operations**: Use filesystem tools for file management
+            5. **For Research**: Use web search tools for current information
+            6. **Never repeat tool calls** - if a tool succeeds, move on
             
             ## Available Capabilities
             
+            - **Memory Management**: Store and retrieve personal information efficiently
             - **GitHub Integration**: Search repositories, analyze code, get repository information
             - **File System Operations**: Read, write, and manage files and directories  
             - **Web Research**: Search for current information and technical details
-            - **Memory System**: Store and retrieve information across sessions
-            - **Reasoning**: Break down complex problems step by step
+            - **Python Execution**: Run code snippets and calculations
+            - **Shell Commands**: Execute system commands when needed
             
             ## Response Format
             
             - Use markdown formatting for better readability
             - Present data in tables when showing multiple items
             - Include relevant links when helpful
-            - Show your reasoning process for complex queries
-
+            - Keep responses concise and focused
+            
             ## Core Principles
             
-            1. **Be Helpful**: Always strive to provide useful and actionable responses
+            1. **Be Efficient**: Use tools once and effectively
             2. **Be Accurate**: Verify information and cite sources when possible
-            3. **Be Efficient**: Use the most appropriate tools for each task
-            4. **Be Contextual**: Consider past interactions and user preferences
-            5. **Be Clear**: Provide well-structured, easy-to-understand responses
-            6. **Be Proactive**: Suggest related actions or improvements when relevant
+            3. **Be Contextual**: Consider past interactions and user preferences
+            4. **Be Clear**: Provide well-structured, easy-to-understand responses
+            5. **Avoid Repetition**: Don't call the same tool multiple times unnecessarily
             
             ## Tool Usage Strategy
-            
-            - **Progressive Enhancement**: Start with simple operations, add complexity as needed
-            - **Cross-Reference**: Validate information across multiple sources
-            - **Context Building**: Use memory to enhance responses with relevant background
-            - **Error Recovery**: Handle tool failures gracefully with alternative approaches
+            - **Simple Facts**: Store immediately with store_user_memory (once)
+            - **Personal Questions**: Query memory first, then provide answer
+            - **Complex Tasks**: Break down into steps, use appropriate tools
+            - **Current Information**: Use web search for recent/external data
+            - **Technical Details**: Use reasoning and appropriate technical tools
+            - **Error Recovery**: Handle tool failures gracefully with alternatives
         """
         )
 
-        memory_instructions = self._create_memory_instructions()
+        return base_instructions
 
-        return base_instructions + memory_instructions
+    async def initialize(self, recreate: bool = False) -> bool:
+        """Initialize the agno agent with all components.
 
-    async def initialize(self) -> bool:
-        """
-        Initialize the agno agent with all components.
-
-        Returns:
-            bool: True if initialization successful, False otherwise
+        :param recreate: Whether to recreate the agent knowledge bases
+        :return: True if initialization successful, False otherwise
         """
         try:
             # Create model
             model = self._create_model()
             logger.info("Created model: %s", self.model_name)
 
-            # Prepare tools list starting with ReasoningTools
-            tools = []
+            # Prepare tools list
+            tools = [
+                DuckDuckGoTools(),
+                YFinanceTools(),
+                PythonTools(),
+                ShellTools(base_dir="/"),  # Configured for security
+                PersonalAgentFilesystemTools(),
+                PersonalAgentWebTools(),
+            ]
+
+            # Initialize Agno native storage and knowledge following the working example pattern
+            if self.enable_memory:
+                self.agno_storage = create_agno_storage(self.storage_dir)
+                logger.info("Created Agno storage at: %s", self.storage_dir)
+
+                # Create knowledge base (sync creation)
+                self.agno_knowledge = create_combined_knowledge_base(
+                    self.storage_dir, self.knowledge_dir
+                )
+
+                # Load knowledge base content (async loading) - matches working example
+                if self.agno_knowledge:
+                    await load_combined_knowledge_base(
+                        self.agno_knowledge, recreate=recreate
+                    )
+                    logger.info("Loaded Agno combined knowledge base content")
+
+                    # Knowledge tools will be automatically added via search_knowledge=True
+                    # DO NOT manually add KnowledgeTools to avoid naming conflicts
+
+                self.agno_memory = create_agno_memory(self.storage_dir)
+
+                # Wrap with anti-duplicate memory system if memory was created successfully
+                if self.agno_memory:
+                    # Create model for the anti-duplicate memory
+                    memory_model = self._create_model()
+
+                    # Extract the database from the regular memory
+                    memory_db = self.agno_memory.db
+
+                    # Create anti-duplicate memory with proper parameters
+                    self.agno_memory = AntiDuplicateMemory(
+                        db=memory_db,
+                        model=memory_model,
+                        similarity_threshold=0.85,  # 85% similarity threshold
+                        enable_semantic_dedup=True,
+                        enable_exact_dedup=True,
+                        debug_mode=self.debug,
+                    )
+                    logger.info(
+                        "Created Agno memory with anti-duplicate protection at: %s",
+                        self.storage_dir,
+                    )
+                else:
+                    logger.error("Failed to create base memory system")
+
+                logger.info("Initialized Agno storage and knowledge backend")
+            else:
+                logger.info(
+                    "Memory disabled, skipping storage and knowledge initialization"
+                )
 
             # Add ReasoningTools for better reasoning capabilities
-            try:
-                from agno.tools.reasoning import ReasoningTools
+            # TEMPORARILY DISABLED to debug tool naming issue
+            # try:
+            #     from agno.tools.reasoning import ReasoningTools
 
-                reasoning_tools = ReasoningTools(add_instructions=True)
-                tools.append(reasoning_tools)
-                logger.info("Added ReasoningTools for enhanced reasoning capabilities")
-            except ImportError:
-                logger.warning(
-                    "ReasoningTools not available, continuing without reasoning capabilities"
-                )
+            #     reasoning_tools = ReasoningTools(add_instructions=True)
+            #     tools.append(reasoning_tools)
+            #     logger.info("Added ReasoningTools for enhanced reasoning capabilities")
+            # except ImportError:
+            #     logger.warning(
+            #         "ReasoningTools not available, continuing without reasoning capabilities"
+            #     )
 
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:
-                mcp_tool_functions = self._get_mcp_tools_as_functions()
+                mcp_tool_functions = await self._get_mcp_tools()
                 tools.extend(mcp_tool_functions)
+
+            # Get memory tools - CRITICAL: This was missing!
+            if self.enable_memory:
+                memory_tool_functions = await self._get_memory_tools()
+                tools.extend(memory_tool_functions)
+                logger.info(
+                    "Added %d memory tools to agent", len(memory_tool_functions)
+                )
 
             # Create agent instructions
             instructions = self._create_agent_instructions()
 
-            # Create the agno agent
+            # Create the agno agent with direct parameter passing for visibility
             self.agent = Agent(
                 model=model,
                 tools=tools,
                 instructions=instructions,
                 markdown=True,
                 show_tool_calls=self.debug,
-                add_history_to_messages=True,  # Enable conversation history
-                num_history_responses=5,  # Keep last 5 exchanges in context
+                name="Personal AI Agent",
+                agent_id="personal_agent",
+                user_id=self.user_id,
+                enable_agentic_memory=False,  # Disable to avoid conflicts with manual memory tools
+                enable_user_memories=False,  # Disable built-in to use our custom memory tools
+                add_history_to_messages=False,
+                num_history_responses=5,
+                knowledge=self.agno_knowledge if self.enable_memory else None,
+                storage=self.agno_storage if self.enable_memory else None,
+                memory=None,  # Don't pass memory to avoid auto-storage conflicts
+                # Enable telemetry and verbose logging
+                debug_mode=self.debug,
+                # Enable streaming for intermediate steps
+                stream_intermediate_steps=False,
+            )
+
+            if self.enable_memory and self.agno_knowledge:
+                logger.info("Agent configured with knowledge base search")
+
+            # Calculate tool counts for logging
+            mcp_tool_count = len(await self._get_mcp_tools()) if self.enable_mcp else 0
+            memory_tool_count = (
+                len(await self._get_memory_tools()) if self.enable_memory else 0
             )
 
             logger.info(
-                "Successfully initialized agno agent with %d MCP tool wrapper(s)",
+                "Successfully initialized agno agent with native storage: %d total tools (%d MCP, %d memory)",
                 len(tools),
+                mcp_tool_count,
+                memory_tool_count,
             )
             return True
 
@@ -325,16 +627,12 @@ class AgnoPersonalAgent:
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
     ) -> str:
-        """
-        Run a query through the agno agent.
+        """Run a query through the agno agent.
 
-        Args:
-            query: User query to process
-            stream: Whether to stream the response
-            add_thought_callback: Optional callback for adding thoughts during processing
-
-        Returns:
-            str: Agent response
+        :param query: User query to process
+        :param stream: Whether to stream the response
+        :param add_thought_callback: Optional callback for adding thoughts during processing
+        :return: Agent response
         """
         if not self.agent:
             raise RuntimeError("Agent not initialized. Call initialize() first.")
@@ -344,33 +642,28 @@ class AgnoPersonalAgent:
             if add_thought_callback:
                 add_thought_callback("🔄 Preparing agno agent...")
 
-            # Add memory context if available
-            enhanced_query = await self._enhance_query_with_memory(query)
-
             if add_thought_callback:
                 if self.enable_memory:
-                    add_thought_callback("🧠 Memory context retrieved")
+                    add_thought_callback("🧠 Memory context available via Agno")
                 add_thought_callback("🚀 Executing agno agent with MCP tools...")
 
             if stream:
                 # For streaming, we'll need to handle this differently
                 # For now, return the complete response
-                response = await self.agent.arun(enhanced_query)
+                response = await self.agent.arun(query, user_id=self.user_id)
                 return response.content
             else:
                 if add_thought_callback:
                     add_thought_callback("⚡ Running async reasoning...")
 
-                response = await self.agent.arun(enhanced_query)
+                response = await self.agent.arun(query, user_id=self.user_id)
 
                 if add_thought_callback:
                     add_thought_callback("✅ Agent response generated")
 
-                # Store interaction in memory if enabled
-                if self.enable_memory and self.vector_store:
-                    if add_thought_callback:
-                        add_thought_callback("💾 Storing in memory...")
-                    await self._store_interaction(query, response.content)
+                # Memory is automatically handled by Agno
+                if add_thought_callback and self.enable_memory:
+                    add_thought_callback("💾 Memory automatically updated by Agno")
 
                 return response.content
 
@@ -380,42 +673,11 @@ class AgnoPersonalAgent:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
 
-    async def _enhance_query_with_memory(self, query: str) -> str:
-        """Enhance query with relevant memory context."""
-        if not self.enable_memory or not self.vector_store:
-            return query
-
-        try:
-            # Simple memory retrieval (you can enhance this based on your memory implementation)
-            # This would integrate with your existing memory tools
-            enhanced_query = f"""
-Context from previous interactions: [Retrieved from memory system]
-
-Current query: {query}
-"""
-            return enhanced_query
-        except Exception as e:
-            logger.warning("Failed to enhance query with memory: %s", e)
-            return query
-
-    async def _store_interaction(self, query: str, response: str) -> None:
-        """Store interaction in memory system."""
-        if not self.enable_memory or not self.vector_store:
-            return
-
-        try:
-            # This would integrate with your existing memory storage
-            # For now, we'll just log the intention
-            logger.info(
-                "Would store interaction in memory: query=%s chars, response=%s chars",
-                len(query),
-                len(response),
-            )
-        except Exception as e:
-            logger.warning("Failed to store interaction: %s", e)
-
     async def cleanup(self) -> None:
-        """Clean up resources."""
+        """Clean up resources.
+
+        :return: None
+        """
         try:
             # With the new on-demand pattern, MCP tools are created and cleaned up
             # automatically within their async context managers
@@ -426,47 +688,244 @@ Current query: {query}
             logger.error("Error during agno agent cleanup: %s", e)
 
     def get_agent_info(self) -> Dict[str, Any]:
-        """Get information about the agent configuration."""
+        """Get comprehensive information about the agent configuration and tools.
+
+        :return: Dictionary containing detailed agent configuration and tool information
+        """
+        # Get basic tool info
+        built_in_tools = []
+        mcp_tools = []
+
+        if self.agent and hasattr(self.agent, "tools"):
+            for tool in self.agent.tools:
+                tool_name = getattr(tool, "__name__", str(type(tool).__name__))
+                tool_doc = getattr(tool, "__doc__", "No description available")
+
+                # Clean up docstring for display
+                if tool_doc:
+                    tool_doc = tool_doc.strip().split("\n")[0]  # First line only
+
+                if tool_name.startswith("use_") and "_server" in tool_name:
+                    mcp_tools.append(
+                        {
+                            "name": tool_name,
+                            "description": tool_doc,
+                            "type": "MCP Server",
+                        }
+                    )
+                else:
+                    built_in_tools.append(
+                        {
+                            "name": tool_name,
+                            "description": tool_doc,
+                            "type": "Built-in Tool",
+                        }
+                    )
+
+        # MCP server details
+        mcp_server_details = {}
+        if self.enable_mcp and self.mcp_servers:
+            for server_name, config in self.mcp_servers.items():
+                mcp_server_details[server_name] = {
+                    "command": config.get("command", "N/A"),
+                    "description": config.get(
+                        "description", f"Access to {server_name} MCP server"
+                    ),
+                    "args_count": len(config.get("args", [])),
+                    "env_vars": len(config.get("env", {})),
+                }
+
         return {
             "framework": "agno",
             "model_provider": self.model_provider,
             "model_name": self.model_name,
             "memory_enabled": self.enable_memory,
+            "knowledge_enabled": self.agno_knowledge is not None,
             "mcp_enabled": self.enable_mcp,
-            "mcp_servers": len(self.mcp_servers),
             "debug_mode": self.debug,
+            "user_id": self.user_id,
             "initialized": self.agent is not None,
+            "storage_dir": self.storage_dir,
+            "knowledge_dir": self.knowledge_dir,
+            "tool_counts": {
+                "total": len(built_in_tools) + len(mcp_tools),
+                "built_in": len(built_in_tools),
+                "mcp": len(mcp_tools),
+                "mcp_servers": len(self.mcp_servers) if self.enable_mcp else 0,
+            },
+            "built_in_tools": built_in_tools,
+            "mcp_tools": mcp_tools,
+            "mcp_servers": mcp_server_details,
         }
+
+    def print_agent_info(self, console: Optional[Console] = None) -> None:
+        """Pretty print comprehensive agent information using Rich.
+
+        :param console: Optional Rich Console instance. If None, creates a new one.
+        """
+        if console is None:
+            console = Console()
+
+        info = self.get_agent_info()
+
+        # Main agent info table
+        main_table = Table(
+            title="🤖 Personal AI Agent Configuration",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        main_table.add_column("Setting", style="cyan", no_wrap=True)
+        main_table.add_column("Value", style="green")
+
+        main_table.add_row("Framework", info["framework"])
+        main_table.add_row("Model Provider", info["model_provider"])
+        main_table.add_row("Model Name", info["model_name"])
+        main_table.add_row("Memory Enabled", "✅" if info["memory_enabled"] else "❌")
+        main_table.add_row(
+            "Knowledge Enabled", "✅" if info["knowledge_enabled"] else "❌"
+        )
+        main_table.add_row("MCP Enabled", "✅" if info["mcp_enabled"] else "❌")
+        main_table.add_row("Debug Mode", "✅" if info["debug_mode"] else "❌")
+        main_table.add_row("User ID", info["user_id"])
+        main_table.add_row("Initialized", "✅" if info["initialized"] else "❌")
+        main_table.add_row("Storage Directory", info["storage_dir"])
+        main_table.add_row("Knowledge Directory", info["knowledge_dir"])
+
+        console.print(main_table)
+        console.print()
+
+        # Tool counts table
+        tool_table = Table(
+            title="🔧 Tool Summary", show_header=True, header_style="bold blue"
+        )
+        tool_table.add_column("Tool Type", style="cyan")
+        tool_table.add_column("Count", style="green", justify="right")
+
+        counts = info["tool_counts"]
+        tool_table.add_row("Total Tools", str(counts["total"]))
+        tool_table.add_row("Built-in Tools", str(counts["built_in"]))
+        tool_table.add_row("MCP Tools", str(counts["mcp"]))
+        tool_table.add_row("MCP Servers", str(counts["mcp_servers"]))
+
+        console.print(tool_table)
+        console.print()
+
+        # Built-in tools table
+        if info["built_in_tools"]:
+            builtin_table = Table(
+                title="🛠️ Built-in Tools", show_header=True, header_style="bold yellow"
+            )
+            builtin_table.add_column("Tool Name", style="cyan")
+            builtin_table.add_column("Description", style="white")
+
+            for tool in info["built_in_tools"]:
+                builtin_table.add_row(tool["name"], tool["description"])
+
+            console.print(builtin_table)
+            console.print()
+
+        # MCP tools table
+        if info["mcp_tools"]:
+            mcp_table = Table(
+                title="🌐 MCP Server Tools", show_header=True, header_style="bold red"
+            )
+            mcp_table.add_column("Tool Name", style="cyan")
+            mcp_table.add_column("Description", style="white")
+
+            for tool in info["mcp_tools"]:
+                mcp_table.add_row(tool["name"], tool["description"])
+
+            console.print(mcp_table)
+            console.print()
+
+        # MCP servers detail table
+        if info["mcp_servers"]:
+            server_table = Table(
+                title="🖥️ MCP Server Details",
+                show_header=True,
+                header_style="bold purple",
+            )
+            server_table.add_column("Server Name", style="cyan")
+            server_table.add_column("Command", style="yellow")
+            server_table.add_column("Description", style="white")
+            server_table.add_column("Args", style="green", justify="right")
+            server_table.add_column("Env Vars", style="green", justify="right")
+
+            for server_name, details in info["mcp_servers"].items():
+                server_table.add_row(
+                    server_name,
+                    details["command"],
+                    details["description"],
+                    str(details["args_count"]),
+                    str(details["env_vars"]),
+                )
+
+            console.print(server_table)
+
+        console.print("\n🎉 Agent information displayed successfully!")
+
+    def quick_agent_summary(self, console: Optional[Console] = None) -> None:
+        """Print a quick one-line summary of the agent.
+
+        :param console: Optional Rich Console instance. If None, creates a new one.
+        """
+        if console is None:
+            console = Console()
+
+        info = self.get_agent_info()
+        counts = info["tool_counts"]
+
+        status = "✅ Ready" if info["initialized"] else "❌ Not Initialized"
+        memory_status = "🧠" if info["memory_enabled"] else "🚫"
+        mcp_status = "🌐" if info["mcp_enabled"] else "🚫"
+
+        summary = (
+            f"[bold]{info['framework'].upper()}[/bold] Agent: {status} | "
+            f"Model: [cyan]{info['model_provider']}:{info['model_name']}[/cyan] | "
+            f"Tools: [green]{counts['total']}[/green] "
+            f"([yellow]{counts['built_in']}[/yellow] built-in + [red]{counts['mcp']}[/red] MCP) | "
+            f"Memory: {memory_status} | MCP: {mcp_status}"
+        )
+
+        console.print(summary)
 
 
 async def create_agno_agent(
-    weaviate_client=None,
-    vector_store=None,
     model_provider: str = "ollama",
-    model_name: str = "qwen2.5:7b-instruct",
-    debug: bool = False,
+    model_name: str = LLM_MODEL,
+    enable_memory: bool = True,
+    enable_mcp: bool = True,
+    storage_dir: str = "./data/agno",
+    knowledge_dir: str = "./data/knowledge",
+    debug: bool = True,
+    ollama_base_url: str = OLLAMA_URL,
+    user_id: str = "default_user",
+    recreate: bool = False,
 ) -> AgnoPersonalAgent:
-    """
-    Create and initialize an agno-based personal agent.
+    """Create and initialize an agno-based personal agent.
 
-    Args:
-        weaviate_client: Weaviate client for memory operations
-        vector_store: Vector store for memory operations
-        model_provider: LLM provider ('ollama' or 'openai')
-        model_name: Model name to use
-        debug: Enable debug mode
-
-    Returns:
-        AgnoPersonalAgent: Initialized agent instance
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param enable_memory: Whether to enable memory and knowledge features
+    :param enable_mcp: Whether to enable MCP tool integration
+    :param storage_dir: Directory for Agno storage files
+    :param knowledge_dir: Directory containing knowledge files to load
+    :param debug: Enable debug mode
+    :param ollama_base_url: Base URL for Ollama API
+    :param user_id: User identifier for memory operations
+    :return: Initialized agent instance
     """
     agent = AgnoPersonalAgent(
         model_provider=model_provider,
         model_name=model_name,
-        weaviate_client=weaviate_client,
-        vector_store=vector_store,
+        enable_memory=enable_memory,
+        enable_mcp=enable_mcp,
+        storage_dir=storage_dir,
+        knowledge_dir=knowledge_dir,
         debug=debug,
-        enable_memory=weaviate_client is not None and vector_store is not None,
-        enable_mcp=USE_MCP,
+        ollama_base_url=ollama_base_url,
+        user_id=user_id,
+        recreate=recreate,
     )
 
     success = await agent.initialize()
@@ -478,24 +937,114 @@ async def create_agno_agent(
 
 # Synchronous wrapper for compatibility
 def create_agno_agent_sync(
-    weaviate_client=None,
-    vector_store=None,
     model_provider: str = "ollama",
-    model_name: str = "qwen2.5:7b-instruct",
+    model_name: str = LLM_MODEL,
+    enable_memory: bool = True,
+    enable_mcp: bool = True,
+    storage_dir: str = "./data/agno",
+    knowledge_dir: str = "./data/knowledge",
     debug: bool = False,
+    ollama_base_url: str = OLLAMA_URL,
+    user_id: str = "default_user",
 ) -> AgnoPersonalAgent:
     """
     Synchronous wrapper for creating agno agent.
 
-    Returns:
-        AgnoPersonalAgent: Initialized agent instance
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param enable_memory: Whether to enable memory and knowledge features
+    :param enable_mcp: Whether to enable MCP tool integration
+    :param storage_dir: Directory for Agno storage files
+    :param knowledge_dir: Directory containing knowledge files to load
+    :param debug: Enable debug mode
+    :param user_id: User identifier for memory operations
+    :return: Initialized agent instance
     """
     return asyncio.run(
         create_agno_agent(
-            weaviate_client=weaviate_client,
-            vector_store=vector_store,
             model_provider=model_provider,
             model_name=model_name,
+            enable_memory=enable_memory,
+            enable_mcp=enable_mcp,
+            storage_dir=storage_dir,
+            knowledge_dir=knowledge_dir,
             debug=debug,
+            ollama_base_url=ollama_base_url,
+            user_id=user_id,
         )
     )
+
+
+def create_simple_personal_agent(
+    storage_dir: str = None,
+    knowledge_dir: str = None,
+    model_provider: str = "ollama",
+    model_name: str = LLM_MODEL,
+) -> tuple[Agent, Optional[CombinedKnowledgeBase]]:
+    """Create a simple personal agent following the working pattern from knowledge_agent_example.py
+
+    This function creates an agent with knowledge base integration using the simple
+    pattern that avoids async initialization complexity.
+
+    :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
+    :param knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :return: Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
+    """
+    # Create knowledge base (synchronous creation)
+    knowledge_base = create_combined_knowledge_base(storage_dir, knowledge_dir)
+
+    # Create the model
+    if model_provider == "openai":
+        model = OpenAIChat(id=model_name)
+    elif model_provider == "ollama":
+        model = Ollama(
+            id=model_name,
+        )
+    else:
+        raise ValueError(f"Unsupported model provider: {model_provider}")
+
+    # Create agent with simple pattern
+    agent = Agent(
+        name="Personal AI Agent",
+        model=model,
+        knowledge=knowledge_base,
+        search_knowledge=True,  # Enable automatic knowledge search
+        show_tool_calls=True,  # Show what tools the agent uses
+        markdown=True,  # Format responses in markdown
+        instructions=[
+            "You are a personal AI assistant with access to the user's knowledge base.",
+            "Always search your knowledge base when asked about personal information.",
+            "Provide detailed responses based on the information you find.",
+            "If you can't find specific information, say so clearly.",
+            "Include relevant details from the knowledge base in your responses.",
+        ],
+    )
+
+    logger.info("✅ Created simple personal agent")
+    if knowledge_base:
+        logger.info("   Knowledge base: Enabled")
+        logger.info("   Search enabled: %s", agent.search_knowledge)
+    else:
+        logger.info("   Knowledge base: None (no knowledge files found)")
+
+    return agent, knowledge_base
+
+
+async def load_agent_knowledge(
+    knowledge_base: CombinedKnowledgeBase, recreate: bool = False
+) -> None:
+    """Load knowledge base content asynchronously.
+
+    This should be called after creating the agent to load the knowledge content.
+
+    :param knowledge_base: Knowledge base instance to load
+    :param recreate: Whether to recreate the knowledge base from scratch
+    :return: None
+    """
+    if knowledge_base:
+        await load_combined_knowledge_base(knowledge_base, recreate=recreate)
+        logger.info("✅ Knowledge base loaded successfully")
+    else:
+        logger.info("No knowledge base to load")

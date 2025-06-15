@@ -11,19 +11,22 @@ import logging
 import signal
 import sys
 import time
-import warnings
 
-from rich.logging import RichHandler
 from weaviate import WeaviateClient
 
-from personal_agent.config.settings import LOG_LEVEL
-from personal_agent.core.mcp_client import SimpleMCPClient
+from ..core.mcp_client import SimpleMCPClient
+from ..utils.pag_logging import setup_logging
+
+# Use logging.INFO as default to avoid circular import
+DEFAULT_LOG_LEVEL = logging.INFO
 
 # These will be injected by the main module
 weaviate_client: "WeaviateClient" = None
 vector_store = None
 mcp_client: "SimpleMCPClient" = None
-logger: logging.Logger = None
+logger: logging.Logger = setup_logging(
+    name="__name__",  # Use a placeholder name
+)
 
 
 def inject_dependencies(weaviate_cli, vec_store, mcp_cli, log):
