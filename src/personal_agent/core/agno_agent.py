@@ -123,10 +123,30 @@ class AgnoPersonalAgent:
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
-            # Use Ollama-compatible interface for Ollama
+            # Enhanced Ollama configuration with performance and reliability options
             return Ollama(
                 id=self.model_name,
                 host=self.ollama_base_url,
+                # Performance optimization options
+                options={
+                    "temperature": 0.7,      # Balanced creativity/consistency
+                    "top_p": 0.9,           # Nucleus sampling
+                    "top_k": 40,            # Vocabulary limiting
+                    "repeat_penalty": 1.1,   # Reduce repetition
+                    "num_ctx": 4096,        # Context window size
+                    "num_predict": 2048,    # Max generation tokens
+                    "num_thread": 8,        # CPU threads for processing
+                },
+                # Connection and reliability settings
+                timeout=60.0,               # Request timeout (seconds)
+                keep_alive="5m",           # Keep model loaded for 5 minutes
+                # Tool usage control - intelligent tool selection
+                _tool_choice="auto",        # Let model decide when to use tools intelligently
+                # Client configuration (not request parameters)
+                client_params={
+                    "verify": False,        # Skip SSL verification for local Ollama
+                    "timeout": 60,          # Client-level timeout
+                }
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
