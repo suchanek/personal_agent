@@ -31,12 +31,12 @@ MCP_SERVERS = {
             )
         },
     },
-    "brave-search": {
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-        "description": "Web search for research and technical information",
-        "env": {"BRAVE_API_KEY": get_env_var("BRAVE_API_KEY", "")},
-    },
+    #    "brave-search": {
+    #        "command": "npx",
+    #        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+    #        "description": "Web search for research and technical information",
+    #        "env": {"BRAVE_API_KEY": get_env_var("BRAVE_API_KEY", "")},
+    #    },
     "puppeteer": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-puppeteer"],

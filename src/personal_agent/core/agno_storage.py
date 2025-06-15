@@ -233,13 +233,4 @@ async def load_combined_knowledge_base(
     logger.info("Combined knowledge base loaded successfully")
 
 
-# REMOVED: load_personal_knowledge() and load_personal_knowledge_async() functions
-# These functions were redundant with create_combined_knowledge_base()
-# which properly handles both text and PDF sources in a unified manner.
-
-
-# REMOVED: load_pdf_knowledge() and load_pdf_knowledge_async() functions
-# These functions were redundant with create_combined_knowledge_base()
-# which properly handles both text and PDF sources in a unified manner.
-
 # end of file

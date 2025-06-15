@@ -116,8 +116,32 @@ def clean_response_content(response: str) -> str:
     if not isinstance(response, str):
         response = str(response)
     
-    # Remove <think>...</think> tags and their content (more conservative approach)
-    # Only remove if they contain actual thinking content, not if they're part of legitimate response
+    # Log the original response for debugging
+    if logger:
+        logger.info(f"Original response before cleaning (length: {len(response)}): {response[:500]}...")
+        logger.info(f"Full response content: {repr(response)}")
+    
+    # Check if response is ONLY thinking content (incomplete response from agent)
+    response_stripped = response.strip()
+    
+    # If response starts with <think> but doesn't have proper content after closing tag
+    if response_stripped.startswith('<think>') or response_stripped.startswith('<think'):
+        # Check if there's a closing think tag
+        think_close_match = re.search(r'</think\s*>', response, re.IGNORECASE | re.DOTALL)
+        
+        if not think_close_match:
+            # No closing tag - incomplete thinking, return a helpful message
+            logger.warning("Response appears to be incomplete thinking content (no closing tag)")
+            return "I'm processing your request, but my response was incomplete. Please try asking again."
+        
+        # Check if there's actual content after the closing think tag
+        content_after_think = response[think_close_match.end():].strip()
+        if not content_after_think:
+            # Only thinking content, no actual response
+            logger.warning("Response contains only thinking content, no actual answer")
+            return "I was thinking about your request but didn't provide a complete answer. Please try asking again."
+    
+    # Remove <think>...</think> tags and their content
     think_pattern = r'<think\s*>.*?</think\s*>'
     cleaned = re.sub(think_pattern, '', response, flags=re.DOTALL | re.IGNORECASE)
     
@@ -128,10 +152,13 @@ def clean_response_content(response: str) -> str:
     cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)  # Replace 3+ newlines with double newlines
     cleaned = cleaned.strip()  # Remove leading/trailing whitespace
     
-    # If cleaning removed everything, return the original response
+    # If cleaning removed everything, return a helpful message instead of original
     if not cleaned and response:
-        logger.warning("Content cleaning removed all content, returning original response")
-        return response
+        logger.warning("Content cleaning removed all content")
+        if '<think>' in response.lower():
+            return "I was processing your request but only generated thinking content. Please try asking again."
+        else:
+            return "I generated an empty response. Please try asking your question again."
     
     if logger:
         original_length = len(response)
@@ -139,9 +166,8 @@ def clean_response_content(response: str) -> str:
         if original_length != cleaned_length:
             logger.info(f"Cleaned response: removed {original_length - cleaned_length} characters (thinking content)")
         
-        # Log if response seems empty after cleaning
-        if not cleaned.strip():
-            logger.warning(f"Response appears empty after cleaning. Original: {response[:200]}...")
+        # Log final cleaned response
+        logger.info(f"Final cleaned response (length: {len(cleaned)}): {cleaned[:200]}...")
     
     return cleaned
 
