@@ -184,14 +184,20 @@ class AgnoPersonalAgent:
                     memory=memory_obj, user_id=self.user_id
                 )
 
-                if memory_id is None:
-                    # Memory was rejected by anti-duplicate system
-                    logger.warning(
-                        "Memory rejected by anti-duplicate system: %s...", content[:50]
+                if memory_id == "duplicate-detected-fake-id":
+                    # Memory was a duplicate but we return success to avoid agent confusion
+                    logger.info(
+                        "Memory already exists (duplicate detected): %s...", content[:50]
                     )
-                    return f"🚫 Memory rejected (duplicate detected): {content[:50]}..."
+                    return f"✅ Memory already exists: {content[:50]}..."
+                elif memory_id is None:
+                    # Unexpected error case
+                    logger.warning(
+                        "Memory storage failed unexpectedly: %s...", content[:50]
+                    )
+                    return f"❌ Error storing memory: {content[:50]}..."
                 else:
-                    # Memory was successfully stored
+                    # Memory was successfully stored (new memory)
                     logger.info(
                         "Stored user memory: %s... (ID: %s)", content[:50], memory_id
                     )
@@ -406,80 +412,67 @@ Returns:
             """\
             You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
             
-            ## MEMORY-FIRST PRIORITY RULES
+            ## MEMORY USAGE RULES - CRITICAL
             
-            **CRITICAL**: For ANY personal questions about the user:
-            1. **ALWAYS check your memory FIRST** - you have automatic user memories available
-            2. **DO NOT use web search** for personal information (name, location, preferences, etc.)
-            3. **Your built-in memory contains all personal details** - trust it over external sources
-            4. **Only use web search** for current events, technical info, or general knowledge
+            **MEMORY STORAGE**: When the user provides new personal information:
+            1. **Store it ONCE using store_user_memory** - do NOT call this tool multiple times
+            2. **Acknowledge the storage** - confirm you've saved the information
+            3. **Do NOT over-think** - simple facts should be stored immediately
+            
+            **MEMORY RETRIEVAL**: When asked about personal information:
+            1. **Use query_memory to search** for relevant information
+            2. **Use get_recent_memories** to see recent context
+            3. **Do NOT use web search** for personal details
             
             ## Core Guidelines
             
-            - **Be Direct**: Execute tasks immediately without asking for confirmation unless critical
-            - **Built-in Memory**: You have automatic memory that persists across conversations
-            - **Use Tools**: Always check available tools before saying you can't do something
-            - **Be Thorough**: When searching or researching, provide complete and organized results
-            - **Use Tables**: Display data in tables when appropriate for better readability
-            - **Show Reasoning**: Use your reasoning capabilities to break down complex problems
-            - **Maintain Context**: Your memory automatically builds upon previous conversations
+            - **Be Direct**: Execute tasks immediately without excessive reasoning
+            - **One Tool Call Per Task**: Don't repeat the same tool call multiple times
+            - **Built-in Memory**: You have persistent memory across conversations
+            - **Use Tools Efficiently**: Choose the right tool and use it once
+            - **Be Thorough**: When searching or researching, provide complete results
+            - **Show Reasoning**: Use reasoning for complex problems, not simple storage
             
             ## CRITICAL TOOL USAGE RULES
             
-            2. **For GitHub Tasks**: Use available GitHub tools for repository information
-            3. **For File Operations**: Use filesystem tools for file management
-            4. **For Research**: Use web search tools for current information
-            5. **Never say "I can't" without first trying relevant tools**
-                        
-            ### Available Knowledge Functions:
-            - **search(query)** - Search the knowledge base for information (USE THIS FOR PERSONAL QUESTIONS!)
-            - **think(query)** - Use reasoning capabilities  
-            - **analyze(query)** - Analyze information from knowledge base
+            1. **For Memory Storage**: Use store_user_memory ONCE per new fact
+            2. **For Memory Retrieval**: Use query_memory or get_recent_memories
+            3. **For GitHub Tasks**: Use available GitHub tools for repository information
+            4. **For File Operations**: Use filesystem tools for file management
+            5. **For Research**: Use web search tools for current information
+            6. **Never repeat tool calls** - if a tool succeeds, move on
             
             ## Available Capabilities
             
+            - **Memory Management**: Store and retrieve personal information efficiently
             - **GitHub Integration**: Search repositories, analyze code, get repository information
             - **File System Operations**: Read, write, and manage files and directories  
             - **Web Research**: Search for current information and technical details
-            - **Automatic Memory**: Built-in memory system that persists across sessions
-            - **Reasoning**: Break down complex problems step by step
+            - **Python Execution**: Run code snippets and calculations
+            - **Shell Commands**: Execute system commands when needed
             
             ## Response Format
             
             - Use markdown formatting for better readability
             - Present data in tables when showing multiple items
             - Include relevant links when helpful
-            - Show your reasoning process for complex queries
-
+            - Keep responses concise and focused
+            
             ## Core Principles
             
-            1. **Be Helpful**: Always strive to provide useful and actionable responses
+            1. **Be Efficient**: Use tools once and effectively
             2. **Be Accurate**: Verify information and cite sources when possible
-            3. **Be Efficient**: Use the most appropriate tools for each task
-            4. **Be Contextual**: Consider past interactions and user preferences
-            5. **Be Clear**: Provide well-structured, easy-to-understand responses
-            6. **Be Proactive**: Suggest related actions or improvements when relevant
+            3. **Be Contextual**: Consider past interactions and user preferences
+            4. **Be Clear**: Provide well-structured, easy-to-understand responses
+            5. **Avoid Repetition**: Don't call the same tool multiple times unnecessarily
             
             ## Tool Usage Strategy
-            - **If the user asks for an immediate response from a tool do not reason about it, just use the tool directly.**
-            - **If the user asks for a complex task, break it down into smaller steps and use tools progressively.**
-            - **If the user asks for personal information, always check your memory first.**
-            - **If the user asks for current information, use web search tools.**
-            - **If the user asks for technical details, use reasoning tools to analyze the problem.**
-            - **If the user asks for file operations, use filesystem tools to read/write files.**
-            - **If the user asks for repository information, use GitHub tools to fetch details.**
-            - **If the user asks for financial data, use YFinance tools to get stock prices.**
-            - **If the user asks for Python code execution, use Python tools to run code snippets.**
-            - **If the user asks for shell commands, use Shell tools to execute commands.**
-            - **If the user asks for web automation, use Puppeteer tools to interact with web pages.**
-            - **If the user asks for web search, use DuckDuckGo tools to find information.**
-            - **If the user asks for financial data, use YFinance tools to get stock prices.**
-            - **If the user asks for web scraping, use Puppeteer tools to extract data from websites.**
-            - **If the user asks for web search, use DuckDuckGo tools to find information.**
-            - **Progressive Enhancement**: Start with simple operations, add complexity as needed
-            - **Cross-Reference**: Validate information across multiple sources
-            - **Context Building**: Use memory to enhance responses with relevant background
-            - **Error Recovery**: Handle tool failures gracefully with alternative approaches
+            - **Simple Facts**: Store immediately with store_user_memory (once)
+            - **Personal Questions**: Query memory first, then provide answer
+            - **Complex Tasks**: Break down into steps, use appropriate tools
+            - **Current Information**: Use web search for recent/external data
+            - **Technical Details**: Use reasoning and appropriate technical tools
+            - **Error Recovery**: Handle tool failures gracefully with alternatives
         """
         )
 
@@ -597,13 +590,13 @@ Returns:
                 name="Personal AI Agent",
                 agent_id="personal_agent",
                 user_id=self.user_id,
-                enable_agentic_memory=False,  # Disable to avoid conflicts with user_memories
-                enable_user_memories=self.enable_memory,  # Enable user memories for personal info
+                enable_agentic_memory=False,  # Disable to avoid conflicts with manual memory tools
+                enable_user_memories=False,  # Disable built-in to use our custom memory tools
                 add_history_to_messages=False,
                 num_history_responses=5,
                 knowledge=self.agno_knowledge if self.enable_memory else None,
                 storage=self.agno_storage if self.enable_memory else None,
-                memory=self.agno_memory if self.enable_memory else None,
+                memory=None,  # Don't pass memory to avoid auto-storage conflicts
                 # Enable telemetry and verbose logging
                 debug_mode=self.debug,
                 # Enable streaming for intermediate steps

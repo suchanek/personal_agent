@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agno.agent import Agent
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
+from agno.memory.v2.manager import MemoryManager
 from agno.memory.v2.memory import Memory
 from agno.models.ollama import Ollama
 from agno.storage.sqlite import SqliteStorage
@@ -44,6 +45,14 @@ Nmemory = Memory(
     # Use any model for creating memories
     model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
     db=SqliteMemoryDb(table_name="user_memories", db_file=db_file),
+    memory_manager=MemoryManager(
+        model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
+        memory_capture_instructions="""\
+                    Memories should include details about the user's various interests, hobbies,
+                    pets, relationships, education. Only return a single category for each memory
+                    and only return one memory.                    
+                    """,
+    ),
 )
 
 # Initialize AntiDuplicateMemory
