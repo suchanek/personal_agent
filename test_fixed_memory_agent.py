@@ -13,6 +13,7 @@ This test validates:
 import asyncio
 import logging
 
+from src.personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL
 from src.personal_agent.core.agno_agent import AgnoPersonalAgent
 
 # Set up logging
@@ -34,8 +35,9 @@ async def test_memory_agent(model_provider: str, model_name: str):
         enable_mcp=False,  # Disable MCP to focus on memory
         debug=True,
         user_id="test_user",
-        ollama_base_url="http://tesla.local:11434",
-        storage_dir="./data/test_memory_fix",
+        ollama_base_url=OLLAMA_URL,
+        storage_dir=AGNO_STORAGE_DIR,
+        recreate=False,
     )
 
     # Initialize agent
