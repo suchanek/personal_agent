@@ -287,21 +287,58 @@ def agent_info_route():
 
     # Get agent info from agno agent
     agent_type = "Agno Framework Agent"
-    agent_info = agno_agent.get_agent_info() if agno_agent else {}
+    raw_agent_info = agno_agent.get_agent_info() if agno_agent else {}
 
     if logger:
-        logger.info(f"Retrieved agent info: {agent_info}")
+        logger.info(f"Retrieved agent info: {raw_agent_info}")
+
+    # Process agent info for better display
+    agent_info = {}
+    for key, value in raw_agent_info.items():
+        if isinstance(value, dict):
+            # Format dictionary values nicely
+            if key == "mcp_servers" and value:
+                agent_info[key] = f"{len(value)} servers configured"
+                # Add server details to available tools
+            else:
+                agent_info[key] = f"{len(value)} items" if value else "None configured"
+        elif isinstance(value, list):
+            agent_info[key] = f"{len(value)} items" if value else "None"
+        else:
+            agent_info[key] = value
 
     # Get available tools from the agno agent
     available_tools = []
     if agno_agent:
         try:
-            # Extract tool names from agent info
-            mcp_servers = agent_info.get("mcp_servers", 0)
-            available_tools.append(f"MCP Servers: {mcp_servers}")
-
-            if agent_info.get("memory_enabled"):
-                available_tools.append("Weaviate Memory")
+            # Extract MCP server information
+            mcp_servers = raw_agent_info.get("mcp_servers", {})
+            if isinstance(mcp_servers, dict) and mcp_servers:
+                for server_name, server_info in mcp_servers.items():
+                    if isinstance(server_info, dict):
+                        # Check for tools in different possible structures
+                        tools = server_info.get("tools", [])
+                        if not tools:
+                            # Try alternative structures
+                            tools = server_info.get("available_tools", [])
+                        if not tools and "tool_count" in server_info:
+                            tools_count = server_info["tool_count"]
+                        else:
+                            tools_count = len(tools) if tools else "Unknown"
+                        
+                        if tools_count == 0 or tools_count == "Unknown":
+                            available_tools.append(f"{server_name}: Connected")
+                        else:
+                            available_tools.append(f"{server_name}: {tools_count} tools")
+                    else:
+                        available_tools.append(f"{server_name}: Active")
+            elif isinstance(mcp_servers, int) and mcp_servers > 0:
+                available_tools.append(f"MCP Servers: {mcp_servers}")
+            
+            # Only add memory system if it's actually enabled and not Weaviate
+            memory_type = raw_agent_info.get("memory_type", "")
+            if raw_agent_info.get("memory_enabled") and memory_type and "weaviate" not in memory_type.lower():
+                available_tools.append(f"{memory_type} Memory System")
 
             available_tools.extend(
                 ["Async Processing", "Multi-tool Coordination", "Context Enhancement"]
@@ -318,6 +355,7 @@ def agent_info_route():
         agent_type=agent_type,
         agent_info=agent_info,
         available_tools=available_tools,
+        mcp_servers_count=len(raw_agent_info.get("mcp_servers", {})) if isinstance(raw_agent_info.get("mcp_servers"), dict) else raw_agent_info.get("mcp_servers", 0),
     )
 
 
@@ -852,89 +890,435 @@ def get_agent_info_template():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Agent Info - Personal AI Agent</title>
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
+            :root {
+                --primary-color: #2563eb;
+                --primary-dark: #1d4ed8;
+                --primary-light: #3b82f6;
+                --success-color: #10b981;
+                --warning-color: #f59e0b;
+                --danger-color: #ef4444;
+                --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                --surface: #ffffff;
+                --surface-alt: #f8fafc;
+                --text-primary: #1e293b;
+                --text-secondary: #64748b;
+                --text-muted: #94a3b8;
+                --border-color: #e2e8f0;
+                --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
             body {
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #f8fafc;
-                color: #1e293b;
+                background: var(--background);
+                color: var(--text-primary);
                 min-height: 100vh;
-                margin: 0;
-                padding: 2rem;
+                line-height: 1.6;
+                padding: 2rem 1rem;
             }
+
             .container {
-                max-width: 800px;
+                max-width: 1200px;
                 margin: 0 auto;
-                background: white;
-                padding: 3rem;
-                border-radius: 1rem;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                border: 1px solid #e2e8f0;
             }
+
             .header {
                 text-align: center;
                 margin-bottom: 3rem;
+                color: white;
             }
+
             .header h1 {
-                font-size: 2.5rem;
+                font-size: 3rem;
                 font-weight: 700;
-                margin-bottom: 0.5rem;
+                margin-bottom: 1rem;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 gap: 1rem;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             }
+
+            .header .robot-icon {
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            }
+
             .header p {
-                color: #64748b;
-                font-size: 1.1rem;
+                font-size: 1.2rem;
+                opacity: 0.9;
+                font-weight: 300;
             }
-            .info-section {
+
+            .agent-status {
+                background: var(--surface);
+                border-radius: 1.5rem;
+                padding: 2rem;
                 margin-bottom: 2rem;
-                padding: 1.5rem;
-                background: #f8fafc;
-                border-radius: 0.75rem;
-                border-left: 4px solid #2563eb;
+                box-shadow: var(--shadow-xl);
+                border: 1px solid var(--border-color);
+                position: relative;
+                overflow: hidden;
             }
-            .info-title {
-                font-size: 1.25rem;
-                font-weight: 600;
+
+            .agent-status::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, var(--primary-color), var(--success-color), var(--warning-color));
+            }
+
+            .status-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+                margin-top: 1.5rem;
+            }
+
+            .status-item {
+                text-align: center;
+                padding: 1.5rem;
+                background: var(--surface-alt);
+                border-radius: 1rem;
+                border: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+            }
+
+            .status-item:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-lg);
+            }
+
+            .status-icon {
+                font-size: 2.5rem;
                 margin-bottom: 1rem;
+                display: block;
+            }
+
+            .status-icon.active {
+                color: var(--success-color);
+                animation: pulse 2s infinite;
+            }
+
+            .status-icon.warning {
+                color: var(--warning-color);
+            }
+
+            .status-icon.info {
+                color: var(--primary-color);
+            }
+
+            .status-label {
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+
+            .status-value {
+                color: var(--text-secondary);
+                font-size: 0.9rem;
+            }
+
+            .info-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 2rem;
+                margin-bottom: 2rem;
+            }
+
+            .info-card {
+                background: var(--surface);
+                border-radius: 1.5rem;
+                padding: 2rem;
+                box-shadow: var(--shadow-lg);
+                border: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .info-card:hover {
+                transform: translateY(-4px);
+                box-shadow: var(--shadow-xl);
+            }
+
+            .info-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: var(--primary-color);
+            }
+
+            .card-header {
                 display: flex;
                 align-items: center;
-                gap: 0.5rem;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+                padding-bottom: 1rem;
+                border-bottom: 1px solid var(--border-color);
             }
-            .info-content {
-                color: #64748b;
-                line-height: 1.6;
+
+            .card-icon {
+                width: 50px;
+                height: 50px;
+                background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+                border-radius: 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 1.5rem;
+                box-shadow: var(--shadow);
             }
-            .tools-list {
+
+            .card-title {
+                font-size: 1.4rem;
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .card-content {
+                color: var(--text-secondary);
+                line-height: 1.7;
+            }
+
+            .config-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.75rem 0;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .config-item:last-child {
+                border-bottom: none;
+            }
+
+            .config-label {
+                font-weight: 500;
+                color: var(--text-primary);
+            }
+
+            .config-value {
+                color: var(--text-secondary);
+                font-family: 'Monaco', 'Menlo', monospace;
+                background: var(--surface-alt);
+                padding: 0.25rem 0.5rem;
+                border-radius: 0.375rem;
+                font-size: 0.875rem;
+            }
+
+            .capabilities-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1rem;
+            }
+
+            .capability-item {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding: 1rem;
+                background: var(--surface-alt);
+                border-radius: 0.75rem;
+                border: 1px solid var(--border-color);
+                transition: all 0.2s ease;
+            }
+
+            .capability-item:hover {
+                background: white;
+                transform: translateX(4px);
+                box-shadow: var(--shadow);
+            }
+
+            .capability-icon {
+                width: 40px;
+                height: 40px;
+                background: linear-gradient(135deg, var(--success-color), #34d399);
+                border-radius: 0.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 1.1rem;
+                flex-shrink: 0;
+            }
+
+            .capability-text {
+                font-weight: 500;
+                color: var(--text-primary);
+            }
+
+            .features-list {
                 list-style: none;
                 padding: 0;
             }
-            .tools-list li {
-                padding: 0.5rem 0;
-                border-bottom: 1px solid #e2e8f0;
+
+            .feature-item {
                 display: flex;
                 align-items: center;
-                gap: 0.5rem;
+                gap: 1rem;
+                padding: 1rem 0;
+                border-bottom: 1px solid var(--border-color);
+                transition: all 0.2s ease;
             }
-            .tools-list li:last-child {
+
+            .feature-item:last-child {
                 border-bottom: none;
             }
-            .back-button {
+
+            .feature-item:hover {
+                background: var(--surface-alt);
+                margin: 0 -1rem;
+                padding: 1rem;
+                border-radius: 0.5rem;
+            }
+
+            .feature-icon {
+                width: 35px;
+                height: 35px;
+                background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+                border-radius: 0.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 1rem;
+                flex-shrink: 0;
+            }
+
+            .feature-text {
+                font-weight: 500;
+                color: var(--text-primary);
+            }
+
+            .action-buttons {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 3rem;
+                flex-wrap: wrap;
+            }
+
+            .btn {
                 display: inline-flex;
                 align-items: center;
-                gap: 0.5rem;
-                background: #2563eb;
-                color: white;
+                gap: 0.75rem;
                 padding: 1rem 2rem;
-                border-radius: 0.75rem;
+                border-radius: 1rem;
                 text-decoration: none;
                 font-weight: 600;
-                transition: all 0.2s;
-                margin-top: 2rem;
+                font-size: 1rem;
+                transition: all 0.3s ease;
+                border: none;
+                cursor: pointer;
+                box-shadow: var(--shadow);
             }
-            .back-button:hover {
-                background: #1d4ed8;
+
+            .btn-primary {
+                background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+                color: white;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-lg);
+                background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+            }
+
+            .btn-secondary {
+                background: var(--surface);
+                color: var(--text-primary);
+                border: 2px solid var(--border-color);
+            }
+
+            .btn-secondary:hover {
+                background: var(--surface-alt);
+                border-color: var(--primary-color);
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-lg);
+            }
+
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
+            }
+
+            @keyframes fadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .info-card {
+                animation: fadeInUp 0.6s ease-out;
+            }
+
+            .info-card:nth-child(2) {
+                animation-delay: 0.1s;
+            }
+
+            .info-card:nth-child(3) {
+                animation-delay: 0.2s;
+            }
+
+            @media (max-width: 768px) {
+                body {
+                    padding: 1rem 0.5rem;
+                }
+
+                .header h1 {
+                    font-size: 2rem;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+
+                .info-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .status-grid {
+                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                }
+
+                .capabilities-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .action-buttons {
+                    flex-direction: column;
+                    align-items: center;
+                }
+
+                .btn {
+                    width: 100%;
+                    max-width: 300px;
+                    justify-content: center;
+                }
             }
         </style>
     </head>
@@ -942,64 +1326,148 @@ def get_agent_info_template():
         <div class="container">
             <div class="header">
                 <h1>
-                    <i class="fas fa-robot"></i>
+                    <i class="fas fa-robot robot-icon"></i>
                     Agent Information
                 </h1>
-                <p>Detailed information about your {{ agent_type }}</p>
+                <p>Comprehensive overview of your {{ agent_type }}</p>
             </div>
 
-            <div class="info-section">
-                <div class="info-title">
-                    <i class="fas fa-cogs"></i>
-                    Agent Configuration
+            <div class="agent-status">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <i class="fas fa-heartbeat"></i>
+                    </div>
+                    <div class="card-title">System Status</div>
                 </div>
-                <div class="info-content">
-                    <strong>Type:</strong> {{ agent_type }}<br>
-                    {% for key, value in agent_info.items() %}
-                    <strong>{{ key.replace('_', ' ').title() }}:</strong> {{ value }}<br>
-                    {% endfor %}
+                <div class="status-grid">
+                    <div class="status-item">
+                        <i class="fas fa-power-off status-icon active"></i>
+                        <div class="status-label">Agent Status</div>
+                        <div class="status-value">Online & Ready</div>
+                    </div>
+                    <div class="status-item">
+                        <i class="fas fa-brain status-icon {{ 'active' if agent_info.get('memory_enabled') else 'warning' }}"></i>
+                        <div class="status-label">Memory System</div>
+                        <div class="status-value">{{ 'Connected' if agent_info.get('memory_enabled') else 'Disconnected' }}</div>
+                    </div>
+                    <div class="status-item">
+                        <i class="fas fa-plug status-icon info"></i>
+                        <div class="status-label">MCP Servers</div>
+                        <div class="status-value">{{ mcp_servers_count }} Active</div>
+                    </div>
+                    <div class="status-item">
+                        <i class="fas fa-cogs status-icon active"></i>
+                        <div class="status-label">Framework</div>
+                        <div class="status-value">Agno v2.0</div>
+                    </div>
                 </div>
             </div>
 
-            {% if available_tools %}
-            <div class="info-section">
-                <div class="info-title">
-                    <i class="fas fa-toolbox"></i>
-                    Available Capabilities
-                </div>
-                <div class="info-content">
-                    <ul class="tools-list">
-                        {% for tool in available_tools %}
-                        <li>
-                            <i class="fas fa-check"></i>
-                            {{ tool }}
-                        </li>
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <div class="card-title">Configuration</div>
+                    </div>
+                    <div class="card-content">
+                        <div class="config-item">
+                            <span class="config-label">Agent Type</span>
+                            <span class="config-value">{{ agent_type }}</span>
+                        </div>
+                        {% for key, value in agent_info.items() %}
+                        <div class="config-item">
+                            <span class="config-label">{{ key.replace('_', ' ').title() }}</span>
+                            <span class="config-value">{{ value }}</span>
+                        </div>
                         {% endfor %}
-                    </ul>
+                    </div>
+                </div>
+
+                {% if available_tools %}
+                <div class="info-card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-toolbox"></i>
+                        </div>
+                        <div class="card-title">Available Capabilities</div>
+                    </div>
+                    <div class="card-content">
+                        <div class="capabilities-grid">
+                            {% for tool in available_tools %}
+                            <div class="capability-item">
+                                <div class="capability-icon">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                <div class="capability-text">{{ tool }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="info-card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-rocket"></i>
+                        </div>
+                        <div class="card-title">Framework Features</div>
+                    </div>
+                    <div class="card-content">
+                        <ul class="features-list">
+                            <li class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-rocket"></i>
+                                </div>
+                                <div class="feature-text">Async/Await Operations</div>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-plug"></i>
+                                </div>
+                                <div class="feature-text">Native MCP Integration</div>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-brain"></i>
+                                </div>
+                                <div class="feature-text">Agno Memory System</div>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-tools"></i>
+                                </div>
+                                <div class="feature-text">Multi-tool Coordination</div>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <div class="feature-text">Error Handling & Recovery</div>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="fas fa-sync-alt"></i>
+                                </div>
+                                <div class="feature-text">Real-time Processing</div>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
-            {% endif %}
 
-            <div class="info-section">
-                <div class="info-title">
-                    <i class="fas fa-info-circle"></i>
-                    Framework Features
-                </div>
-                <div class="info-content">
-                    <ul class="tools-list">
-                        <li><i class="fas fa-rocket"></i> Async/Await Operations</li>
-                        <li><i class="fas fa-plug"></i> Native MCP Integration</li>
-                        <li><i class="fas fa-brain"></i> Weaviate Memory System</li>
-                        <li><i class="fas fa-tools"></i> Multi-tool Coordination</li>
-                        <li><i class="fas fa-shield-alt"></i> Error Handling & Recovery</li>
-                    </ul>
-                </div>
+            <div class="action-buttons">
+                <a href="/" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Back to Agent</span>
+                </a>
+                <a href="/clear" class="btn btn-secondary">
+                    <i class="fas fa-trash-alt"></i>
+                    <span>Clear Memory</span>
+                </a>
             </div>
-
-            <a href="/" class="back-button">
-                <i class="fas fa-arrow-left"></i>
-                <span>Back to Agent</span>
-            </a>
         </div>
     </body>
     </html>
