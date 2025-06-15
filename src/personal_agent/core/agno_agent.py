@@ -154,10 +154,30 @@ class AgnoPersonalAgent:
                 str: Success or error message
             """
             try:
+                import json
+
                 from agno.memory.v2.memory import UserMemory
 
                 if topics is None:
                     topics = ["general"]
+
+                # Fix: Handle case where topics comes in as string representation of list
+                # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
+                if isinstance(topics, str):
+                    try:
+                        # Try to parse as JSON first
+                        topics = json.loads(topics)
+                        logger.debug("Converted topics from string to list: %s", topics)
+                    except (json.JSONDecodeError, ValueError):
+                        # If that fails, treat as a single topic
+                        topics = [topics]
+                        logger.debug(
+                            "Treating topics string as single topic: %s", topics
+                        )
+
+                # Ensure topics is a list
+                if not isinstance(topics, list):
+                    topics = [str(topics)]
 
                 memory_obj = UserMemory(memory=content, topics=topics)
                 memory_id = self.agno_memory.add_user_memory(
