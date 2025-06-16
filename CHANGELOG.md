@@ -40,13 +40,6 @@ agent = Agent(
 )
 ```
 
-**NEW: WhatsApp Integration**
-
-- **WhatsApp Bot**: `examples/agent_with_memory_whatsapp.py` - Direct WhatsApp messaging integration
-- **Real-time Messaging**: Instant responses through WhatsApp API
-- **Memory Persistence**: Cross-session memory retention for personalized conversations
-- **Mobile-First**: Optimized for mobile messaging workflows
-
 **NEW: Advanced Team Collaboration Demo**
 
 - **Multi-Agent Teams**: `examples/teams_demo.py` - Comprehensive team-based AI system
@@ -548,12 +541,14 @@ for attempt in range(max_retries + 1):
 
 - **Symptom**: Agent would show full `<response>..</response>` but then hang indefinitely
 - **Root Cause**: CLI loop was calling **both** `aprint_response()` AND `arun()` for the same query
-- **Technical Details**: 
+- **Technical Details**:
+
   ```python
   # PROBLEMATIC CODE - Double processing
   await agent.agent.aprint_response(query, stream=True, ...)  # Processes query
   response_result = await agent.agent.arun(query)             # Processes SAME query again!
   ```
+
 - **Impact**: Race conditions, resource conflicts, infinite loops, inconsistent behavior
 
 **CRITICAL ISSUE #2: Excessive Tool Call Explosion (7x Duplicate Calls)**
