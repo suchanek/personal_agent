@@ -34,8 +34,8 @@ from .utils import (
     setup_logging,
 )
 
-# Import agno web interface (will be created)
-from .web.agno_interface import create_app, register_routes
+# Import agno web interface (Streamlit-based)
+from .web.agno_interface import initialize_agent, main as streamlit_main
 
 # Global variables for cleanup
 agno_agent: Optional[AgnoPersonalAgent] = None
@@ -117,13 +117,15 @@ async def initialize_agno_system(use_remote_ollama: bool = False, complexity_lev
     )
 
 
-def create_agno_web_app(use_remote_ollama: bool = False):
+def run_agno_web(use_remote_ollama: bool = False):
     """
-    Create and configure the Flask web application with agno.
+    Run the agno web application using Streamlit.
 
     :param use_remote_ollama: Whether to use the remote Ollama server instead of local
-    :return: Configured Flask application
     """
+    import subprocess
+    import sys
+    
     # Set up Rich logging for all components including agno
     configure_all_rich_logging()
     logger_instance = setup_logging()
@@ -133,14 +135,9 @@ def create_agno_web_app(use_remote_ollama: bool = False):
         initialize_agno_system(use_remote_ollama)
     )
 
-    # Create Flask app
-    app = create_app()
-
-    # Register routes with agno agent
-    register_routes(
-        app,
+    # Initialize the Streamlit interface with the agent
+    initialize_agent(
         agno_agent_instance,
-        logger_instance,
         query_kb_func,
         store_int_func,
         clear_kb_func,
@@ -149,21 +146,11 @@ def create_agno_web_app(use_remote_ollama: bool = False):
     # Register cleanup handlers
     register_cleanup_handlers()
 
-    logger_instance.info("Agno web application ready!")
-    return app
+    logger_instance.info("Agno Streamlit application ready!")
 
-
-def run_agno_web(use_remote_ollama: bool = False):
-    """
-    Run the agno web application.
-
-    :param use_remote_ollama: Whether to use the remote Ollama server instead of local
-    """
-    app = create_agno_web_app(use_remote_ollama)
-
-    # Run the app
+    # Print startup information
     print("\n🚀 Starting Personal AI Agent with Agno Framework...")
-    print("🌐 Web interface will be available at: http://127.0.0.1:5002")
+    print("🌐 Streamlit interface will be available at: http://localhost:8501")
     print("📚 Features: Native MCP integration, Async operations, Enhanced memory")
     print("⚡ Framework: Agno with native MCP + Ollama")
     if use_remote_ollama:
@@ -173,7 +160,21 @@ def run_agno_web(use_remote_ollama: bool = False):
     print("🔧 Mode: Modern async agent with advanced capabilities")
     print("\nPress Ctrl+C to stop the server.\n")
 
-    app.run(host="127.0.0.1", port=5002, debug=False)
+    # Run Streamlit
+    try:
+        subprocess.run([
+            sys.executable, "-m", "streamlit", "run", 
+            __file__.replace("agno_main.py", "web/agno_interface.py"),
+            "--server.port", "8501",
+            "--server.address", "localhost"
+        ])
+    except KeyboardInterrupt:
+        print("\n👋 Shutting down...")
+    except Exception as e:
+        logger_instance.error(f"Error running Streamlit: {e}")
+        print(f"Error: {e}")
+        print("You can also run the interface directly with:")
+        print(f"streamlit run {__file__.replace('agno_main.py', 'web/agno_interface.py')}")
 
 
 async def run_agno_cli(
@@ -282,6 +283,7 @@ def cli_main():
         description="Run the Personal AI Agent with Agno Framework"
     )
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
+    parser.add_argument("--web", action="store_true", help="Run in web mode (Streamlit)")
     parser.add_argument(
         "--remote-ollama", action="store_true", help="Use remote Ollama server"
     )
@@ -335,22 +337,20 @@ def cli_main():
     
     args = parser.parse_args()
 
-    # Check if this function is being called from the paga_cli script
-    # If it is, or if the --cli flag is set, run in CLI mode
-    # This simple approach should be sufficient for most cases
-
-    # Always run in CLI mode when the function name is cli_main
-    # Since this is specifically the CLI entry point in pyproject.toml
-    logger.info("Starting Personal AI Agent in CLI mode")
-
-    # Run in CLI mode
-    asyncio.run(run_agno_cli(
-        use_remote_ollama=args.remote_ollama,
-        show_reasoning=args.show_reasoning,
-        stream=args.stream,
-        stream_steps=args.stream_steps,
-        instruction_level=args.instruction_level,
-    ))
+    # Determine mode based on arguments
+    if args.web:
+        logger.info("Starting Personal AI Agent in web mode (Streamlit)")
+        run_agno_web(use_remote_ollama=args.remote_ollama)
+    else:
+        # Default to CLI mode
+        logger.info("Starting Personal AI Agent in CLI mode")
+        asyncio.run(run_agno_cli(
+            use_remote_ollama=args.remote_ollama,
+            show_reasoning=args.show_reasoning,
+            stream=args.stream,
+            stream_steps=args.stream_steps,
+            instruction_level=args.instruction_level,
+        ))
 
 
 if __name__ == "__main__":
