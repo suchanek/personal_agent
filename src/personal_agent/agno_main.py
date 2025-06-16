@@ -42,11 +42,12 @@ agno_agent: Optional[AgnoPersonalAgent] = None
 logger: Optional[logging.Logger] = setup_logging()
 
 
-async def initialize_agno_system(use_remote_ollama: bool = False):
+async def initialize_agno_system(use_remote_ollama: bool = False, complexity_level: int = 4):
     """
     Initialize all system components for agno framework.
 
     :param use_remote_ollama: Whether to use the remote Ollama server instead of local
+    :param complexity_level: Instruction complexity level (0=minimal, 4=full)
     :return: Tuple of (agno_agent, memory_functions)
     """
     global logger
@@ -79,6 +80,7 @@ async def initialize_agno_system(use_remote_ollama: bool = False):
         debug=True,
         user_id=USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
+        complexity_level=complexity_level,  # Pass the instruction complexity level
     )
 
     agent_info = agno_agent.get_agent_info()
@@ -174,12 +176,23 @@ def run_agno_web(use_remote_ollama: bool = False):
     app.run(host="127.0.0.1", port=5002, debug=False)
 
 
-async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
+async def run_agno_cli(
+    query: str = None, 
+    use_remote_ollama: bool = False,
+    show_reasoning: bool = False,
+    stream: bool = True,
+    stream_steps: bool = False,
+    instruction_level: int = 4,
+):
     """
-    Run agno agent in CLI mode with streaming and reasoning.
+    Run agno agent in CLI mode with configurable streaming and reasoning.
 
     :param query: Initial query to run
     :param use_remote_ollama: Whether to use the remote Ollama server instead of local
+    :param show_reasoning: Whether to show full reasoning (thinking tags)
+    :param stream: Whether to enable streaming responses
+    :param stream_steps: Whether to stream intermediate steps
+    :param instruction_level: Instruction complexity level (0=minimal, 4=full)
     """
     print("\n🤖 Personal AI Agent - Agno CLI Mode")
     print("=" * 50)
@@ -188,10 +201,16 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
         print("🖥️  Using remote Ollama at: http://tesla.local:11434")
     else:
         print("🖥️  Using local Ollama at: http://localhost:11434")
+    
+    # Display response configuration
+    print(f"🧠 Show reasoning: {'✅' if show_reasoning else '❌'}")
+    print(f"📡 Streaming: {'✅' if stream else '❌'}")
+    print(f"🔄 Stream steps: {'✅' if stream_steps else '❌'}")
+    print(f"📝 Instruction level: {instruction_level} ({'minimal' if instruction_level == 0 else 'basic' if instruction_level == 1 else 'moderate' if instruction_level == 2 else 'complex' if instruction_level == 3 else 'full'})")
 
     # Initialize system
     agent, query_kb, store_int, clear_kb = await initialize_agno_system(
-        use_remote_ollama
+        use_remote_ollama, complexity_level=instruction_level
     )
 
     # Print formatted agent info
@@ -221,14 +240,19 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
 
             print("🤖 Assistant: ")
             try:
-                # Use agno's async print_response with streaming for better UX
-                # This handles both display AND processing - no need for separate arun()
-                await agent.agent.aprint_response(
-                    query,
-                    stream=True,
-                    show_full_reasoning=True,
-                    stream_intermediate_steps=True,
-                )
+                if show_reasoning:
+                    # Use agno's async print_response with full reasoning
+                    await agent.agent.aprint_response(
+                        query,
+                        stream=stream,
+                        show_full_reasoning=True,
+                        stream_intermediate_steps=stream_steps,
+                    )
+                else:
+                    # Get response and clean it to remove thinking tags
+                    response = await agent.agent.arun(query, user_id=agent.user_id)
+                    cleaned_response = agent._clean_response(response.content)
+                    print(cleaned_response)
 
                 # Memory is handled automatically by Agno - no manual storage needed
 
@@ -261,6 +285,54 @@ def cli_main():
     parser.add_argument(
         "--remote-ollama", action="store_true", help="Use remote Ollama server"
     )
+    
+    # Response control arguments
+    parser.add_argument(
+        "--show-reasoning", 
+        action="store_true", 
+        default=False,
+        help="Show full reasoning including thinking tags (default: False)"
+    )
+    parser.add_argument(
+        "--no-show-reasoning", 
+        dest="show_reasoning",
+        action="store_false", 
+        help="Hide reasoning and thinking tags"
+    )
+    parser.add_argument(
+        "--stream", 
+        action="store_true", 
+        default=True,
+        help="Enable streaming responses (default: True)"
+    )
+    parser.add_argument(
+        "--no-stream", 
+        dest="stream",
+        action="store_false", 
+        help="Disable streaming responses"
+    )
+    parser.add_argument(
+        "--stream-steps", 
+        action="store_true", 
+        default=False,
+        help="Stream intermediate steps (default: False)"
+    )
+    parser.add_argument(
+        "--no-stream-steps", 
+        dest="stream_steps",
+        action="store_false", 
+        help="Disable streaming intermediate steps"
+    )
+    
+    # Instruction complexity arguments
+    parser.add_argument(
+        "--instruction-level",
+        type=int,
+        choices=[0, 1, 2, 3, 4],
+        default=4,
+        help="Instruction complexity level: 0=minimal, 1=basic tools, 2=moderate, 3=complex, 4=full (default: 4)"
+    )
+    
     args = parser.parse_args()
 
     # Check if this function is being called from the paga_cli script
@@ -272,7 +344,13 @@ def cli_main():
     logger.info("Starting Personal AI Agent in CLI mode")
 
     # Run in CLI mode
-    asyncio.run(run_agno_cli(use_remote_ollama=args.remote_ollama))
+    asyncio.run(run_agno_cli(
+        use_remote_ollama=args.remote_ollama,
+        show_reasoning=args.show_reasoning,
+        stream=args.stream,
+        stream_steps=args.stream_steps,
+        instruction_level=args.instruction_level,
+    ))
 
 
 if __name__ == "__main__":

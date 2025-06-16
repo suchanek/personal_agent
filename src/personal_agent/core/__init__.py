@@ -1,6 +1,7 @@
 """Core package for Personal Agent."""
 
 from .agent import create_agent_executor
+from .agent_instructions import create_agent_instructions
 from .agno_agent import create_simple_personal_agent, load_agent_knowledge
 from .agno_storage import (
     create_agno_memory,
@@ -27,6 +28,7 @@ __all__ = [
     "is_weaviate_connected",
     "reset_weaviate_if_corrupted",
     "create_agent_executor",
+    "create_agent_instructions",
     "MultiAgentSystem",
     "create_multi_agent_system",
     "create_smolagents_executor",

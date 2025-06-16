@@ -8,13 +8,11 @@ including native MCP support, async operations, and advanced agent features.
 
 import asyncio
 import os
+import re
+from pathlib import Path
+from tempfile import gettempdir
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
-
-# Set logging levels for better telemetry
-if "RUST_LOG" not in os.environ:
-    # Enable more verbose Rust logging for debugging
-    os.environ["RUST_LOG"] = "debug"
 
 # Enable Ollama debug logging
 if "OLLAMA_DEBUG" not in os.environ:
@@ -42,6 +40,7 @@ from ..tools.personal_agent_tools import (
 )
 from ..tools.rate_limited_duckduckgo import RateLimitedDuckDuckGoTools
 from ..utils import setup_logging
+from .agent_instructions import create_agent_instructions
 from .agno_storage import (
     create_agno_memory,
     create_agno_storage,
@@ -128,20 +127,16 @@ class AgnoPersonalAgent:
             return Ollama(
                 id=self.model_name,
                 host=self.ollama_base_url,
-                # Performance optimization options
+                # Simplified configuration - use options dict for model parameters
                 options={
-                    "temperature": 0.7,  # Balanced creativity/consistency
-                    "top_p": 0.9,  # Nucleus sampling
-                    "top_k": 40,  # Vocabulary limiting
-                    "repeat_penalty": 1.1,  # Reduce repetition
-                    "num_ctx": 4096,  # Context window size
-                    "num_predict": 2048,  # Max generation tokens
-                    "num_thread": 8,  # CPU threads for processing
+                    "temperature": 0.7,
+                    "num_predict": 2048,  # max_tokens equivalent
+                    "top_p": 0.9,
+                    "num_ctx": 4096,  # context window
                 },
                 # Connection and reliability settings
                 timeout=60.0,  # Request timeout (seconds)
                 keep_alive="5m",  # Keep model loaded for 5 minutes
-                # Tool usage control - intelligent tool selection
                 # Client configuration
                 client_params={
                     "verify": False,  # Skip SSL verification for local Ollama
@@ -150,6 +145,44 @@ class AgnoPersonalAgent:
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
+
+    def _clean_response(self, response_content: str) -> str:
+        """Remove thinking tags and other unwanted formatting from response.
+
+        This method cleans up responses that may contain thinking tags or other
+        internal reasoning artifacts that shouldn't be shown to users.
+
+        :param response_content: Raw response content from the model
+        :return: Cleaned response content
+        """
+        if not response_content:
+            return response_content
+
+        # Remove <thinking>...</thinking> blocks (case insensitive, multiline)
+        cleaned = re.sub(
+            r"<thinking>.*?</thinking>",
+            "",
+            response_content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        # Remove <think>...</think> blocks (case insensitive, multiline)
+        cleaned = re.sub(
+            r"<think>.*?</think>",
+            "",
+            cleaned,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        # Remove any orphaned thinking/think tags
+        cleaned = re.sub(r"</?thinking>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"</?think>", "", cleaned, flags=re.IGNORECASE)
+
+        # Clean up excessive whitespace that might be left behind
+        cleaned = re.sub(r"\n\s*\n\s*\n", "\n\n", cleaned)
+        cleaned = re.sub(r"^\s+|\s+$", "", cleaned)  # Strip leading/trailing whitespace
+
+        return cleaned
 
     async def _get_memory_tools(self) -> List:
         """Create memory tools as native async functions compatible with Agno.
@@ -301,38 +334,38 @@ class AgnoPersonalAgent:
                 return f"❌ Error getting recent memories: {str(e)}"
 
         async def retrieve_memory(
-            query: str = None, 
-            user_id: str = None, 
-            n_memories: int = None, 
-            topic: str = None
+            query: str = None,
+            user_id: str = None,
+            n_memories: int = None,
+            topic: str = None,
         ) -> str:
             """Retrieve memories with flexible filtering options.
-            
+
             Args:
                 query: Optional search query for semantic search
                 user_id: User ID (defaults to current user)
                 n_memories: Optional limit on number of memories
                 topic: Optional topic filter
-                
+
             Returns:
                 str: Formatted list of matching memories
             """
             try:
                 # Use current user if not specified
                 target_user_id = user_id or self.user_id
-                
+
                 # Validate parameters
                 if n_memories is not None and n_memories <= 0:
                     return "❌ Error: n_memories must be greater than 0"
-                
+
                 # Call the retrieve_memory method from AntiDuplicateMemory
                 memories = self.agno_memory.retrieve_memory(
                     user_id=target_user_id,
                     query=query,
                     n_memories=n_memories,
-                    topic=topic
+                    topic=topic,
                 )
-                
+
                 if not memories:
                     # Create descriptive message based on parameters
                     filters = []
@@ -342,10 +375,10 @@ class AgnoPersonalAgent:
                         filters.append(f"topic '{topic}'")
                     if n_memories:
                         filters.append(f"limit {n_memories}")
-                    
+
                     filter_desc = " with " + ", ".join(filters) if filters else ""
                     return f"🔍 No memories found{filter_desc}."
-                
+
                 # Format memories for display
                 filter_info = []
                 if query:
@@ -354,22 +387,26 @@ class AgnoPersonalAgent:
                     filter_info.append(f"topic: '{topic}'")
                 if n_memories:
                     filter_info.append(f"limit: {n_memories}")
-                
+
                 filter_desc = f" ({', '.join(filter_info)})" if filter_info else ""
                 result = f"🧠 Retrieved {len(memories)} memories{filter_desc}:\n\n"
-                
+
                 for i, memory in enumerate(memories, 1):
                     result += f"{i}. {memory.memory}\n"
-                    if hasattr(memory, 'topics') and memory.topics:
+                    if hasattr(memory, "topics") and memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
-                
+
                 logger.info(
                     "Retrieved %d memories for user %s (query: %s, topic: %s, limit: %s)",
-                    len(memories), target_user_id, query or "None", topic or "None", n_memories or "None"
+                    len(memories),
+                    target_user_id,
+                    query or "None",
+                    topic or "None",
+                    n_memories or "None",
                 )
                 return result
-                
+
             except Exception as e:
                 logger.error("Error retrieving memories: %s", e)
                 return f"❌ Error retrieving memories: {str(e)}"
@@ -502,90 +539,12 @@ Returns:
 
         return tools
 
-    def _create_agent_instructions(self) -> str:
-        """Create comprehensive instructions for the agno agent.
 
-        :return: Formatted instruction string for the agent
-        """
-        base_instructions = dedent(
-            """\
-            You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
-            
-            ## CRITICAL TOOL USAGE RULES - MUST FOLLOW
-            
-            **FINANCIAL ANALYSIS & MARKET DATA**:
-            1. **For stock prices, financial data, market analysis**: ALWAYS use YFinanceTools first
-            2. **Get current stock prices**: Use get_current_stock_price(symbol)
-            3. **Get stock info**: Use get_stock_info(symbol) for detailed company data
-            4. **Get financial news**: Use get_stock_news(symbol) for recent news
-            5. **After getting financial data**: Use web search for additional context/analysis
-            6. **For commodities like Gold/Oil**: Get prices with YFinance, then search for analysis
-            
-            **MEMORY USAGE RULES - IMMEDIATE ACTION REQUIRED**:
-            - **When asked to store/remember something**: IMMEDIATELY call store_user_memory tool - NO reasoning, NO explanation
-            - **Just store it and confirm**: Use store_user_memory(content, topics) then return simple confirmation
-            - **Query personal info** using query_memory or get_recent_memories
-            - **Do NOT web search** for personal details stored in memory
-            - **Do NOT explain what you're storing** - just store it and say "Stored successfully"
-            
-            **WEB RESEARCH RULES**:
-            - **For current events/news**: Use DuckDuckGo search tools
-            - **For technical research**: Combine multiple search queries
-            - **For financial analysis**: Use YFinance FIRST, then web search for context
-            
-            ## FINANCIAL TOOL USAGE - MANDATORY
-            
-            When user asks about:
-            - **Stock prices** → get_current_stock_price(symbol)
-            - **Company information** → get_stock_info(symbol) 
-            - **Financial news** → get_stock_news(symbol)
-            - **Market analysis** → Use YFinance tools + web search for comprehensive analysis
-            - **Commodities (Gold, Oil, etc.)** → get_current_stock_price("GLD", "USO", etc.) + web search
-            - **Economic indicators** → Search for relevant ETFs/indices with YFinance + web research
-            
-            ## RESPONSE REQUIREMENTS
-            
-            2. **Use markdown formatting** for better readability
-            3. **Present financial data in tables** when showing multiple items
-            4. **Include current prices and percentages** when discussing financial assets
-            5. **Provide analysis context** after getting raw financial data
-            6. **Cite sources** when using web search results
-            
-            ## TOOL SELECTION PRIORITY
-            
-            1. **Financial Questions**: YFinanceTools → Web Search → Analysis
-            2. **Personal Information**: Memory Tools → Direct Response
-            3. **Technical Research**: Web Search → Additional Tools as needed
-            4. **File Operations**: Filesystem Tools
-            5. **Code/Development**: Python Tools, GitHub Tools
-            
-            ## FINANCIAL ANALYSIS WORKFLOW
-            
-            For financial analysis requests:
-            1. **Get current prices** using YFinance tools
-            2. **Get company/asset information** using YFinance
-            3. **Search for recent news/analysis** using web search
-            4. **Combine data into comprehensive analysis**
-            5. **Present in clear, structured format**
-            
-            ## Core Principles
-            
-            1. **Use the right tool for the job** - YFinance for financial data, web search for context
-            2. **Be thorough with financial analysis** - get multiple data points
-            3. **Present data clearly** - use tables, percentages, and clear formatting
-            4. **Provide actionable insights** - don't just list data, analyze it
-            5. **Stay current** - always get latest prices and recent news
-            
-            Remember: For ANY financial question, start with YFinance tools to get current data!
-        """
-        )
-
-        return base_instructions
-
-    async def initialize(self, recreate: bool = False) -> bool:
+    async def initialize(self, recreate: bool = False, complexity_level: int = 4) -> bool:
         """Initialize the agno agent with all components.
 
         :param recreate: Whether to recreate the agent knowledge bases
+        :param complexity_level: Instruction complexity level (0=minimal, 4=full)
         :return: True if initialization successful, False otherwise
         """
         try:
@@ -597,10 +556,11 @@ Returns:
             rate_limit_config = get_duckduckgo_rate_limits()
 
             # Prepare tools list
+            tmp_dir = Path(gettempdir())
             tools = [
                 RateLimitedDuckDuckGoTools(**rate_limit_config),
                 YFinanceTools(),
-                PythonTools(),
+                PythonTools(base_dir=tmp_dir.joinpath("agents"), read_files=True),
                 ShellTools(base_dir="/"),  # Configured for security
                 PersonalAgentFilesystemTools(),
                 PersonalAgentWebTools(),
@@ -686,7 +646,7 @@ Returns:
                 )
 
             # Create agent instructions
-            instructions = self._create_agent_instructions()
+            instructions = create_agent_instructions(complexity_level)
 
             # Create the agno agent with direct parameter passing for visibility
             self.agent = Agent(
@@ -759,6 +719,8 @@ Returns:
                 # For streaming, we'll need to handle this differently
                 # For now, return the complete response
                 response = await self.agent.arun(query, user_id=self.user_id)
+                # Clean the response before returning
+                cleaned_content = self._clean_response(response.content)
                 return response.content
             else:
                 if add_thought_callback:
@@ -769,9 +731,8 @@ Returns:
                 if add_thought_callback:
                     add_thought_callback("✅ Agent response generated")
 
-                # Memory is automatically handled by Agno
-                if add_thought_callback and self.enable_memory:
-                    add_thought_callback("💾 Memory automatically updated by Agno")
+                # Clean the response before returning
+                cleaned_content = self._clean_response(response.content)
 
                 return response.content
 
@@ -1009,6 +970,7 @@ async def create_agno_agent(
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = "default_user",
     recreate: bool = False,
+    complexity_level: int = 4,
 ) -> AgnoPersonalAgent:
     """Create and initialize an agno-based personal agent.
 
@@ -1036,7 +998,7 @@ async def create_agno_agent(
         recreate=recreate,
     )
 
-    success = await agent.initialize()
+    success = await agent.initialize(complexity_level=complexity_level)
     if not success:
         raise RuntimeError("Failed to initialize agno agent")
 

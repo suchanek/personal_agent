@@ -164,6 +164,8 @@ def create_combined_knowledge_base(
             table_name="text_knowledge",
             search_type=SearchType.hybrid,
             embedder=embedder,
+            # Configure Lance parameters to suppress warnings
+            nprobes=10,  # Set default nprobes to avoid warning
         )
 
         text_kb = TextKnowledgeBase(
@@ -181,6 +183,8 @@ def create_combined_knowledge_base(
             table_name="pdf_knowledge",
             search_type=SearchType.hybrid,
             embedder=embedder,
+            # Configure Lance parameters to suppress warnings
+            nprobes=10,  # Set default nprobes to avoid warning
         )
 
         pdf_kb = PDFKnowledgeBase(
@@ -197,6 +201,8 @@ def create_combined_knowledge_base(
             table_name="combined_knowledge",
             search_type=SearchType.hybrid,
             embedder=embedder,
+            # Configure Lance parameters to suppress warnings
+            nprobes=10,  # Set default nprobes to avoid warning
         )
 
         combined_kb = CombinedKnowledgeBase(

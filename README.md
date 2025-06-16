@@ -405,6 +405,36 @@ All tools integrate with the persistent memory system:
 - **Semantic Search**: Vector-based retrieval of relevant information
 - **Topic Organization**: Categorized storage for better organization
 
+#### Memory Tools Available
+
+The agent includes 4 powerful memory tools:
+
+1. **`store_user_memory`** - Store new information with topic categorization
+2. **`query_memory`** - Semantic search across stored memories
+3. **`get_recent_memories`** - Retrieve most recent memories chronologically
+4. **`retrieve_memory`** - Advanced flexible memory retrieval with filtering
+
+**Advanced Memory Retrieval (`retrieve_memory`)**:
+- **Flexible Parameters**: Supports query, topic filtering, and result limits
+- **Smart Search Logic**: Uses semantic search when query provided, recent memories otherwise
+- **Topic Filtering**: Case-insensitive matching in both metadata and content
+- **Parameter Combinations**: Supports all combinations like `query + topic + limit`
+
+Example usage patterns:
+```python
+# Semantic search with topic filter and limit
+retrieve_memory(query="work", topic="career", n_memories=5)
+
+# All memories about a specific topic
+retrieve_memory(topic="food")
+
+# Recent memories with limit
+retrieve_memory(n_memories=10)
+
+# Pure semantic search
+retrieve_memory(query="preferences")
+```
+
 ## 🗂️ Legacy Implementations
 
 The project includes alternative implementations that are being phased out in favor of the Agno framework:
