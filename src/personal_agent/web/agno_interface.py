@@ -8,20 +8,36 @@ straightforward design focused on query input and response display.
 
 import asyncio
 import logging
+import sys
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import streamlit as st
 
-from ..config.settings import USER_ID
-from ..core.memory import is_memory_connected
-from ..utils.pag_logging import setup_logging
+# Add the src directory to the path for imports
+current_dir = Path(__file__).parent
+src_dir = current_dir.parent.parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+try:
+    from personal_agent.config.settings import USER_ID
+    from personal_agent.core.memory import is_memory_connected
+    from personal_agent.utils.pag_logging import setup_logging
+except ImportError:
+    # Fallback for relative imports
+    from ..config.settings import USER_ID
+    from ..core.memory import is_memory_connected
+    from ..utils.pag_logging import setup_logging
 
 if TYPE_CHECKING:
     from logging import Logger
-
-    from ..core.agno_agent import AgnoPersonalAgent
+    try:
+        from personal_agent.core.agno_agent import AgnoPersonalAgent
+    except ImportError:
+        from ..core.agno_agent import AgnoPersonalAgent
 
 # Global variables
 logger: "Logger" = setup_logging()
@@ -234,11 +250,78 @@ def main():
     )
 
     # Check if agent is initialized (prefer session state, fallback to global)
+    global agno_agent
     current_agent = st.session_state.get('agno_agent', agno_agent)
     if current_agent is None:
-        st.error("⚠️ Agent not initialized. Please start the agent first.")
-        st.info("Run the agent using: `python -m personal_agent.agno_main --web`")
-        return
+        # Try to initialize the agent if running directly
+        st.info("🔄 Initializing agent...")
+        try:
+            # Import the agent creation function
+            try:
+                from personal_agent.core.agno_agent import create_agno_agent
+                from personal_agent.config.settings import (
+                    LLM_MODEL, USE_MCP, AGNO_STORAGE_DIR, 
+                    AGNO_KNOWLEDGE_DIR, OLLAMA_URL
+                )
+            except ImportError:
+                from ..core.agno_agent import create_agno_agent
+                from ..config.settings import (
+                    LLM_MODEL, USE_MCP, AGNO_STORAGE_DIR, 
+                    AGNO_KNOWLEDGE_DIR, OLLAMA_URL
+                )
+            
+            # Initialize the agent
+            with st.spinner("Creating agno agent..."):
+                async def init_agent():
+                    agent = await create_agno_agent(
+                        model_provider="ollama",
+                        model_name=LLM_MODEL,
+                        enable_memory=True,
+                        enable_mcp=USE_MCP,
+                        storage_dir=AGNO_STORAGE_DIR,
+                        knowledge_dir=AGNO_KNOWLEDGE_DIR,
+                        debug=True,
+                        user_id=USER_ID,
+                        ollama_base_url=OLLAMA_URL,
+                        complexity_level=4,
+                    )
+                    return agent
+                
+                # Run the async initialization
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    current_agent = loop.run_until_complete(init_agent())
+                finally:
+                    loop.close()
+                
+                # Store in session state and globals
+                st.session_state.agno_agent = current_agent
+                agno_agent = current_agent
+                
+                # Create dummy memory functions for compatibility
+                async def dummy_query_kb(query: str) -> str:
+                    return "Memory handled by Agno"
+                
+                async def dummy_store_interaction(query: str, response: str) -> bool:
+                    return True
+                
+                async def dummy_clear_kb() -> bool:
+                    return True
+                
+                # Store memory functions
+                st.session_state.query_knowledge_base_func = dummy_query_kb
+                st.session_state.store_interaction_func = dummy_store_interaction
+                st.session_state.clear_knowledge_base_func = dummy_clear_kb
+                
+                st.success("✅ Agent initialized successfully!")
+                st.rerun()
+                
+        except Exception as e:
+            st.error(f"❌ Failed to initialize agent: {str(e)}")
+            st.info("Please run the agent using: `python -m personal_agent.agno_main --web`")
+            st.info("Or ensure all dependencies are properly installed.")
+            return
     
     # Ensure session state has the agent
     if 'agno_agent' not in st.session_state:
