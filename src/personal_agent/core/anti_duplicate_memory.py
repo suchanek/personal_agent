@@ -17,11 +17,12 @@ from typing import Dict, List, Optional, Union
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from agno.memory.v2.db.base import MemoryDb
-from agno.memory.v2.memory import Memory
+from agno.memory.v2.memory import Memory, MemoryManager
 from agno.memory.v2.schema import UserMemory
 from agno.models.base import Model
+from agno.models.ollama import Ollama
 
-from personal_agent.config import USER_ID
+from personal_agent.config import AGNO_STORAGE_DIR, OLLAMA_URL, USER_ID
 from personal_agent.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -141,10 +142,10 @@ class AntiDuplicateMemory(Memory):
     def _calculate_semantic_threshold(self, memory1: str, memory2: str) -> float:
         """
         Calculate the appropriate semantic similarity threshold based on memory content.
-        
+
         This method analyzes the content of both memories to determine the most
         appropriate threshold for semantic duplicate detection.
-        
+
         :param memory1: First memory text (cleaned/lowercased)
         :param memory2: Second memory text (cleaned/lowercased)
         :return: Similarity threshold to use for these memories
@@ -153,40 +154,56 @@ class AntiDuplicateMemory(Memory):
         if self._is_structured_test_data(memory1, memory2):
             # For structured test data, use a much higher threshold to avoid false positives
             return 0.95
-        
+
         # Check for preference-related memories that might be legitimately similar
         # but represent different preferences (e.g., "prefers tea" vs "likes tea")
         preference_indicators = [
-            "prefer", "like", "enjoy", "love", "hate", "dislike",
-            "favorite", "favourite", "best", "worst"
+            "prefer",
+            "like",
+            "enjoy",
+            "love",
+            "hate",
+            "dislike",
+            "favorite",
+            "favourite",
+            "best",
+            "worst",
         ]
-        
+
         has_preferences = any(
-            indicator in memory1 or indicator in memory2 
+            indicator in memory1 or indicator in memory2
             for indicator in preference_indicators
         )
-        
+
         if has_preferences:
             # For preference-related memories, use a lower threshold to catch
             # semantic duplicates like "prefers tea" and "likes tea"
             return 0.65
-        
+
         # Check for factual statements that might have similar structure
         # but different content (e.g., "works in tech" vs "works in finance")
         factual_indicators = [
-            "works", "lives", "has", "owns", "studies", "graduated",
-            "born", "married", "single", "divorced"
+            "works",
+            "lives",
+            "has",
+            "owns",
+            "studies",
+            "graduated",
+            "born",
+            "married",
+            "single",
+            "divorced",
         ]
-        
+
         has_factual_content = any(
             indicator in memory1 or indicator in memory2
             for indicator in factual_indicators
         )
-        
+
         if has_factual_content:
             # For factual content, use a moderate threshold
             return 0.75
-        
+
         # Default threshold - use the configured similarity threshold but cap at 85%
         return min(0.85, self.similarity_threshold)
 
@@ -207,25 +224,27 @@ class AntiDuplicateMemory(Memory):
             "enjoys activity",
             "fact number",
         ]
-        
+
         # Check if both memories contain test patterns
         for pattern in test_patterns:
             if pattern in memory1 and pattern in memory2:
                 # Check if they differ by small numeric or single character differences
                 # This indicates structured test data with incremental values
                 import re
-                
+
                 # Extract numbers from both memories
-                numbers1 = re.findall(r'\d+', memory1)
-                numbers2 = re.findall(r'\d+', memory2)
-                
+                numbers1 = re.findall(r"\d+", memory1)
+                numbers2 = re.findall(r"\d+", memory2)
+
                 # If they have the same number of numeric values but different values,
                 # this is likely structured test data
-                if (len(numbers1) == len(numbers2) and 
-                    len(numbers1) > 0 and 
-                    numbers1 != numbers2):
+                if (
+                    len(numbers1) == len(numbers2)
+                    and len(numbers1) > 0
+                    and numbers1 != numbers2
+                ):
                     return True
-                    
+
         return False
 
     def _contains_multiple_facts(self, memory_text: str) -> bool:
@@ -444,7 +463,7 @@ class AntiDuplicateMemory(Memory):
             if self.debug_mode:
                 print(f"🚫 REJECTED: {reason}")
                 print(f"   Memory: '{memory.memory}'")
-            
+
             # Return a fake success ID to prevent agent confusion
             # The memory wasn't actually stored, but from the agent's perspective,
             # the desired state (memory exists) is achieved
@@ -575,15 +594,15 @@ class AntiDuplicateMemory(Memory):
             return False
 
     def retrieve_memory(
-        self, 
-        user_id: str, 
-        query: Optional[str] = None, 
-        n_memories: Optional[int] = None, 
-        topic: Optional[str] = None
+        self,
+        user_id: str,
+        query: Optional[str] = None,
+        n_memories: Optional[int] = None,
+        topic: Optional[str] = None,
     ) -> List[UserMemory]:
         """
         Retrieve memories with flexible filtering options.
-        
+
         :param user_id: User ID to retrieve memories for
         :param query: Optional search query for semantic search
         :param n_memories: Optional limit on number of memories (if None, returns all)
@@ -598,47 +617,53 @@ class AntiDuplicateMemory(Memory):
                     user_id=user_id,
                     query=query,
                     retrieval_method="agentic",
-                    limit=n_memories or 1000  # Use n_memories as limit, default to large number
+                    limit=n_memories
+                    or 1000,  # Use n_memories as limit, default to large number
                 )
             else:
                 # Use recent memories when no query provided
                 memories = self.search_user_memories(
                     user_id=user_id,
-                    limit=n_memories or 1000,  # Use n_memories as limit, default to large number
-                    retrieval_method="last_n"
+                    limit=n_memories
+                    or 1000,  # Use n_memories as limit, default to large number
+                    retrieval_method="last_n",
                 )
-            
+
             # Filter by topic if specified
             if topic:
                 filtered_memories = []
                 for memory in memories:
                     # Check if memory has topics and if the specified topic is in them
-                    if hasattr(memory, 'topics') and memory.topics:
+                    if hasattr(memory, "topics") and memory.topics:
                         # Handle case where topics might be a string or list
                         memory_topics = memory.topics
                         if isinstance(memory_topics, str):
                             memory_topics = [memory_topics]
-                        
+
                         # Case-insensitive topic matching
                         if any(topic.lower() in t.lower() for t in memory_topics):
                             filtered_memories.append(memory)
                     # Also check if topic appears in the memory content itself
                     elif topic.lower() in memory.memory.lower():
                         filtered_memories.append(memory)
-                
+
                 memories = filtered_memories
-            
+
             # Apply n_memories limit if specified and we haven't already limited
             if n_memories and len(memories) > n_memories:
                 memories = memories[:n_memories]
-            
+
             logger.info(
                 "Retrieved %d memories for user %s (query: %s, topic: %s, limit: %s)",
-                len(memories), user_id, query or "None", topic or "None", n_memories or "None"
+                len(memories),
+                user_id,
+                query or "None",
+                topic or "None",
+                n_memories or "None",
             )
-            
+
             return memories
-            
+
         except Exception as e:
             logger.error("Error retrieving memories for user %s: %s", user_id, e)
             return []
@@ -795,14 +820,28 @@ def main():
     )
 
     # Create AntiDuplicateMemory instance
-    anti_dup_memory = AntiDuplicateMemory(
+    _anti_dup_memory = AntiDuplicateMemory(
         db=memory_db,
         similarity_threshold=0.8,
         enable_semantic_dedup=True,
         enable_exact_dedup=True,
         debug_mode=True,
     )
-
+    # fake this for now to try it.
+    anti_dup_memory = Memory(
+        db=memory_db,
+        memory_manager=MemoryManager(
+            memory_capture_instructions="""\
+                            Collect User's name,
+                            Collect Information about user's passion and hobbies,
+                            Collect Information about the users likes and dislikes,
+                            Collect information about what the user is doing with their life right now
+                            Collect information about what matters to the user
+                        """,
+            # model=Gemini(id="gemini-2.0-flash"),
+            model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
+        ),
+    )
     try:
         # Get list of all users
         all_memories = memory_db.read_memories()

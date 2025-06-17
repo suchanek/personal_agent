@@ -18,13 +18,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 # Import from the correct path
 from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, USER_ID
 
+db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
+
 # Initialize session state
 if "agent" not in st.session_state:
     # Set up storage and memory
     agent_storage = SqliteStorage(
         table_name="agent_sessions", db_file="/tmp/persistent_memory.db"
     )
-    memory_db = SqliteMemoryDb(table_name="memory", db_file="/tmp/memory.db")
+    memory_db = SqliteMemoryDb(table_name="personal_agent_memory", db_file=str(db_path))
 
     memory = Memory(
         db=memory_db,

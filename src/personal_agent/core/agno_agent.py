@@ -6,6 +6,8 @@ with the existing MCP infrastructure while leveraging agno's enhanced capabiliti
 including native MCP support, async operations, and advanced agent features.
 """
 
+# pylint disable=C0413
+
 import asyncio
 import os
 import re
@@ -20,6 +22,9 @@ if "OLLAMA_DEBUG" not in os.environ:
 
 from agno.agent import Agent
 from agno.knowledge.combined import CombinedKnowledgeBase
+from agno.memory.v2.db.sqlite import SqliteMemoryDb
+from agno.memory.v2.manager import MemoryManager
+from agno.memory.v2.memory import Memory
 from agno.models.ollama import Ollama, OllamaTools
 from agno.models.openai import OpenAIChat
 from mcp import ClientSession, StdioServerParameters
@@ -27,12 +32,20 @@ from mcp.client.stdio import stdio_client
 from rich.console import Console
 from rich.table import Table
 
+from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
 
-from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..config import (
+    AGNO_STORAGE_DIR,
+    LLM_MODEL,
+    OLLAMA_URL,
+    USE_MCP,
+    USER_ID,
+    get_mcp_servers,
+)
 from ..config.rate_limiting import get_duckduckgo_rate_limits
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
@@ -100,6 +113,195 @@ class AgnoPersonalAgent:
         self.agno_storage = None
         self.agno_knowledge = None
         self.agno_memory = None
+
+        # MCP configuration
+        self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
+
+        # Agent instance
+        self.agent = Agent(
+            name="Personal AI Friend",
+            model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
+            user_id=USER_ID,  # Specify the user_id for memory management
+            tools=[GoogleSearchTools(), YFinanceTools()],
+            add_history_to_messages=True,
+            num_history_responses=3,
+            add_datetime_to_instructions=True,
+            markdown=True,
+            memory=self.agno_memory,
+            knowledge=self.agno_knowledge,
+            enable_agentic_memory=True,
+            enable_user_memories=True,
+            instructions=dedent(
+                f"""
+            You are a personal AI friend of the user, your purpose is to chat with the user about things and make them feel good.
+            The user you are talking to is: {USER_ID}
+            First introduce yourself and greet them by their user ID, then ask about themselves, their hobbies, what they like to do and what they like to talk about.
+            If they ask for more information use Google Search tool to find latest information about things in the conversations.
+            Store these memories for later recall.
+            """
+            ),
+            debug_mode=True,
+        )
+
+    def _create_model(self) -> Union[OpenAIChat, Ollama]:
+        """Create the appropriate model instance based on provider.
+
+        :return: Configured model instance
+        :raises ValueError: If unsupported model provider is specified
+        """
+        if self.model_provider == "openai":
+            return OpenAIChat(id=self.model_name)
+        elif self.model_provider == "ollama":
+            return Ollama(
+                id=self.model_name,
+                host=self.ollama_base_url,
+                # Simplified configuration - use options dict for model parameters
+                options={
+                    "temperature": 0.7,
+                    "num_predict": 2048,  # max_tokens equivalent
+                    "top_p": 0.9,
+                    "num_ctx": 4096,  # context window
+                },
+                # Connection and reliability settings
+                timeout=60.0,  # Request timeout (seconds)
+                keep_alive="5m",  # Keep model loaded for 5 minutes
+                # Client configuration
+                client_params={
+                    "verify": False,  # Skip SSL verification for local Ollama
+                    "timeout": 60,  # Client-level timeout
+                },
+            )
+        else:
+            raise ValueError(f"Unsupported model provider: {self.model_provider}")
+
+        return None
+
+    def initialize(self, recreate: bool = False, complexity_level: int = 4) -> bool:
+        """Initialize the agno agent with all components.
+
+        :param recreate: Whether to recreate the agent knowledge bases
+        :param complexity_level: Instruction complexity level (0=minimal, 4=full)
+        :return: True if initialization successful, False otherwise
+        """
+        # Memory layer
+
+        db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
+        memory_db = SqliteMemoryDb(
+            table_name="personal_agent_memory", db_file=str(db_path)
+        )
+
+        self.agno_memory = Memory(
+            db=memory_db,
+            memory_manager=MemoryManager(
+                memory_capture_instructions="""\
+                            Collect User's name,
+                            Collect Information about user's passion and hobbies,
+                            Collect Information about the users likes and dislikes,
+                            Collect information about what the user is doing with their life right now
+                            Collect information about what matters to the user
+                        """,
+                # model=Gemini(id="gemini-2.0-flash"),
+                model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
+            ),
+        )
+        # Agno native storage components
+        self.agno_storage = create_agno_storage(self.storage_dir)
+        self.agno_knowledge = create_combined_knowledge_base(self.storage_dir)
+
+        # MCP configuration
+        self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
+
+        # Agent instance
+        self.agent = Agent(
+            name="Personal AI Friend",
+            model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
+            user_id=USER_ID,  # Specify the user_id for memory management
+            tools=[GoogleSearchTools(), YFinanceTools()],
+            add_history_to_messages=True,
+            num_history_responses=3,
+            add_datetime_to_instructions=True,
+            markdown=True,
+            memory=self.agno_memory,
+            knowledge=self.agno_knowledge,
+            enable_agentic_memory=True,
+            enable_user_memories=True,
+            instructions=dedent(
+                f"""
+            You are a personal AI friend of the user, your purpose is to chat with the user about things and make them feel good.
+            The user you are talking to is: {USER_ID}
+            First introduce yourself and greet them by their user ID, then ask about themselves, their hobbies, what they like to do and what they like to talk about.
+            If they ask for more information use Google Search tool to find latest information about things in the conversations.
+            Store these memories for later recall.
+            """
+            ),
+            debug_mode=True,
+        )
+
+        if self.agno_knowledge:
+            load_agent_knowledge(self.agno_knowledge, recreate=recreate)
+
+        logger.info(
+            "Initialized AgnoPersonalAgent with model=%s, memory=%s, mcp=%s, user_id=%s",
+            f"{self.model_provider}:{self.model_name}",
+            self.enable_memory,
+            self.enable_mcp,
+            self.user_id,
+        )
+
+        return self.agent
+
+
+# end of class
+
+
+# backup original class
+class _AgnoPersonalAgent:
+    """
+    Agno-based Personal AI Agent with MCP integration and native storage.
+
+    This class provides a modern async agent implementation using the agno framework
+    with built-in SQLite storage and LanceDB knowledge base.
+    """
+
+    def __init__(
+        self,
+        model_provider: str = "ollama",
+        model_name: str = LLM_MODEL,
+        enable_memory: bool = True,
+        enable_mcp: bool = True,
+        storage_dir: str = "./data/agno",
+        knowledge_dir: str = "./data/knowledge",
+        debug: bool = False,
+        ollama_base_url: str = OLLAMA_URL,
+        user_id: str = "default_user",
+        recreate: bool = False,
+    ) -> None:
+        """Initialize the Agno Personal Agent.
+
+        :param model_provider: LLM provider ('ollama' or 'openai')
+        :param model_name: Model name to use
+        :param enable_memory: Whether to enable memory and knowledge features
+        :param enable_mcp: Whether to enable MCP tool integration
+        :param storage_dir: Directory for Agno storage files
+        :param knowledge_dir: Directory containing knowledge files to load
+        :param debug: Enable debug logging and tool call visibility
+        :param ollama_base_url: Base URL for Ollama API
+        :param user_id: User identifier for memory operations
+        """
+        self.model_provider = model_provider
+        self.model_name = model_name
+        self.enable_memory = enable_memory
+        self.enable_mcp = enable_mcp and USE_MCP
+        self.storage_dir = storage_dir
+        self.knowledge_dir = knowledge_dir
+        self.debug = debug
+        self.ollama_base_url = ollama_base_url
+        self.user_id = user_id
+
+        # Agno native storage components
+        self.agno_storage = create_agno_storage(self.storage_dir)
+        self.agno_knowledge = create_combined_knowledge_base()
+        self.agno_memory = create_agno_memory(self.storage_dir)
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -539,8 +741,9 @@ Returns:
 
         return tools
 
-
-    async def initialize(self, recreate: bool = False, complexity_level: int = 4) -> bool:
+    async def initialize(
+        self, recreate: bool = False, complexity_level: int = 4
+    ) -> bool:
         """Initialize the agno agent with all components.
 
         :param recreate: Whether to recreate the agent knowledge bases
@@ -1102,7 +1305,7 @@ def create_simple_personal_agent(
     return agent, knowledge_base
 
 
-async def load_agent_knowledge(
+async def aload_agent_knowledge(
     knowledge_base: CombinedKnowledgeBase, recreate: bool = False
 ) -> None:
     """Load knowledge base content asynchronously.
@@ -1115,6 +1318,24 @@ async def load_agent_knowledge(
     """
     if knowledge_base:
         await load_combined_knowledge_base(knowledge_base, recreate=recreate)
+        logger.info("✅ Knowledge base loaded successfully")
+    else:
+        logger.info("No knowledge base to load")
+
+
+def load_agent_knowledge(
+    knowledge_base: CombinedKnowledgeBase, recreate: bool = False
+) -> None:
+    """Load knowledge base content synchronously.
+
+    This should be called after creating the agent to load the knowledge content.
+
+    :param knowledge_base: Knowledge base instance to load
+    :param recreate: Whether to recreate the knowledge base from scratch
+    :return: None
+    """
+    if knowledge_base:
+        load_combined_knowledge_base(knowledge_base, recreate=recreate)
         logger.info("✅ Knowledge base loaded successfully")
     else:
         logger.info("No knowledge base to load")

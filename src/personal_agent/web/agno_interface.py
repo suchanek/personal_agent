@@ -34,6 +34,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from logging import Logger
+
     try:
         from personal_agent.core.agno_agent import AgnoPersonalAgent
     except ImportError:
@@ -66,9 +67,9 @@ def initialize_agent(
     query_knowledge_base_func = query_kb_func
     store_interaction_func = store_int_func
     clear_knowledge_base_func = clear_kb_func
-    
+
     # Store in Streamlit session state for proper access
-    if hasattr(st, 'session_state'):
+    if hasattr(st, "session_state"):
         st.session_state.agno_agent = agent
         st.session_state.query_knowledge_base_func = query_kb_func
         st.session_state.store_interaction_func = store_int_func
@@ -108,8 +109,8 @@ def run_async_in_thread(coroutine):
     thread.start()
     thread.join(timeout=60)  # 60 second timeout
 
-    if result_container["error"]:
-        error = result_container["error"]
+    error = result_container["error"]
+    if error is not None:
         if isinstance(error, Exception):
             raise error
         else:
@@ -251,27 +252,34 @@ def main():
 
     # Check if agent is initialized (prefer session state, fallback to global)
     global agno_agent
-    current_agent = st.session_state.get('agno_agent', agno_agent)
+    current_agent = st.session_state.get("agno_agent", agno_agent)
     if current_agent is None:
         # Try to initialize the agent if running directly
         st.info("🔄 Initializing agent...")
         try:
             # Import the agent creation function
             try:
-                from personal_agent.core.agno_agent import create_agno_agent
                 from personal_agent.config.settings import (
-                    LLM_MODEL, USE_MCP, AGNO_STORAGE_DIR, 
-                    AGNO_KNOWLEDGE_DIR, OLLAMA_URL
+                    AGNO_KNOWLEDGE_DIR,
+                    AGNO_STORAGE_DIR,
+                    LLM_MODEL,
+                    OLLAMA_URL,
+                    USE_MCP,
                 )
+                from personal_agent.core.agno_agent import create_agno_agent
             except ImportError:
-                from ..core.agno_agent import create_agno_agent
                 from ..config.settings import (
-                    LLM_MODEL, USE_MCP, AGNO_STORAGE_DIR, 
-                    AGNO_KNOWLEDGE_DIR, OLLAMA_URL
+                    AGNO_KNOWLEDGE_DIR,
+                    AGNO_STORAGE_DIR,
+                    LLM_MODEL,
+                    OLLAMA_URL,
+                    USE_MCP,
                 )
-            
+                from ..core.agno_agent import create_agno_agent
+
             # Initialize the agent
             with st.spinner("Creating agno agent..."):
+
                 async def init_agent():
                     agent = await create_agno_agent(
                         model_provider="ollama",
@@ -286,7 +294,7 @@ def main():
                         complexity_level=4,
                     )
                     return agent
-                
+
                 # Run the async initialization
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -294,37 +302,39 @@ def main():
                     current_agent = loop.run_until_complete(init_agent())
                 finally:
                     loop.close()
-                
+
                 # Store in session state and globals
                 st.session_state.agno_agent = current_agent
                 agno_agent = current_agent
-                
+
                 # Create dummy memory functions for compatibility
                 async def dummy_query_kb(query: str) -> str:
                     return "Memory handled by Agno"
-                
+
                 async def dummy_store_interaction(query: str, response: str) -> bool:
                     return True
-                
+
                 async def dummy_clear_kb() -> bool:
                     return True
-                
+
                 # Store memory functions
                 st.session_state.query_knowledge_base_func = dummy_query_kb
                 st.session_state.store_interaction_func = dummy_store_interaction
                 st.session_state.clear_knowledge_base_func = dummy_clear_kb
-                
+
                 st.success("✅ Agent initialized successfully!")
                 st.rerun()
-                
+
         except Exception as e:
             st.error(f"❌ Failed to initialize agent: {str(e)}")
-            st.info("Please run the agent using: `python -m personal_agent.agno_main --web`")
+            st.info(
+                "Please run the agent using: `python -m personal_agent.agno_main --web`"
+            )
             st.info("Or ensure all dependencies are properly installed.")
             return
-    
+
     # Ensure session state has the agent
-    if 'agno_agent' not in st.session_state:
+    if "agno_agent" not in st.session_state:
         st.session_state.agno_agent = current_agent
 
     # Initialize session state
@@ -394,7 +404,9 @@ def main():
             st.rerun()
 
         if st.button("🧠 Clear Memory", use_container_width=True):
-            clear_func = st.session_state.get('clear_knowledge_base_func', clear_knowledge_base_func)
+            clear_func = st.session_state.get(
+                "clear_knowledge_base_func", clear_knowledge_base_func
+            )
             if clear_func:
                 try:
                     with st.spinner("Clearing memory..."):
@@ -409,6 +421,87 @@ def main():
             st.session_state.session_id = str(uuid.uuid4())
             st.session_state.messages = []
             st.rerun()
+
+        if st.button("🧠 Show All Memories", use_container_width=True):
+            if current_agent and hasattr(current_agent, "agno_memory"):
+                try:
+                    with st.spinner("Retrieving memories..."):
+                        # Debug: Check what we're working with
+                        st.write(f"**Debug Info:**")
+                        st.write(f"- Agent type: {type(current_agent)}")
+                        st.write(f"- Memory type: {type(current_agent.agno_memory)}")
+                        st.write(f"- User ID: {USER_ID}")
+                        
+                        # Get memories for the specific user using the native memory manager
+                        memories = current_agent.agno_memory.get_user_memories(
+                            user_id=USER_ID
+                        )
+                        
+                        # Debug: Show what we got
+                        st.write(f"- Retrieved memories count: {len(memories) if memories else 0}")
+                        st.write(f"- Memory types: {[type(m) for m in memories] if memories else 'None'}")
+                        
+                        # Debug: Check the database directly
+                        try:
+                            all_memory_rows = current_agent.agno_memory.db.read_memories()
+                            st.write(f"- Total memories in DB: {len(all_memory_rows)}")
+                            if all_memory_rows:
+                                user_ids = list(set(row.user_id for row in all_memory_rows if row.user_id))
+                                st.write(f"- User IDs in DB: {user_ids}")
+                                # Show first few memories for debugging
+                                st.write("**First 3 memories in DB:**")
+                                for i, row in enumerate(all_memory_rows[:3]):
+                                    st.write(f"  {i+1}. User: {row.user_id}, Memory: {str(row.memory)[:100]}...")
+                        except Exception as db_e:
+                            st.write(f"- DB query error: {str(db_e)}")
+
+                    if memories:
+                        st.subheader("📚 Stored Memories")
+                        for i, memory in enumerate(memories, 1):
+                            # Handle memory content - UserMemory objects have direct attributes
+                            memory_content = getattr(memory, "memory", "No content")
+                            if not memory_content:
+                                memory_content = "No content"
+
+                            # Create expandable section with truncated title
+                            title_preview = (
+                                memory_content[:50] + "..."
+                                if len(memory_content) > 50
+                                else memory_content
+                            )
+
+                            with st.expander(f"Memory {i}: {title_preview}"):
+                                st.write(f"**Content:** {memory_content}")
+
+                                # Display additional memory attributes if available
+                                memory_id = getattr(memory, "memory_id", "N/A")
+                                if memory_id != "N/A":
+                                    st.write(f"**Memory ID:** {memory_id}")
+
+                                last_updated = getattr(memory, "last_updated", "N/A")
+                                if last_updated != "N/A":
+                                    st.write(f"**Last Updated:** {last_updated}")
+
+                                input_text = getattr(memory, "input", "N/A")
+                                if input_text != "N/A":
+                                    st.write(f"**Input:** {input_text}")
+
+                                topics = getattr(memory, "topics", [])
+                                if topics:
+                                    st.write(f"**Topics:** {', '.join(topics)}")
+                    else:
+                        st.info(
+                            "📝 No memories stored yet. Start chatting to create some memories!"
+                        )
+
+                except Exception as e:
+                    st.error(f"❌ Error retrieving memories: {str(e)}")
+                    if logger:
+                        logger.error(f"Error retrieving memories: {str(e)}")
+            else:
+                st.warning(
+                    "⚠️ Agno memory system not available or agent not properly initialized"
+                )
 
         st.divider()
 
@@ -495,12 +588,12 @@ def main():
                     )
 
                     # Store interaction in memory if available
-                    store_func = st.session_state.get('store_interaction_func', store_interaction_func)
+                    store_func = st.session_state.get(
+                        "store_interaction_func", store_interaction_func
+                    )
                     if store_func:
                         try:
-                            run_async_in_thread(
-                                store_func(prompt, response)
-                            )
+                            run_async_in_thread(store_func(prompt, response))
                             if logger:
                                 logger.info("Interaction stored in memory")
                         except Exception as e:
