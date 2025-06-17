@@ -35,14 +35,17 @@ from .utils import (
 )
 
 # Import agno web interface (Streamlit-based)
-from .web.agno_interface import initialize_agent, main as streamlit_main
+from .web.agno_interface import initialize_agent
+from .web.agno_interface import main as streamlit_main
 
 # Global variables for cleanup
 agno_agent: Optional[AgnoPersonalAgent] = None
 logger: Optional[logging.Logger] = setup_logging()
 
 
-async def initialize_agno_system(use_remote_ollama: bool = False, complexity_level: int = 4):
+async def initialize_agno_system(
+    use_remote_ollama: bool = False, complexity_level: int = 4
+):
     """
     Initialize all system components for agno framework.
 
@@ -125,7 +128,7 @@ def run_agno_web(use_remote_ollama: bool = False):
     """
     import subprocess
     import sys
-    
+
     # Set up Rich logging for all components including agno
     configure_all_rich_logging()
     logger_instance = setup_logging()
@@ -162,23 +165,32 @@ def run_agno_web(use_remote_ollama: bool = False):
 
     # Run Streamlit
     try:
-        subprocess.run([
-            sys.executable, "-m", "streamlit", "run", 
-            __file__.replace("agno_main.py", "web/agno_interface.py"),
-            "--server.port", "8501",
-            "--server.address", "localhost"
-        ])
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "streamlit",
+                "run",
+                __file__.replace("agno_main.py", "web/agno_interface.py"),
+                "--server.port",
+                "8501",
+                "--server.address",
+                "localhost",
+            ]
+        )
     except KeyboardInterrupt:
         print("\n👋 Shutting down...")
     except Exception as e:
         logger_instance.error(f"Error running Streamlit: {e}")
         print(f"Error: {e}")
         print("You can also run the interface directly with:")
-        print(f"streamlit run {__file__.replace('agno_main.py', 'web/agno_interface.py')}")
+        print(
+            f"streamlit run {__file__.replace('agno_main.py', 'web/agno_interface.py')}"
+        )
 
 
 async def run_agno_cli(
-    query: str = None, 
+    query: str = None,
     use_remote_ollama: bool = False,
     show_reasoning: bool = False,
     stream: bool = True,
@@ -202,12 +214,14 @@ async def run_agno_cli(
         print("🖥️  Using remote Ollama at: http://tesla.local:11434")
     else:
         print("🖥️  Using local Ollama at: http://localhost:11434")
-    
+
     # Display response configuration
     print(f"🧠 Show reasoning: {'✅' if show_reasoning else '❌'}")
     print(f"📡 Streaming: {'✅' if stream else '❌'}")
     print(f"🔄 Stream steps: {'✅' if stream_steps else '❌'}")
-    print(f"📝 Instruction level: {instruction_level} ({'minimal' if instruction_level == 0 else 'basic' if instruction_level == 1 else 'moderate' if instruction_level == 2 else 'complex' if instruction_level == 3 else 'full'})")
+    print(
+        f"📝 Instruction level: {instruction_level} ({'minimal' if instruction_level == 0 else 'basic' if instruction_level == 1 else 'moderate' if instruction_level == 2 else 'complex' if instruction_level == 3 else 'full'})"
+    )
 
     # Initialize system
     agent, query_kb, store_int, clear_kb = await initialize_agno_system(
@@ -221,13 +235,10 @@ async def run_agno_cli(
 
     print("\nEnter your queries (type 'quit' to exit):")
     if query is not None:
-        response = await agent.agent.arun(query)
-        print(f"🤖 Assistant: {response}")
-        try:
-            await agent.cleanup()
-        except Exception as e:
-            print(f"Warning during cleanup: {e}")
-
+        # response = await agent.agent.arun(query)
+        print(f"🤖 Assistant:")
+        await agent.aprint_response(query, stream=stream, show_full_reasoning=True)
+        # print(f"🤖 Assistant: {response}")
         return
 
     try:
@@ -238,8 +249,6 @@ async def run_agno_cli(
 
             if not query:
                 continue
-
-            print("🤖 Assistant: ")
             try:
                 if show_reasoning:
                     # Use agno's async print_response with full reasoning
@@ -251,9 +260,8 @@ async def run_agno_cli(
                     )
                 else:
                     # Get response and clean it to remove thinking tags
-                    response = await agent.agent.arun(query, user_id=agent.user_id)
-                    cleaned_response = agent._clean_response(response.content)
-                    print(cleaned_response)
+                    print("🤖 Assistant: ")
+                    await agent.agent.aprint_response(query, user_id=agent.user_id)
 
                 # Memory is handled automatically by Agno - no manual storage needed
 
@@ -262,11 +270,6 @@ async def run_agno_cli(
 
     except KeyboardInterrupt:
         print("\n\n👋 Goodbye!")
-    finally:
-        try:
-            await agent.cleanup()
-        except Exception as e:
-            print(f"Warning during cleanup: {e}")
 
 
 def cli_main():
@@ -274,7 +277,6 @@ def cli_main():
     Main entry point for CLI mode (used by poetry scripts).
     """
     # Set up Rich logging for all components including agno
-    from .utils import configure_all_rich_logging, setup_logging
 
     configure_all_rich_logging()
     logger = setup_logging()
@@ -283,58 +285,60 @@ def cli_main():
         description="Run the Personal AI Agent with Agno Framework"
     )
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
-    parser.add_argument("--web", action="store_true", help="Run in web mode (Streamlit)")
+    parser.add_argument(
+        "--web", action="store_true", help="Run in web mode (Streamlit)"
+    )
     parser.add_argument(
         "--remote-ollama", action="store_true", help="Use remote Ollama server"
     )
-    
+
     # Response control arguments
     parser.add_argument(
-        "--show-reasoning", 
-        action="store_true", 
+        "--show-reasoning",
+        action="store_true",
         default=False,
-        help="Show full reasoning including thinking tags (default: False)"
+        help="Show full reasoning including thinking tags (default: False)",
     )
     parser.add_argument(
-        "--no-show-reasoning", 
+        "--no-show-reasoning",
         dest="show_reasoning",
-        action="store_false", 
-        help="Hide reasoning and thinking tags"
+        action="store_false",
+        help="Hide reasoning and thinking tags",
     )
     parser.add_argument(
-        "--stream", 
-        action="store_true", 
+        "--stream",
+        action="store_true",
         default=True,
-        help="Enable streaming responses (default: True)"
+        help="Enable streaming responses (default: True)",
     )
     parser.add_argument(
-        "--no-stream", 
+        "--no-stream",
         dest="stream",
-        action="store_false", 
-        help="Disable streaming responses"
+        action="store_false",
+        help="Disable streaming responses",
     )
     parser.add_argument(
-        "--stream-steps", 
-        action="store_true", 
+        "--stream-steps",
+        action="store_true",
         default=False,
-        help="Stream intermediate steps (default: False)"
+        help="Stream intermediate steps (default: False)",
     )
     parser.add_argument(
-        "--no-stream-steps", 
+        "--no-stream-steps",
         dest="stream_steps",
-        action="store_false", 
-        help="Disable streaming intermediate steps"
+        action="store_false",
+        help="Disable streaming intermediate steps",
     )
-    
+
     # Instruction complexity arguments
     parser.add_argument(
         "--instruction-level",
         type=int,
         choices=[0, 1, 2, 3, 4],
         default=4,
-        help="Instruction complexity level: 0=minimal, 1=basic tools, 2=moderate, 3=complex, 4=full (default: 4)"
+        help="Instruction complexity level: 0=minimal, 1=basic tools, 2=moderate, 3=complex, 4=full (default: 4)",
     )
-    
+
     args = parser.parse_args()
 
     # Determine mode based on arguments
@@ -344,13 +348,15 @@ def cli_main():
     else:
         # Default to CLI mode
         logger.info("Starting Personal AI Agent in CLI mode")
-        asyncio.run(run_agno_cli(
-            use_remote_ollama=args.remote_ollama,
-            show_reasoning=args.show_reasoning,
-            stream=args.stream,
-            stream_steps=args.stream_steps,
-            instruction_level=args.instruction_level,
-        ))
+        asyncio.run(
+            run_agno_cli(
+                use_remote_ollama=args.remote_ollama,
+                show_reasoning=args.show_reasoning,
+                stream=args.stream,
+                stream_steps=args.stream_steps,
+                instruction_level=args.instruction_level,
+            )
+        )
 
 
 if __name__ == "__main__":

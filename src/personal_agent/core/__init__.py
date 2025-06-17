@@ -2,7 +2,7 @@
 
 from .agent import create_agent_executor
 from .agent_instructions import create_agent_instructions
-from .agno_agent import create_simple_personal_agent, load_agent_knowledge
+from .agno_agent import load_agent_knowledge
 from .agno_storage import (
     create_agno_memory,
     create_agno_storage,
@@ -37,6 +37,5 @@ __all__ = [
     "create_agno_memory",
     "create_combined_knowledge_base",
     "load_combined_knowledge_base",
-    "create_simple_personal_agent",
     "load_agent_knowledge",
 ]

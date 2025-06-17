@@ -38,8 +38,8 @@ if "agent" not in st.session_state:
                             Collect information about what the user is doing with their life right now
                             Collect information about what matters to the user
                         """,
-            # model=Gemini(id="gemini-2.0-flash"),
-            model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
+            model=Gemini(id="gemini-2.0-flash"),
+            # model=Ollama(id=LLM_MODEL, host=OLLAMA_URL),
         ),
     )
 
