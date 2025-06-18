@@ -200,15 +200,6 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
     agent.print_agent_info(console)
 
     print("\nEnter your queries (type 'quit' to exit):")
-    if query is not None:
-        response = await agent.agent.arun(query)
-        print(f"🤖 Assistant: {response}")
-        try:
-            await agent.cleanup()
-        except Exception as e:
-            print(f"Warning during cleanup: {e}")
-
-        return
 
     try:
         while True:
