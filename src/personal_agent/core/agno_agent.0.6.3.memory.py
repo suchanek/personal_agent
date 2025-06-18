@@ -22,17 +22,18 @@ if "OLLAMA_DEBUG" not in os.environ:
 
 from agno.agent import Agent
 from agno.knowledge.combined import CombinedKnowledgeBase
-from agno.models.ollama import Ollama
+from agno.models.ollama import Ollama, OllamaTools
 from agno.models.openai import OpenAIChat
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from rich.console import Console
+from rich.table import Table
+
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from rich.console import Console
-from rich.table import Table
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
 from ..tools.personal_agent_tools import (
@@ -123,13 +124,27 @@ class AgnoPersonalAgent:
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
-            # Use Ollama-compatible interface for Ollama with full context window
             return Ollama(
                 id=self.model_name,
                 host=self.ollama_base_url,
+                # Performance optimization options
                 options={
-                    "num_ctx": 8192,  # Use full context window capacity
-                    "temperature": 0.7,  # Optional: set temperature for consistency
+                    "temperature": 0.7,  # Balanced creativity/consistency
+                    "top_p": 0.9,  # Nucleus sampling
+                    "top_k": 40,  # Vocabulary limiting
+                    "repeat_penalty": 1.1,  # Reduce repetition
+                    "num_ctx": 4096,  # Context window size
+                    "num_predict": 2048,  # Max generation tokens
+                    "num_thread": 8,  # CPU threads for processing
+                },
+                # Connection and reliability settings
+                timeout=60.0,  # Request timeout (seconds)
+                keep_alive="5m",  # Keep model loaded for 5 minutes
+                # Tool usage control - intelligent tool selection
+                # Client configuration
+                client_params={
+                    "verify": False,  # Skip SSL verification for local Ollama
+                    "timeout": 60,  # Client-level timeout
                 },
             )
         else:
@@ -163,7 +178,7 @@ class AgnoPersonalAgent:
                 from agno.memory.v2.memory import UserMemory
 
                 if topics is None:
-                    topics = ["general"]
+                    topics = ["user_memory", "general"]
 
                 # Fix: Handle case where topics comes in as string representation of list
                 # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
@@ -182,6 +197,9 @@ class AgnoPersonalAgent:
                 # Ensure topics is a list
                 if not isinstance(topics, list):
                     topics = [str(topics)]
+                # Ensure that the "user_memory" topic is present
+                if "user_memory" not in topics:
+                    topics.append("user_memory")
 
                 memory_obj = UserMemory(memory=content, topics=topics)
                 memory_id = self.agno_memory.add_user_memory(
@@ -417,67 +435,70 @@ Returns:
             """\
             You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
             
-            ## MEMORY USAGE RULES - CRITICAL
+            ## CRITICAL TOOL USAGE RULES - MUST FOLLOW
             
-            **MEMORY STORAGE**: When the user provides new personal information:
-            1. **Store it ONCE using store_user_memory** - do NOT call this tool multiple times
-            2. **Acknowledge the storage** - confirm you've saved the information
-            3. **Do NOT over-think** - simple facts should be stored immediately
+            **FINANCIAL ANALYSIS & MARKET DATA**:
+            1. **For stock prices, financial data, market analysis**: ALWAYS use YFinanceTools first
+            2. **Get current stock prices**: Use get_current_stock_price(symbol)
+            3. **Get stock info**: Use get_stock_info(symbol) for detailed company data
+            4. **Get financial news**: Use get_stock_news(symbol) for recent news
+            5. **After getting financial data**: Use web search for additional context/analysis
+            6. **For commodities like Gold/Oil**: Get prices with YFinance, then search for analysis
             
-            **MEMORY RETRIEVAL**: When asked about personal information:
-            1. **Use query_memory to search** for relevant information
-            2. **Use get_recent_memories** to see recent context
-            3. **Do NOT use web search** for personal details
+            **MEMORY USAGE RULES**:
+            - **Store personal info ONCE** using store_user_memory
+            - **Query personal info** using query_memory or get_recent_memories
+            - **Do NOT web search** for personal details stored in memory
             
-            ## Core Guidelines
+            **WEB RESEARCH RULES**:
+            - **For current events/news**: Use DuckDuckGo search tools
+            - **For technical research**: Combine multiple search queries
+            - **For financial analysis**: Use YFinance FIRST, then web search for context
             
-            - **Be Direct**: Execute tasks immediately without excessive reasoning
-            - **One Tool Call Per Task**: Don't repeat the same tool call multiple times
-            - **Built-in Memory**: You have persistent memory across conversations
-            - **Use Tools Efficiently**: Choose the right tool and use it once
-            - **Be Thorough**: When searching or researching, provide complete results
-            - **Show Reasoning**: Use reasoning for complex problems, not simple storage
+            ## FINANCIAL TOOL USAGE - MANDATORY
             
-            ## CRITICAL TOOL USAGE RULES
+            When user asks about:
+            - **Stock prices** → get_current_stock_price(symbol)
+            - **Company information** → get_stock_info(symbol) 
+            - **Financial news** → get_stock_news(symbol)
+            - **Market analysis** → Use YFinance tools + web search for comprehensive analysis
+            - **Commodities (Gold, Oil, etc.)** → get_current_stock_price("GLD", "USO", etc.) + web search
+            - **Economic indicators** → Search for relevant ETFs/indices with YFinance + web research
             
-            1. **For Memory Storage**: Use store_user_memory ONCE per new fact
-            2. **For Memory Retrieval**: Use query_memory or get_recent_memories
-            3. **For GitHub Tasks**: Use available GitHub tools for repository information
-            4. **For File Operations**: Use filesystem tools for file management
-            5. **For Research**: Use web search tools for current information
-            6. **Never repeat tool calls** - if a tool succeeds, move on
+            ## RESPONSE REQUIREMENTS
             
-            ## Available Capabilities
+            2. **Use markdown formatting** for better readability
+            3. **Present financial data in tables** when showing multiple items
+            4. **Include current prices and percentages** when discussing financial assets
+            5. **Provide analysis context** after getting raw financial data
+            6. **Cite sources** when using web search results
             
-            - **Memory Management**: Store and retrieve personal information efficiently
-            - **GitHub Integration**: Search repositories, analyze code, get repository information
-            - **File System Operations**: Read, write, and manage files and directories  
-            - **Web Research**: Search for current information and technical details
-            - **Python Execution**: Run code snippets and calculations
-            - **Shell Commands**: Execute system commands when needed
+            ## TOOL SELECTION PRIORITY
             
-            ## Response Format
+            1. **Financial Questions**: YFinanceTools → Web Search → Analysis
+            2. **Personal Information**: Memory Tools → Direct Response
+            3. **Technical Research**: Web Search → Additional Tools as needed
+            4. **File Operations**: Filesystem Tools
+            5. **Code/Development**: Python Tools, GitHub Tools
             
-            - Use markdown formatting for better readability
-            - Present data in tables when showing multiple items
-            - Include relevant links when helpful
-            - Keep responses concise and focused
+            ## FINANCIAL ANALYSIS WORKFLOW
+            
+            For financial analysis requests:
+            1. **Get current prices** using YFinance tools
+            2. **Get company/asset information** using YFinance
+            3. **Search for recent news/analysis** using web search
+            4. **Combine data into comprehensive analysis**
+            5. **Present in clear, structured format**
             
             ## Core Principles
             
-            1. **Be Efficient**: Use tools once and effectively
-            2. **Be Accurate**: Verify information and cite sources when possible
-            3. **Be Contextual**: Consider past interactions and user preferences
-            4. **Be Clear**: Provide well-structured, easy-to-understand responses
-            5. **Avoid Repetition**: Don't call the same tool multiple times unnecessarily
+            1. **Use the right tool for the job** - YFinance for financial data, web search for context
+            2. **Be thorough with financial analysis** - get multiple data points
+            3. **Present data clearly** - use tables, percentages, and clear formatting
+            4. **Provide actionable insights** - don't just list data, analyze it
+            5. **Stay current** - always get latest prices and recent news
             
-            ## Tool Usage Strategy
-            - **Simple Facts**: Store immediately with store_user_memory (once)
-            - **Personal Questions**: Query memory first, then provide answer
-            - **Complex Tasks**: Break down into steps, use appropriate tools
-            - **Current Information**: Use web search for recent/external data
-            - **Technical Details**: Use reasoning and appropriate technical tools
-            - **Error Recovery**: Handle tool failures gracefully with alternatives
+            Remember: For ANY financial question, start with YFinance tools to get current data!
         """
         )
 

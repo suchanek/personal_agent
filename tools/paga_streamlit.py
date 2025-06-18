@@ -12,6 +12,7 @@ from agno.memory.v2.memory import Memory
 from agno.models.google import Gemini
 from agno.models.ollama import Ollama
 from agno.storage.sqlite import SqliteStorage
+from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.googlesearch import GoogleSearchTools
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -58,16 +59,30 @@ def initialize_agent(model_name, ollama_url):
                             Collect information about the life events that had impact on them
                         """,
             # model=Gemini(id="gemini-2.0-flash"),
-            model=Ollama(id=model_name, host=ollama_url),
+            model=Ollama(
+                id=model_name,
+                host=ollama_url,
+                options={
+                    "num_ctx": 131072,  # Use full context window capacity
+                    "temperature": 0.7,
+                },
+            ),
         ),
     )
 
     # Create the agent
     return Agent(
         name="Personal AI Friend",
-        model=Ollama(id=model_name, host=ollama_url),
+        model=Ollama(
+            id=model_name,
+            host=ollama_url,
+            options={
+                "num_ctx": 8192,  # Use full context window capacity
+                "temperature": 0.7,
+            },
+        ),
         user_id=USER_ID,  # Specify the user_id for memory management
-        tools=[GoogleSearchTools()],
+        tools=[GoogleSearchTools(), DuckDuckGoTools()],
         add_history_to_messages=True,
         num_history_responses=3,
         add_datetime_to_instructions=True,
@@ -82,6 +97,8 @@ def initialize_agent(model_name, ollama_url):
             First introduce yourself and greet them by their user ID, then ask about themselves, their hobbies, what they like to do and what they like to talk about.
             If they ask for more information use Google Search tool to find latest information about things in the conversations.
             Store these memories for later recall.
+            IMPORTANT: When calling memory functions, always pass topics as a proper list like ["topic1", "topic2"], 
+            never as a string like '["topic1", "topic2"]'.
             """
         ),
         debug_mode=True,
@@ -245,16 +262,18 @@ with st.sidebar:
             "💡 **Remember**: Your AI friend's memories help create better, "
             "more personalized conversations over time."
         )
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
             if st.button("❌ Cancel", use_container_width=True):
                 st.session_state.show_memory_confirmation = False
                 st.rerun()
-        
+
         with col2:
-            if st.button("🗑️ Yes, Delete All Memories", type="primary", use_container_width=True):
+            if st.button(
+                "🗑️ Yes, Delete All Memories", type="primary", use_container_width=True
+            ):
                 if "agent" in st.session_state:
                     st.session_state.agent.memory.clear()
                     st.session_state.show_memory_confirmation = False
