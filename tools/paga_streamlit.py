@@ -12,7 +12,6 @@ from agno.memory.v2.memory import Memory
 from agno.models.google import Gemini
 from agno.models.ollama import Ollama
 from agno.storage.sqlite import SqliteStorage
-
 from agno.tools.googlesearch import GoogleSearchTools
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -56,6 +55,7 @@ def initialize_agent(model_name, ollama_url):
                             Collect Information about the users likes and dislikes,
                             Collect information about what the user is doing with their life right now
                             Collect information about what matters to the user
+                            Collect information about the life events that had impact on them
                         """,
             # model=Gemini(id="gemini-2.0-flash"),
             model=Ollama(id=model_name, host=ollama_url),
@@ -104,6 +104,10 @@ if "agent" not in st.session_state:
 # Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+# Initialize confirmation dialog state
+if "show_memory_confirmation" not in st.session_state:
+    st.session_state.show_memory_confirmation = False
 
 # Streamlit UI
 st.title("🤖 Personal AI Friend with Memory")
@@ -225,10 +229,40 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-    if st.button("Reset Agent Memory"):
-        if "agent" in st.session_state:
-            st.session_state.agent.memory.clear()
-            st.success("Agent memory cleared!")
+    # Memory reset button
+    if st.button("Reset User Memory"):
+        st.session_state.show_memory_confirmation = True
+
+    # Confirmation dialog popup
+    if st.session_state.show_memory_confirmation:
+        st.markdown("---")
+        st.markdown("### ⚠️ Confirm Memory Deletion")
+        st.error(
+            "**WARNING**: This will permanently delete ALL stored memories and "
+            "personal information about you. This action CANNOT be undone!"
+        )
+        st.info(
+            "💡 **Remember**: Your AI friend's memories help create better, "
+            "more personalized conversations over time."
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("❌ Cancel", use_container_width=True):
+                st.session_state.show_memory_confirmation = False
+                st.rerun()
+        
+        with col2:
+            if st.button("🗑️ Yes, Delete All Memories", type="primary", use_container_width=True):
+                if "agent" in st.session_state:
+                    st.session_state.agent.memory.clear()
+                    st.session_state.show_memory_confirmation = False
+                    st.success("⚠️ All agent memories have been cleared!")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("No agent found in session state")
 
     if st.button("Show All Memories"):
         if "agent" in st.session_state:
