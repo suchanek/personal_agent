@@ -218,6 +218,9 @@ class SemanticMemoryManager:
     and duplicate detection capabilities, without requiring LLM invocation.
     """
     
+    # Required by Agno Memory class - model attribute
+    model: Optional[Model] = Field(default=None)
+    
     # Configuration
     config: SemanticMemoryManagerConfig = Field(default_factory=SemanticMemoryManagerConfig)
     
@@ -230,6 +233,7 @@ class SemanticMemoryManager:
     
     def __init__(
         self,
+        model: Optional[Model] = None,
         config: Optional[SemanticMemoryManagerConfig] = None,
         similarity_threshold: float = 0.8,
         enable_semantic_dedup: bool = True,
@@ -247,6 +251,7 @@ class SemanticMemoryManager:
                 debug_mode=debug_mode,
             )
         
+        self.model = model  # Required by Agno Memory class
         self.config = config
         self.topic_classifier = TopicClassifier()
         self.duplicate_detector = SemanticDuplicateDetector(
@@ -677,6 +682,156 @@ class SemanticMemoryManager:
         
         return results
     
+    def create_or_update_memories(
+        self,
+        messages: List,  # List[Message] from agno.models.message
+        existing_memories: List[Dict[str, Any]],
+        user_id: str,
+        db: MemoryDb,
+        delete_memories: bool = True,
+        clear_memories: bool = True,
+    ) -> str:
+        """
+        Create or update memories based on messages - LLM-free implementation.
+        
+        This method provides the same interface as Agno's MemoryManager but uses
+        semantic analysis instead of LLM calls for better performance and reliability.
+        
+        :param messages: List of Message objects to process
+        :param existing_memories: List of existing memory dictionaries
+        :param user_id: User ID for the memories
+        :param db: Memory database instance
+        :param delete_memories: Whether deletion is enabled (not used in our implementation)
+        :param clear_memories: Whether clearing is enabled (not used in our implementation)
+        :return: String describing the actions taken
+        """
+        logger.debug("SemanticMemoryManager.create_or_update_memories Start")
+        
+        # Create a simple memory class for duplicate checking
+        class SimpleMemory:
+            def __init__(self, memory_text: str, memory_id: str = ""):
+                self.memory = memory_text
+                self.memory_id = memory_id
+        
+        # Convert existing memories to UserMemory objects for our processing
+        existing_user_memories = []
+        for mem_dict in existing_memories:
+            try:
+                # Create a UserMemory-like object for our duplicate detection
+                memory_text = mem_dict.get("memory", "")
+                if memory_text:
+                    existing_user_memories.append(SimpleMemory(memory_text, mem_dict.get("memory_id", "")))
+            except Exception as e:
+                logger.warning(f"Failed to process existing memory: {e}")
+        
+        # Extract text content from messages
+        message_texts = []
+        for message in messages:
+            if hasattr(message, 'content') and message.content:
+                if hasattr(message, 'role') and message.role == 'user':
+                    # Only process user messages for memory extraction
+                    message_texts.append(str(message.content))
+            elif hasattr(message, 'get_content_string'):
+                # Use agno's method to get content
+                content = message.get_content_string()
+                if content and hasattr(message, 'role') and message.role == 'user':
+                    message_texts.append(content)
+        
+        if not message_texts:
+            logger.debug("No user messages found to process")
+            return "No user messages to process for memory creation"
+        
+        # Combine all message texts
+        combined_input = " ".join(message_texts)
+        
+        # Extract memorable statements
+        memorable_statements = self._extract_memorable_statements(combined_input)
+        
+        if not memorable_statements:
+            logger.debug("No memorable statements found in messages")
+            return "No memorable information found in the messages"
+        
+        # Process each memorable statement
+        actions_taken = []
+        memories_added = 0
+        memories_rejected = 0
+        
+        for statement in memorable_statements:
+            # Check for duplicates against existing memories
+            should_reject, reason = self._should_reject_memory(statement, existing_user_memories)
+            
+            if should_reject:
+                memories_rejected += 1
+                actions_taken.append(f"Rejected: '{statement[:50]}...' - {reason}")
+                logger.debug(f"Rejected memory: {reason}")
+                continue
+            
+            # Add the memory
+            success, message, memory_id = self.add_memory(
+                memory_text=statement,
+                db=db,
+                user_id=user_id,
+                input_text=combined_input,
+            )
+            
+            if success:
+                memories_added += 1
+                actions_taken.append(f"Added: '{statement[:50]}...'")
+                logger.debug(f"Added memory: {memory_id}")
+                
+                # Add to existing memories list for subsequent duplicate checking
+                existing_user_memories.append(SimpleMemory(statement, memory_id or ""))
+            else:
+                memories_rejected += 1
+                actions_taken.append(f"Failed to add: '{statement[:50]}...' - {message}")
+                logger.warning(f"Failed to add memory: {message}")
+        
+        # Set memories_updated flag if any memories were added
+        if memories_added > 0:
+            self.memories_updated = True
+        
+        # Create response summary
+        response_parts = [
+            f"Processed {len(memorable_statements)} memorable statements",
+            f"Added {memories_added} new memories",
+            f"Rejected {memories_rejected} duplicates/invalid memories"
+        ]
+        
+        if self.config.debug_mode and actions_taken:
+            response_parts.append("Actions taken:")
+            response_parts.extend(actions_taken[:5])  # Limit to first 5 actions
+            if len(actions_taken) > 5:
+                response_parts.append(f"... and {len(actions_taken) - 5} more actions")
+        
+        response = ". ".join(response_parts)
+        logger.debug("SemanticMemoryManager.create_or_update_memories End")
+        
+        return response
+    
+    async def acreate_or_update_memories(
+        self,
+        messages: List,  # List[Message] from agno.models.message
+        existing_memories: List[Dict[str, Any]],
+        user_id: str,
+        db: MemoryDb,
+        delete_memories: bool = True,
+        clear_memories: bool = True,
+    ) -> str:
+        """
+        Async version of create_or_update_memories.
+        
+        Since our implementation doesn't use async operations, this just calls
+        the sync version. This maintains compatibility with Agno's async interface.
+        """
+        return self.create_or_update_memories(
+            messages=messages,
+            existing_memories=existing_memories,
+            user_id=user_id,
+            db=db,
+            delete_memories=delete_memories,
+            clear_memories=clear_memories,
+        )
+
     def _extract_memorable_statements(self, text: str) -> List[str]:
         """
         Extract memorable statements from text using simple heuristics.
@@ -724,6 +879,7 @@ class SemanticMemoryManager:
 
 # Convenience function for easy usage
 def create_semantic_memory_manager(
+    model: Optional[Model] = None,
     similarity_threshold: float = 0.8,
     enable_semantic_dedup: bool = True,
     enable_exact_dedup: bool = True,
@@ -733,6 +889,7 @@ def create_semantic_memory_manager(
     """
     Create a SemanticMemoryManager instance with sensible defaults.
     
+    :param model: Optional model instance (required by Agno Memory class)
     :param similarity_threshold: Threshold for semantic similarity
     :param enable_semantic_dedup: Enable semantic duplicate detection
     :param enable_exact_dedup: Enable exact duplicate detection
@@ -748,7 +905,7 @@ def create_semantic_memory_manager(
         debug_mode=debug_mode,
     )
     
-    return SemanticMemoryManager(config=config)
+    return SemanticMemoryManager(model=model, config=config)
 
 
 def main():
