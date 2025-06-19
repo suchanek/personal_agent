@@ -832,6 +832,148 @@ class SemanticMemoryManager:
             clear_memories=clear_memories,
         )
 
+    def run_memory_task(
+        self,
+        task: str,
+        existing_memories: List[Dict[str, Any]],
+        user_id: str,
+        db: MemoryDb,
+        delete_memories: bool = True,
+        clear_memories: bool = True,
+    ) -> str:
+        """
+        Process a memory task without using LLM.
+        
+        This method provides the same interface as Agno's MemoryManager.run_memory_task
+        but uses semantic analysis instead of LLM calls for better performance and reliability.
+        
+        :param task: The task/input text to process for memory extraction
+        :param existing_memories: List of existing memory dictionaries
+        :param user_id: User ID for the memories
+        :param db: Memory database instance
+        :param delete_memories: Whether deletion is enabled (not used in our implementation)
+        :param clear_memories: Whether clearing is enabled (not used in our implementation)
+        :return: String describing the actions taken
+        """
+        logger.debug("SemanticMemoryManager.run_memory_task Start")
+        
+        try:
+            # Extract memorable statements from the task
+            memorable_statements = self._extract_memorable_statements(task)
+            
+            if not memorable_statements:
+                logger.debug("No memorable statements found in task")
+                return "No memorable information found in the task"
+            
+            # Convert existing memories to UserMemory-like objects for duplicate checking
+            class SimpleMemory:
+                def __init__(self, memory_text: str, memory_id: str = ""):
+                    self.memory = memory_text
+                    self.memory_id = memory_id
+            
+            existing_user_memories = []
+            for mem_dict in existing_memories:
+                try:
+                    memory_text = mem_dict.get("memory", "")
+                    if memory_text:
+                        existing_user_memories.append(SimpleMemory(memory_text, mem_dict.get("memory_id", "")))
+                except Exception as e:
+                    logger.warning(f"Failed to process existing memory: {e}")
+            
+            # Process each memorable statement
+            actions_taken = []
+            memories_added = 0
+            memories_rejected = 0
+            
+            for statement in memorable_statements:
+                # Check for duplicates against existing memories
+                should_reject, reason = self._should_reject_memory(statement, existing_user_memories)
+                
+                if should_reject:
+                    memories_rejected += 1
+                    actions_taken.append(f"Rejected: '{statement[:50]}...' - {reason}")
+                    logger.debug(f"Rejected memory: {reason}")
+                    continue
+                
+                # Add the memory
+                success, message, memory_id = self.add_memory(
+                    memory_text=statement,
+                    db=db,
+                    user_id=user_id,
+                    input_text=task,
+                )
+                
+                if success:
+                    memories_added += 1
+                    actions_taken.append(f"Added: '{statement[:50]}...'")
+                    logger.debug(f"Added memory: {memory_id}")
+                    
+                    # Add to existing memories list for subsequent duplicate checking
+                    existing_user_memories.append(SimpleMemory(statement, memory_id or ""))
+                else:
+                    memories_rejected += 1
+                    actions_taken.append(f"Failed to add: '{statement[:50]}...' - {message}")
+                    logger.warning(f"Failed to add memory: {message}")
+            
+            # Set memories_updated flag if any memories were added
+            if memories_added > 0:
+                self.memories_updated = True
+            
+            # Create response summary
+            response_parts = [
+                f"Processed {len(memorable_statements)} memorable statements",
+                f"Added {memories_added} new memories",
+                f"Rejected {memories_rejected} duplicates/invalid memories"
+            ]
+            
+            if self.config.debug_mode and actions_taken:
+                response_parts.append("Actions taken:")
+                response_parts.extend(actions_taken[:5])  # Limit to first 5 actions
+                if len(actions_taken) > 5:
+                    response_parts.append(f"... and {len(actions_taken) - 5} more actions")
+            
+            response = ". ".join(response_parts)
+            logger.debug("SemanticMemoryManager.run_memory_task End")
+            
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error in run_memory_task: {e}"
+            logger.error(error_msg)
+            return error_msg
+
+    async def arun_memory_task(
+        self,
+        task: str,
+        existing_memories: List[Dict[str, Any]],
+        user_id: str,
+        db: MemoryDb,
+        delete_memories: bool = True,
+        clear_memories: bool = True,
+    ) -> str:
+        """
+        Async version of run_memory_task.
+        
+        Since our implementation doesn't use async operations, this just calls
+        the sync version. This maintains compatibility with Agno's async interface.
+        
+        :param task: The task/input text to process for memory extraction
+        :param existing_memories: List of existing memory dictionaries
+        :param user_id: User ID for the memories
+        :param db: Memory database instance
+        :param delete_memories: Whether deletion is enabled (not used in our implementation)
+        :param clear_memories: Whether clearing is enabled (not used in our implementation)
+        :return: String describing the actions taken
+        """
+        return self.run_memory_task(
+            task=task,
+            existing_memories=existing_memories,
+            user_id=user_id,
+            db=db,
+            delete_memories=delete_memories,
+            clear_memories=clear_memories,
+        )
+
     def _extract_memorable_statements(self, text: str) -> List[str]:
         """
         Extract memorable statements from text using simple heuristics.

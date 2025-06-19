@@ -656,7 +656,26 @@ with st.sidebar:
                         # Create a simple line chart of response times
                         chart_data = df[['timestamp', 'response_time']].copy()
                         chart_data = chart_data.set_index('timestamp')
-                        st.line_chart(chart_data['response_time'])
+                        
+                        # Use altair for better chart control and avoid deprecation warnings
+                        try:
+                            import altair as alt
+                            
+                            # Create altair chart with proper theme handling
+                            chart = alt.Chart(chart_data.reset_index()).mark_line(point=True).encode(
+                                x=alt.X('timestamp:O', title='Time'),
+                                y=alt.Y('response_time:Q', title='Response Time (s)'),
+                                tooltip=['timestamp:O', 'response_time:Q']
+                            ).properties(
+                                width=400,
+                                height=200,
+                                title='Response Time Trend'
+                            )
+                            
+                            st.altair_chart(chart, use_container_width=True)
+                        except ImportError:
+                            # Fallback to streamlit line chart if altair not available
+                            st.line_chart(chart_data['response_time'])
                     else:
                         st.info("Need at least 2 successful requests to show trend chart")
                 except Exception as e:
