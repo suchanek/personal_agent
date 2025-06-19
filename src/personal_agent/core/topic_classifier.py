@@ -235,6 +235,15 @@ class TopicClassifier:
                     "achieve",
                     "target",
                 ],
+                "feelings": RuleSet(
+                keywords=["happy", "sad", "angry", "frustrated", "excited", "nervous", "worried", "anxious", "depressed", "mood", "emotion", "feel", "feeling"],
+                patterns=[
+                    re.compile(r"\bi feel\b", re.IGNORECASE),
+                    re.compile(r"\bi am feeling\b", re.IGNORECASE),
+                    re.compile(r"\bi'm feeling\b", re.IGNORECASE)
+                ]
+            ),
+
                 patterns=[
                     re.compile(r"\bmy goal\b", re.IGNORECASE),
                     re.compile(r"\bi want to\b", re.IGNORECASE),
