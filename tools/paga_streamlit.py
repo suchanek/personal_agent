@@ -9,19 +9,19 @@ import requests
 import streamlit as st
 from agno.agent import Agent
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
-from agno.memory.v2.manager import MemoryManager
 from agno.memory.v2.memory import Memory
 from agno.models.google import Gemini
 from agno.models.ollama import Ollama
 from agno.storage.sqlite import SqliteStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.googlesearch import GoogleSearchTools
-from agno.tools.yfinancetools import YFinanceTools()
+from agno.tools.yfinance import YFinanceTools
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import from the correct path
 from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, USER_ID
+from personal_agent.core.semantic_memory_manager import SemanticMemoryManager, SemanticMemoryManagerConfig
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
@@ -65,27 +65,32 @@ def initialize_agent(model_name, ollama_url, existing_agent=None):
         )
         memory_db = SqliteMemoryDb(table_name="personal_agent_memory", db_file=str(db_path))
 
+        # Create semantic memory manager configuration
+        semantic_config = SemanticMemoryManagerConfig(
+            similarity_threshold=0.8,
+            enable_semantic_dedup=True,
+            enable_exact_dedup=True,
+            enable_topic_classification=True,
+            debug_mode=True,
+        )
+        
+        # Create semantic memory manager (LLM-free, but with model attribute for compatibility)
+        semantic_memory_manager = SemanticMemoryManager(
+            model=Ollama(
+                id=model_name,
+                host=ollama_url,
+                options={
+                    "num_ctx": 8192,
+                    "temperature": 0.7,
+                },
+            ),
+            config=semantic_config
+        )
+        
+        # Memory class with custom memory manager (no model parameter needed)
         memory = Memory(
             db=memory_db,
-            memory_manager=MemoryManager(
-                memory_capture_instructions="""\
-                                Collect User's name,
-                                Collect Information about user's passion and hobbies,
-                                Collect Information about the users likes and dislikes,
-                                Collect information about what the user is doing with their life right now
-                                Collect information about what matters to the user
-                                Collect information about the life events that had impact on them
-                                Only store a memory ONCE! Do not duplicate memories.
-                            """,
-                model=Ollama(
-                    id=model_name,
-                    host=ollama_url,
-                    options={
-                        "num_ctx": 8192,
-                        "temperature": 0.7,
-                    },
-                ),
-            ),
+            memory_manager=semantic_memory_manager,
         )
 
     # If we have an existing agent, update its properties instead of creating new
@@ -511,8 +516,6 @@ with st.sidebar:
         if "agent" in st.session_state:
             try:
                 # Get all memories from the memory database
-                # memories = st.session_state.agent.memory.db.get_all()
-                # Get memories for a specific user
                 memories = st.session_state.agent.memory.get_user_memories(
                     user_id=USER_ID
                 )
@@ -539,6 +542,82 @@ with st.sidebar:
                     )
             except Exception as e:
                 st.error(f"Error retrieving memories: {str(e)}")
+
+    # Semantic Memory Manager Controls
+    st.header("🧠 Semantic Memory")
+    
+    # Memory Statistics
+    if st.button("📊 Show Memory Statistics"):
+        if "agent" in st.session_state and hasattr(st.session_state.agent, 'memory'):
+            try:
+                # Get semantic memory manager from the agent's memory
+                memory_manager = st.session_state.agent.memory.memory_manager
+                if hasattr(memory_manager, 'get_memory_stats'):
+                    stats = memory_manager.get_memory_stats(
+                        st.session_state.agent.memory.db, USER_ID
+                    )
+                    
+                    st.subheader("Memory Statistics")
+                    
+                    # Display basic stats
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Total Memories", stats.get("total_memories", 0))
+                        st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
+                    
+                    with col2:
+                        avg_length = stats.get("average_memory_length", 0)
+                        st.metric("Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A")
+                        most_common = stats.get("most_common_topic", "None")
+                        st.metric("Top Topic", most_common if most_common else "None")
+                    
+                    # Topic distribution
+                    topic_dist = stats.get("topic_distribution", {})
+                    if topic_dist:
+                        st.subheader("📈 Topic Distribution")
+                        for topic, count in sorted(topic_dist.items(), key=lambda x: x[1], reverse=True):
+                            st.write(f"**{topic.title()}:** {count} memories")
+                    
+                else:
+                    st.info("Memory statistics not available with current memory manager")
+            except Exception as e:
+                st.error(f"Error getting memory statistics: {str(e)}")
+    
+    # Memory Search
+    st.subheader("🔍 Search Memories")
+    search_query = st.text_input(
+        "Search Query:",
+        placeholder="Enter keywords to search your memories...",
+        help="Search through your stored memories using semantic similarity"
+    )
+    
+    if st.button("Search") and search_query:
+        if "agent" in st.session_state and hasattr(st.session_state.agent, 'memory'):
+            try:
+                memory_manager = st.session_state.agent.memory.memory_manager
+                if hasattr(memory_manager, 'search_memories'):
+                    results = memory_manager.search_memories(
+                        search_query,
+                        st.session_state.agent.memory.db,
+                        USER_ID,
+                        limit=5,
+                        similarity_threshold=0.3
+                    )
+                    
+                    if results:
+                        st.subheader(f"Search Results for: '{search_query}'")
+                        for i, (memory, similarity) in enumerate(results, 1):
+                            with st.expander(f"Result {i} (Similarity: {similarity:.2f})"):
+                                st.write(f"**Memory:** {memory.memory}")
+                                if memory.topics:
+                                    st.write(f"**Topics:** {', '.join(memory.topics)}")
+                                st.write(f"**Last Updated:** {memory.last_updated}")
+                    else:
+                        st.info("No matching memories found. Try different keywords.")
+                else:
+                    st.info("Memory search not available with current memory manager")
+            except Exception as e:
+                st.error(f"Error searching memories: {str(e)}")
 
     st.header("Debug Info")
     # Debug mode toggle
