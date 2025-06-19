@@ -9,8 +9,8 @@ that provides LLM-free memory management with semantic search and duplicate dete
 import sys
 from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add src to path for imports - go up one level from memory_tests to project root
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 

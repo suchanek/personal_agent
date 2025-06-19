@@ -43,13 +43,18 @@ Version: 1.0.0
 
 import asyncio
 import json
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
+
+# Add the src directory to the Python path - go up one level from memory_tests to project root
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from rich import print
 from rich.console import Console
 
-from src.personal_agent.config import (
+from personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
     DATA_DIR,
@@ -57,7 +62,7 @@ from src.personal_agent.config import (
     OLLAMA_URL,
     USER_ID,
 )
-from src.personal_agent.core.agno_agent import AgnoPersonalAgent
+from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 
 class MemoryTestSuite:
