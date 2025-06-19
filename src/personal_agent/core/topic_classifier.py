@@ -5,12 +5,59 @@ from typing import Dict, List, Pattern
 
 @dataclass
 class RuleSet:
+    """Basic ruleset"""
+
     keywords: List[str]
     patterns: List[Pattern]
 
 
 class TopicClassifier:
-    """Enhanced rule-based topic classifier that doesn't require an LLM."""
+    """Enhanced rule-based topic classifier for categorizing text without requiring an LLM.
+    
+    This classifier uses a combination of keyword matching and regex pattern matching
+    to categorize text into predefined topics. It's designed to identify personal
+    information categories such as work, education, family, hobbies, and more.
+    
+    The classifier employs a scoring system where:
+    - Keyword matches contribute 1 point each
+    - Pattern matches contribute 2 points each
+    - A minimum score of 2 is required for topic classification
+    - If no topics meet the threshold, text is classified as "general"
+    
+    Attributes:
+        TOPIC_RULES (Dict[str, RuleSet]): Dictionary mapping topic names to their
+            corresponding RuleSet objects containing keywords and regex patterns.
+            
+    Supported Topics:
+        - personal_info: Name, age, contact information, location details
+        - work: Job, career, company, employment-related information
+        - education: School, university, degrees, academic information
+        - family: Family members, relationships, marital status
+        - hobbies: Interests, activities, entertainment preferences
+        - preferences: Likes, dislikes, favorites, opinions
+        - health: Medical information, allergies, fitness, diet
+        - location: Geographic information, addresses, places
+        - goals: Aspirations, plans, targets, future objectives
+        - general: Fallback category for unclassified text
+        
+    Example:
+        >>> classifier = TopicClassifier()
+        >>> topics = classifier.classify_topic("My name is John and I work at Google")
+        >>> print(topics)
+        ['personal_info', 'work']
+        
+        >>> topics = classifier.classify_topic("I love playing piano and traveling")
+        >>> print(topics)
+        ['hobbies']
+        
+        >>> topics = classifier.classify_topic("Random unrelated text")
+        >>> print(topics)
+        ['general']
+        
+    Note:
+        This classifier is rule-based and deterministic. It doesn't learn from data
+        but relies on predefined patterns and keywords. It is designed to be efficient
+    """
 
     def __init__(self):
         self.TOPIC_RULES: Dict[str, RuleSet] = {
@@ -60,6 +107,7 @@ class TopicClassifier:
                     "college",
                     "degree",
                     "study",
+                    "studied",
                     "student",
                     "graduate",
                     "major",
@@ -89,6 +137,8 @@ class TopicClassifier:
                     "spouse",
                     "wife",
                     "husband",
+                    "grandma",
+                    "grandpa",
                 ],
                 patterns=[
                     re.compile(r"\bmy family\b", re.IGNORECASE),
@@ -229,3 +279,22 @@ class TopicClassifier:
             topics = ["general"]
 
         return topics
+
+
+if __name__ == "__main__":
+    classifier = TopicClassifier()
+    examples = [
+        "My name is John and I work at Google.",
+        "I love to play the piano and travel.",
+        "I am 35 years old and live in Paris.",
+        "I studied biology at university.",
+        "Married to a wonderful woman with 2 kids.",
+        "I prefer coffee over tea.",
+        "I plan to climb Mount Everest.",
+        "I have a peanut allergy.",
+        "Completely unrelated sentence.",
+    ]
+
+    for text in examples:
+        topics = classifier.classify_topic(text)
+        print(f"Input: {text}\nTopics: {topics}\n")

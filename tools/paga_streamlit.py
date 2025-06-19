@@ -1,9 +1,9 @@
 import json
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from datetime import datetime
 
 import requests
 import streamlit as st
@@ -21,9 +21,458 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import from the correct path
 from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, USER_ID
-from personal_agent.core.semantic_memory_manager import SemanticMemoryManager, SemanticMemoryManagerConfig
+from personal_agent.core.semantic_memory_manager import (
+    SemanticMemoryManager,
+    SemanticMemoryManagerConfig,
+)
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
+
+
+def apply_custom_theme():
+    """Apply custom CSS for theme switching."""
+    # Get current theme from session state
+    is_dark_theme = st.session_state.get("dark_theme", False)
+    
+    if is_dark_theme:
+        # Dark theme CSS
+        st.markdown("""
+        <style>
+        /* Dark theme styles */
+        .stApp {
+            background-color: #0e1117 !important;
+            color: #fafafa !important;
+        }
+        
+        /* Main content area */
+        .main .block-container {
+            background-color: #0e1117 !important;
+            color: #fafafa !important;
+        }
+        
+        /* Header area */
+        .stApp > header {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Main content wrapper */
+        .stMainBlockContainer {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Bottom toolbar/footer */
+        .stBottom {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Chat input outer container and all wrapper elements */
+        .stChatFloatingInputContainer {
+            background-color: #0e1117 !important;
+            border-top: 1px solid #4a4a4a !important;
+        }
+        
+        /* Additional selectors for chat input area containers */
+        section[data-testid="stChatFloatingInputContainer"] {
+            background-color: #0e1117 !important;
+        }
+        
+        div[data-testid="stChatInput"] {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Chat input wrapper */
+        .stChatInput {
+            background-color: #0e1117 !important;
+        }
+        
+        .stChatInput > div {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Target any remaining white containers around chat input */
+        .stChatInput div:not([data-baseweb="textarea"]) {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Bottom area containers - more comprehensive targeting */
+        .stApp > div:last-child {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Additional bottom area selectors */
+        .stApp footer {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Target any remaining white divs in the bottom area */
+        .stChatFloatingInputContainer div {
+            background-color: #0e1117 !important;
+        }
+        
+        /* More specific chat input container targeting */
+        [data-testid="stChatFloatingInputContainer"] > div {
+            background-color: #0e1117 !important;
+        }
+        
+        [data-testid="stChatFloatingInputContainer"] > div > div {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Target the main viewport and large background areas */
+        .main {
+            background-color: #0e1117 !important;
+        }
+        
+        .main > div {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Target any large white background containers */
+        div[data-testid="stAppViewContainer"] {
+            background-color: #0e1117 !important;
+        }
+        
+        div[data-testid="stMain"] {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Target the bottom section specifically */
+        section[data-testid="stSidebar"] ~ div {
+            background-color: #0e1117 !important;
+        }
+        
+        /* More aggressive targeting of large containers */
+        .stApp > div {
+            background-color: #0e1117 !important;
+        }
+        
+        .stApp section {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Nuclear option - target everything then exclude input */
+        .stApp * {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Restore input box to default */
+        .stChatInput textarea,
+        .stChatInput input,
+        textarea,
+        input[type="text"] {
+            background-color: unset !important;
+            color: unset !important;
+            border: unset !important;
+        }
+        
+        /* Restore other interactive elements */
+        button {
+            background-color: #262730 !important;
+            color: #fafafa !important;
+        }
+        
+        /* Sidebar */
+        .stSidebar {
+            background-color: #262730 !important;
+        }
+        
+        .stSidebar .stMarkdown {
+            color: #fafafa !important;
+        }
+        
+        .stSidebar .stSelectbox > div > div {
+            background-color: #262730 !important;
+            color: #fafafa !important;
+        }
+        
+        /* Text inputs */
+        .stTextInput > div > div > input {
+            background-color: #262730 !important;
+            color: #fafafa !important;
+            border: 1px solid #4a4a4a !important;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            border-color: #6a6a6a !important;
+            box-shadow: 0 0 0 1px #6a6a6a !important;
+        }
+        
+        /* Buttons */
+        .stButton > button {
+            background-color: #262730 !important;
+            color: #fafafa !important;
+            border: 1px solid #4a4a4a !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #3a3a3a !important;
+            border: 1px solid #6a6a6a !important;
+        }
+        
+        /* Expanders */
+        .stExpander {
+            background-color: #1e1e1e !important;
+            border: 1px solid #4a4a4a !important;
+        }
+        
+        .stExpander > div > div > div > div {
+            background-color: #1e1e1e !important;
+        }
+        
+        /* Chat messages */
+        .stChatMessage {
+            background-color: #1e1e1e !important;
+        }
+        
+        .stChatMessage > div {
+            background-color: #1e1e1e !important;
+        }
+        
+        /* Metrics */
+        .stMetric {
+            background-color: #1e1e1e !important;
+            border: 1px solid #4a4a4a !important;
+            border-radius: 5px !important;
+            padding: 10px !important;
+        }
+        
+        /* Alerts */
+        .stAlert {
+            background-color: #1e1e1e !important;
+            border: 1px solid #4a4a4a !important;
+        }
+        
+        /* Selectbox */
+        .stSelectbox > div > div {
+            background-color: #262730 !important;
+            color: #fafafa !important;
+        }
+        
+        /* Checkbox */
+        .stCheckbox > label {
+            color: #fafafa !important;
+        }
+        
+        /* Headers and text */
+        h1, h2, h3, h4, h5, h6 {
+            color: #fafafa !important;
+        }
+        
+        p, div, span {
+            color: #fafafa !important;
+        }
+        
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #262730;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #4a4a4a;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6a6a6a;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Light theme CSS (enhanced default)
+        st.markdown("""
+        <style>
+        /* Soft Light theme styles - less bright than pure white */
+        .stApp {
+            background-color: #f8f9fa !important;
+            color: #2d3748 !important;
+        }
+        
+        /* Main content area */
+        .main .block-container {
+            background-color: #f8f9fa !important;
+            color: #2d3748 !important;
+        }
+        
+        /* Header area */
+        .stApp > header {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Main content wrapper */
+        .stMainBlockContainer {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Bottom toolbar/footer */
+        .stBottom {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Chat input outer container and all wrapper elements */
+        .stChatFloatingInputContainer {
+            background-color: #f8f9fa !important;
+            border-top: 1px solid #e2e8f0 !important;
+        }
+        
+        /* Additional selectors for chat input area containers */
+        section[data-testid="stChatFloatingInputContainer"] {
+            background-color: #f8f9fa !important;
+        }
+        
+        div[data-testid="stChatInput"] {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Chat input wrapper */
+        .stChatInput {
+            background-color: #f8f9fa !important;
+        }
+        
+        .stChatInput > div {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Target any remaining containers around chat input */
+        .stChatInput div {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Bottom area containers - more comprehensive targeting */
+        .stApp > div:last-child {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Additional bottom area selectors */
+        .stApp footer {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Target any remaining white divs in the bottom area */
+        .stChatFloatingInputContainer div {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* More specific chat input container targeting */
+        [data-testid="stChatFloatingInputContainer"] > div {
+            background-color: #f8f9fa !important;
+        }
+        
+        [data-testid="stChatFloatingInputContainer"] > div > div {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Target the main viewport and large background areas */
+        .main {
+            background-color: #f8f9fa !important;
+        }
+        
+        .main > div {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Target any large white background containers */
+        div[data-testid="stAppViewContainer"] {
+            background-color: #f8f9fa !important;
+        }
+        
+        div[data-testid="stMain"] {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Target the bottom section specifically */
+        section[data-testid="stSidebar"] ~ div {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* More aggressive targeting of large containers */
+        .stApp > div {
+            background-color: #f8f9fa !important;
+        }
+        
+        .stApp section {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Nuclear option - target everything then exclude input */
+        .stApp * {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Restore input box to default */
+        .stChatInput textarea,
+        .stChatInput input,
+        textarea,
+        input[type="text"] {
+            background-color: unset !important;
+            color: unset !important;
+            border: unset !important;
+        }
+        
+        /* Restore other interactive elements */
+        button {
+            background-color: #ffffff !important;
+            color: #2d3748 !important;
+        }
+        
+        /* Sidebar */
+        .stSidebar {
+            background-color: #edf2f7 !important;
+        }
+        
+        /* Buttons */
+        .stButton > button {
+            background-color: #ffffff !important;
+            color: #2d3748 !important;
+            border: 1px solid #cbd5e0 !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #f7fafc !important;
+            border: 1px solid #a0aec0 !important;
+        }
+        
+        /* Expanders */
+        .stExpander {
+            background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        
+        /* Chat messages */
+        .stChatMessage {
+            background-color: #f7fafc !important;
+        }
+        
+        /* Metrics */
+        .stMetric {
+            background-color: #f7fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 5px !important;
+            padding: 10px !important;
+        }
+        
+        /* Custom scrollbar for light theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
 
 def get_ollama_models(ollama_url):
@@ -45,11 +494,11 @@ def get_ollama_models(ollama_url):
 def initialize_agent(model_name, ollama_url, existing_agent=None):
     """Initialize or reinitialize the agent with the specified model and URL."""
     # Set up storage and memory (reuse existing if available)
-    if existing_agent and hasattr(existing_agent, 'memory') and existing_agent.memory:
+    if existing_agent and hasattr(existing_agent, "memory") and existing_agent.memory:
         # Reuse existing memory to preserve stored memories
         memory = existing_agent.memory
         # Update the memory manager's model to use the new model
-        if hasattr(memory, 'memory_manager') and memory.memory_manager:
+        if hasattr(memory, "memory_manager") and memory.memory_manager:
             memory.memory_manager.model = Ollama(
                 id=model_name,
                 host=ollama_url,
@@ -63,7 +512,9 @@ def initialize_agent(model_name, ollama_url, existing_agent=None):
         agent_storage = SqliteStorage(
             table_name="agent_sessions", db_file="/tmp/persistent_memory.db"
         )
-        memory_db = SqliteMemoryDb(table_name="personal_agent_memory", db_file=str(db_path))
+        memory_db = SqliteMemoryDb(
+            table_name="personal_agent_memory", db_file=str(db_path)
+        )
 
         # Create semantic memory manager configuration
         semantic_config = SemanticMemoryManagerConfig(
@@ -73,7 +524,7 @@ def initialize_agent(model_name, ollama_url, existing_agent=None):
             enable_topic_classification=True,
             debug_mode=True,
         )
-        
+
         # Create semantic memory manager (LLM-free, but with model attribute for compatibility)
         semantic_memory_manager = SemanticMemoryManager(
             model=Ollama(
@@ -84,9 +535,9 @@ def initialize_agent(model_name, ollama_url, existing_agent=None):
                     "temperature": 0.7,
                 },
             ),
-            config=semantic_config
+            config=semantic_config,
         )
-        
+
         # Memory class with custom memory manager (no model parameter needed)
         memory = Memory(
             db=memory_db,
@@ -142,11 +593,12 @@ def initialize_agent(model_name, ollama_url, existing_agent=None):
                 
                 - Always execute tool calls properly and provide the results to the user in a conversational manner.
                 - Store these memories for later recall.
-                - Only store a memory ONCE
-                - Do not duplicate memories
-                
-                IMPORTANT: When calling memory functions, always pass topics as a proper list like ["topic1", "topic2"], 
+                - Only store a memory ONCE                
+                IMPORTANT: 
+                - When calling memory functions, always pass topics as a proper list like ["topic1", "topic2"], 
                 never as a string like '["topic1", "topic2"]'.
+                - When recalling memories phrase them in second person, not literally.
+                example: If the memory is "I was born in Ohio", you would respond with "You were born in Ohio".
                 """
             ),
             debug_mode=True,
@@ -159,6 +611,10 @@ if "current_ollama_url" not in st.session_state:
 
 if "current_model" not in st.session_state:
     st.session_state.current_model = LLM_MODEL
+
+# Initialize theme state (start with softer default theme)
+if "dark_theme" not in st.session_state:
+    st.session_state.dark_theme = False
 
 # Initialize agent
 if "agent" not in st.session_state:
@@ -186,17 +642,31 @@ if "performance_stats" not in st.session_state:
         "average_response_time": 0,
         "total_tokens": 0,
         "average_tokens": 0,
-        "fastest_response": float('inf'),
+        "fastest_response": float("inf"),
         "slowest_response": 0,
         "tool_calls_count": 0,
-        "memory_operations": 0
+        "memory_operations": 0,
     }
 
+# Apply theme before rendering UI
+apply_custom_theme()
+
 # Streamlit UI
-st.title("🤖 Personal AI Friend with Memory")
-st.markdown(
-    "*A friendly AI agent that remembers your conversations and learns about you*"
-)
+theme_icon = "🌙" if st.session_state.dark_theme else "☀️"
+theme_text = "Dark" if st.session_state.dark_theme else "Light"
+
+# Create header with theme toggle
+col1, col2 = st.columns([4, 1])
+with col1:
+    st.title("🤖 Personal AI Friend with Memory")
+    st.markdown(
+        "*A friendly AI agent that remembers your conversations and learns about you*"
+    )
+with col2:
+    # Theme toggle button
+    if st.button(f"{theme_icon} {theme_text} Mode", key="theme_toggle"):
+        st.session_state.dark_theme = not st.session_state.dark_theme
+        st.rerun()
 
 # Display chat messages from history on app rerun
 for message in st.session_state.messages:
@@ -218,26 +688,26 @@ if prompt := st.chat_input("What would you like to talk about?"):
             # Start timing
             start_time = time.time()
             start_timestamp = datetime.now()
-            
+
             try:
                 response = st.session_state.agent.run(prompt)
-                
+
                 # End timing
                 end_time = time.time()
                 response_time = end_time - start_time
-                
+
                 # Calculate token estimates (rough approximation)
                 input_tokens = len(prompt.split()) * 1.3  # Rough token estimate
                 output_tokens = 0
                 if hasattr(response, "content") and response.content:
                     output_tokens = len(response.content.split()) * 1.3
-                
+
                 total_tokens = input_tokens + output_tokens
-                
+
                 # Count tool calls - check multiple possible attributes
                 tool_calls_made = 0
                 tool_call_details = []
-                
+
                 # Check various possible tool call attributes
                 if hasattr(response, "tool_calls") and response.tool_calls:
                     tool_calls_made = len(response.tool_calls)
@@ -251,21 +721,32 @@ if prompt := st.chat_input("What would you like to talk about?"):
                         elif hasattr(msg, "content") and isinstance(msg.content, list):
                             # Check for tool calls in message content
                             for content_item in msg.content:
-                                if hasattr(content_item, "type") and content_item.type == "tool_use":
+                                if (
+                                    hasattr(content_item, "type")
+                                    and content_item.type == "tool_use"
+                                ):
                                     tool_calls_made += 1
                                     tool_call_details.append(content_item)
-                
+
                 # Update performance stats
                 stats = st.session_state.performance_stats
                 stats["total_requests"] += 1
                 stats["total_response_time"] += response_time
-                stats["average_response_time"] = stats["total_response_time"] / stats["total_requests"]
+                stats["average_response_time"] = (
+                    stats["total_response_time"] / stats["total_requests"]
+                )
                 stats["total_tokens"] += total_tokens
-                stats["average_tokens"] = stats["total_tokens"] / stats["total_requests"]
-                stats["fastest_response"] = min(stats["fastest_response"], response_time)
-                stats["slowest_response"] = max(stats["slowest_response"], response_time)
+                stats["average_tokens"] = (
+                    stats["total_tokens"] / stats["total_requests"]
+                )
+                stats["fastest_response"] = min(
+                    stats["fastest_response"], response_time
+                )
+                stats["slowest_response"] = max(
+                    stats["slowest_response"], response_time
+                )
                 stats["tool_calls_count"] += tool_calls_made
-                
+
                 # Store detailed debug metrics
                 debug_entry = {
                     "timestamp": start_timestamp.strftime("%H:%M:%S"),
@@ -277,9 +758,9 @@ if prompt := st.chat_input("What would you like to talk about?"):
                     "tool_calls": tool_calls_made,
                     "tool_call_details": tool_call_details,
                     "response_type": str(type(response).__name__),
-                    "success": True
+                    "success": True,
                 }
-                
+
                 # Keep only last 10 debug entries
                 st.session_state.debug_metrics.append(debug_entry)
                 if len(st.session_state.debug_metrics) > 10:
@@ -289,59 +770,67 @@ if prompt := st.chat_input("What would you like to talk about?"):
                 if st.session_state.get("show_debug", False):
                     with st.expander("🔍 **Detailed Debug Info**", expanded=False):
                         col1, col2, col3 = st.columns(3)
-                        
+
                         with col1:
                             st.metric("⏱️ Response Time", f"{response_time:.3f}s")
                             st.metric("🔢 Input Tokens", f"{round(input_tokens)}")
-                            
+
                         with col2:
                             st.metric("📝 Output Tokens", f"{round(output_tokens)}")
                             st.metric("📊 Total Tokens", f"{round(total_tokens)}")
-                            
+
                         with col3:
                             st.metric("🛠️ Tool Calls", tool_calls_made)
                             st.metric("📋 Response Type", str(type(response).__name__))
-                        
+
                         st.write("**Response Object Details:**")
-                        
+
                         # Enhanced tool call display
                         if tool_call_details:
                             st.write("**🛠️ Tool Calls Made:**")
                             for i, tool_call in enumerate(tool_call_details, 1):
                                 st.write(f"**Tool Call {i}:**")
-                                if hasattr(tool_call, 'function'):
+                                if hasattr(tool_call, "function"):
                                     st.write(f"  - Function: {tool_call.function.name}")
-                                    st.write(f"  - Arguments: {tool_call.function.arguments}")
-                                elif hasattr(tool_call, 'name'):
+                                    st.write(
+                                        f"  - Arguments: {tool_call.function.arguments}"
+                                    )
+                                elif hasattr(tool_call, "name"):
                                     st.write(f"  - Tool: {tool_call.name}")
-                                    if hasattr(tool_call, 'input'):
+                                    if hasattr(tool_call, "input"):
                                         st.write(f"  - Input: {tool_call.input}")
                                 else:
                                     st.write(f"  - Tool Call: {str(tool_call)}")
                                 st.write("---")
                         else:
                             st.write("- No tool calls detected")
-                        
+
                         if hasattr(response, "messages") and response.messages:
                             st.write(f"- Messages count: {len(response.messages)}")
                             st.write("**Message Details:**")
                             for i, msg in enumerate(response.messages):
                                 st.write(f"**Message {i+1}:**")
                                 st.write(f"  - Role: {getattr(msg, 'role', 'Unknown')}")
-                                if hasattr(msg, 'content'):
-                                    content_preview = str(msg.content)[:200] + "..." if len(str(msg.content)) > 200 else str(msg.content)
+                                if hasattr(msg, "content"):
+                                    content_preview = (
+                                        str(msg.content)[:200] + "..."
+                                        if len(str(msg.content)) > 200
+                                        else str(msg.content)
+                                    )
                                     st.write(f"  - Content: {content_preview}")
-                                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                                if hasattr(msg, "tool_calls") and msg.tool_calls:
                                     st.write(f"  - Tool calls: {len(msg.tool_calls)}")
-                        
+
                         if hasattr(response, "model") and response.model:
                             st.write(f"- Model used: {response.model}")
-                        
+
                         # Show raw response attributes
                         st.write("**Available Response Attributes:**")
-                        response_attrs = [attr for attr in dir(response) if not attr.startswith('_')]
+                        response_attrs = [
+                            attr for attr in dir(response) if not attr.startswith("_")
+                        ]
                         st.write(response_attrs)
-                        
+
                         # Show full response object for deep debugging
                         st.write("**Full Response Object (Advanced):**")
                         st.code(str(response))
@@ -364,7 +853,7 @@ if prompt := st.chat_input("What would you like to talk about?"):
             except Exception as e:
                 end_time = time.time()
                 response_time = end_time - start_time
-                
+
                 # Log failed request
                 debug_entry = {
                     "timestamp": start_timestamp.strftime("%H:%M:%S"),
@@ -376,31 +865,47 @@ if prompt := st.chat_input("What would you like to talk about?"):
                     "tool_calls": 0,
                     "response_type": "Error",
                     "success": False,
-                    "error": str(e)
+                    "error": str(e),
                 }
                 st.session_state.debug_metrics.append(debug_entry)
                 if len(st.session_state.debug_metrics) > 10:
                     st.session_state.debug_metrics.pop(0)
-                
+
                 error_msg = f"Sorry, I encountered an error: {str(e)}"
                 st.error(error_msg)
-                
+
                 # Show enhanced error debug info
                 if st.session_state.get("show_debug", False):
                     with st.expander("❌ **Error Debug Info**", expanded=True):
                         st.write(f"**Error Time:** {response_time:.3f}s")
                         st.write(f"**Error Type:** {type(e).__name__}")
                         st.write(f"**Error Message:** {str(e)}")
-                        
+
                         import traceback
+
                         st.code(traceback.format_exc())
-                        
+
                 st.session_state.messages.append(
                     {"role": "assistant", "content": error_msg}
                 )
 
 # Sidebar with agent info and controls
 with st.sidebar:
+    # Theme section at the top of sidebar
+    st.header("🎨 Theme")
+    theme_icon = "🌙" if st.session_state.dark_theme else "☀️"
+    theme_text = "Dark" if st.session_state.dark_theme else "Light"
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.write(f"**Current Theme:** {theme_text}")
+    with col2:
+        if st.button(theme_icon, key="sidebar_theme_toggle", help=f"Switch to {('Light' if st.session_state.dark_theme else 'Dark')} mode"):
+            st.session_state.dark_theme = not st.session_state.dark_theme
+            st.rerun()
+    
+    st.markdown("---")
+    
     st.header("Model Selection")
 
     # Ollama URL input
@@ -545,69 +1050,78 @@ with st.sidebar:
 
     # Semantic Memory Manager Controls
     st.header("🧠 Semantic Memory")
-    
+
     # Memory Statistics
     if st.button("📊 Show Memory Statistics"):
-        if "agent" in st.session_state and hasattr(st.session_state.agent, 'memory'):
+        if "agent" in st.session_state and hasattr(st.session_state.agent, "memory"):
             try:
                 # Get semantic memory manager from the agent's memory
                 memory_manager = st.session_state.agent.memory.memory_manager
-                if hasattr(memory_manager, 'get_memory_stats'):
+                if hasattr(memory_manager, "get_memory_stats"):
                     stats = memory_manager.get_memory_stats(
                         st.session_state.agent.memory.db, USER_ID
                     )
-                    
+
                     st.subheader("Memory Statistics")
-                    
+
                     # Display basic stats
                     col1, col2 = st.columns(2)
                     with col1:
                         st.metric("Total Memories", stats.get("total_memories", 0))
                         st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
-                    
+
                     with col2:
                         avg_length = stats.get("average_memory_length", 0)
-                        st.metric("Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A")
+                        st.metric(
+                            "Avg Length",
+                            f"{avg_length:.1f} chars" if avg_length else "N/A",
+                        )
                         most_common = stats.get("most_common_topic", "None")
                         st.metric("Top Topic", most_common if most_common else "None")
-                    
+
                     # Topic distribution
                     topic_dist = stats.get("topic_distribution", {})
                     if topic_dist:
                         st.subheader("📈 Topic Distribution")
-                        for topic, count in sorted(topic_dist.items(), key=lambda x: x[1], reverse=True):
+                        for topic, count in sorted(
+                            topic_dist.items(), key=lambda x: x[1], reverse=True
+                        ):
                             st.write(f"**{topic.title()}:** {count} memories")
-                    
+
                 else:
-                    st.info("Memory statistics not available with current memory manager")
+                    st.info(
+                        "Memory statistics not available with current memory manager"
+                    )
             except Exception as e:
                 st.error(f"Error getting memory statistics: {str(e)}")
-    
+
     # Memory Search
     st.subheader("🔍 Search Memories")
     search_query = st.text_input(
         "Search Query:",
         placeholder="Enter keywords to search your memories...",
-        help="Search through your stored memories using semantic similarity"
+        help="Search through your stored memories using semantic similarity",
     )
-    
+
     if st.button("Search") and search_query:
-        if "agent" in st.session_state and hasattr(st.session_state.agent, 'memory'):
+        if "agent" in st.session_state and hasattr(st.session_state.agent, "memory"):
             try:
                 memory_manager = st.session_state.agent.memory.memory_manager
-                if hasattr(memory_manager, 'search_memories'):
+                if hasattr(memory_manager, "search_memories"):
                     results = memory_manager.search_memories(
                         search_query,
                         st.session_state.agent.memory.db,
                         USER_ID,
                         limit=5,
-                        similarity_threshold=0.3
+                        similarity_threshold=0.3,
                     )
-                    
+
                     if results:
                         st.subheader(f"Search Results for: '{search_query}'")
                         for i, (memory, similarity) in enumerate(results, 1):
-                            with st.expander(f"Result {i} (Similarity: {similarity:.2f})"):
+                            with st.expander(
+                                f"Result {i} (Similarity: {similarity:.2f})"
+                            ):
                                 st.write(f"**Memory:** {memory.memory}")
                                 if memory.topics:
                                     st.write(f"**Topics:** {', '.join(memory.topics)}")
@@ -629,94 +1143,130 @@ with st.sidebar:
         # Performance Statistics
         st.subheader("📊 Performance Statistics")
         stats = st.session_state.performance_stats
-        
+
         if stats["total_requests"] > 0:
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.metric("Total Requests", stats["total_requests"])
                 st.metric("Avg Response Time", f"{stats['average_response_time']:.3f}s")
-                st.metric("Fastest Response", f"{stats['fastest_response']:.3f}s" if stats['fastest_response'] != float('inf') else "N/A")
-                
+                st.metric(
+                    "Fastest Response",
+                    (
+                        f"{stats['fastest_response']:.3f}s"
+                        if stats["fastest_response"] != float("inf")
+                        else "N/A"
+                    ),
+                )
+
             with col2:
                 st.metric("Total Tool Calls", stats["tool_calls_count"])
                 st.metric("Avg Tokens/Request", f"{stats['average_tokens']:.0f}")
                 st.metric("Slowest Response", f"{stats['slowest_response']:.3f}s")
-            
+
             # Performance chart
             if len(st.session_state.debug_metrics) > 1:
                 st.subheader("📈 Response Time Trend")
                 try:
                     import pandas as pd
-                    
+
                     df = pd.DataFrame(st.session_state.debug_metrics)
-                    df = df[df['success'] == True]  # Only successful requests
-                    
+                    df = df[df["success"] == True]  # Only successful requests
+
                     if not df.empty and len(df) > 1:
                         # Create a simple line chart of response times
-                        chart_data = df[['timestamp', 'response_time']].copy()
-                        chart_data = chart_data.set_index('timestamp')
-                        
+                        chart_data = df[["timestamp", "response_time"]].copy()
+                        chart_data = chart_data.set_index("timestamp")
+
                         # Use altair for better chart control and avoid deprecation warnings
                         try:
                             import altair as alt
-                            
+
                             # Create altair chart with proper theme handling
-                            chart = alt.Chart(chart_data.reset_index()).mark_line(point=True).encode(
-                                x=alt.X('timestamp:O', title='Time'),
-                                y=alt.Y('response_time:Q', title='Response Time (s)'),
-                                tooltip=['timestamp:O', 'response_time:Q']
-                            ).properties(
-                                width=400,
-                                height=200,
-                                title='Response Time Trend'
+                            chart = (
+                                alt.Chart(chart_data.reset_index())
+                                .mark_line(point=True)
+                                .encode(
+                                    x=alt.X("timestamp:O", title="Time"),
+                                    y=alt.Y(
+                                        "response_time:Q", title="Response Time (s)"
+                                    ),
+                                    tooltip=["timestamp:O", "response_time:Q"],
+                                )
+                                .properties(
+                                    width=400, height=200, title="Response Time Trend"
+                                )
                             )
-                            
+
                             st.altair_chart(chart, use_container_width=True)
                         except ImportError:
                             # Fallback to streamlit line chart if altair not available
-                            st.line_chart(chart_data['response_time'])
+                            st.line_chart(chart_data["response_time"])
                     else:
-                        st.info("Need at least 2 successful requests to show trend chart")
+                        st.info(
+                            "Need at least 2 successful requests to show trend chart"
+                        )
                 except Exception as e:
-                    st.warning(f"Chart rendering issue (this doesn't affect functionality): {str(e)}")
+                    st.warning(
+                        f"Chart rendering issue (this doesn't affect functionality): {str(e)}"
+                    )
                     # Fallback: show data in table format
                     if st.session_state.debug_metrics:
-                        recent_times = [entry['response_time'] for entry in st.session_state.debug_metrics[-5:] if entry['success']]
+                        recent_times = [
+                            entry["response_time"]
+                            for entry in st.session_state.debug_metrics[-5:]
+                            if entry["success"]
+                        ]
                         if recent_times:
-                            st.write(f"Recent response times: {', '.join([f'{t:.3f}s' for t in recent_times])}")
+                            st.write(
+                                f"Recent response times: {', '.join([f'{t:.3f}s' for t in recent_times])}"
+                            )
         else:
             st.info("No requests made yet. Start chatting to see performance stats!")
-        
+
         # Recent Debug Metrics
         st.subheader("🔍 Recent Request Details")
         if st.session_state.debug_metrics:
-            for i, entry in enumerate(reversed(st.session_state.debug_metrics[-5:])):  # Show last 5
-                status_icon = "✅" if entry['success'] else "❌"
-                tool_indicator = f" 🛠️{entry['tool_calls']}" if entry['tool_calls'] > 0 else ""
-                with st.expander(f"{status_icon} {entry['timestamp']} - {entry['response_time']}s{tool_indicator}", expanded=False):
+            for i, entry in enumerate(
+                reversed(st.session_state.debug_metrics[-5:])
+            ):  # Show last 5
+                status_icon = "✅" if entry["success"] else "❌"
+                tool_indicator = (
+                    f" 🛠️{entry['tool_calls']}" if entry["tool_calls"] > 0 else ""
+                )
+                with st.expander(
+                    f"{status_icon} {entry['timestamp']} - {entry['response_time']}s{tool_indicator}",
+                    expanded=False,
+                ):
                     st.write(f"**Prompt:** {entry['prompt']}")
                     st.write(f"**Response Time:** {entry['response_time']}s")
-                    st.write(f"**Tokens:** {entry['total_tokens']} (In: {entry['input_tokens']}, Out: {entry['output_tokens']})")
+                    st.write(
+                        f"**Tokens:** {entry['total_tokens']} (In: {entry['input_tokens']}, Out: {entry['output_tokens']})"
+                    )
                     st.write(f"**Tool Calls:** {entry['tool_calls']}")
                     st.write(f"**Response Type:** {entry['response_type']}")
-                    
+
                     # Show tool call details if available
-                    if entry.get('tool_call_details') and len(entry['tool_call_details']) > 0:
+                    if (
+                        entry.get("tool_call_details")
+                        and len(entry["tool_call_details"]) > 0
+                    ):
                         st.write("**🛠️ Tools Used:**")
-                        for j, tool_call in enumerate(entry['tool_call_details'], 1):
-                            if hasattr(tool_call, 'function') and hasattr(tool_call.function, 'name'):
+                        for j, tool_call in enumerate(entry["tool_call_details"], 1):
+                            if hasattr(tool_call, "function") and hasattr(
+                                tool_call.function, "name"
+                            ):
                                 st.write(f"  {j}. {tool_call.function.name}")
-                            elif hasattr(tool_call, 'name'):
+                            elif hasattr(tool_call, "name"):
                                 st.write(f"  {j}. {tool_call.name}")
                             else:
                                 st.write(f"  {j}. {str(tool_call)[:50]}...")
-                    
-                    if not entry['success'] and 'error' in entry:
+
+                    if not entry["success"] and "error" in entry:
                         st.error(f"**Error:** {entry['error']}")
         else:
             st.info("No debug metrics available yet.")
-        
+
         # Session Information
         st.subheader("🔧 Session Information")
         st.write("**Session State Keys:**")
@@ -739,7 +1289,7 @@ with st.sidebar:
                 f"- Tool call limit: {getattr(agent, 'tool_call_limit', 'Not set')}"
             )
             st.write(f"- Debug mode: {getattr(agent, 'debug_mode', 'Not set')}")
-            
+
         # Clear debug data button
         if st.button("🗑️ Clear Debug Data"):
             st.session_state.debug_metrics = []
@@ -749,10 +1299,10 @@ with st.sidebar:
                 "average_response_time": 0,
                 "total_tokens": 0,
                 "average_tokens": 0,
-                "fastest_response": float('inf'),
+                "fastest_response": float("inf"),
                 "slowest_response": 0,
                 "tool_calls_count": 0,
-                "memory_operations": 0
+                "memory_operations": 0,
             }
             st.success("Debug data cleared!")
             st.rerun()
