@@ -22,9 +22,9 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 
-# Add the src directory to the Python path
-sys.path.insert(0, "/Users/egs/repos/personal_agent/src")
-sys.path.insert(0, "/Users/egs/repos/personal_agent")
+# Add the src directory to the Python path - go up one level from memory_tests to project root
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 from agno.memory.v2.schema import UserMemory

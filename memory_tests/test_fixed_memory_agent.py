@@ -12,9 +12,14 @@ This test validates:
 
 import asyncio
 import logging
+import sys
+from pathlib import Path
 
-from src.personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL
-from src.personal_agent.core.agno_agent import AgnoPersonalAgent
+# Add the src directory to the Python path - go up one level from memory_tests to project root
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL
+from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
