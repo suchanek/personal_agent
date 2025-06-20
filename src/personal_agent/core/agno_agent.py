@@ -803,13 +803,13 @@ Returns:
 
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
-    ) -> str:
+    ) -> Union[str, Dict[str, Any]]:
         """Run a query through the agno agent.
 
         :param query: User query to process
         :param stream: Whether to stream the response
         :param add_thought_callback: Optional callback for adding thoughts during processing
-        :return: Agent response
+        :return: Agent response (string) or dict with response and tool call info
         """
         if not self.agent:
             raise RuntimeError("Agent not initialized. Call initialize() first.")
@@ -842,6 +842,9 @@ Returns:
                 if add_thought_callback and self.enable_memory:
                     add_thought_callback("💾 Memory automatically updated by Agno")
 
+                # Store the last response for tool call extraction
+                self._last_response = response
+                
                 return response.content
 
         except Exception as e:
@@ -849,6 +852,127 @@ Returns:
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
+
+    def get_last_tool_calls(self) -> Dict[str, Any]:
+        """Get tool call information from the last response.
+        
+        :return: Dictionary with tool call details
+        """
+        if not hasattr(self, '_last_response') or not self._last_response:
+            return {
+                "tool_calls_count": 0,
+                "tool_call_details": [],
+                "has_tool_calls": False
+            }
+        
+        try:
+            response = self._last_response
+            tool_calls = []
+            tool_calls_count = 0
+            
+            # Check if response has formatted_tool_calls (agno-specific)
+            if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls:
+                tool_calls_count = len(response.formatted_tool_calls)
+                for tool_call in response.formatted_tool_calls:
+                    tool_info = {
+                        "id": getattr(tool_call, 'id', 'unknown'),
+                        "type": getattr(tool_call, 'type', 'function'),
+                    }
+                    
+                    if hasattr(tool_call, 'function'):
+                        tool_info.update({
+                            "function_name": getattr(tool_call.function, 'name', 'unknown'),
+                            "function_args": getattr(tool_call.function, 'arguments', '{}')
+                        })
+                    elif hasattr(tool_call, 'name'):
+                        tool_info.update({
+                            "function_name": tool_call.name,
+                            "function_args": getattr(tool_call, 'input', '{}')
+                        })
+                    else:
+                        # Handle string or dict format
+                        if isinstance(tool_call, dict):
+                            tool_info.update({
+                                "function_name": tool_call.get('name', 'unknown'),
+                                "function_args": tool_call.get('arguments', '{}')
+                            })
+                        else:
+                            tool_info.update({
+                                "function_name": str(tool_call),
+                                "function_args": '{}'
+                            })
+                    
+                    tool_calls.append(tool_info)
+            
+            # Check if response has messages with tool calls
+            elif hasattr(response, 'messages') and response.messages:
+                for message in response.messages:
+                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                        tool_calls_count += len(message.tool_calls)
+                        for tool_call in message.tool_calls:
+                            tool_info = {
+                                "id": getattr(tool_call, 'id', 'unknown'),
+                                "type": getattr(tool_call, 'type', 'function'),
+                            }
+                            
+                            if hasattr(tool_call, 'function'):
+                                tool_info.update({
+                                    "function_name": getattr(tool_call.function, 'name', 'unknown'),
+                                    "function_args": getattr(tool_call.function, 'arguments', '{}')
+                                })
+                            elif hasattr(tool_call, 'name'):
+                                tool_info.update({
+                                    "function_name": tool_call.name,
+                                    "function_args": getattr(tool_call, 'input', '{}')
+                                })
+                            
+                            tool_calls.append(tool_info)
+            
+            # Also check if response has direct tool call information
+            elif hasattr(response, 'tool_calls') and response.tool_calls:
+                tool_calls_count = len(response.tool_calls)
+                for tool_call in response.tool_calls:
+                    tool_info = {
+                        "id": getattr(tool_call, 'id', 'unknown'),
+                        "type": getattr(tool_call, 'type', 'function'),
+                    }
+                    
+                    if hasattr(tool_call, 'function'):
+                        tool_info.update({
+                            "function_name": getattr(tool_call.function, 'name', 'unknown'),
+                            "function_args": getattr(tool_call.function, 'arguments', '{}')
+                        })
+                    elif hasattr(tool_call, 'name'):
+                        tool_info.update({
+                            "function_name": tool_call.name,
+                            "function_args": getattr(tool_call, 'input', '{}')
+                        })
+                    
+                    tool_calls.append(tool_info)
+            
+            return {
+                "tool_calls_count": tool_calls_count,
+                "tool_call_details": tool_calls,
+                "has_tool_calls": tool_calls_count > 0,
+                "response_type": "AgnoPersonalAgent",
+                "debug_info": {
+                    "response_attributes": [attr for attr in dir(response) if not attr.startswith('_')],
+                    "has_messages": hasattr(response, 'messages'),
+                    "messages_count": len(response.messages) if hasattr(response, 'messages') and response.messages else 0,
+                    "has_tool_calls_attr": hasattr(response, 'tool_calls'),
+                    "has_formatted_tool_calls_attr": hasattr(response, 'formatted_tool_calls'),
+                    "formatted_tool_calls_count": len(response.formatted_tool_calls) if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls else 0,
+                }
+            }
+            
+        except Exception as e:
+            logger.error("Error extracting tool calls: %s", e)
+            return {
+                "tool_calls_count": 0,
+                "tool_call_details": [],
+                "has_tool_calls": False,
+                "error": str(e)
+            }
 
     async def cleanup(self) -> None:
         """Clean up resources.

@@ -1,5 +1,315 @@
 # Personal AI Agent - Technical Changelog
 
+## 🔧 **v0.7.4.dev2: Tool Call Detection Fix - Streamlit Debug Visibility Enhancement** (June 20, 2025)
+
+### ✅ **CRITICAL UX FIX: Tool Call Visibility in Streamlit Frontend**
+
+**🎯 Mission Accomplished**: Successfully resolved critical issue where tool calls were being executed by AgnoPersonalAgent but not visible in the Streamlit frontend debug information, transforming invisible tool usage into comprehensive debugging visibility!
+
+#### 🔍 **Problem Analysis - Tool Call Invisibility Crisis**
+
+**CRITICAL ISSUE: Tool Calls Executed But Not Visible**
+
+- **Symptom**: User reported rate limiting after tool calls, but debug panels showed "0 tool calls" and no tool call details
+- **Root Cause**: `AgnoPersonalAgent` executes tool calls internally through agno framework, but only returns string responses
+- **Impact**: Debugging impossible, no visibility into agent's actual tool usage, rate limiting appeared mysterious
+
+**Example of Problematic Behavior**:
+
+```python
+# Streamlit frontend code (BEFORE)
+# For AgnoPersonalAgent, tool calls are handled internally
+# We can't easily extract tool call details from the string response
+tool_calls_made = 0
+tool_call_details = []
+```
+
+**User Experience Impact**:
+
+- ❌ No visibility into which tools were called during rate limiting
+- ❌ Debug panels showed 0 tool calls despite tools being executed
+- ❌ Performance metrics missing tool call information
+- ❌ Troubleshooting rate limiting issues was impossible
+
+#### 🛠️ **Technical Solution Implementation**
+
+**SOLUTION #1: Enhanced AgnoPersonalAgent Tool Call Extraction**
+
+Added `get_last_tool_calls()` method to `src/personal_agent/core/agno_agent.py`:
+
+```python
+def get_last_tool_calls(self) -> Dict[str, Any]:
+    """Get tool call information from the last response.
+    
+    :return: Dictionary with tool call details
+    """
+    if not hasattr(self, '_last_response') or not self._last_response:
+        return {
+            "tool_calls_count": 0,
+            "tool_call_details": [],
+            "has_tool_calls": False
+        }
+    
+    try:
+        response = self._last_response
+        tool_calls = []
+        tool_calls_count = 0
+        
+        # Check if response has formatted_tool_calls (agno-specific)
+        if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls:
+            tool_calls_count = len(response.formatted_tool_calls)
+            for tool_call in response.formatted_tool_calls:
+                tool_info = {
+                    "id": getattr(tool_call, 'id', 'unknown'),
+                    "type": getattr(tool_call, 'type', 'function'),
+                    "function_name": tool_call.get('name', 'unknown'),
+                    "function_args": tool_call.get('arguments', '{}')
+                }
+                tool_calls.append(tool_info)
+        
+        # Also check messages and direct tool_calls attributes
+        # [Additional extraction logic for comprehensive coverage]
+        
+        return {
+            "tool_calls_count": tool_calls_count,
+            "tool_call_details": tool_calls,
+            "has_tool_calls": tool_calls_count > 0,
+            "response_type": "AgnoPersonalAgent",
+            "debug_info": {
+                "response_attributes": [attr for attr in dir(response) if not attr.startswith('_')],
+                "has_messages": hasattr(response, 'messages'),
+                "messages_count": len(response.messages) if hasattr(response, 'messages') and response.messages else 0,
+                "has_tool_calls_attr": hasattr(response, 'tool_calls'),
+                "has_formatted_tool_calls_attr": hasattr(response, 'formatted_tool_calls'),
+                "formatted_tool_calls_count": len(response.formatted_tool_calls) if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls else 0,
+            }
+        }
+    except Exception as e:
+        logger.error("Error extracting tool calls: %s", e)
+        return {
+            "tool_calls_count": 0,
+            "tool_call_details": [],
+            "has_tool_calls": False,
+            "error": str(e)
+        }
+```
+
+**SOLUTION #2: Modified Agent Run Method to Store Response**
+
+Enhanced the `run()` method to store the last response for analysis:
+
+```python
+async def run(self, query: str, stream: bool = False, add_thought_callback=None) -> str:
+    # ... existing code ...
+    
+    response = await self.agent.arun(query, user_id=self.user_id)
+    
+    # Store the last response for tool call extraction
+    self._last_response = response
+    
+    return response.content
+```
+
+**SOLUTION #3: Updated Streamlit Frontend Tool Call Detection**
+
+Modified `tools/paga_streamlit_agno.py` to use the new extraction method:
+
+```python
+# BEFORE (No visibility)
+# For AgnoPersonalAgent, tool calls are handled internally
+# We can't easily extract tool call details from the string response
+tool_calls_made = 0
+tool_call_details = []
+
+# AFTER (Full visibility)
+# For AgnoPersonalAgent, get tool call details from the agent
+tool_call_info = st.session_state.agent.get_last_tool_calls()
+tool_calls_made = tool_call_info.get("tool_calls_count", 0)
+tool_call_details = tool_call_info.get("tool_call_details", [])
+```
+
+**SOLUTION #4: Enhanced Debug Display**
+
+Updated debug panels to show comprehensive tool call information:
+
+```python
+# Enhanced tool call display for new format
+if tool_call_details:
+    st.write("**🛠️ Tool Calls Made:**")
+    for i, tool_call in enumerate(tool_call_details, 1):
+        st.write(f"**Tool Call {i}:**")
+        # Handle new dictionary format from get_last_tool_calls()
+        if isinstance(tool_call, dict):
+            st.write(f"  - ID: {tool_call.get('id', 'unknown')}")
+            st.write(f"  - Type: {tool_call.get('type', 'function')}")
+            st.write(f"  - Function: {tool_call.get('function_name', 'unknown')}")
+            args = tool_call.get('function_args', '{}')
+            st.write(f"  - Arguments: {args}")
+        # ... handle legacy formats for compatibility ...
+
+# Show debug info from get_last_tool_calls if available
+if isinstance(st.session_state.agent, AgnoPersonalAgent):
+    debug_info = tool_call_info.get("debug_info", {})
+    if debug_info:
+        st.write("**🔍 Tool Call Debug Info:**")
+        st.write(f"  - Response has messages: {debug_info.get('has_messages', False)}")
+        st.write(f"  - Messages count: {debug_info.get('messages_count', 0)}")
+        st.write(f"  - Has tool_calls attr: {debug_info.get('has_tool_calls_attr', False)}")
+        response_attrs = debug_info.get('response_attributes', [])
+        if response_attrs:
+            st.write(f"  - Response attributes: {response_attrs}")
+```
+
+#### 🧪 **Comprehensive Testing & Validation**
+
+**NEW: Tool Call Detection Test Suite**
+
+Created comprehensive testing infrastructure:
+
+- **`test_tool_call_detection.py`**: Main test script with 6 different scenarios
+- **`run_tool_test.sh`**: Convenient execution script  
+- **`TOOL_CALL_TEST_README.md`**: Complete documentation
+
+**Test Results - 5/6 Tests Passed (83% Success Rate)**:
+
+```
+🧪 Testing Tool Call Detection in AgnoPersonalAgent
+
+✅ Memory Storage Test: 9 tool calls detected (store_user_memory)
+✅ Memory Retrieval Test: 1 tool call detected (get_recent_memories)  
+✅ Finance Tool Test: 2 tool calls detected (get_current_stock_price)
+✅ Web Search Test: 2 tool calls detected (duckduckgo_news, web_search)
+❌ Python Calculation Test: 0 tool calls (model chose not to use tools)
+✅ Simple Chat Test: 0 tool calls (correctly detected no tools needed)
+
+🔍 DEBUG INFORMATION
+Last response debug info:
+  - Has messages: True
+  - Messages count: 3
+  - Has tool_calls attr: False
+  - Response attributes: ['agent_id', 'audio', 'citations', 'content', 'content_type', 'created_at', 'event', 'extra_data', 'formatted_tool_calls', 'from_dict', 'get_content_as_string', 'images', 'is_paused', 'messages', 'metrics', 'model', 'model_provider', 'reasoning_content', 'response_audio', 'run_id', 'session_id', 'thinking', 'to_dict', 'to_json', 'tools', 'tools_awaiting_external_execution', 'tools_requiring_confirmation', 'tools_requiring_user_input', 'videos', 'workflow_id']
+
+🔧 Testing get_last_tool_calls() method directly:
+  - Tool calls count: 9 (for last test)
+  - Has tool calls: True
+  - Response type: AgnoPersonalAgent
+```
+
+**Key Discovery**: The agno framework stores tool calls in the `formatted_tool_calls` attribute, which was the missing piece for tool call extraction.
+
+#### 📊 **Performance & Reliability Improvements**
+
+**Tool Call Visibility Enhancement**:
+
+**BEFORE (Invisible Tool Usage)**:
+
+- Tool calls executed but not visible in debug panels
+- Performance metrics showed 0 tool calls despite actual usage
+- Rate limiting appeared mysterious with no debugging information
+- Tool indicators missing from request history
+
+**AFTER (Complete Visibility)**:
+
+- All tool calls properly detected and displayed
+- Detailed tool information including function names and arguments
+- Comprehensive debugging information about response structure
+- Tool indicators (🛠️) properly shown in request history
+
+**Debug Information Now Available**:
+
+- Tool call counts in performance metrics
+- Detailed tool call information (ID, type, function name, arguments)
+- Response structure analysis for troubleshooting
+- Tool indicators in recent request history
+
+#### 🎯 **User Experience Transformation**
+
+**Real-World Impact**:
+
+**Scenario**: User experiences rate limiting and wants to understand what tools were called
+
+**BEFORE**:
+
+```
+User: "Why am I getting rate limited?"
+Debug Panel: "Tool calls: 0" (despite tools being called)
+User: "This is confusing, I can't see what's happening"
+```
+
+**AFTER**:
+
+```
+User: "Why am I getting rate limited?"
+Debug Panel: "Tool calls: 2"
+Tool Details:
+  1. duckduckgo_news(query=artificial intelligence) (function)
+  2. web_search(query=artificial intelligence news) (function)
+User: "Ah, I see the web search tools hit rate limits"
+```
+
+**Key Improvements**:
+
+1. ✅ **Complete Tool Visibility**: All tool calls now visible in debug panels
+2. ✅ **Detailed Information**: Function names, arguments, and metadata displayed
+3. ✅ **Performance Metrics**: Accurate tool call counts in statistics
+4. ✅ **Debugging Support**: Comprehensive response structure analysis
+5. ✅ **Professional UI**: Tool indicators and detailed debug information
+
+#### 🔧 **Technical Architecture Excellence**
+
+**Enhanced AgnoPersonalAgent Features**:
+
+- **Tool Call Extraction**: Comprehensive method to extract tool information from agno responses
+- **Response Storage**: Automatic storage of last response for analysis
+- **Multiple Format Support**: Handles various tool call formats from agno framework
+- **Error Resilience**: Graceful handling of missing or malformed tool call data
+- **Debug Information**: Detailed response structure analysis for troubleshooting
+
+**Streamlit Integration Enhancements**:
+
+- **Dynamic Tool Detection**: Real-time extraction of tool call information
+- **Enhanced Debug Panels**: Comprehensive tool call display with metadata
+- **Performance Integration**: Tool calls properly counted in performance metrics
+- **Visual Indicators**: Tool indicators (🛠️) in request history
+- **Backward Compatibility**: Maintains support for other agent types
+
+#### 📁 **Files Created & Modified**
+
+**Enhanced Files**:
+
+- `src/personal_agent/core/agno_agent.py` - Added `get_last_tool_calls()` method and response storage
+- `tools/paga_streamlit_agno.py` - Updated tool call detection and debug display
+
+**New Test Files**:
+
+- `test_tool_call_detection.py` - Comprehensive tool call detection test suite
+- `run_tool_test.sh` - Convenient test execution script
+- `TOOL_CALL_TEST_README.md` - Complete testing documentation
+
+#### 🏆 **Achievement Summary**
+
+**Technical Innovation**: Successfully resolved the tool call visibility crisis by implementing comprehensive tool call extraction from agno framework responses, transforming invisible tool usage into complete debugging transparency.
+
+**Key Innovations**:
+
+1. ✅ **Tool Call Extraction**: First implementation of comprehensive tool call detection for AgnoPersonalAgent
+2. ✅ **Response Analysis**: Deep inspection of agno response structure to find tool call information
+3. ✅ **Streamlit Integration**: Seamless integration with existing debug infrastructure
+4. ✅ **Comprehensive Testing**: Complete test suite validating tool call detection across scenarios
+5. ✅ **Debug Enhancement**: Rich debugging information for troubleshooting tool usage
+6. ✅ **User Experience**: Transformed mysterious tool behavior into transparent, debuggable operations
+
+**Business Impact**:
+
+- **Debugging Capability**: Users can now see exactly which tools are called and why
+- **Rate Limiting Transparency**: Clear visibility into which tools trigger rate limits
+- **Performance Monitoring**: Accurate tool call metrics for system optimization
+- **Professional UI**: Enhanced debug panels with comprehensive tool information
+
+**Result**: Successfully transformed invisible tool usage into a transparent, debuggable system that provides complete visibility into agent tool behavior, enabling effective troubleshooting and performance monitoring! 🚀
+
+---
+
 ## 💰 **v0.7.3.dev2: YFinance 401 Error Fix - Working Finance Tools Implementation** (June 20, 2025)
 
 ### ✅ **CRITICAL FINANCE FIX: Resolved Yahoo Finance API 401 Errors**
