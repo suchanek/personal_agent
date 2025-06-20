@@ -29,7 +29,7 @@ from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
-from agno.tools.yfinance import YFinanceTools
+# from agno.tools.yfinance import YFinanceTools  # Disabled due to 401 errors
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from rich.console import Console
@@ -40,6 +40,7 @@ from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentWebTools,
 )
+from ..tools.working_yfinance_tools import WorkingYFinanceTools
 from ..utils import setup_logging
 from .agno_storage import (
     create_agno_memory,
@@ -559,15 +560,57 @@ Returns:
             - "Do you know my preferences?" → query_memory("preferences") → Share what you find
             - "What have I told you?" → get_recent_memories() → Reference past conversations
             
-            ## TOOL USAGE - BE HELPFUL & EFFICIENT
+            ## TOOL USAGE - IMMEDIATE ACTION REQUIRED (NO HESITATION)
             
-            When users ask for current information, news, or search queries, use the available tools:
-            - **DuckDuckGoTools**: For news searches and general web searches
-            - **YFinanceTools**: For financial analysis and stock information
-            - **PythonTools**: For calculations and programming help
-            - **Shell commands**: For system operations when needed
-            - **GitHub tools**: For repository information and code analysis
-            - **File operations**: For reading/writing files
+            **CRITICAL: ELIMINATE ALL TOOL USAGE HESITATION**
+            
+            **FINANCE QUERIES - IMMEDIATE ACTION**:
+            - Stock analysis requests → IMMEDIATELY use YFinanceTools
+            - "analyze [STOCK]" → IMMEDIATELY call get_current_stock_price() and get_stock_info()
+            - Financial data requests → IMMEDIATELY use finance tools
+            - NO thinking, NO debate, just USE THE TOOLS
+            
+            **WEB SEARCH QUERIES - IMMEDIATE ACTION**:
+            - News requests → IMMEDIATELY use DuckDuckGoTools
+            - Current events → IMMEDIATELY search the web
+            - "what's happening with..." → IMMEDIATELY use web search
+            - NO analysis paralysis, just SEARCH
+            
+            **TOOL DECISION TREE - FOLLOW EXACTLY**:
+            - Finance question? → YFinanceTools IMMEDIATELY
+            - News/current events? → DuckDuckGoTools IMMEDIATELY  
+            - Calculations? → PythonTools IMMEDIATELY
+            - File operations? → Use file tools IMMEDIATELY
+            - Code/GitHub? → Use GitHub tools IMMEDIATELY
+            
+            **BANNED BEHAVIORS FOR ALL TOOLS**:
+            - ❌ "Let me think about what tools to use..."
+            - ❌ "I should probably use [tool] but..."
+            - ❌ "Maybe I should search or maybe I should..."
+            - ❌ Any internal debate about tool selection
+            - ❌ Fabricating data instead of using tools
+            
+            **REQUIRED IMMEDIATE RESPONSES**:
+            - ✅ "Analyze NVDA" → IMMEDIATELY use YFinanceTools
+            - ✅ "call your yfinance tool with argument NVDA" → IMMEDIATELY use get_current_stock_price("NVDA")
+            - ✅ "use your finance tools" → IMMEDIATELY use YFinanceTools
+            - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools  
+            - ✅ "Calculate..." → IMMEDIATELY use PythonTools
+            - ✅ NO hesitation, just ACTION
+            
+            **CRITICAL: STOP ALL THINKING FOR TOOL REQUESTS**
+            - When user asks for tool usage, DO NOT use <think> tags
+            - DO NOT analyze what to do - just DO IT
+            - IMMEDIATELY call the requested tool
+            - Example: "call yfinance with NVDA" → get_current_stock_price("NVDA") RIGHT NOW
+            
+            Available tools and their immediate use cases:
+            - **YFinanceTools**: Stock prices, financial analysis, market data
+            - **DuckDuckGoTools**: News searches, current events, web information
+            - **PythonTools**: Calculations, data analysis, programming help
+            - **Shell commands**: System operations when needed
+            - **GitHub tools**: Repository information and code analysis
+            - **File operations**: Reading/writing files
             
             **IMPORTANT MEMORY RULES**:
             - When calling memory functions, always pass topics as a proper list like ["topic1", "topic2"]
@@ -613,7 +656,7 @@ Returns:
             # Prepare tools list
             tools = [
                 DuckDuckGoTools(),
-                YFinanceTools(),
+                WorkingYFinanceTools(),  # Use our working YFinance tools instead of broken ones
                 PythonTools(),
                 ShellTools(base_dir="."),  # Match Streamlit configuration for consistency
                 PersonalAgentFilesystemTools(),
