@@ -1,6 +1,6 @@
 # Personal AI Agent - Technical Changelog
 
-## 🔧 **v0.7.4.dev2: Tool Call Detection Fix - Streamlit Debug Visibility Enhancement** (June 20, 2025)
+## 🔧 **v0.7.dev2: Tool Call Detection Fix - Streamlit Debug Visibility Enhancement** (June 20, 2025)
 
 ### ✅ **CRITICAL UX FIX: Tool Call Visibility in Streamlit Frontend**
 
@@ -990,6 +990,7 @@ AI Response: "I remember several things about you! You mentioned that you like p
 **Real-World Issue Identified**: During testing, discovered that the tool usage hesitation problem extends beyond memory tools to ALL tools, particularly finance tools.
 
 **Example Problem Case**:
+
 ```
 User: "use your finance tools to analyze NVDA and give me a good summary"
 
@@ -1003,6 +1004,7 @@ Agent Response:
 **Root Cause**: The agent instructions focused heavily on memory tool hesitation but failed to address the broader pattern of tool usage analysis paralysis across ALL available tools.
 
 **Solution Applied**: Enhanced agent instructions with universal tool usage rules:
+
 - Finance queries → IMMEDIATELY use YFinanceTools
 - Web searches → IMMEDIATELY use DuckDuckGoTools  
 - Calculations → IMMEDIATELY use PythonTools
