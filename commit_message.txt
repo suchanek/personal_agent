@@ -1,0 +1,46 @@
+feat: Add tool call detection for AgnoPersonalAgent in Streamlit frontend
+
+BREAKING: Resolve critical tool call visibility issue in debug panels
+
+## Problem Solved
+- Tool calls were executed by AgnoPersonalAgent but invisible in Streamlit debug info
+- Users experiencing rate limiting couldn't see which tools were called
+- Debug panels showed "0 tool calls" despite actual tool usage
+- Performance metrics missing tool call information
+
+## Technical Implementation
+- Added `get_last_tool_calls()` method to AgnoPersonalAgent
+- Enhanced `run()` method to store last response for analysis
+- Updated Streamlit frontend to extract tool call details dynamically
+- Added comprehensive debug information display
+
+## Key Discovery
+- Agno framework stores tool calls in `formatted_tool_calls` attribute
+- Required deep response structure analysis to extract tool information
+- Implemented multi-format tool call detection for robustness
+
+## Test Results
+- Created comprehensive test suite with 6 scenarios
+- 5/6 tests passed (83% success rate)
+- Successfully detects memory, finance, and web search tool calls
+- Tool call details include function names, arguments, and metadata
+
+## Files Modified
+- src/personal_agent/core/agno_agent.py: Added tool call extraction method
+- tools/paga_streamlit_agno.py: Updated debug display and tool detection
+- test_tool_call_detection.py: Comprehensive test suite (NEW)
+- run_tool_test.sh: Test execution script (NEW)
+- TOOL_CALL_TEST_README.md: Complete documentation (NEW)
+
+## Impact
+- Users can now see exactly which tools are called during rate limiting
+- Debug panels show accurate tool call counts and details
+- Performance metrics include proper tool usage statistics
+- Enhanced troubleshooting capabilities for agent behavior
+
+## Breaking Changes
+- AgnoPersonalAgent now requires `_last_response` storage for tool extraction
+- Streamlit debug panels display format updated for new tool call data structure
+
+Fixes: Tool call invisibility in Streamlit debug panels
+Closes: Rate limiting debugging issues

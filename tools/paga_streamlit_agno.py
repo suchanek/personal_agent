@@ -434,10 +434,10 @@ if prompt := st.chat_input("What would you like to talk about?"):
 
                 total_tokens = input_tokens + output_tokens
 
-                # For AgnoPersonalAgent, tool calls are handled internally
-                # We can't easily extract tool call details from the string response
-                tool_calls_made = 0
-                tool_call_details = []
+                # For AgnoPersonalAgent, get tool call details from the agent
+                tool_call_info = st.session_state.agent.get_last_tool_calls()
+                tool_calls_made = tool_call_info.get("tool_calls_count", 0)
+                tool_call_details = tool_call_info.get("tool_call_details", [])
 
                 # Update performance stats
                 stats = st.session_state.performance_stats
@@ -509,16 +509,22 @@ if prompt := st.chat_input("What would you like to talk about?"):
 
                         st.write("**Response Object Details:**")
 
-                        # Enhanced tool call display
+                        # Enhanced tool call display for new format
                         if tool_call_details:
                             st.write("**🛠️ Tool Calls Made:**")
                             for i, tool_call in enumerate(tool_call_details, 1):
                                 st.write(f"**Tool Call {i}:**")
-                                if hasattr(tool_call, "function"):
+                                # Handle new dictionary format from get_last_tool_calls()
+                                if isinstance(tool_call, dict):
+                                    st.write(f"  - ID: {tool_call.get('id', 'unknown')}")
+                                    st.write(f"  - Type: {tool_call.get('type', 'function')}")
+                                    st.write(f"  - Function: {tool_call.get('function_name', 'unknown')}")
+                                    args = tool_call.get('function_args', '{}')
+                                    st.write(f"  - Arguments: {args}")
+                                # Handle legacy format for compatibility
+                                elif hasattr(tool_call, "function"):
                                     st.write(f"  - Function: {tool_call.function.name}")
-                                    st.write(
-                                        f"  - Arguments: {tool_call.function.arguments}"
-                                    )
+                                    st.write(f"  - Arguments: {tool_call.function.arguments}")
                                 elif hasattr(tool_call, "name"):
                                     st.write(f"  - Tool: {tool_call.name}")
                                     if hasattr(tool_call, "input"):
@@ -528,6 +534,18 @@ if prompt := st.chat_input("What would you like to talk about?"):
                                 st.write("---")
                         else:
                             st.write("- No tool calls detected")
+                            
+                        # Show debug info from get_last_tool_calls if available
+                        if isinstance(st.session_state.agent, AgnoPersonalAgent):
+                            debug_info = tool_call_info.get("debug_info", {})
+                            if debug_info:
+                                st.write("**🔍 Tool Call Debug Info:**")
+                                st.write(f"  - Response has messages: {debug_info.get('has_messages', False)}")
+                                st.write(f"  - Messages count: {debug_info.get('messages_count', 0)}")
+                                st.write(f"  - Has tool_calls attr: {debug_info.get('has_tool_calls_attr', False)}")
+                                response_attrs = debug_info.get('response_attributes', [])
+                                if response_attrs:
+                                    st.write(f"  - Response attributes: {response_attrs}")
 
                         # For AgnoPersonalAgent, we only have response_content (string)
                         if isinstance(st.session_state.agent, AgnoPersonalAgent):
