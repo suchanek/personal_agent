@@ -213,12 +213,12 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_memory(query: str, limit: Union[int, None] = 5) -> str:
-            """Search user memories using semantic search.
+        async def query_memory(query: str, limit: Union[int, None] = None) -> str:
+            """Search user memories using semantic search through ALL memories.
 
             Args:
                 query: The query to search for in memories
-                limit: Maximum number of memories to return
+                limit: Maximum number of memories to return (None = search all, return top matches)
 
             Returns:
                 str: Found memories or message if none found
@@ -229,20 +229,59 @@ class AgnoPersonalAgent:
                     logger.warning("Empty query provided to query_memory")
                     return "❌ Error: Query cannot be empty. Please provide a search term."
 
-                memories = self.agno_memory.search_user_memories(
-                    user_id=self.user_id,
-                    query=query.strip(),
-                    retrieval_method="agentic",
-                    limit=limit,
-                )
+                # First, get ALL memories to search through them comprehensively
+                all_memories = self.agno_memory.get_user_memories(user_id=self.user_id)
+                
+                if not all_memories:
+                    logger.info("No memories stored for user: %s", self.user_id)
+                    return f"🔍 No memories found - you haven't shared any information with me yet!"
 
-                if not memories:
-                    logger.info("No memories found for query: %s", query)
-                    return f"🔍 No memories found for: {query}"
+                # Search through ALL memories manually for comprehensive results
+                query_terms = query.strip().lower().split()
+                matching_memories = []
+                
+                for memory in all_memories:
+                    memory_content = getattr(memory, "memory", "").lower()
+                    memory_topics = getattr(memory, "topics", [])
+                    topic_text = " ".join(memory_topics).lower()
+                    
+                    # Check if any query term appears in memory content or topics
+                    if any(term in memory_content or term in topic_text for term in query_terms):
+                        matching_memories.append(memory)
+
+                # Also try semantic search as a backup to catch semantically similar memories
+                try:
+                    semantic_memories = self.agno_memory.search_user_memories(
+                        user_id=self.user_id,
+                        query=query.strip(),
+                        retrieval_method="agentic",
+                        limit=20,  # Get more semantic matches
+                    )
+                    
+                    # Add semantic matches that aren't already in our results
+                    for sem_memory in semantic_memories:
+                        if sem_memory not in matching_memories:
+                            matching_memories.append(sem_memory)
+                            
+                except Exception as semantic_error:
+                    logger.warning("Semantic search failed, using manual search only: %s", semantic_error)
+
+                if not matching_memories:
+                    logger.info("No matching memories found for query: %s (searched %d total memories)", query, len(all_memories))
+                    return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords or ask me to remember something new!"
+
+                # Apply limit if specified, otherwise return all matches
+                if limit and len(matching_memories) > limit:
+                    display_memories = matching_memories[:limit]
+                    result_note = f"🧠 MEMORY RETRIEVAL (showing top {limit} of {len(matching_memories)} matches from {len(all_memories)} total memories)"
+                else:
+                    display_memories = matching_memories
+                    result_note = f"🧠 MEMORY RETRIEVAL (found {len(matching_memories)} matches from {len(all_memories)} total memories)"
 
                 # Format memories with explicit instruction to restate in second person
-                result = f"🧠 MEMORY RETRIEVAL INSTRUCTION: The following {len(memories)} memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user. Convert any first-person statements to second-person:\n\n"
-                for i, memory in enumerate(memories, 1):
+                result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user. Convert any first-person statements to second-person:\n\n"
+                
+                for i, memory in enumerate(display_memories, 1):
                     result += f"{i}. {memory.memory}\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
@@ -250,7 +289,7 @@ class AgnoPersonalAgent:
                 
                 result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
 
-                logger.info("Found %d memories for query: %s", len(memories), query)
+                logger.info("Found %d matching memories for query: %s (searched %d total)", len(matching_memories), query, len(all_memories))
                 return result
 
             except Exception as e:
