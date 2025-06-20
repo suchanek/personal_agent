@@ -25,6 +25,7 @@ from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
@@ -147,12 +148,12 @@ class AgnoPersonalAgent:
 
         tools = []
 
-        async def store_user_memory(content: str, topics: List[str] = None) -> str:
+        async def store_user_memory(content: str, topics: Union[List[str], str, None] = None) -> str:
             """Store information as a user memory.
 
             Args:
                 content: The information to store as a memory
-                topics: Optional list of topics/categories for the memory
+                topics: Optional list of topics/categories for the memory (can be list or JSON string)
 
             Returns:
                 str: Success or error message
@@ -212,7 +213,7 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_memory(query: str, limit: int = 5) -> str:
+        async def query_memory(query: str, limit: Union[int, None] = 5) -> str:
             """Search user memories using semantic search.
 
             Args:
@@ -425,9 +426,15 @@ Returns:
             3. **Do NOT over-think** - simple facts should be stored immediately
             
             **MEMORY RETRIEVAL**: When asked about personal information:
-            1. **Use query_memory to search** for relevant information
+            1. **ALWAYS use query_memory FIRST** for personal questions (name, preferences, location, etc.)
             2. **Use get_recent_memories** to see recent context
-            3. **Do NOT use web search** for personal details
+            3. **Do NOT use knowledge base search** for personal details
+            4. **Do NOT use web search** for personal details
+            
+            **TOOL PRIORITY**: For personal information queries:
+            1. **Memory tools (query_memory, get_recent_memories) - HIGHEST PRIORITY**
+            2. Knowledge base search - only for general knowledge
+            3. Web search - only for current/external information
             
             ## Core Guidelines
             
@@ -521,8 +528,20 @@ Returns:
                     )
                     logger.info("Loaded Agno combined knowledge base content")
 
-                    # Knowledge tools will be automatically added via search_knowledge=True
-                    # DO NOT manually add KnowledgeTools to avoid naming conflicts
+                    # Add KnowledgeTools for automatic knowledge base search and reasoning
+                    try:
+                        knowledge_tools = KnowledgeTools(
+                            knowledge=self.agno_knowledge,
+                            think=True,      # Enable reasoning scratchpad
+                            search=True,     # Enable knowledge search
+                            analyze=True,    # Enable analysis capabilities
+                            add_instructions=True,  # Use built-in instructions
+                            add_few_shot=True,     # Add example interactions
+                        )
+                        tools.append(knowledge_tools)
+                        logger.info("Added KnowledgeTools for automatic knowledge base search and reasoning")
+                    except Exception as e:
+                        logger.warning("Failed to add KnowledgeTools: %s", e)
 
                 self.agno_memory = create_agno_memory(self.storage_dir)
 
@@ -600,6 +619,7 @@ Returns:
                 add_history_to_messages=False,
                 num_history_responses=5,
                 knowledge=self.agno_knowledge if self.enable_memory else None,
+                search_knowledge=True if self.enable_memory and self.agno_knowledge else False,  # Enable automatic knowledge search
                 storage=self.agno_storage if self.enable_memory else None,
                 memory=None,  # Don't pass memory to avoid auto-storage conflicts
                 # Enable telemetry and verbose logging

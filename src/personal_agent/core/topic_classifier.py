@@ -13,21 +13,21 @@ class RuleSet:
 
 class TopicClassifier:
     """Enhanced rule-based topic classifier for categorizing text without requiring an LLM.
-    
+
     This classifier uses a combination of keyword matching and regex pattern matching
     to categorize text into predefined topics. It's designed to identify personal
     information categories such as work, education, family, hobbies, and more.
-    
+
     The classifier employs a scoring system where:
     - Keyword matches contribute 1 point each
     - Pattern matches contribute 2 points each
     - A minimum score of 2 is required for topic classification
     - If no topics meet the threshold, text is classified as "general"
-    
+
     Attributes:
         TOPIC_RULES (Dict[str, RuleSet]): Dictionary mapping topic names to their
             corresponding RuleSet objects containing keywords and regex patterns.
-            
+
     Supported Topics:
         - personal_info: Name, age, contact information, location details
         - work: Job, career, company, employment-related information
@@ -39,21 +39,21 @@ class TopicClassifier:
         - location: Geographic information, addresses, places
         - goals: Aspirations, plans, targets, future objectives
         - general: Fallback category for unclassified text
-        
+
     Example:
         >>> classifier = TopicClassifier()
         >>> topics = classifier.classify_topic("My name is John and I work at Google")
         >>> print(topics)
         ['personal_info', 'work']
-        
+
         >>> topics = classifier.classify_topic("I love playing piano and traveling")
         >>> print(topics)
         ['hobbies']
-        
+
         >>> topics = classifier.classify_topic("Random unrelated text")
         >>> print(topics)
         ['general']
-        
+
     Note:
         This classifier is rule-based and deterministic. It doesn't learn from data
         but relies on predefined patterns and keywords. It is designed to be efficient
@@ -235,15 +235,6 @@ class TopicClassifier:
                     "achieve",
                     "target",
                 ],
-                "feelings": RuleSet(
-                keywords=["happy", "sad", "angry", "frustrated", "excited", "nervous", "worried", "anxious", "depressed", "mood", "emotion", "feel", "feeling"],
-                patterns=[
-                    re.compile(r"\bi feel\b", re.IGNORECASE),
-                    re.compile(r"\bi am feeling\b", re.IGNORECASE),
-                    re.compile(r"\bi'm feeling\b", re.IGNORECASE)
-                ]
-            ),
-
                 patterns=[
                     re.compile(r"\bmy goal\b", re.IGNORECASE),
                     re.compile(r"\bi want to\b", re.IGNORECASE),
@@ -251,21 +242,43 @@ class TopicClassifier:
                     re.compile(r"\bi hope to\b", re.IGNORECASE),
                 ],
             ),
+            "feelings": RuleSet(
+                keywords=[
+                    "happy",
+                    "sad",
+                    "angry",
+                    "frustrated",
+                    "excited",
+                    "nervous",
+                    "worried",
+                    "anxious",
+                    "depressed",
+                    "mood",
+                    "emotion",
+                    "feel",
+                    "feeling",
+                ],
+                patterns=[
+                    re.compile(r"\bi feel\b", re.IGNORECASE),
+                    re.compile(r"\bi am feeling\b", re.IGNORECASE),
+                    re.compile(r"\bi'm feeling\b", re.IGNORECASE),
+                ],
+            ),
             "general": RuleSet(keywords=[], patterns=[]),
         }
 
-    def normalize(self, text: str) -> str:
+    def normalize(self, _text: str) -> str:
         """Basic text normalization."""
-        return re.sub(r"\s+", " ", text.lower()).strip()
+        return re.sub(r"\s+", " ", _text.lower()).strip()
 
-    def classify_topic(self, text: str) -> List[str]:
+    def classify_topic(self, _text: str) -> List[str]:
         """
         Classify the topic(s) of a given text using rule-based classification.
 
         :param text: Text to classify
         :return: List of topic categories
         """
-        text_normalized = self.normalize(text)
+        text_normalized = self.normalize(_text)
         topics = []
 
         for topic, rules in self.TOPIC_RULES.items():
