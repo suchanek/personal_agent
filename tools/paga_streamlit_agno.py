@@ -898,33 +898,16 @@ with st.sidebar:
                     # Try different search methods to avoid the KeyError bug
                     memories = None
                     
-                    # First try the "last_n" method which is more stable
+                    # First try the "agentic" method for semantic search
                     try:
                         memories = st.session_state.agent.agno_memory.search_user_memories(
                             user_id=USER_ID,
                             query=search_query,
-                            retrieval_method="last_n",
-                            limit=20,  # Get more results to filter
+                            retrieval_method="agentic",
+                            limit=10,
                         )
-                        
-                        # Filter results manually for relevance
-                        if memories:
-                            filtered_memories = []
-                            search_terms = search_query.lower().split()
-                            
-                            for memory in memories:
-                                memory_content = getattr(memory, "memory", "").lower()
-                                memory_topics = getattr(memory, "topics", [])
-                                topic_text = " ".join(memory_topics).lower()
-                                
-                                # Check if any search term appears in memory content or topics
-                                if any(term in memory_content or term in topic_text for term in search_terms):
-                                    filtered_memories.append(memory)
-                            
-                            memories = filtered_memories[:5]  # Limit to 5 results
-                            
                     except Exception as search_error:
-                        st.warning(f"Advanced search failed: {str(search_error)}")
+                        st.warning(f"Semantic search failed: {str(search_error)}")
                         # Fallback: get all memories and filter manually
                         try:
                             all_memories = st.session_state.agent.agno_memory.get_user_memories(
@@ -944,7 +927,7 @@ with st.sidebar:
                                     if any(term in memory_content or term in topic_text for term in search_terms):
                                         filtered_memories.append(memory)
                                 
-                                memories = filtered_memories[:5]  # Limit to 5 results
+                                memories = filtered_memories[:10]
                             else:
                                 memories = []
                                 

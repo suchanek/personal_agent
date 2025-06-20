@@ -17,9 +17,11 @@ The package supports three main frameworks:
 3. Agno (modern async agent framework) - primary interface
 
 Author: Personal Agent Development Team
-Last modified: December 19, 2024
-Version: 0.7.1-dev
+Last modified: 2025-06-20 08:58:39
+Version: 0.7.dev
 """
+
+# pylint: disable=C0413
 
 import logging
 import os
@@ -75,8 +77,9 @@ _logger.info("Initializing Personal AI Agent package v%s...", __version__)
 
 # Main entry points
 from .agno_main import cli_main, run_agno_cli, run_agno_web
-from .langchain_main import main as langchain_main, cli_main as langchain_cli_main
-from .smol_main import run_smolagents_web, run_smolagents_cli
+from .langchain_main import cli_main as langchain_cli_main
+from .langchain_main import main as langchain_main
+from .smol_main import run_smolagents_cli, run_smolagents_web
 
 
 def print_configuration() -> str:
@@ -212,7 +215,7 @@ def print_configuration() -> str:
         )
 
     config_lines.extend(storage_status)
-    
+
     # Entry points information
     config_lines.extend(
         [
