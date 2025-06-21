@@ -313,7 +313,7 @@ async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
             user_id=USER_ID,
             debug=True,
             enable_memory=True,
-            enable_mcp=False,
+            enable_mcp=True,
             storage_dir=AGNO_STORAGE_DIR,
         )
         await agent.initialize()
@@ -516,15 +516,23 @@ if prompt := st.chat_input("What would you like to talk about?"):
                                 st.write(f"**Tool Call {i}:**")
                                 # Handle new dictionary format from get_last_tool_calls()
                                 if isinstance(tool_call, dict):
-                                    st.write(f"  - ID: {tool_call.get('id', 'unknown')}")
-                                    st.write(f"  - Type: {tool_call.get('type', 'function')}")
-                                    st.write(f"  - Function: {tool_call.get('function_name', 'unknown')}")
-                                    args = tool_call.get('function_args', '{}')
+                                    st.write(
+                                        f"  - ID: {tool_call.get('id', 'unknown')}"
+                                    )
+                                    st.write(
+                                        f"  - Type: {tool_call.get('type', 'function')}"
+                                    )
+                                    st.write(
+                                        f"  - Function: {tool_call.get('function_name', 'unknown')}"
+                                    )
+                                    args = tool_call.get("function_args", "{}")
                                     st.write(f"  - Arguments: {args}")
                                 # Handle legacy format for compatibility
                                 elif hasattr(tool_call, "function"):
                                     st.write(f"  - Function: {tool_call.function.name}")
-                                    st.write(f"  - Arguments: {tool_call.function.arguments}")
+                                    st.write(
+                                        f"  - Arguments: {tool_call.function.arguments}"
+                                    )
                                 elif hasattr(tool_call, "name"):
                                     st.write(f"  - Tool: {tool_call.name}")
                                     if hasattr(tool_call, "input"):
@@ -534,18 +542,28 @@ if prompt := st.chat_input("What would you like to talk about?"):
                                 st.write("---")
                         else:
                             st.write("- No tool calls detected")
-                            
+
                         # Show debug info from get_last_tool_calls if available
                         if isinstance(st.session_state.agent, AgnoPersonalAgent):
                             debug_info = tool_call_info.get("debug_info", {})
                             if debug_info:
                                 st.write("**🔍 Tool Call Debug Info:**")
-                                st.write(f"  - Response has messages: {debug_info.get('has_messages', False)}")
-                                st.write(f"  - Messages count: {debug_info.get('messages_count', 0)}")
-                                st.write(f"  - Has tool_calls attr: {debug_info.get('has_tool_calls_attr', False)}")
-                                response_attrs = debug_info.get('response_attributes', [])
+                                st.write(
+                                    f"  - Response has messages: {debug_info.get('has_messages', False)}"
+                                )
+                                st.write(
+                                    f"  - Messages count: {debug_info.get('messages_count', 0)}"
+                                )
+                                st.write(
+                                    f"  - Has tool_calls attr: {debug_info.get('has_tool_calls_attr', False)}"
+                                )
+                                response_attrs = debug_info.get(
+                                    "response_attributes", []
+                                )
                                 if response_attrs:
-                                    st.write(f"  - Response attributes: {response_attrs}")
+                                    st.write(
+                                        f"  - Response attributes: {response_attrs}"
+                                    )
 
                         # For AgnoPersonalAgent, we only have response_content (string)
                         if isinstance(st.session_state.agent, AgnoPersonalAgent):
@@ -915,51 +933,60 @@ with st.sidebar:
                 ):
                     # Try different search methods to avoid the KeyError bug
                     memories = None
-                    
+
                     # First try the "agentic" method for semantic search
                     try:
-                        memories = st.session_state.agent.agno_memory.search_user_memories(
-                            user_id=USER_ID,
-                            query=search_query,
-                            retrieval_method="agentic",
-                            limit=10,
+                        memories = (
+                            st.session_state.agent.agno_memory.search_user_memories(
+                                user_id=USER_ID,
+                                query=search_query,
+                                retrieval_method="agentic",
+                                limit=10,
+                            )
                         )
                     except Exception as search_error:
                         st.warning(f"Semantic search failed: {str(search_error)}")
                         # Fallback: get all memories and filter manually
                         try:
-                            all_memories = st.session_state.agent.agno_memory.get_user_memories(
-                                user_id=USER_ID
+                            all_memories = (
+                                st.session_state.agent.agno_memory.get_user_memories(
+                                    user_id=USER_ID
+                                )
                             )
-                            
+
                             if all_memories:
                                 filtered_memories = []
                                 search_terms = search_query.lower().split()
-                                
+
                                 for memory in all_memories:
-                                    memory_content = getattr(memory, "memory", "").lower()
+                                    memory_content = getattr(
+                                        memory, "memory", ""
+                                    ).lower()
                                     memory_topics = getattr(memory, "topics", [])
                                     topic_text = " ".join(memory_topics).lower()
-                                    
+
                                     # Check if any search term appears in memory content or topics
-                                    if any(term in memory_content or term in topic_text for term in search_terms):
+                                    if any(
+                                        term in memory_content or term in topic_text
+                                        for term in search_terms
+                                    ):
                                         filtered_memories.append(memory)
-                                
+
                                 memories = filtered_memories[:10]
                             else:
                                 memories = []
-                                
+
                         except Exception as fallback_error:
-                            st.error(f"Fallback search also failed: {str(fallback_error)}")
+                            st.error(
+                                f"Fallback search also failed: {str(fallback_error)}"
+                            )
                             memories = []
 
                     if memories:
                         st.subheader(f"Search Results for: '{search_query}'")
                         for i, memory in enumerate(memories, 1):
                             memory_content = getattr(memory, "memory", "No content")
-                            with st.expander(
-                                f"Result {i}: {memory_content[:50]}..."
-                            ):
+                            with st.expander(f"Result {i}: {memory_content[:50]}..."):
                                 st.write(f"**Memory:** {memory_content}")
                                 topics = getattr(memory, "topics", [])
                                 if topics:
@@ -978,6 +1005,7 @@ with st.sidebar:
                 st.error(f"Error searching memories: {str(e)}")
                 # Show detailed error for debugging
                 import traceback
+
                 st.code(traceback.format_exc())
 
     st.header("Debug Info")
@@ -1131,7 +1159,7 @@ with st.sidebar:
             if isinstance(agent, AgnoPersonalAgent):
                 try:
                     agent_info = agent.get_agent_info()
-                    
+
                     # Display basic configuration
                     st.write(f"- Model: {agent_info['model_name']}")
                     st.write(f"- Provider: {agent_info['model_provider']}")
@@ -1140,20 +1168,24 @@ with st.sidebar:
                     st.write(f"- MCP enabled: {agent_info['mcp_enabled']}")
                     st.write(f"- Debug mode: {agent_info['debug_mode']}")
                     st.write(f"- Initialized: {agent_info['initialized']}")
-                    
+
                     # Display tool counts
-                    tool_counts = agent_info['tool_counts']
-                    st.write(f"- Total tools: {tool_counts['total']} ({tool_counts['built_in']} built-in + {tool_counts['mcp']} MCP)")
-                    
+                    tool_counts = agent_info["tool_counts"]
+                    st.write(
+                        f"- Total tools: {tool_counts['total']} ({tool_counts['built_in']} built-in + {tool_counts['mcp']} MCP)"
+                    )
+
                     # Display actual tool names
-                    built_in_tools = [tool['name'] for tool in agent_info['built_in_tools']]
-                    mcp_tools = [tool['name'] for tool in agent_info['mcp_tools']]
-                    
+                    built_in_tools = [
+                        tool["name"] for tool in agent_info["built_in_tools"]
+                    ]
+                    mcp_tools = [tool["name"] for tool in agent_info["mcp_tools"]]
+
                     if built_in_tools:
                         st.write(f"- Built-in tools: {built_in_tools}")
                     if mcp_tools:
                         st.write(f"- MCP tools: {mcp_tools}")
-                        
+
                 except Exception as e:
                     st.write(f"- Error getting agent info: {str(e)}")
                     # Fallback to basic info

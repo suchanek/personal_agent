@@ -9,7 +9,7 @@ import difflib
 import re
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent.core.semantic_memory_manager import SemanticDuplicateDetector
 

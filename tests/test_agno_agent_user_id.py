@@ -4,6 +4,11 @@ Test script to verify that AgnoPersonalAgent properly handles user_id for memory
 """
 
 import asyncio
+import sys
+from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,

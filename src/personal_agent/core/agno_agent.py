@@ -36,6 +36,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentWebTools,
@@ -125,12 +126,22 @@ class AgnoPersonalAgent:
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
-            # Use Ollama-compatible interface for Ollama with full context window
+            # Get dynamic context size for this model
+            context_size, detection_method = get_model_context_size_sync(
+                self.model_name, self.ollama_base_url
+            )
+            
+            logger.info(
+                "Using context size %d for model %s (detected via: %s)",
+                context_size, self.model_name, detection_method
+            )
+            
+            # Use Ollama-compatible interface for Ollama with dynamic context window
             return Ollama(
                 id=self.model_name,
                 host=self.ollama_base_url,
                 options={
-                    "num_ctx": 8192,  # Use full context window capacity
+                    "num_ctx": context_size,  # Use dynamically detected context window
                     "temperature": 0.7,  # Optional: set temperature for consistency
                 },
             )
