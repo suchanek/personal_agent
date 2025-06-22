@@ -1,0 +1,126 @@
+# Structured Personal Facts for Personal Agent Memory
+# These can be sent to the agent through the Streamlit chat interface
+
+## Basic Information Facts
+My name is Eric G. Suchanek.
+I have a Ph.D. degree.
+I live at 4264 Meadow Creek CT Liberty TWP, OH 45011.
+My phone number is 513-593-4522.
+My email address is suchanek@mac.com.
+My GitHub profile is https://github.com/suchanek/.
+I am currently working on proteusPy at https://github.com/suchanek/proteusPy/.
+
+## Professional Identity Facts
+I am a highly-skilled scientist seeking employment in computational chemistry, computational biology or Artificial Intelligence.
+I have broad experience in life science, computer systems, troubleshooting and customer service.
+I have management experience in a Fortune 50 company.
+I am currently working in structural biophysics, building proteusPy.
+
+## Education Facts
+I graduated as Valedictorian from Lakota High School, West Chester, Ohio in June 1978, ranking 1st out of 550 students.
+I earned my BS from Washington University, St Louis in June 1982.
+I graduated in the top 10% of my class at Washington University.
+I graduated cum honore from Washington University.
+I was elected to Phi Beta Kappa at Washington University.
+I earned my Ph.D from Johns Hopkins Medical School, Baltimore MD in June 1987.
+I was at the top of my class in the combined program for Biochemistry, Cellular and Molecular Biology.
+My dissertation was titled "Applications of Artificial Intelligence to Problems in Protein Engineering".
+My PhD advisors received the Nobel Prize for the discovery of EcoR1, establishing the Biotechnology field.
+
+## Technical Skills Facts
+I program in C, C++, Python, Fortran, Lisp, shell programming, and SQL.
+I use development tools including git, VisualStudio Code, and Jira.
+I work with machine learning using Python, Tensorflow, torch, numpy, scikit-learn, scipy, and pandas.
+I have experience with Unix, OSX, and Linux system management and administration.
+I use specialized software including Pixinsight and Microsoft Office.
+I am an Apple-certified hardware and software technician.
+I have skills in 3D modeling/CAD/CAM, image analysis, analytics and statistics, numerical analysis, and visualization.
+
+## Scientific Expertise Facts
+My primary fields are computer science, computational chemistry, bioinformatics, computational biology, molecular dynamics, machine learning, statistical analysis, scientific visualization, and structural biophysics.
+I specialize in virtual screening technologies to develop statistical models of drug efficacy.
+I have systems administration experience.
+I have agile team experience.
+
+## Major Achievement Facts
+I developed one of the first real-time molecular visualization programs deployed on a personal computer (Commodore Amiga).
+I developed the first computer-based rapid screening algorithm for disulfide bond stabilization in proteins of known structure.
+I invented structure-based heuristics with considerable state-space optimizations.
+I developed algorithms for rapid creation of photo-realistic lenticular and holographic images with emphasis on scientific visualization.
+I built a high-resolution model of Parathyroid Hormone 1-34 from ab-initio modeling, subsequently verified with solution NMR.
+I built the first model of 7 trans-membrane G-protein Coupled Receptors within P&G.
+I developed several high-potency small molecular candidates from the kinase family, used in osteoporosis therapy.
+I implemented bone turnover simulation based on John Reeves' work to establish initial dosing regimens for Actonel.
+I architected, deployed and managed a high-performance multi-processor supercomputer center for P&G Pharmaceuticals.
+I managed a diverse, multi-national modeling and simulation community of practice within P&G R&D division.
+I led the Research Computing and Informatics group at P&G Pharmaceuticals.
+I built the first database of all disulfide bonds in the RCSB protein databank containing over 292,000 disulfide bonds.
+
+## Current Work Facts
+I currently work as a GeekSquad Agent at BestBuy since 2019.
+I provide front-line technical support to customers at BestBuy.
+I troubleshoot, diagnose, and recommend strategies to meet customer needs.
+I work as an Astronomer at Monterey Institute for Research in Astronomy since 2018.
+I develop computer algorithms and programs for astrophysical and astrometric analysis of proper motion in stars using Python, Plotly, and Dash.
+I configure and install hardware and software to control generators via Arduino and C++.
+I configure hardware/software to control high-precision motors for instrument alignment and spectrograph configuration.
+I do software development across many areas primarily in Python/Astropy.
+
+## Previous Work Experience Facts
+I worked as Support Desk Analyst II at Miami University, Oxford OH from 2013-2017.
+I provided front-line help desk support for IT-related technical issues at Miami University.
+I did knowledge management across multiple end-user and internal services at Miami University.
+I performed Mac computer repair for Macbook Pro, iMac and Macbook computers at Miami University.
+I worked as a Genius at Apple Computer, Kenwood OH from 2010-2013.
+I provided 'Genius Bar' one-on-one troubleshooting for over 11,000 customer sessions at Apple.
+I consistently achieved top customer feedback scores at Apple.
+I was recognized for excellent problem solving skills and management of difficult customer interactions at Apple.
+I worked as Director at Procter & Gamble from 2007-2010, leading the Global Modeling Community within P&G Corporate Functions R&D.
+I worked as Director, Research Computing and Informatics at Procter & Gamble Pharmaceuticals from 2000-2007.
+I designed, implemented and supported a Silicon Graphics supercomputing center at P&G Pharmaceuticals.
+I maintained greater than 99% uptime while running the scientific computing network at P&G Pharmaceuticals.
+I deployed over 90 SGI workstations for divisional chemists at P&G Pharmaceuticals.
+I was the lead molecular modeler within the Discovery division at P&G Pharmaceuticals.
+I managed the Research Computing and Informatics Section at P&G Pharmaceuticals.
+I worked as Senior Scientist at Procter & Gamble from 1992-2000, applying computational chemistry and bioinformatics to business problems.
+I worked as Scientist/Senior Scientist at Procter & Gamble from 1987-1992 in the Management Systems Division (MSD).
+I worked on The Builder Advisor project, coupling Fortran-based physical chemistry calculations to Windows interface.
+I worked on The Genotoxicity Advisor project, using a rule-based approach to predict genotoxicity.
+I worked on The Phase Advisor project, predicting phase behaviors of complex systems.
+
+## Publication Facts
+I co-authored "Theoretical and Practical Considerations in Virtual Screening: A Beaten Field?" published in Current Med Chem 15:107-116 2008.
+I co-authored "Design and Synthesis of 13,14-Dihydro Prostaglandin F1α Analogues as Potent and Selective Ligands for the Human FP Receptor" published in J. Med Chem 43 (5), pp 945–952, 2000.
+I co-authored "An engineered intersubunit disulfide enhances the stability and DNA binding of the N-terminal domain of lambda repressor" published in Biochemistry 25 (20), pp 5992–599, 1986.
+I co-authored "Computer-aided model-building strategies for protein design" published in Biochemistry 25 (20), pp 5987–599 1986.
+I co-authored "Introduction of Intersubunit Disulfide Bonds In the Membrane-Distal Region of the Influenza Hemagglutinin Abolishes Membrane Fusion Activity" published in Cell 68:635-645 1992.
+
+## Current Project Facts
+I am currently working on proteusPy, a project in structural biophysics.
+proteusPy is available at https://github.com/suchanek/proteusPy/.
+proteusPy is a re-written version of the Proteus program for disulfide bond analysis.
+I am analyzing a database of over 292,000 disulfide bonds using the proteusPy Python package.
+
+## Management Experience Facts
+I was Section Leader of the Research Computing and Informatics group within P&G Pharmaceuticals.
+I was Director of the Global Modeling Community within P&G Corporate Functions R&D.
+I managed groups of scientists and coordinated project work.
+I managed careers, salaries, and ratings for my team members.
+I had budget approval and management responsibilities for hardware and software installations.
+I communicated with senior management regularly.
+I have experience building diverse teams.
+I have experience mentoring staff.
+I have experience planning and delegating work.
+
+## Customer Service Experience Facts
+I provided over 11,000 customer sessions as an Apple Genius.
+I achieved top customer feedback scores at Apple.
+I have excellent problem solving and difficult customer interaction management skills.
+I currently provide front-line technical support at GeekSquad.
+
+## Personal Characteristics Facts
+I am a veteran P&G employee with understanding of high-performing corporate culture.
+I have the ability to rapidly integrate into new work situations.
+I have effective communication skills across a broad spectrum of users and customers.
+I have patient and effective teaching abilities.
+I have a technical background enabling work across multiple disciplines from astrophysics to computational chemistry to machine learning.

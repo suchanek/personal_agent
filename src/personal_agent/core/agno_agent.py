@@ -877,43 +877,131 @@ Returns:
             }
         
         try:
+            import json
             response = self._last_response
             tool_calls = []
             tool_calls_count = 0
             
-            # Check if response has formatted_tool_calls (agno-specific)
+            # Helper function to safely parse arguments
+            def parse_arguments(args_str):
+                """Parse arguments string into a proper dict or return formatted string."""
+                if not args_str or args_str == '{}':
+                    return {}
+                
+                try:
+                    # Try to parse as JSON
+                    if isinstance(args_str, str):
+                        parsed = json.loads(args_str)
+                        return parsed
+                    elif isinstance(args_str, dict):
+                        return args_str
+                    else:
+                        return str(args_str)
+                except (json.JSONDecodeError, TypeError):
+                    # If parsing fails, return the string as-is
+                    return str(args_str)
+            
+            # Helper function to extract function signature from content
+            def extract_function_signature(content_str):
+                """Extract function name and arguments from content like 'duckduckgo_search(max_results=5, query=top 5 trends in AI)'"""
+                import re
+                if not content_str:
+                    return None, {}
+                
+                # Pattern to match function_name(arg1=value1, arg2=value2)
+                pattern = r'(\w+)\((.*?)\)'
+                match = re.search(pattern, content_str)
+                
+                if match:
+                    func_name = match.group(1)
+                    args_str = match.group(2)
+                    
+                    # Parse arguments
+                    args_dict = {}
+                    if args_str.strip():
+                        # Split by comma and parse key=value pairs
+                        arg_pairs = [arg.strip() for arg in args_str.split(',')]
+                        for pair in arg_pairs:
+                            if '=' in pair:
+                                key, value = pair.split('=', 1)
+                                key = key.strip()
+                                value = value.strip()
+                                # Remove quotes if present
+                                if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                                    value = value[1:-1]
+                                args_dict[key] = value
+                    
+                    return func_name, args_dict
+                
+                return None, {}
+            
+            # Check if response has formatted_tool_calls (agno-specific) - PRIMARY SOURCE
             if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls:
                 tool_calls_count = len(response.formatted_tool_calls)
                 for tool_call in response.formatted_tool_calls:
-                    tool_info = {
-                        "id": getattr(tool_call, 'id', 'unknown'),
-                        "type": getattr(tool_call, 'type', 'function'),
-                    }
-                    
-                    if hasattr(tool_call, 'function'):
-                        tool_info.update({
-                            "function_name": getattr(tool_call.function, 'name', 'unknown'),
-                            "function_args": getattr(tool_call.function, 'arguments', '{}')
-                        })
-                    elif hasattr(tool_call, 'name'):
-                        tool_info.update({
-                            "function_name": tool_call.name,
-                            "function_args": getattr(tool_call, 'input', '{}')
-                        })
+                    # Handle the case where formatted_tool_calls contains strings like 'duckduckgo_news(query=artificial intelligence)'
+                    if isinstance(tool_call, str):
+                        # Extract function name and arguments from the string
+                        extracted_name, extracted_args = extract_function_signature(tool_call)
+                        if extracted_name:
+                            tool_info = {
+                                "type": "function",
+                                "function_name": extracted_name,
+                                "function_args": extracted_args
+                            }
+                            tool_calls.append(tool_info)
+                        else:
+                            # Fallback if parsing fails
+                            tool_info = {
+                                "type": "function",
+                                "function_name": tool_call,
+                                "function_args": {}
+                            }
+                            tool_calls.append(tool_info)
                     else:
-                        # Handle string or dict format
-                        if isinstance(tool_call, dict):
+                        # Handle object format (original code)
+                        tool_info = {
+                            "type": getattr(tool_call, 'type', 'function'),
+                        }
+                        
+                        if hasattr(tool_call, 'function'):
+                            raw_args = getattr(tool_call.function, 'arguments', '{}')
+                            parsed_args = parse_arguments(raw_args)
+                            function_name = getattr(tool_call.function, 'name', 'unknown')
+                            
+                            # If arguments are empty but we have content, try to extract from content
+                            if not parsed_args and hasattr(response, 'content') and response.content:
+                                extracted_name, extracted_args = extract_function_signature(response.content)
+                                if extracted_name == function_name and extracted_args:
+                                    parsed_args = extracted_args
+                            
                             tool_info.update({
-                                "function_name": tool_call.get('name', 'unknown'),
-                                "function_args": tool_call.get('arguments', '{}')
+                                "function_name": function_name,
+                                "function_args": parsed_args
+                            })
+                        elif hasattr(tool_call, 'name'):
+                            raw_args = getattr(tool_call, 'input', '{}')
+                            parsed_args = parse_arguments(raw_args)
+                            tool_info.update({
+                                "function_name": tool_call.name,
+                                "function_args": parsed_args
                             })
                         else:
-                            tool_info.update({
-                                "function_name": str(tool_call),
-                                "function_args": '{}'
-                            })
-                    
-                    tool_calls.append(tool_info)
+                            # Handle dict format
+                            if isinstance(tool_call, dict):
+                                raw_args = tool_call.get('arguments', '{}')
+                                parsed_args = parse_arguments(raw_args)
+                                tool_info.update({
+                                    "function_name": tool_call.get('name', 'unknown'),
+                                    "function_args": parsed_args
+                                })
+                            else:
+                                tool_info.update({
+                                    "function_name": str(tool_call),
+                                    "function_args": {}
+                                })
+                        
+                        tool_calls.append(tool_info)
             
             # Check if response has messages with tool calls
             elif hasattr(response, 'messages') and response.messages:
@@ -922,19 +1010,22 @@ Returns:
                         tool_calls_count += len(message.tool_calls)
                         for tool_call in message.tool_calls:
                             tool_info = {
-                                "id": getattr(tool_call, 'id', 'unknown'),
                                 "type": getattr(tool_call, 'type', 'function'),
                             }
                             
                             if hasattr(tool_call, 'function'):
+                                raw_args = getattr(tool_call.function, 'arguments', '{}')
+                                parsed_args = parse_arguments(raw_args)
                                 tool_info.update({
                                     "function_name": getattr(tool_call.function, 'name', 'unknown'),
-                                    "function_args": getattr(tool_call.function, 'arguments', '{}')
+                                    "function_args": parsed_args
                                 })
                             elif hasattr(tool_call, 'name'):
+                                raw_args = getattr(tool_call, 'input', '{}')
+                                parsed_args = parse_arguments(raw_args)
                                 tool_info.update({
                                     "function_name": tool_call.name,
-                                    "function_args": getattr(tool_call, 'input', '{}')
+                                    "function_args": parsed_args
                                 })
                             
                             tool_calls.append(tool_info)
@@ -944,19 +1035,22 @@ Returns:
                 tool_calls_count = len(response.tool_calls)
                 for tool_call in response.tool_calls:
                     tool_info = {
-                        "id": getattr(tool_call, 'id', 'unknown'),
                         "type": getattr(tool_call, 'type', 'function'),
                     }
                     
                     if hasattr(tool_call, 'function'):
+                        raw_args = getattr(tool_call.function, 'arguments', '{}')
+                        parsed_args = parse_arguments(raw_args)
                         tool_info.update({
                             "function_name": getattr(tool_call.function, 'name', 'unknown'),
-                            "function_args": getattr(tool_call.function, 'arguments', '{}')
+                            "function_args": parsed_args
                         })
                     elif hasattr(tool_call, 'name'):
+                        raw_args = getattr(tool_call, 'input', '{}')
+                        parsed_args = parse_arguments(raw_args)
                         tool_info.update({
                             "function_name": tool_call.name,
-                            "function_args": getattr(tool_call, 'input', '{}')
+                            "function_args": parsed_args
                         })
                     
                     tool_calls.append(tool_info)
