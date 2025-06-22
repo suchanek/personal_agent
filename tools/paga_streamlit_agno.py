@@ -901,47 +901,71 @@ with st.sidebar:
 
     # Memory Statistics
     if st.button("📊 Show Memory Statistics"):
-        if "agent" in st.session_state and hasattr(st.session_state.agent, "memory"):
+        if "agent" in st.session_state and isinstance(
+            st.session_state.agent, AgnoPersonalAgent
+        ):
             try:
-                # Get semantic memory manager from the agent's memory
-                memory_manager = st.session_state.agent.memory.memory_manager
-                if hasattr(memory_manager, "get_memory_stats"):
-                    stats = memory_manager.get_memory_stats(
-                        st.session_state.agent.memory.db, USER_ID
-                    )
-
-                    st.subheader("Memory Statistics")
-
-                    # Display basic stats
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Total Memories", stats.get("total_memories", 0))
-                        st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
-
-                    with col2:
-                        avg_length = stats.get("average_memory_length", 0)
-                        st.metric(
-                            "Avg Length",
-                            f"{avg_length:.1f} chars" if avg_length else "N/A",
+                # Get semantic memory manager from the AgnoPersonalAgent's memory system
+                if (
+                    hasattr(st.session_state.agent, "agno_memory")
+                    and st.session_state.agent.agno_memory
+                ):
+                    # Access the SemanticMemoryManager through the Memory object
+                    memory_manager = st.session_state.agent.agno_memory.memory_manager
+                    if hasattr(memory_manager, "get_memory_stats"):
+                        stats = memory_manager.get_memory_stats(
+                            st.session_state.agent.agno_memory.db, USER_ID
                         )
-                        most_common = stats.get("most_common_topic", "None")
-                        st.metric("Top Topic", most_common if most_common else "None")
 
-                    # Topic distribution
-                    topic_dist = stats.get("topic_distribution", {})
-                    if topic_dist:
-                        st.subheader("📈 Topic Distribution")
-                        for topic, count in sorted(
-                            topic_dist.items(), key=lambda x: x[1], reverse=True
-                        ):
-                            st.write(f"**{topic.title()}:** {count} memories")
+                        st.subheader("🧠 Semantic Memory Statistics")
 
+                        # Display basic stats
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Total Memories", stats.get("total_memories", 0))
+                            st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
+
+                        with col2:
+                            avg_length = stats.get("average_memory_length", 0)
+                            st.metric(
+                                "Avg Length",
+                                f"{avg_length:.1f} chars" if avg_length else "N/A",
+                            )
+                            most_common = stats.get("most_common_topic", "None")
+                            st.metric("Top Topic", most_common if most_common else "None")
+
+                        # Topic distribution
+                        topic_dist = stats.get("topic_distribution", {})
+                        if topic_dist:
+                            st.subheader("📈 Topic Distribution")
+                            for topic, count in sorted(
+                                topic_dist.items(), key=lambda x: x[1], reverse=True
+                            ):
+                                st.write(f"**{topic.title()}:** {count} memories")
+
+                        # Show SemanticMemoryManager configuration
+                        st.subheader("⚙️ Memory Configuration")
+                        config = memory_manager.config
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
+                            st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
+                            st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
+                        with col2:
+                            st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
+                            st.write(f"**Max Memory Length:** {config.max_memory_length}")
+                            st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
+
+                    else:
+                        st.info(
+                            "Memory statistics not available - SemanticMemoryManager not found"
+                        )
                 else:
-                    st.info(
-                        "Memory statistics not available with current memory manager"
-                    )
+                    st.error("Memory system not available")
             except Exception as e:
                 st.error(f"Error getting memory statistics: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
 
     # Memory Search
     st.subheader("🔍 Search Memories")

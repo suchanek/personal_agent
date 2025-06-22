@@ -29,7 +29,7 @@ from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
-# from agno.tools.yfinance import YFinanceTools  # Disabled due to 401 errors
+from agno.tools.yfinance import YFinanceTools
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from rich.console import Console
@@ -49,7 +49,6 @@ from .agno_storage import (
     create_combined_knowledge_base,
     load_combined_knowledge_base,
 )
-from .anti_duplicate_memory import AntiDuplicateMemory
 
 # Configure logging
 logger = setup_logging(__name__)
@@ -308,7 +307,7 @@ class AgnoPersonalAgent:
                 logger.error("Error querying memories: %s", e)
                 return f"❌ Error searching memories: {str(e)}"
 
-        async def get_recent_memories(limit: int = 10) -> str:
+        async def get_recent_memories(limit: int = 100) -> str:
             """Get the most recent user memories.
 
             Args:
@@ -340,15 +339,44 @@ class AgnoPersonalAgent:
                 logger.error("Error getting recent memories: %s", e)
                 return f"❌ Error getting recent memories: {str(e)}"
 
+        async def get_all_memories() -> str:
+            """Get all user memories.
+
+            Returns:
+                str: All memories or message if none found
+            """
+            try:
+                memories = self.agno_memory.get_user_memories(user_id=self.user_id)
+
+                if not memories:
+                    return "📝 No memories found."
+
+                # Format memories for display
+                result = f"📝 All {len(memories)} memories:\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                logger.info("Retrieved %d total memories", len(memories))
+                return result
+
+            except Exception as e:
+                logger.error("Error getting all memories: %s", e)
+                return f"❌ Error getting all memories: {str(e)}"
+
         # Set proper function names for tool identification
         store_user_memory.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
         get_recent_memories.__name__ = "get_recent_memories"
+        get_all_memories.__name__ = "get_all_memories"
 
         # Add tools to the list
         tools.append(store_user_memory)
         tools.append(query_memory)
         tools.append(get_recent_memories)
+        tools.append(get_all_memories)
 
         logger.info("Created %d memory tools", len(tools))
         return tools
@@ -509,6 +537,7 @@ Returns:
             - "What do you remember about me?" → IMMEDIATELY call get_recent_memories()
             - "Do you know anything about me?" → IMMEDIATELY call get_recent_memories()
             - "What have I told you?" → IMMEDIATELY call get_recent_memories()
+            - "Show me all my memories" or "What are all my memories?" → IMMEDIATELY call get_all_memories()
             - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences")
             - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
             
@@ -520,9 +549,10 @@ Returns:
             **MEMORY RETRIEVAL PROTOCOL**:
             1. **IMMEDIATE ACTION**: If it's about the user, query memory FIRST - no thinking, no hesitation
             2. **Primary Tool**: Use get_recent_memories() for general "what do you remember" questions
-            3. **Specific Queries**: Use query_memory("search terms") for specific topics
-            4. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
-            5. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
+            3. **Complete Overview**: Use get_all_memories() when user asks for ALL memories or complete history
+            4. **Specific Queries**: Use query_memory("search terms") for specific topics
+            5. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
+            6. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
             
             **DECISION TREE - FOLLOW THIS EXACTLY**:
             - Question about user? → Query memory tools IMMEDIATELY
@@ -666,8 +696,16 @@ Returns:
 
             # Prepare tools list
             tools = [
-                DuckDuckGoTools(),
-                WorkingYFinanceTools(),  # Use our working YFinance tools instead of broken ones
+                #GoogleSearchTools(),
+                #DuckDuckGoTools(),
+                #WorkingYFinanceTools(),  # Use our working YFinance tools instead of broken ones
+                YFinanceTools(
+                    stock_price=True,
+                    company_info=True,
+                    stock_fundamentals=True,
+                    key_financial_ratios=True,
+                    analyst_recommendations=True,
+                ),
                 PythonTools(),
                 ShellTools(base_dir="."),  # Match Streamlit configuration for consistency
                 PersonalAgentFilesystemTools(),
@@ -706,31 +744,16 @@ Returns:
                     except Exception as e:
                         logger.warning("Failed to add KnowledgeTools: %s", e)
 
-                self.agno_memory = create_agno_memory(self.storage_dir)
+                # Create memory with SemanticMemoryManager (debug mode passed through)
+                self.agno_memory = create_agno_memory(self.storage_dir, debug_mode=self.debug)
 
-                # Wrap with anti-duplicate memory system if memory was created successfully
                 if self.agno_memory:
-                    # Create model for the anti-duplicate memory
-                    memory_model = self._create_model()
-
-                    # Extract the database from the regular memory
-                    memory_db = self.agno_memory.db
-
-                    # Create anti-duplicate memory with proper parameters
-                    self.agno_memory = AntiDuplicateMemory(
-                        db=memory_db,
-                        model=memory_model,
-                        similarity_threshold=0.85,  # 85% similarity threshold
-                        enable_semantic_dedup=True,
-                        enable_exact_dedup=True,
-                        debug_mode=self.debug,
-                    )
                     logger.info(
-                        "Created Agno memory with anti-duplicate protection at: %s",
+                        "Created Agno memory with SemanticMemoryManager at: %s",
                         self.storage_dir,
                     )
                 else:
-                    logger.error("Failed to create base memory system")
+                    logger.error("Failed to create memory system")
 
                 logger.info("Initialized Agno storage and knowledge backend")
             else:

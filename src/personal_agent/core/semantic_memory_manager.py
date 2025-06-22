@@ -23,8 +23,7 @@ from pydantic import BaseModel, Field
 
 from personal_agent.config import USER_ID
 from personal_agent.utils import setup_logging
-
-from .topic_classifier import TopicClassifier
+from personal_agent.core.topic_classifier import TopicClassifier
 
 logger = setup_logging(__name__)
 
@@ -160,15 +159,15 @@ class SemanticDuplicateDetector:
         norm2 = self._normalize_text(text2)
 
         # Check for exact word matches (NEW: improved for search queries)
-        words1 = set(re.findall(r'\b\w+\b', norm1))
-        words2 = set(re.findall(r'\b\w+\b', norm2))
+        words1 = set(re.findall(r"\b\w+\b", norm1))
+        words2 = set(re.findall(r"\b\w+\b", norm2))
         exact_matches = words1.intersection(words2)
-        
+
         # If we have exact word matches, boost the score significantly
         if exact_matches and len(words1) <= 3:  # For short queries (1-3 words)
             match_ratio = len(exact_matches) / len(words1)
             exact_word_score = 0.6 + (match_ratio * 0.4)  # 0.6 to 1.0 range
-            
+
             # Also calculate traditional semantic similarity
             string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
             terms1 = self._extract_key_terms(text1)
@@ -184,10 +183,10 @@ class SemanticDuplicateDetector:
                 terms_similarity = intersection / union if union > 0 else 0.0
 
             traditional_score = (string_similarity * 0.6) + (terms_similarity * 0.4)
-            
+
             # Return the higher of exact word score or traditional score
             return max(exact_word_score, traditional_score)
-        
+
         # For longer queries or no exact matches, use traditional method
         string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
@@ -647,17 +646,19 @@ class SemanticMemoryManager:
             # Calculate similarities and topic matches
             results = []
             query_lower = query.lower().strip()
-            
+
             for memory in user_memories:
                 # Content similarity (existing method)
-                content_similarity = self.duplicate_detector._calculate_semantic_similarity(
-                    query, memory.memory
+                content_similarity = (
+                    self.duplicate_detector._calculate_semantic_similarity(
+                        query, memory.memory
+                    )
                 )
-                
+
                 # Topic matching (NEW!)
                 topic_score = 0.0
                 topic_matches = []
-                
+
                 if search_topics and memory.topics:
                     for topic in memory.topics:
                         if query_lower in topic.lower():
@@ -666,19 +667,24 @@ class SemanticMemoryManager:
                                 topic_matches.append(topic)
                                 break
                             else:
-                                topic_score = max(topic_score, 0.8)  # Partial topic match
+                                topic_score = max(
+                                    topic_score, 0.8
+                                )  # Partial topic match
                                 topic_matches.append(topic)
-                
+
                 # Combined scoring: include if content similarity OR topic match
                 if content_similarity >= similarity_threshold or topic_score > 0:
                     # Weighted combination: content gets base weight, topics get boost
                     combined_score = content_similarity + (topic_score * topic_boost)
                     results.append((memory, combined_score))
-                    
+
                     if self.config.debug_mode and topic_matches:
                         logger.debug(
                             "Topic match found for query '%s': memory='%s', topics=%s, combined_score=%.3f",
-                            query, memory.memory[:50], topic_matches, combined_score
+                            query,
+                            memory.memory[:50],
+                            topic_matches,
+                            combined_score,
                         )
 
             # Sort by combined score (descending) and limit
