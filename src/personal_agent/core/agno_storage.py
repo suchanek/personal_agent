@@ -1,20 +1,31 @@
 """Agno native storage and knowledge management utilities.
 
 Enhanced storage module that provides factory functions for Agno's native
-memory and storage components, featuring intelligent duplicate prevention
-and advanced memory management capabilities.
+memory and storage components, featuring LLM-free semantic memory management
+and advanced knowledge base capabilities.
 
 Primary functions:
 - create_agno_storage(): SQLite storage for agent sessions
-- create_agno_memory(): AntiDuplicateMemory instance with intelligent duplicate prevention
+- create_agno_memory(): Memory instance with SemanticMemoryManager for LLM-free memory management
 - create_combined_knowledge_base(): Unified knowledge base handling both text and PDF sources
 - load_combined_knowledge_base(): Async loading for combined knowledge base
 
-Memory Management (v0.6.1):
-- Enhanced with AntiDuplicateMemory class for automatic duplicate detection and prevention
-- Configures delete_memories=True and clear_memories=True for intelligent memory curation
-- Addresses memory duplication issues commonly found with Ollama models
-- Provides semantic and exact duplicate detection with configurable similarity thresholds
+Memory Management (v0.7.2 - SemanticMemoryManager Integration):
+- Integrated with SemanticMemoryManager for LLM-free memory operations
+- Advanced semantic duplicate detection without requiring LLM calls
+- Automatic topic classification using rule-based patterns
+- Enhanced semantic search with topic matching and content similarity
+- Configurable similarity thresholds and memory management settings
+- Rich memory statistics and analytics capabilities
+- Debug mode for detailed memory operation logging
+
+Key Features:
+- LLM-free semantic duplicate detection (similarity threshold: 0.8)
+- Automatic topic classification (personal_info, work, education, etc.)
+- Enhanced semantic search combining content and topic matching
+- Memory deletion and clearing capabilities
+- Rich analytics: memory statistics, topic distribution, usage patterns
+- Debug mode for detailed operation insights
 
 Removed redundant functions (v0.5.3):
 - create_agno_knowledge(), load_agno_knowledge(): Redundant with combined knowledge base
@@ -30,12 +41,13 @@ from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.knowledge.pdf import PDFKnowledgeBase
 from agno.knowledge.text import TextKnowledgeBase
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
+from agno.memory.v2.memory import Memory
 from agno.storage.sqlite import SqliteStorage
 from agno.vectordb.lancedb import LanceDb, SearchType
 
 from ..config import DATA_DIR, OLLAMA_URL
 from ..utils import setup_logging
-from .anti_duplicate_memory import AntiDuplicateMemory
+from .semantic_memory_manager import SemanticMemoryManager, SemanticMemoryManagerConfig
 
 logger = setup_logging(__name__)
 
@@ -64,24 +76,24 @@ def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
     return storage
 
 
-def create_agno_memory(storage_dir: str = None) -> AntiDuplicateMemory:
-    """Create AntiDuplicateMemory instance with SQLite backend for persistent memory.
+def create_agno_memory(storage_dir: str = None, debug_mode: bool = False) -> Memory:
+    """Create Memory instance with SemanticMemoryManager for LLM-free memory management.
 
-    Uses Agno's enhanced agentic memory approach with intelligent duplicate detection
-    and prevention. The LLM decides what information to store as memories while
-    the AntiDuplicateMemory class prevents duplicate creation through semantic
-    and exact duplicate detection.
+    Uses the advanced SemanticMemoryManager that provides intelligent duplicate detection,
+    automatic topic classification, and semantic search capabilities without requiring
+    LLM calls for memory operations.
 
     Features:
-    - Automatic duplicate detection and prevention (similarity threshold: 0.8)
-    - Memory deletion capabilities (delete_memories=True)
-    - Memory clearing capabilities (clear_memories=True)
-    - Semantic similarity analysis using difflib
-    - Combined memory detection and handling
-    - Debug mode available for analysis
+    - LLM-free semantic duplicate detection (similarity threshold: 0.8)
+    - Automatic topic classification using rule-based patterns
+    - Enhanced semantic search with topic matching
+    - Memory deletion and clearing capabilities
+    - Rich memory statistics and analytics
+    - Debug mode for detailed logging
 
     :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
-    :return: Configured AntiDuplicateMemory instance with duplicate prevention enabled
+    :param debug_mode: Enable debug logging for memory operations
+    :return: Configured Memory instance with SemanticMemoryManager
     """
     if storage_dir is None:
         storage_dir = f"{DATA_DIR}/agno"
@@ -89,20 +101,36 @@ def create_agno_memory(storage_dir: str = None) -> AntiDuplicateMemory:
     storage_path = Path(storage_dir)
     storage_path.mkdir(parents=True, exist_ok=True)
 
+    # Create SQLite memory database
     memory_db = SqliteMemoryDb(
         table_name="personal_agent_memory",
         db_file=str(storage_path / "agent_memory.db"),
     )
-    # Create AntiDuplicateMemory instance with SQLite backend
-    # delete_memories=True allows the agent to clear memories when needed
-    # clear_memories=True allows the agent to clear all memories on initialization
-    memory = AntiDuplicateMemory(
-        db=memory_db, delete_memories=True, clear_memories=True
+
+    # Create semantic memory manager configuration
+    semantic_config = SemanticMemoryManagerConfig(
+        similarity_threshold=0.8,
+        enable_semantic_dedup=True,
+        enable_exact_dedup=True,
+        enable_topic_classification=True,
+        debug_mode=debug_mode,
+        max_memory_length=500,
+        recent_memory_limit=100,
+    )
+
+    # Create semantic memory manager
+    semantic_memory_manager = SemanticMemoryManager(config=semantic_config)
+
+    # Create Agno Memory instance with SemanticMemoryManager
+    memory = Memory(
+        db=memory_db,
+        memory_manager=semantic_memory_manager,
     )
 
     logger.info(
-        "Created AntiDuplicateMemory with SQLite backend at: %s",
+        "Created Memory with SemanticMemoryManager at: %s (debug_mode=%s)",
         storage_path / "agent_memory.db",
+        debug_mode,
     )
     return memory
 
