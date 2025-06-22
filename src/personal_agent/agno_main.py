@@ -14,7 +14,7 @@ from typing import Optional
 from rich.console import Console
 
 # Import configuration
-from .config import LLM_MODEL, USE_MCP
+from .config import LLM_MODEL, REMOTE_OLLAMA_URL, USE_MCP
 from .config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
@@ -159,19 +159,26 @@ def run_agno_web(use_remote_ollama: bool = False):
     """
     app = create_agno_web_app(use_remote_ollama)
 
+    # Determine host and URL based on remote usage
+    if use_remote_ollama:
+        host = "0.0.0.0"  # Bind to all interfaces for remote access
+        web_url = REMOTE_OLLAMA_URL
+        ollama_info = "🖥️  Using remote Ollama at: http://tesla.local:11434"
+    else:
+        host = "localhost"
+        web_url = "http://localhost:5002"
+        ollama_info = "🖥️  Using local Ollama at: http://localhost:11434"
+
     # Run the app
     print("\n🚀 Starting Personal AI Agent with Agno Framework...")
-    print("🌐 Web interface will be available at: http://127.0.0.1:5002")
+    print(f"🌐 Web interface will be available at: {web_url}")
     print("📚 Features: Native MCP integration, Async operations, Enhanced memory")
     print("⚡ Framework: Agno with native MCP + Ollama")
-    if use_remote_ollama:
-        print("🖥️  Using remote Ollama at: http://tesla.local:11434")
-    else:
-        print("🖥️  Using local Ollama at: http://localhost:11434")
+    print(ollama_info)
     print("🔧 Mode: Modern async agent with advanced capabilities")
     print("\nPress Ctrl+C to stop the server.\n")
 
-    app.run(host="127.0.0.1", port=5002, debug=False)
+    app.run(host=host, port=5002, debug=False)
 
 
 async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
@@ -250,7 +257,7 @@ def cli_main():
     )
     parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
     parser.add_argument(
-        "--remote-ollama", action="store_true", help="Use remote Ollama server"
+        "--remote", action="store_true", help="Use remote Ollama server"
     )
     args = parser.parse_args()
 

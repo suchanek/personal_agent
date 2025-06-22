@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import sys
@@ -12,8 +13,23 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import from the correct path
-from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, USER_ID
+from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, REMOTE_OLLAMA_URL, USER_ID
 from personal_agent.core.agno_agent import AgnoPersonalAgent
+
+# Parse command line arguments
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Personal Agent Streamlit App")
+    parser.add_argument(
+        "--remote", 
+        action="store_true", 
+        help="Use remote Ollama URL instead of local"
+    )
+    return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
+
+# Parse arguments and determine Ollama URL
+args, unknown = parse_args()
+EFFECTIVE_OLLAMA_URL = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
@@ -327,7 +343,7 @@ def initialize_agent(model_name, ollama_url, existing_agent=None):
 
 # Initialize session state variables
 if "current_ollama_url" not in st.session_state:
-    st.session_state.current_ollama_url = OLLAMA_URL
+    st.session_state.current_ollama_url = EFFECTIVE_OLLAMA_URL
 
 if "current_model" not in st.session_state:
     st.session_state.current_model = LLM_MODEL
@@ -517,16 +533,23 @@ if prompt := st.chat_input("What would you like to talk about?"):
                                 # Handle new dictionary format from get_last_tool_calls()
                                 if isinstance(tool_call, dict):
                                     st.write(
-                                        f"  - ID: {tool_call.get('id', 'unknown')}"
-                                    )
-                                    st.write(
                                         f"  - Type: {tool_call.get('type', 'function')}"
                                     )
                                     st.write(
                                         f"  - Function: {tool_call.get('function_name', 'unknown')}"
                                     )
-                                    args = tool_call.get("function_args", "{}")
-                                    st.write(f"  - Arguments: {args}")
+                                    args = tool_call.get("function_args", {})
+                                    # Format arguments nicely
+                                    if isinstance(args, dict) and args:
+                                        formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
+                                        st.write(f"  - Arguments: {formatted_args}")
+                                        st.write(f"  - ✅ Arguments parsed successfully")
+                                    elif args:
+                                        st.write(f"  - Arguments: {args}")
+                                        st.write(f"  - ✅ Arguments available")
+                                    else:
+                                        st.write(f"  - Arguments: (none)")
+                                        st.write(f"  - ℹ️ No arguments required")
                                 # Handle legacy format for compatibility
                                 elif hasattr(tool_call, "function"):
                                     st.write(f"  - Function: {tool_call.function.name}")
@@ -766,6 +789,13 @@ with st.sidebar:
     st.header("Agent Information")
     st.write(f"**Current Model:** {st.session_state.current_model}")
     st.write(f"**Current Ollama URL:** {st.session_state.current_ollama_url}")
+    
+    # Show remote mode indicator
+    if hasattr(args, 'remote') and args.remote:
+        st.success("🌐 **Remote Mode:** Using remote Ollama server")
+    else:
+        st.info("🏠 **Local Mode:** Using local Ollama server")
+    
     st.write(f"**User ID:** {USER_ID}")
 
     st.header("Controls")
@@ -1128,7 +1158,15 @@ with st.sidebar:
                     ):
                         st.write("**🛠️ Tools Used:**")
                         for j, tool_call in enumerate(entry["tool_call_details"], 1):
-                            if hasattr(tool_call, "function") and hasattr(
+                            if isinstance(tool_call, dict):
+                                function_name = tool_call.get("function_name", "unknown")
+                                args = tool_call.get("function_args", {})
+                                if isinstance(args, dict) and args:
+                                    formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
+                                    st.write(f"  {j}. {function_name}({formatted_args})")
+                                else:
+                                    st.write(f"  {j}. {function_name}()")
+                            elif hasattr(tool_call, "function") and hasattr(
                                 tool_call.function, "name"
                             ):
                                 st.write(f"  {j}. {tool_call.function.name}")
