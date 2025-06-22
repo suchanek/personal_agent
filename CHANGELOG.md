@@ -1,5 +1,315 @@
 # Personal AI Agent - Technical Changelog
 
+## 🔧 **v0.7.3-dev: Critical Web Search Fix - Eliminated Python Code Generation** (June 22, 2025)
+
+### ✅ **CRITICAL FUNCTIONALITY FIX: Resolved Agent Returning Python Code Instead of Executing Web Searches**
+
+**🎯 Mission Accomplished**: Successfully resolved a critical issue where the AgnoPersonalAgent was returning Python code snippets instead of executing web searches, transforming broken web search functionality into reliable DuckDuckGo-powered news and search capabilities!
+
+#### 🔍 **Problem Analysis - Python Code Generation Crisis**
+
+**CRITICAL ISSUE: Agent Generating Code Instead of Executing Searches**
+
+- **Symptom**: When users requested web searches or news headlines, agent returned Python code like:
+
+  ```python
+  import use_brave_search_server as bss
+  top_5_headlines = bss.call("unrest in the middle east")
+  print(top_5_headlines)
+  ```
+
+- **Root Cause**: `PersonalAgentWebTools` contained placeholder methods that referenced non-existent Brave Search MCP server
+- **Impact**: Complete web search functionality failure, confusing user experience, no actual news or search results
+
+**Example of Problematic Behavior**:
+
+```python
+# PersonalAgentWebTools.web_search() was returning:
+def web_search(self, query: str) -> str:
+    return f"Web search for '{query}' - This functionality is provided by the Brave Search MCP server. Use the 'use_brave_search_server' tool instead."
+```
+
+**User Experience Impact**:
+
+- ❌ No actual web search results when requested
+- ❌ Confusing Python code responses instead of news headlines
+- ❌ Agent appeared to be malfunctioning or misconfigured
+- ❌ Complete failure of news and current events functionality
+
+#### 🛠️ **Comprehensive Solution Implementation**
+
+**SOLUTION #1: Disabled MCP to Eliminate Conflicts**
+
+Modified `tools/paga_streamlit_agno.py` to disable MCP servers:
+
+```python
+# BEFORE (MCP enabled, causing conflicts)
+agent = AgnoPersonalAgent(
+    model_provider="ollama",
+    model_name=model_name,
+    ollama_base_url=ollama_url,
+    user_id=USER_ID,
+    debug=True,
+    enable_memory=True,
+    enable_mcp=True,  # ❌ CAUSING CONFLICTS
+    storage_dir=AGNO_STORAGE_DIR,
+)
+
+# AFTER (MCP disabled, clean tool usage)
+agent = AgnoPersonalAgent(
+    model_provider="ollama",
+    model_name=model_name,
+    ollama_base_url=ollama_url,
+    user_id=USER_ID,
+    debug=True,
+    enable_memory=True,
+    enable_mcp=False,  # ✅ DISABLED TO AVOID CONFLICTS
+    storage_dir=AGNO_STORAGE_DIR,
+)
+```
+
+**SOLUTION #2: Removed Problematic PersonalAgentWebTools**
+
+Modified `src/personal_agent/core/agno_agent.py` to remove the conflicting tool:
+
+```python
+# BEFORE (Problematic placeholder tool)
+tools = [
+    YFinanceTools(...),
+    PythonTools(),
+    ShellTools(...),
+    PersonalAgentFilesystemTools(),
+    PersonalAgentWebTools(),  # ❌ CAUSING BRAVE SEARCH REFERENCES
+]
+
+# AFTER (Direct DuckDuckGo integration)
+tools = [
+    DuckDuckGoTools(),  # ✅ DIRECT INTEGRATION
+    YFinanceTools(...),
+    PythonTools(),
+    ShellTools(...),
+    PersonalAgentFilesystemTools(),
+    # Removed PersonalAgentWebTools - was causing confusion
+]
+```
+
+**SOLUTION #3: Updated Agent Instructions for Current Configuration**
+
+Completely rewrote agent instructions in `src/personal_agent/core/agno_agent.py`:
+
+```python
+def _create_agent_instructions(self) -> str:
+    # Get current tool configuration for accurate instructions
+    mcp_status = "enabled" if self.enable_mcp else "disabled"
+    memory_status = "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
+    
+    base_instructions = dedent(f"""
+        ## CURRENT CONFIGURATION
+        - **Memory System**: {memory_status}
+        - **MCP Servers**: {mcp_status}
+        - **User ID**: {self.user_id}
+        - **Debug Mode**: {self.debug}
+        
+        ## CURRENT AVAILABLE TOOLS - USE THESE IMMEDIATELY
+        
+        **BUILT-IN TOOLS AVAILABLE**:
+        - **YFinanceTools**: Stock prices, financial analysis, market data
+        - **DuckDuckGoTools**: Web search, news searches, current events
+        - **PythonTools**: Calculations, data analysis, programming help
+        - **ShellTools**: System operations and command execution
+        - **PersonalAgentFilesystemTools**: File reading, writing, directory operations
+        - **Memory Tools**: store_user_memory, query_memory, get_recent_memories, get_all_memories
+        
+        **WEB SEARCH - IMMEDIATE ACTION**:
+        - News requests → IMMEDIATELY use DuckDuckGoTools (duckduckgo_news)
+        - Current events → IMMEDIATELY use DuckDuckGoTools (duckduckgo_search)
+        - "what's happening with..." → IMMEDIATELY use DuckDuckGo search
+        - "top headlines about..." → IMMEDIATELY use duckduckgo_news
+        - NO analysis paralysis, just SEARCH
+        
+        **CRITICAL: STOP ALL THINKING FOR TOOL REQUESTS**
+        - When user asks for tool usage, DO NOT use <think> tags
+        - DO NOT analyze what to do - just DO IT
+        - IMMEDIATELY call the requested tool
+        - Example: "list headlines about Middle East" → duckduckgo_news("Middle East headlines") RIGHT NOW
+    """)
+```
+
+**SOLUTION #4: Enhanced Semantic Memory Documentation**
+
+Updated instructions to reflect the SemanticMemoryManager features:
+
+```python
+## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED
+
+**SEMANTIC MEMORY FEATURES**:
+- **Automatic Deduplication**: Prevents storing duplicate memories
+- **Topic Classification**: Automatically categorizes memories by topic
+- **Similarity Matching**: Uses semantic similarity for intelligent retrieval
+- **Comprehensive Search**: Searches through ALL stored memories
+
+**SEMANTIC MEMORY STORAGE**: When the user provides new personal information:
+1. **Store it ONCE using store_user_memory** - the system automatically prevents duplicates
+2. **Include relevant topics** - pass topics as a list like ["hobbies", "preferences"]
+3. **Acknowledge the storage warmly** - "I'll remember that about you!"
+4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically
+```
+
+#### 🧪 **Comprehensive Testing & Validation**
+
+**Test Results - 100% Success**:
+
+```bash
+🔧 Creating AgnoPersonalAgent with MCP disabled...
+📋 Agent configuration:
+  - MCP enabled: False
+  - Total tools: 9
+  - Built-in tools: 9
+  - MCP tools: 0
+  - Available built-in tools:
+    * DuckDuckGoTools  # ✅ DIRECT DUCKDUCKGO INTEGRATION
+    * YFinanceTools
+    * PythonTools
+    * ShellTools
+    * PersonalAgentFilesystemTools
+    * store_user_memory
+    * query_memory
+    * get_recent_memories
+    * get_all_memories
+
+🔍 Testing web search for Middle East unrest headlines...
+
+📰 Agent Response:
+Here are the top 5 headlines about the Middle East unrest:
+
+1. **Bitcoin Remains Stable Around $105K Amid Middle East Unrest and Fed Caution** (June 19, 2025)
+2. **Iowa Senator Joni Ernst Responds to Middle East Unrest** (June 21, 2025)
+3. **Trump Downplays Signs of MAGA Unrest Over Possible Military Strike on Iran** (June 19, 2025)
+4. **British Airways Flight BA276 Returns to Chennai After Middle East Airspace Closure** (June 22, 2025)
+5. **Dollar Edges Higher vs. Yen Amid Middle East Unrest** (June 21, 2025)
+
+✅ SUCCESS: Agent is providing actual news content!
+```
+
+**Verification Points**:
+
+- ✅ **No Python Code**: Agent no longer returns `import use_brave_search_server` code
+- ✅ **Actual Headlines**: Real news headlines with dates and sources
+- ✅ **DuckDuckGo Working**: Agent properly calls `duckduckgo_news()` function
+- ✅ **MCP Disabled**: 0 MCP tools loaded, eliminating conflicts
+- ✅ **Tool Integration**: Direct DuckDuckGo integration working correctly
+
+#### 📊 **Performance & Functionality Improvements**
+
+**Before Fix**:
+
+- ❌ **Web Search**: Returned Python code instead of results
+- ❌ **News Headlines**: Generated code snippets instead of actual news
+- ❌ **User Experience**: Confusing and broken functionality
+- ❌ **Tool Usage**: Agent confused about which tools to use
+
+**After Fix**:
+
+- ✅ **Web Search**: Direct execution with real results
+- ✅ **News Headlines**: Actual headlines with dates and sources
+- ✅ **User Experience**: Seamless news and search functionality
+- ✅ **Tool Usage**: Clear, immediate tool execution without hesitation
+
+**Tool Configuration Transformation**:
+
+| Component | Before | After | Status |
+|-----------|--------|-------|--------|
+| **MCP Servers** | Enabled (causing conflicts) | Disabled | ✅ Fixed |
+| **PersonalAgentWebTools** | Included (placeholder) | Removed | ✅ Fixed |
+| **DuckDuckGoTools** | Indirect via MCP | Direct integration | ✅ Working |
+| **Web Search** | Python code generation | Actual search execution | ✅ Working |
+| **News Headlines** | Code snippets | Real headlines | ✅ Working |
+
+#### 🎯 **User Experience Transformation**
+
+**Scenario**: User asks "list the top 5 headlines about the unrest in the middle east"
+
+**BEFORE (Broken)**:
+
+```python
+<|python_tag|>import use_brave_search_server as bss
+top_5_headlines = bss.call("unrest in the middle east") 
+print(top_5_headlines)
+```
+
+**AFTER (Working)**:
+
+```
+Here are the top 5 headlines about the Middle East unrest:
+
+1. **Bitcoin Remains Stable Around $105K Amid Middle East Unrest and Fed Caution** (June 19, 2025)
+2. **Iowa Senator Joni Ernst Responds to Middle East Unrest** (June 21, 2025)
+3. **Trump Downplays Signs of MAGA Unrest Over Possible Military Strike on Iran** (June 19, 2025)
+4. **British Airways Flight BA276 Returns to Chennai After Middle East Airspace Closure** (June 22, 2025)
+5. **Dollar Edges Higher vs. Yen Amid Middle East Unrest** (June 21, 2025)
+```
+
+#### 🏗️ **Technical Architecture Improvements**
+
+**Clean Tool Architecture**:
+
+1. **Eliminated Conflicts**: Removed problematic placeholder tools
+2. **Direct Integration**: DuckDuckGo tools directly available to agent
+3. **Clear Instructions**: Agent knows exactly which tools to use
+4. **Immediate Action**: No hesitation or analysis paralysis
+5. **Reliable Execution**: Consistent web search and news functionality
+
+**Enhanced Configuration Management**:
+
+- **Dynamic Status Reporting**: Instructions reflect actual configuration
+- **Tool-Specific Guidance**: Clear instructions for each available tool
+- **Semantic Memory Integration**: Proper documentation of memory features
+- **Debug-Friendly**: Clear logging and status information
+
+#### 📁 **Files Modified**
+
+**Core Fixes**:
+
+- `tools/paga_streamlit_agno.py` - Disabled MCP to eliminate conflicts
+- `src/personal_agent/core/agno_agent.py` - Removed PersonalAgentWebTools, added direct DuckDuckGo integration, updated instructions
+
+**Testing Files Created**:
+
+- `test_middle_east_headlines.py` - Direct DuckDuckGo testing
+- `middle_east_headlines_formatted.py` - Results formatting demonstration
+- `test_agent_web_search.py` - Comprehensive agent web search testing
+
+#### 🏆 **Critical Functionality Achievement**
+
+**Technical Innovation**: Successfully transformed a broken web search system that generated Python code into a reliable, direct-execution web search and news system using DuckDuckGo integration.
+
+**Key Achievements**:
+
+1. ✅ **Eliminated Python Code Generation**: No more confusing code snippets
+2. ✅ **Direct Tool Execution**: Agent immediately executes web searches
+3. ✅ **Real News Results**: Actual headlines with dates and sources
+4. ✅ **Clean Architecture**: Removed conflicting placeholder tools
+5. ✅ **Enhanced Instructions**: Agent knows exactly what tools to use
+6. ✅ **Semantic Memory Integration**: Proper documentation of memory features
+
+**Business Impact**:
+
+- **Functionality Restored**: Web search and news features now working
+- **User Experience**: Seamless, professional news and search results
+- **Reliability**: Consistent tool execution without confusion
+- **Maintainability**: Clean architecture without conflicting components
+
+**User Benefits**:
+
+- **Immediate Results**: Real headlines and search results on demand
+- **Professional Experience**: Clean, formatted news with sources and dates
+- **Reliable Operation**: No more confusing Python code responses
+- **Enhanced Capabilities**: Full web search and news functionality restored
+
+**Result**: Transformed a completely broken web search system into a reliable, professional news and search service that delivers actual results instead of Python code! 🚀
+
+---
+
 ## 🔧 **v0.7.5-dev: Critical Circular Import Fix - Semantic Memory Manager** (June 21, 2025)
 
 ### ✅ **CRITICAL INFRASTRUCTURE FIX: Resolved Circular Import Dependency**
@@ -642,12 +952,14 @@ export DEFAULT_MODEL_CTX_SIZE=8192
 **Scenario**: Long conversation about complex topics
 
 **BEFORE**:
+
 ```
 User: [After 20 exchanges] "What did we discuss about my project earlier?"
 Agent: "I don't have that information in my current context..."
 ```
 
 **AFTER**:
+
 ```
 User: [After 20 exchanges] "What did we discuss about my project earlier?"
 Agent: "Earlier you mentioned your machine learning project focusing on..."

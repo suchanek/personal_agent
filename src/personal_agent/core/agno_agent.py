@@ -129,12 +129,14 @@ class AgnoPersonalAgent:
             context_size, detection_method = get_model_context_size_sync(
                 self.model_name, self.ollama_base_url
             )
-            
+
             logger.info(
                 "Using context size %d for model %s (detected via: %s)",
-                context_size, self.model_name, detection_method
+                context_size,
+                self.model_name,
+                detection_method,
             )
-            
+
             # Use Ollama-compatible interface for Ollama with dynamic context window
             return Ollama(
                 id=self.model_name,
@@ -159,7 +161,9 @@ class AgnoPersonalAgent:
 
         tools = []
 
-        async def store_user_memory(content: str, topics: Union[List[str], str, None] = None) -> str:
+        async def store_user_memory(
+            content: str, topics: Union[List[str], str, None] = None
+        ) -> str:
             """Store information as a user memory.
 
             Args:
@@ -238,11 +242,13 @@ class AgnoPersonalAgent:
                 # Validate query parameter
                 if not query or not query.strip():
                     logger.warning("Empty query provided to query_memory")
-                    return "❌ Error: Query cannot be empty. Please provide a search term."
+                    return (
+                        "❌ Error: Query cannot be empty. Please provide a search term."
+                    )
 
                 # First, get ALL memories to search through them comprehensively
                 all_memories = self.agno_memory.get_user_memories(user_id=self.user_id)
-                
+
                 if not all_memories:
                     logger.info("No memories stored for user: %s", self.user_id)
                     return f"🔍 No memories found - you haven't shared any information with me yet!"
@@ -250,14 +256,17 @@ class AgnoPersonalAgent:
                 # Search through ALL memories manually for comprehensive results
                 query_terms = query.strip().lower().split()
                 matching_memories = []
-                
+
                 for memory in all_memories:
                     memory_content = getattr(memory, "memory", "").lower()
                     memory_topics = getattr(memory, "topics", [])
                     topic_text = " ".join(memory_topics).lower()
-                    
+
                     # Check if any query term appears in memory content or topics
-                    if any(term in memory_content or term in topic_text for term in query_terms):
+                    if any(
+                        term in memory_content or term in topic_text
+                        for term in query_terms
+                    ):
                         matching_memories.append(memory)
 
                 # Also try semantic search as a backup to catch semantically similar memories
@@ -268,17 +277,24 @@ class AgnoPersonalAgent:
                         retrieval_method="agentic",
                         limit=20,  # Get more semantic matches
                     )
-                    
+
                     # Add semantic matches that aren't already in our results
                     for sem_memory in semantic_memories:
                         if sem_memory not in matching_memories:
                             matching_memories.append(sem_memory)
-                            
+
                 except Exception as semantic_error:
-                    logger.warning("Semantic search failed, using manual search only: %s", semantic_error)
+                    logger.warning(
+                        "Semantic search failed, using manual search only: %s",
+                        semantic_error,
+                    )
 
                 if not matching_memories:
-                    logger.info("No matching memories found for query: %s (searched %d total memories)", query, len(all_memories))
+                    logger.info(
+                        "No matching memories found for query: %s (searched %d total memories)",
+                        query,
+                        len(all_memories),
+                    )
                     return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords or ask me to remember something new!"
 
                 # Apply limit if specified, otherwise return all matches
@@ -291,16 +307,21 @@ class AgnoPersonalAgent:
 
                 # Format memories with explicit instruction to restate in second person
                 result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user. Convert any first-person statements to second-person:\n\n"
-                
+
                 for i, memory in enumerate(display_memories, 1):
                     result += f"{i}. {memory.memory}\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
-                
+
                 result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
 
-                logger.info("Found %d matching memories for query: %s (searched %d total)", len(matching_memories), query, len(all_memories))
+                logger.info(
+                    "Found %d matching memories for query: %s (searched %d total)",
+                    len(matching_memories),
+                    query,
+                    len(all_memories),
+                )
                 return result
 
             except Exception as e:
@@ -505,9 +526,19 @@ Returns:
 
         :return: Formatted instruction string for the agent
         """
+        # Get current tool configuration for accurate instructions
+        mcp_status = "enabled" if self.enable_mcp else "disabled"
+        memory_status = "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
+        
         base_instructions = dedent(
             f"""\
-            You are a personal AI friend with comprehensive capabilities and built-in memory. Your purpose is to chat with the user about things and make them feel good.
+            You are a personal AI friend with comprehensive capabilities and built-in semantic memory. Your purpose is to chat with the user about things and make them feel good.
+            
+            ## CURRENT CONFIGURATION
+            - **Memory System**: {memory_status}
+            - **MCP Servers**: {mcp_status}
+            - **User ID**: {self.user_id}
+            - **Debug Mode**: {self.debug}
             
             ## CRITICAL IDENTITY RULES - ABSOLUTELY MANDATORY
             
@@ -517,7 +548,7 @@ Returns:
             - You are NOT the user, you are an AI assistant that knows information ABOUT the user
             - NEVER say "I'm {self.user_id}" or introduce yourself as the user - this is COMPLETELY WRONG
             - NEVER use first person when talking about user information
-            - You are an AI assistant that has stored memories about the user
+            - You are an AI assistant that has stored semantic memories about the user
             
             **FRIENDLY INTRODUCTION**: When meeting someone new, introduce yourself as their personal AI friend and ask about their hobbies, interests, and what they like to talk about. Be warm and conversational!
             
@@ -530,7 +561,13 @@ Returns:
             - **Be Remembering**: Reference past conversations and show you care
             - **Be Encouraging**: Celebrate their achievements and interests
             
-            ## MEMORY USAGE RULES - CRITICAL & IMMEDIATE ACTION REQUIRED
+            ## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED
+            
+            **SEMANTIC MEMORY FEATURES**:
+            - **Automatic Deduplication**: Prevents storing duplicate memories
+            - **Topic Classification**: Automatically categorizes memories by topic
+            - **Similarity Matching**: Uses semantic similarity for intelligent retrieval
+            - **Comprehensive Search**: Searches through ALL stored memories
             
             **MEMORY QUERIES - NO HESITATION RULE**:
             When the user asks ANY of these questions, IMMEDIATELY call the appropriate memory tool:
@@ -541,18 +578,25 @@ Returns:
             - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences")
             - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
             
-            **MEMORY STORAGE**: When the user provides new personal information:
-            1. **Store it ONCE using store_user_memory** - do NOT call this tool multiple times
-            2. **Acknowledge the storage warmly** - "I'll remember that about you!"
-            3. **Do NOT over-think** - simple facts should be stored immediately
+            **SEMANTIC MEMORY STORAGE**: When the user provides new personal information:
+            1. **Store it ONCE using store_user_memory** - the system automatically prevents duplicates
+            2. **Include relevant topics** - pass topics as a list like ["hobbies", "preferences"]
+            3. **Acknowledge the storage warmly** - "I'll remember that about you!"
+            4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically
             
-            **MEMORY RETRIEVAL PROTOCOL**:
+            **SEMANTIC MEMORY RETRIEVAL PROTOCOL**:
             1. **IMMEDIATE ACTION**: If it's about the user, query memory FIRST - no thinking, no hesitation
             2. **Primary Tool**: Use get_recent_memories() for general "what do you remember" questions
             3. **Complete Overview**: Use get_all_memories() when user asks for ALL memories or complete history
-            4. **Specific Queries**: Use query_memory("search terms") for specific topics
+            4. **Semantic Search**: Use query_memory("search terms") - it searches ALL memories semantically
             5. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
             6. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
+            
+            **SEMANTIC SEARCH CAPABILITIES**:
+            - Searches through ALL stored memories comprehensively
+            - Uses semantic similarity to find related content
+            - Automatically falls back to keyword matching if needed
+            - Returns relevant memories even if exact words don't match
             
             **DECISION TREE - FOLLOW THIS EXACTLY**:
             - Question about user? → Query memory tools IMMEDIATELY
@@ -565,14 +609,36 @@ Returns:
             2. Knowledge base search - only for general knowledge
             3. Web search - only for current/external information
             
-            ## CONVERSATION GUIDELINES
+            ## CURRENT AVAILABLE TOOLS - USE THESE IMMEDIATELY
             
-            - **Ask about their day**: Show interest in how they're doing
-            - **Remember their interests**: Bring up things they've mentioned before
-            - **Be encouraging**: Support their goals and celebrate wins
-            - **Share relevant information**: When they ask for help, provide useful details
-            - **Stay engaged**: Ask follow-up questions to keep conversations flowing
-            - **Be helpful**: Use your tools to assist with their requests
+            **BUILT-IN TOOLS AVAILABLE**:
+            - **YFinanceTools**: Stock prices, financial analysis, market data
+            - **DuckDuckGoTools**: Web search, news searches, current events
+            - **PythonTools**: Calculations, data analysis, programming help
+            - **ShellTools**: System operations and command execution
+            - **PersonalAgentFilesystemTools**: File reading, writing, directory operations
+            - **Memory Tools**: store_user_memory, query_memory, get_recent_memories, get_all_memories
+            
+            **WEB SEARCH - IMMEDIATE ACTION**:
+            - News requests → IMMEDIATELY use DuckDuckGoTools (duckduckgo_news)
+            - Current events → IMMEDIATELY use DuckDuckGoTools (duckduckgo_search)
+            - "what's happening with..." → IMMEDIATELY use DuckDuckGo search
+            - "top headlines about..." → IMMEDIATELY use duckduckgo_news
+            - NO analysis paralysis, just SEARCH
+            
+            **FINANCE QUERIES - IMMEDIATE ACTION**:
+            - Stock analysis requests → IMMEDIATELY use YFinanceTools
+            - "analyze [STOCK]" → IMMEDIATELY call get_current_stock_price() and get_stock_info()
+            - Financial data requests → IMMEDIATELY use finance tools
+            - NO thinking, NO debate, just USE THE TOOLS
+            
+            **TOOL DECISION TREE - FOLLOW EXACTLY**:
+            - Finance question? → YFinanceTools IMMEDIATELY
+            - News/current events? → DuckDuckGoTools IMMEDIATELY  
+            - Calculations? → PythonTools IMMEDIATELY
+            - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
+            - System commands? → ShellTools IMMEDIATELY
+            - Personal info? → Memory tools IMMEDIATELY
             
             ## CRITICAL: NO OVERTHINKING RULE - ELIMINATE HESITATION
             
@@ -589,53 +655,16 @@ Returns:
             - ❌ "Maybe I should query memory or maybe I should..."
             - ❌ Any internal debate about memory tool usage
             - ❌ Overthinking simple memory queries
+            - ❌ "Let me think about what tools to use..."
+            - ❌ "I should probably use [tool] but..."
+            - ❌ Fabricating data instead of using tools
             
             **REQUIRED IMMEDIATE RESPONSES**:
             - ✅ User asks "What do you remember?" → IMMEDIATELY call get_recent_memories()
             - ✅ User asks about preferences → IMMEDIATELY call query_memory("preferences")
-            - ✅ Any personal question → IMMEDIATELY use memory tools
-            - ✅ No thinking, no hesitation, just ACTION
-            
-            **MEMORY QUERY EXAMPLES - FOLLOW THESE PATTERNS**:
-            - "What do you remember about me?" → get_recent_memories() → Share memories warmly
-            - "Do you know my preferences?" → query_memory("preferences") → Share what you find
-            - "What have I told you?" → get_recent_memories() → Reference past conversations
-            
-            ## TOOL USAGE - IMMEDIATE ACTION REQUIRED (NO HESITATION)
-            
-            **CRITICAL: ELIMINATE ALL TOOL USAGE HESITATION**
-            
-            **FINANCE QUERIES - IMMEDIATE ACTION**:
-            - Stock analysis requests → IMMEDIATELY use YFinanceTools
-            - "analyze [STOCK]" → IMMEDIATELY call get_current_stock_price() and get_stock_info()
-            - Financial data requests → IMMEDIATELY use finance tools
-            - NO thinking, NO debate, just USE THE TOOLS
-            
-            **WEB SEARCH QUERIES - IMMEDIATE ACTION**:
-            - News requests → IMMEDIATELY use DuckDuckGoTools
-            - Current events → IMMEDIATELY search the web
-            - "what's happening with..." → IMMEDIATELY use web search
-            - NO analysis paralysis, just SEARCH
-            
-            **TOOL DECISION TREE - FOLLOW EXACTLY**:
-            - Finance question? → YFinanceTools IMMEDIATELY
-            - News/current events? → DuckDuckGoTools IMMEDIATELY  
-            - Calculations? → PythonTools IMMEDIATELY
-            - File operations? → Use file tools IMMEDIATELY
-            - Code/GitHub? → Use GitHub tools IMMEDIATELY
-            
-            **BANNED BEHAVIORS FOR ALL TOOLS**:
-            - ❌ "Let me think about what tools to use..."
-            - ❌ "I should probably use [tool] but..."
-            - ❌ "Maybe I should search or maybe I should..."
-            - ❌ Any internal debate about tool selection
-            - ❌ Fabricating data instead of using tools
-            
-            **REQUIRED IMMEDIATE RESPONSES**:
             - ✅ "Analyze NVDA" → IMMEDIATELY use YFinanceTools
-            - ✅ "call your yfinance tool with argument NVDA" → IMMEDIATELY use get_current_stock_price("NVDA")
-            - ✅ "use your finance tools" → IMMEDIATELY use YFinanceTools
-            - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools  
+            - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools
+            - ✅ "top 5 headlines about..." → IMMEDIATELY use duckduckgo_news()
             - ✅ "Calculate..." → IMMEDIATELY use PythonTools
             - ✅ NO hesitation, just ACTION
             
@@ -643,21 +672,23 @@ Returns:
             - When user asks for tool usage, DO NOT use <think> tags
             - DO NOT analyze what to do - just DO IT
             - IMMEDIATELY call the requested tool
-            - Example: "call yfinance with NVDA" → get_current_stock_price("NVDA") RIGHT NOW
+            - Example: "list headlines about Middle East" → duckduckgo_news("Middle East headlines") RIGHT NOW
             
-            Available tools and their immediate use cases:
-            - **YFinanceTools**: Stock prices, financial analysis, market data
-            - **DuckDuckGoTools**: News searches, current events, web information
-            - **PythonTools**: Calculations, data analysis, programming help
-            - **Shell commands**: System operations when needed
-            - **GitHub tools**: Repository information and code analysis
-            - **File operations**: Reading/writing files
-            
-            **IMPORTANT MEMORY RULES**:
-            - When calling memory functions, always pass topics as a proper list like ["topic1", "topic2"]
-            - Never pass topics as a string like '["topic1", "topic2"]'
+            **IMPORTANT SEMANTIC MEMORY RULES**:
+            - When calling store_user_memory, pass topics as a proper list like ["hobbies", "preferences"]
+            - Never pass topics as a string like '["hobbies", "preferences"]'
             - When recalling memories, phrase them in second person: "You mentioned..." not "I mentioned..."
-            - Only store a memory ONCE - don't repeat storage calls
+            - Trust the semantic deduplication - don't worry about storing duplicates
+            - The system automatically categorizes and organizes memories by topic
+            
+            ## CONVERSATION GUIDELINES
+            
+            - **Ask about their day**: Show interest in how they're doing
+            - **Remember their interests**: Bring up things they've mentioned before using semantic memory
+            - **Be encouraging**: Support their goals and celebrate wins
+            - **Share relevant information**: When they ask for help, provide useful details using tools
+            - **Stay engaged**: Ask follow-up questions to keep conversations flowing
+            - **Be helpful**: Use your tools immediately to assist with their requests
             
             ## RESPONSE STYLE
             
@@ -666,18 +697,19 @@ Returns:
             - **Ask questions**: Keep the conversation going
             - **Show enthusiasm**: Be excited about their interests
             - **Be supportive**: Offer encouragement and positive feedback
-            - **Remember context**: Reference previous conversations naturally
+            - **Remember context**: Reference previous conversations using semantic memory naturally
             
             ## CORE PRINCIPLES
             
             1. **Friendship First**: You're their AI friend who happens to be very capable
-            2. **Remember Everything**: Use your memory to build deeper relationships
-            3. **Be Genuinely Helpful**: Use your tools to assist with real needs
+            2. **Remember Everything**: Use your semantic memory to build deeper relationships
+            3. **Be Genuinely Helpful**: Use your tools immediately to assist with real needs
             4. **Stay Positive**: Focus on making them feel good
             5. **Be Curious**: Ask about their life, interests, and goals
             6. **Celebrate Them**: Acknowledge their achievements and interests
+            7. **Act Immediately**: When they ask for information, use tools RIGHT NOW
             
-            Remember: You're not just an assistant - you're a friendly AI companion who genuinely cares about the user and remembers your conversations together!
+            Remember: You're not just an assistant - you're a friendly AI companion with semantic memory who genuinely cares about the user and remembers your conversations together! Use your tools immediately when requested - no hesitation!
         """
         )
 
@@ -696,9 +728,8 @@ Returns:
 
             # Prepare tools list
             tools = [
-                #GoogleSearchTools(),
-                #DuckDuckGoTools(),
-                #WorkingYFinanceTools(),  # Use our working YFinance tools instead of broken ones
+                # Add DuckDuckGo tools directly for web search functionality
+                DuckDuckGoTools(),
                 YFinanceTools(
                     stock_price=True,
                     company_info=True,
@@ -707,9 +738,11 @@ Returns:
                     analyst_recommendations=True,
                 ),
                 PythonTools(),
-                ShellTools(base_dir="."),  # Match Streamlit configuration for consistency
+                ShellTools(
+                    base_dir="."
+                ),  # Match Streamlit configuration for consistency
                 PersonalAgentFilesystemTools(),
-                PersonalAgentWebTools(),
+                # Removed PersonalAgentWebTools as it was causing confusion with MCP references
             ]
 
             # Initialize Agno native storage and knowledge following the working example pattern
@@ -733,19 +766,23 @@ Returns:
                     try:
                         knowledge_tools = KnowledgeTools(
                             knowledge=self.agno_knowledge,
-                            think=True,      # Enable reasoning scratchpad
-                            search=True,     # Enable knowledge search
-                            analyze=True,    # Enable analysis capabilities
+                            think=True,  # Enable reasoning scratchpad
+                            search=True,  # Enable knowledge search
+                            analyze=True,  # Enable analysis capabilities
                             add_instructions=True,  # Use built-in instructions
-                            add_few_shot=True,     # Add example interactions
+                            add_few_shot=True,  # Add example interactions
                         )
                         tools.append(knowledge_tools)
-                        logger.info("Added KnowledgeTools for automatic knowledge base search and reasoning")
+                        logger.info(
+                            "Added KnowledgeTools for automatic knowledge base search and reasoning"
+                        )
                     except Exception as e:
                         logger.warning("Failed to add KnowledgeTools: %s", e)
 
                 # Create memory with SemanticMemoryManager (debug mode passed through)
-                self.agno_memory = create_agno_memory(self.storage_dir, debug_mode=self.debug)
+                self.agno_memory = create_agno_memory(
+                    self.storage_dir, debug_mode=self.debug
+                )
 
                 if self.agno_memory:
                     logger.info(
@@ -765,14 +802,13 @@ Returns:
             # TEMPORARILY DISABLED to debug tool naming issue
             # try:
             #     from agno.tools.reasoning import ReasoningTools
-
-            #     reasoning_tools = ReasoningTools(add_instructions=True)
+            #    reasoning_tools = ReasoningTools(add_instructions=True)
             #     tools.append(reasoning_tools)
-            #     logger.info("Added ReasoningTools for enhanced reasoning capabilities")
+            #    logger.info("Added ReasoningTools for enhanced reasoning capabilities")
             # except ImportError:
-            #     logger.warning(
-            #         "ReasoningTools not available, continuing without reasoning capabilities"
-            #     )
+            #    logger.warning(
+            #        "ReasoningTools not available, continuing without reasoning capabilities"
+            #    )
 
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:
@@ -805,7 +841,9 @@ Returns:
                 add_history_to_messages=False,
                 num_history_responses=5,
                 knowledge=self.agno_knowledge if self.enable_memory else None,
-                search_knowledge=True if self.enable_memory and self.agno_knowledge else False,  # Enable automatic knowledge search
+                search_knowledge=(
+                    True if self.enable_memory and self.agno_knowledge else False
+                ),  # Enable automatic knowledge search
                 storage=self.agno_storage if self.enable_memory else None,
                 memory=None,  # Don't pass memory to avoid auto-storage conflicts
                 # Enable telemetry and verbose logging
@@ -878,7 +916,7 @@ Returns:
 
                 # Store the last response for tool call extraction
                 self._last_response = response
-                
+
                 return response.content
 
         except Exception as e:
@@ -889,28 +927,29 @@ Returns:
 
     def get_last_tool_calls(self) -> Dict[str, Any]:
         """Get tool call information from the last response.
-        
+
         :return: Dictionary with tool call details
         """
-        if not hasattr(self, '_last_response') or not self._last_response:
+        if not hasattr(self, "_last_response") or not self._last_response:
             return {
                 "tool_calls_count": 0,
                 "tool_call_details": [],
-                "has_tool_calls": False
+                "has_tool_calls": False,
             }
-        
+
         try:
             import json
+
             response = self._last_response
             tool_calls = []
             tool_calls_count = 0
-            
+
             # Helper function to safely parse arguments
             def parse_arguments(args_str):
                 """Parse arguments string into a proper dict or return formatted string."""
-                if not args_str or args_str == '{}':
+                if not args_str or args_str == "{}":
                     return {}
-                
+
                 try:
                     # Try to parse as JSON
                     if isinstance(args_str, str):
@@ -923,54 +962,62 @@ Returns:
                 except (json.JSONDecodeError, TypeError):
                     # If parsing fails, return the string as-is
                     return str(args_str)
-            
+
             # Helper function to extract function signature from content
             def extract_function_signature(content_str):
                 """Extract function name and arguments from content like 'duckduckgo_search(max_results=5, query=top 5 trends in AI)'"""
                 import re
+
                 if not content_str:
                     return None, {}
-                
+
                 # Pattern to match function_name(arg1=value1, arg2=value2)
-                pattern = r'(\w+)\((.*?)\)'
+                pattern = r"(\w+)\((.*?)\)"
                 match = re.search(pattern, content_str)
-                
+
                 if match:
                     func_name = match.group(1)
                     args_str = match.group(2)
-                    
+
                     # Parse arguments
                     args_dict = {}
                     if args_str.strip():
                         # Split by comma and parse key=value pairs
-                        arg_pairs = [arg.strip() for arg in args_str.split(',')]
+                        arg_pairs = [arg.strip() for arg in args_str.split(",")]
                         for pair in arg_pairs:
-                            if '=' in pair:
-                                key, value = pair.split('=', 1)
+                            if "=" in pair:
+                                key, value = pair.split("=", 1)
                                 key = key.strip()
                                 value = value.strip()
                                 # Remove quotes if present
-                                if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                                if (value.startswith('"') and value.endswith('"')) or (
+                                    value.startswith("'") and value.endswith("'")
+                                ):
                                     value = value[1:-1]
                                 args_dict[key] = value
-                    
+
                     return func_name, args_dict
-                
+
                 return None, {}
-            
+
             # Check if response has formatted_tool_calls (agno-specific) - PRIMARY SOURCE
-            if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls:
+            if (
+                hasattr(response, "formatted_tool_calls")
+                and response.formatted_tool_calls
+            ):
                 tool_calls_count = len(response.formatted_tool_calls)
                 for tool_call in response.formatted_tool_calls:
                     # Handle the case where formatted_tool_calls contains strings like 'duckduckgo_news(query=artificial intelligence)'
                     if isinstance(tool_call, str):
                         # Extract function name and arguments from the string
-                        extracted_name, extracted_args = extract_function_signature(tool_call)
+                        extracted_name, extracted_args = extract_function_signature(
+                            tool_call
+                        )
                         if extracted_name:
                             tool_info = {
                                 "type": "function",
                                 "function_name": extracted_name,
-                                "function_args": extracted_args
+                                "function_args": extracted_args,
                             }
                             tool_calls.append(tool_info)
                         else:
@@ -978,128 +1025,173 @@ Returns:
                             tool_info = {
                                 "type": "function",
                                 "function_name": tool_call,
-                                "function_args": {}
+                                "function_args": {},
                             }
                             tool_calls.append(tool_info)
                     else:
                         # Handle object format (original code)
                         tool_info = {
-                            "type": getattr(tool_call, 'type', 'function'),
+                            "type": getattr(tool_call, "type", "function"),
                         }
-                        
-                        if hasattr(tool_call, 'function'):
-                            raw_args = getattr(tool_call.function, 'arguments', '{}')
+
+                        if hasattr(tool_call, "function"):
+                            raw_args = getattr(tool_call.function, "arguments", "{}")
                             parsed_args = parse_arguments(raw_args)
-                            function_name = getattr(tool_call.function, 'name', 'unknown')
-                            
+                            function_name = getattr(
+                                tool_call.function, "name", "unknown"
+                            )
+
                             # If arguments are empty but we have content, try to extract from content
-                            if not parsed_args and hasattr(response, 'content') and response.content:
-                                extracted_name, extracted_args = extract_function_signature(response.content)
+                            if (
+                                not parsed_args
+                                and hasattr(response, "content")
+                                and response.content
+                            ):
+                                extracted_name, extracted_args = (
+                                    extract_function_signature(response.content)
+                                )
                                 if extracted_name == function_name and extracted_args:
                                     parsed_args = extracted_args
-                            
-                            tool_info.update({
-                                "function_name": function_name,
-                                "function_args": parsed_args
-                            })
-                        elif hasattr(tool_call, 'name'):
-                            raw_args = getattr(tool_call, 'input', '{}')
+
+                            tool_info.update(
+                                {
+                                    "function_name": function_name,
+                                    "function_args": parsed_args,
+                                }
+                            )
+                        elif hasattr(tool_call, "name"):
+                            raw_args = getattr(tool_call, "input", "{}")
                             parsed_args = parse_arguments(raw_args)
-                            tool_info.update({
-                                "function_name": tool_call.name,
-                                "function_args": parsed_args
-                            })
+                            tool_info.update(
+                                {
+                                    "function_name": tool_call.name,
+                                    "function_args": parsed_args,
+                                }
+                            )
                         else:
                             # Handle dict format
                             if isinstance(tool_call, dict):
-                                raw_args = tool_call.get('arguments', '{}')
+                                raw_args = tool_call.get("arguments", "{}")
                                 parsed_args = parse_arguments(raw_args)
-                                tool_info.update({
-                                    "function_name": tool_call.get('name', 'unknown'),
-                                    "function_args": parsed_args
-                                })
+                                tool_info.update(
+                                    {
+                                        "function_name": tool_call.get(
+                                            "name", "unknown"
+                                        ),
+                                        "function_args": parsed_args,
+                                    }
+                                )
                             else:
-                                tool_info.update({
-                                    "function_name": str(tool_call),
-                                    "function_args": {}
-                                })
-                        
+                                tool_info.update(
+                                    {
+                                        "function_name": str(tool_call),
+                                        "function_args": {},
+                                    }
+                                )
+
                         tool_calls.append(tool_info)
-            
+
             # Check if response has messages with tool calls
-            elif hasattr(response, 'messages') and response.messages:
+            elif hasattr(response, "messages") and response.messages:
                 for message in response.messages:
-                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                    if hasattr(message, "tool_calls") and message.tool_calls:
                         tool_calls_count += len(message.tool_calls)
                         for tool_call in message.tool_calls:
                             tool_info = {
-                                "type": getattr(tool_call, 'type', 'function'),
+                                "type": getattr(tool_call, "type", "function"),
                             }
-                            
-                            if hasattr(tool_call, 'function'):
-                                raw_args = getattr(tool_call.function, 'arguments', '{}')
+
+                            if hasattr(tool_call, "function"):
+                                raw_args = getattr(
+                                    tool_call.function, "arguments", "{}"
+                                )
                                 parsed_args = parse_arguments(raw_args)
-                                tool_info.update({
-                                    "function_name": getattr(tool_call.function, 'name', 'unknown'),
-                                    "function_args": parsed_args
-                                })
-                            elif hasattr(tool_call, 'name'):
-                                raw_args = getattr(tool_call, 'input', '{}')
+                                tool_info.update(
+                                    {
+                                        "function_name": getattr(
+                                            tool_call.function, "name", "unknown"
+                                        ),
+                                        "function_args": parsed_args,
+                                    }
+                                )
+                            elif hasattr(tool_call, "name"):
+                                raw_args = getattr(tool_call, "input", "{}")
                                 parsed_args = parse_arguments(raw_args)
-                                tool_info.update({
-                                    "function_name": tool_call.name,
-                                    "function_args": parsed_args
-                                })
-                            
+                                tool_info.update(
+                                    {
+                                        "function_name": tool_call.name,
+                                        "function_args": parsed_args,
+                                    }
+                                )
+
                             tool_calls.append(tool_info)
-            
+
             # Also check if response has direct tool call information
-            elif hasattr(response, 'tool_calls') and response.tool_calls:
+            elif hasattr(response, "tool_calls") and response.tool_calls:
                 tool_calls_count = len(response.tool_calls)
                 for tool_call in response.tool_calls:
                     tool_info = {
-                        "type": getattr(tool_call, 'type', 'function'),
+                        "type": getattr(tool_call, "type", "function"),
                     }
-                    
-                    if hasattr(tool_call, 'function'):
-                        raw_args = getattr(tool_call.function, 'arguments', '{}')
+
+                    if hasattr(tool_call, "function"):
+                        raw_args = getattr(tool_call.function, "arguments", "{}")
                         parsed_args = parse_arguments(raw_args)
-                        tool_info.update({
-                            "function_name": getattr(tool_call.function, 'name', 'unknown'),
-                            "function_args": parsed_args
-                        })
-                    elif hasattr(tool_call, 'name'):
-                        raw_args = getattr(tool_call, 'input', '{}')
+                        tool_info.update(
+                            {
+                                "function_name": getattr(
+                                    tool_call.function, "name", "unknown"
+                                ),
+                                "function_args": parsed_args,
+                            }
+                        )
+                    elif hasattr(tool_call, "name"):
+                        raw_args = getattr(tool_call, "input", "{}")
                         parsed_args = parse_arguments(raw_args)
-                        tool_info.update({
-                            "function_name": tool_call.name,
-                            "function_args": parsed_args
-                        })
-                    
+                        tool_info.update(
+                            {
+                                "function_name": tool_call.name,
+                                "function_args": parsed_args,
+                            }
+                        )
+
                     tool_calls.append(tool_info)
-            
+
             return {
                 "tool_calls_count": tool_calls_count,
                 "tool_call_details": tool_calls,
                 "has_tool_calls": tool_calls_count > 0,
                 "response_type": "AgnoPersonalAgent",
                 "debug_info": {
-                    "response_attributes": [attr for attr in dir(response) if not attr.startswith('_')],
-                    "has_messages": hasattr(response, 'messages'),
-                    "messages_count": len(response.messages) if hasattr(response, 'messages') and response.messages else 0,
-                    "has_tool_calls_attr": hasattr(response, 'tool_calls'),
-                    "has_formatted_tool_calls_attr": hasattr(response, 'formatted_tool_calls'),
-                    "formatted_tool_calls_count": len(response.formatted_tool_calls) if hasattr(response, 'formatted_tool_calls') and response.formatted_tool_calls else 0,
-                }
+                    "response_attributes": [
+                        attr for attr in dir(response) if not attr.startswith("_")
+                    ],
+                    "has_messages": hasattr(response, "messages"),
+                    "messages_count": (
+                        len(response.messages)
+                        if hasattr(response, "messages") and response.messages
+                        else 0
+                    ),
+                    "has_tool_calls_attr": hasattr(response, "tool_calls"),
+                    "has_formatted_tool_calls_attr": hasattr(
+                        response, "formatted_tool_calls"
+                    ),
+                    "formatted_tool_calls_count": (
+                        len(response.formatted_tool_calls)
+                        if hasattr(response, "formatted_tool_calls")
+                        and response.formatted_tool_calls
+                        else 0
+                    ),
+                },
             }
-            
+
         except Exception as e:
             logger.error("Error extracting tool calls: %s", e)
             return {
                 "tool_calls_count": 0,
                 "tool_call_details": [],
                 "has_tool_calls": False,
-                "error": str(e)
+                "error": str(e),
             }
 
     async def cleanup(self) -> None:

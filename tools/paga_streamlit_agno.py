@@ -329,7 +329,7 @@ async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
             user_id=USER_ID,
             debug=True,
             enable_memory=True,
-            enable_mcp=True,
+            enable_mcp=False,  # Disable MCP to avoid conflicts with DuckDuckGo tools
             storage_dir=AGNO_STORAGE_DIR,
         )
         await agent.initialize()
