@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import from the correct path
 from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, REMOTE_OLLAMA_URL, USER_ID
-from personal_agent.team.personal_agent_team import PersonalAgentTeamWrapper
+from personal_agent.team.personal_agent_team import create_personal_agent_team
 
 # Parse command line arguments
 def parse_args():
@@ -311,18 +311,11 @@ def get_ollama_models(ollama_url):
         return []
 
 
-async def initialize_team_async(model_name, ollama_url, existing_team=None):
-    """Initialize PersonalAgentTeamWrapper with proper async handling."""
-    if existing_team and isinstance(existing_team, PersonalAgentTeamWrapper):
-        # Update existing team's configuration
-        existing_team.model_name = model_name
-        existing_team.ollama_base_url = ollama_url
-        # Reinitialize with new settings
-        await existing_team.initialize()
-        return existing_team
-    else:
-        # Create new PersonalAgentTeamWrapper
-        team = PersonalAgentTeamWrapper(
+def initialize_team(model_name, ollama_url):
+    """Initialize the team using the standard agno Team class."""
+    try:
+        # Create team using the factory function
+        team = create_personal_agent_team(
             model_provider="ollama",
             model_name=model_name,
             ollama_base_url=ollama_url,
@@ -330,13 +323,18 @@ async def initialize_team_async(model_name, ollama_url, existing_team=None):
             user_id=USER_ID,
             debug=True,
         )
-        await team.initialize()
+        
+        # Create memory system for Streamlit compatibility
+        from personal_agent.core.agno_storage import create_agno_memory
+        agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
+        
+        # Attach memory to team for Streamlit access
+        team.agno_memory = agno_memory
+        
         return team
-
-
-def initialize_team(model_name, ollama_url, existing_team=None):
-    """Sync wrapper for team initialization."""
-    return asyncio.run(initialize_team_async(model_name, ollama_url, existing_team))
+    except Exception as e:
+        st.error(f"Failed to initialize team: {str(e)}")
+        return None
 
 
 # Initialize session state variables
@@ -424,17 +422,12 @@ if prompt := st.chat_input("What would you like to talk about?"):
             start_timestamp = datetime.now()
 
             try:
-                # Handle async team response
-                if isinstance(st.session_state.team, PersonalAgentTeamWrapper):
-                    response_content = asyncio.run(st.session_state.team.run(prompt))
+                # Use the standard agno Team arun method (async)
+                if st.session_state.team:
+                    response = asyncio.run(st.session_state.team.arun(prompt, user_id=USER_ID))
+                    response_content = response.content if hasattr(response, 'content') else str(response)
                 else:
-                    # Fallback for other team types
-                    response = st.session_state.team.run(prompt)
-                    response_content = (
-                        response.content
-                        if hasattr(response, "content")
-                        else str(response)
-                    )
+                    response_content = "Team not initialized properly"
 
                 # End timing
                 end_time = time.time()
@@ -448,10 +441,21 @@ if prompt := st.chat_input("What would you like to talk about?"):
 
                 total_tokens = input_tokens + output_tokens
 
-                # For PersonalAgentTeamWrapper, get tool call details from the team
-                tool_call_info = st.session_state.team.get_last_tool_calls()
-                tool_calls_made = tool_call_info.get("tool_calls_count", 0)
-                tool_call_details = tool_call_info.get("tool_call_details", [])
+                # Extract tool call information from response
+                tool_calls_made = 0
+                tool_call_details = []
+                
+                if hasattr(response, 'messages') and response.messages:
+                    for message in response.messages:
+                        if hasattr(message, 'tool_calls') and message.tool_calls:
+                            tool_calls_made += len(message.tool_calls)
+                            for tool_call in message.tool_calls:
+                                tool_info = {
+                                    "type": getattr(tool_call, "type", "function"),
+                                    "function_name": getattr(tool_call, "name", "unknown"),
+                                    "function_args": getattr(tool_call, "input", {}),
+                                }
+                                tool_call_details.append(tool_info)
 
                 # Update performance stats
                 stats = st.session_state.performance_stats
@@ -482,11 +486,7 @@ if prompt := st.chat_input("What would you like to talk about?"):
                     "total_tokens": round(total_tokens),
                     "tool_calls": tool_calls_made,
                     "tool_call_details": tool_call_details,
-                    "response_type": (
-                        "PersonalAgentTeam"
-                        if isinstance(st.session_state.team, PersonalAgentTeamWrapper)
-                        else "Unknown"
-                    ),
+                    "response_type": "AgnoTeam",
                     "success": True,
                 }
 
@@ -510,7 +510,7 @@ if prompt := st.chat_input("What would you like to talk about?"):
 
                         with col3:
                             st.metric("🛠️ Tool Calls", tool_calls_made)
-                            st.metric("📋 Response Type", "PersonalAgentTeam")
+                            st.metric("📋 Response Type", "AgnoTeam")
 
                         st.write("**Team Response Details:**")
 
@@ -537,19 +537,20 @@ if prompt := st.chat_input("What would you like to talk about?"):
                             st.write("- No tool calls detected")
 
                         # Show team info
-                        if isinstance(st.session_state.team, PersonalAgentTeamWrapper):
-                            team_info = st.session_state.team.get_agent_info()
+                        if st.session_state.team:
                             st.write("**🤝 Team Information:**")
-                            st.write(f"  - Framework: {team_info.get('framework', 'Unknown')}")
-                            st.write(f"  - Team Name: {team_info.get('team_name', 'Unknown')}")
-                            st.write(f"  - Team Mode: {team_info.get('team_mode', 'Unknown')}")
-                            st.write(f"  - Member Count: {team_info.get('member_count', 0)}")
+                            st.write(f"  - Framework: agno")
+                            st.write(f"  - Team Name: {getattr(st.session_state.team, 'name', 'Unknown')}")
+                            st.write(f"  - Member Count: {len(getattr(st.session_state.team, 'members', []))}")
                             
-                            members = team_info.get('members', [])
+                            members = getattr(st.session_state.team, 'members', [])
                             if members:
                                 st.write("**👥 Team Members:**")
                                 for member in members:
-                                    st.write(f"  - {member.get('name', 'Unknown')}: {member.get('role', 'Unknown')} ({member.get('tools', 0)} tools)")
+                                    member_name = getattr(member, 'name', 'Unknown')
+                                    member_role = getattr(member, 'role', 'Unknown')
+                                    member_tools = len(getattr(member, 'tools', []))
+                                    st.write(f"  - {member_name}: {member_role} ({member_tools} tools)")
 
                 # Display the response content
                 if response_content:
@@ -670,9 +671,9 @@ with st.sidebar:
                         st.session_state.current_model = selected_model
                         st.session_state.current_ollama_url = new_ollama_url
 
-                        # Reinitialize team with existing team to preserve memory
+                        # Reinitialize team
                         st.session_state.team = initialize_team(
-                            selected_model, new_ollama_url, st.session_state.team
+                            selected_model, new_ollama_url
                         )
 
                         # Clear chat history for new model
@@ -700,16 +701,17 @@ with st.sidebar:
     st.write(f"**User ID:** {USER_ID}")
 
     # Show team composition
-    if isinstance(st.session_state.team, PersonalAgentTeamWrapper):
-        team_info = st.session_state.team.get_agent_info()
-        st.write(f"**Team Framework:** {team_info.get('framework', 'Unknown')}")
-        st.write(f"**Team Members:** {team_info.get('member_count', 0)}")
+    if st.session_state.team:
+        st.write(f"**Team Framework:** agno")
+        members = getattr(st.session_state.team, 'members', [])
+        st.write(f"**Team Members:** {len(members)}")
         
-        members = team_info.get('members', [])
         if members:
             st.write("**Specialized Agents:**")
             for member in members:
-                st.write(f"• **{member.get('name', 'Unknown')}**: {member.get('role', 'Unknown')}")
+                member_name = getattr(member, 'name', 'Unknown')
+                member_role = getattr(member, 'role', 'Unknown')
+                st.write(f"• **{member_name}**: {member_role}")
 
     st.header("Controls")
     if st.button("Clear Chat History"):
@@ -747,138 +749,115 @@ with st.sidebar:
             if st.button(
                 "🗑️ Yes, Delete All Memories", type="primary", use_container_width=True
             ):
-                if "team" in st.session_state and isinstance(
-                    st.session_state.team, PersonalAgentTeamWrapper
-                ):
+                if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
                     try:
-                        # Clear memories using team's memory system
-                        if (
-                            hasattr(st.session_state.team, "agno_memory")
-                            and st.session_state.team.agno_memory
-                        ):
-                            # Clear all user memories
-                            st.session_state.team.agno_memory.clear_user_memories(
-                                user_id=USER_ID
-                            )
-                            st.session_state.show_memory_confirmation = False
-                            st.success("⚠️ All team memories have been cleared!")
-                            st.balloons()
-                            st.rerun()
-                        else:
-                            st.error("Memory system not available")
+                        # Clear all user memories
+                        st.session_state.team.agno_memory.clear_user_memories(
+                            user_id=USER_ID
+                        )
+                        st.session_state.show_memory_confirmation = False
+                        st.success("⚠️ All team memories have been cleared!")
+                        st.balloons()
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error clearing memories: {str(e)}")
                 else:
-                    st.error("No compatible team found in session state")
+                    st.error("Memory system not available")
 
     if st.button("Show All Memories"):
-        if "team" in st.session_state and isinstance(
-            st.session_state.team, PersonalAgentTeamWrapper
-        ):
+        if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
             try:
-                # Get all memories from the team's memory system
-                if (
-                    hasattr(st.session_state.team, "agno_memory")
-                    and st.session_state.team.agno_memory
-                ):
-                    memories = st.session_state.team.agno_memory.get_user_memories(
-                        user_id=USER_ID
-                    )
-                    if memories:
-                        st.subheader("Stored Memories")
-                        for i, memory in enumerate(memories, 1):
-                            # UserMemory objects have direct attributes, not dictionary access
-                            memory_content = getattr(memory, "memory", "No content")
-                            with st.expander(f"Memory {i}: {memory_content[:50]}..."):
-                                st.write(f"**Content:** {memory_content}")
-                                st.write(
-                                    f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**Input:** {getattr(memory, 'input', 'N/A')}"
-                                )
-                                topics = getattr(memory, "topics", [])
-                                if topics:
-                                    st.write(f"**Topics:** {', '.join(topics)}")
-                    else:
-                        st.info(
-                            "No memories stored yet. Start chatting to create some memories!"
-                        )
+                memories = st.session_state.team.agno_memory.get_user_memories(
+                    user_id=USER_ID
+                )
+                if memories:
+                    st.subheader("Stored Memories")
+                    for i, memory in enumerate(memories, 1):
+                        # UserMemory objects have direct attributes, not dictionary access
+                        memory_content = getattr(memory, "memory", "No content")
+                        with st.expander(f"Memory {i}: {memory_content[:50]}..."):
+                            st.write(f"**Content:** {memory_content}")
+                            st.write(
+                                f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
+                            )
+                            st.write(
+                                f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                            )
+                            st.write(
+                                f"**Input:** {getattr(memory, 'input', 'N/A')}"
+                            )
+                            topics = getattr(memory, "topics", [])
+                            if topics:
+                                st.write(f"**Topics:** {', '.join(topics)}")
                 else:
-                    st.error("Memory system not available")
+                    st.info(
+                        "No memories stored yet. Start chatting to create some memories!"
+                    )
             except Exception as e:
                 st.error(f"Error retrieving memories: {str(e)}")
+        else:
+            st.error("Memory system not available")
 
     # Memory Statistics
     if st.button("📊 Show Memory Statistics"):
-        if "team" in st.session_state and isinstance(
-            st.session_state.team, PersonalAgentTeamWrapper
-        ):
+        if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
             try:
-                # Get semantic memory manager from the team's memory system
-                if (
-                    hasattr(st.session_state.team, "agno_memory")
-                    and st.session_state.team.agno_memory
-                ):
-                    # Access the SemanticMemoryManager through the Memory object
-                    memory_manager = st.session_state.team.agno_memory.memory_manager
-                    if hasattr(memory_manager, "get_memory_stats"):
-                        stats = memory_manager.get_memory_stats(
-                            st.session_state.team.agno_memory.db, USER_ID
+                # Access the SemanticMemoryManager through the Memory object
+                memory_manager = st.session_state.team.agno_memory.memory_manager
+                if hasattr(memory_manager, "get_memory_stats"):
+                    stats = memory_manager.get_memory_stats(
+                        st.session_state.team.agno_memory.db, USER_ID
+                    )
+
+                    st.subheader("🧠 Semantic Memory Statistics")
+
+                    # Display basic stats
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Total Memories", stats.get("total_memories", 0))
+                        st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
+
+                    with col2:
+                        avg_length = stats.get("average_memory_length", 0)
+                        st.metric(
+                            "Avg Length",
+                            f"{avg_length:.1f} chars" if avg_length else "N/A",
                         )
+                        most_common = stats.get("most_common_topic", "None")
+                        st.metric("Top Topic", most_common if most_common else "None")
 
-                        st.subheader("🧠 Semantic Memory Statistics")
+                    # Topic distribution
+                    topic_dist = stats.get("topic_distribution", {})
+                    if topic_dist:
+                        st.subheader("📈 Topic Distribution")
+                        for topic, count in sorted(
+                            topic_dist.items(), key=lambda x: x[1], reverse=True
+                        ):
+                            st.write(f"**{topic.title()}:** {count} memories")
 
-                        # Display basic stats
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Total Memories", stats.get("total_memories", 0))
-                            st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
+                    # Show SemanticMemoryManager configuration
+                    st.subheader("⚙️ Memory Configuration")
+                    config = memory_manager.config
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
+                        st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
+                        st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
+                    with col2:
+                        st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
+                        st.write(f"**Max Memory Length:** {config.max_memory_length}")
+                        st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
 
-                        with col2:
-                            avg_length = stats.get("average_memory_length", 0)
-                            st.metric(
-                                "Avg Length",
-                                f"{avg_length:.1f} chars" if avg_length else "N/A",
-                            )
-                            most_common = stats.get("most_common_topic", "None")
-                            st.metric("Top Topic", most_common if most_common else "None")
-
-                        # Topic distribution
-                        topic_dist = stats.get("topic_distribution", {})
-                        if topic_dist:
-                            st.subheader("📈 Topic Distribution")
-                            for topic, count in sorted(
-                                topic_dist.items(), key=lambda x: x[1], reverse=True
-                            ):
-                                st.write(f"**{topic.title()}:** {count} memories")
-
-                        # Show SemanticMemoryManager configuration
-                        st.subheader("⚙️ Memory Configuration")
-                        config = memory_manager.config
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
-                            st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
-                            st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
-                        with col2:
-                            st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
-                            st.write(f"**Max Memory Length:** {config.max_memory_length}")
-                            st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
-
-                    else:
-                        st.info(
-                            "Memory statistics not available - SemanticMemoryManager not found"
-                        )
                 else:
-                    st.error("Memory system not available")
+                    st.info(
+                        "Memory statistics not available - SemanticMemoryManager not found"
+                    )
             except Exception as e:
                 st.error(f"Error getting memory statistics: {str(e)}")
                 import traceback
                 st.code(traceback.format_exc())
+        else:
+            st.error("Memory system not available")
 
     # Memory Search
     st.subheader("🔍 Search Memories")
@@ -889,90 +868,83 @@ with st.sidebar:
     )
 
     if st.button("Search") and search_query:
-        if "team" in st.session_state and isinstance(
-            st.session_state.team, PersonalAgentTeamWrapper
-        ):
+        if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
             try:
-                # Use team's memory system directly
-                if (
-                    hasattr(st.session_state.team, "agno_memory")
-                    and st.session_state.team.agno_memory
-                ):
-                    # Try different search methods to avoid the KeyError bug
-                    memories = None
+                # Try different search methods to avoid the KeyError bug
+                memories = None
 
-                    # First try the "agentic" method for semantic search
+                # First try the "agentic" method for semantic search
+                try:
+                    memories = (
+                        st.session_state.team.agno_memory.search_user_memories(
+                            user_id=USER_ID,
+                            query=search_query,
+                            retrieval_method="agentic",
+                            limit=10,
+                        )
+                    )
+                except Exception as search_error:
+                    st.warning(f"Semantic search failed: {str(search_error)}")
+                    # Fallback: get all memories and filter manually
                     try:
-                        memories = (
-                            st.session_state.team.agno_memory.search_user_memories(
-                                user_id=USER_ID,
-                                query=search_query,
-                                retrieval_method="agentic",
-                                limit=10,
+                        all_memories = (
+                            st.session_state.team.agno_memory.get_user_memories(
+                                user_id=USER_ID
                             )
                         )
-                    except Exception as search_error:
-                        st.warning(f"Semantic search failed: {str(search_error)}")
-                        # Fallback: get all memories and filter manually
-                        try:
-                            all_memories = (
-                                st.session_state.team.agno_memory.get_user_memories(
-                                    user_id=USER_ID
-                                )
-                            )
 
-                            if all_memories:
-                                filtered_memories = []
-                                search_terms = search_query.lower().split()
+                        if all_memories:
+                            filtered_memories = []
+                            search_terms = search_query.lower().split()
 
-                                for memory in all_memories:
-                                    memory_content = getattr(
-                                        memory, "memory", ""
-                                    ).lower()
-                                    memory_topics = getattr(memory, "topics", [])
-                                    topic_text = " ".join(memory_topics).lower()
+                            for memory in all_memories:
+                                memory_content = getattr(
+                                    memory, "memory", ""
+                                ).lower()
+                                memory_topics = getattr(memory, "topics", [])
+                                topic_text = " ".join(memory_topics).lower()
 
-                                    # Check if any search term appears in memory content or topics
-                                    if any(
-                                        term in memory_content or term in topic_text
-                                        for term in search_terms
-                                    ):
-                                        filtered_memories.append(memory)
+                                # Check if any search term appears in memory content or topics
+                                if any(
+                                    term in memory_content or term in topic_text
+                                    for term in search_terms
+                                ):
+                                    filtered_memories.append(memory)
 
-                                memories = filtered_memories[:10]
-                            else:
-                                memories = []
-
-                        except Exception as fallback_error:
-                            st.error(
-                                f"Fallback search also failed: {str(fallback_error)}"
-                            )
+                            memories = filtered_memories[:10]
+                        else:
                             memories = []
 
-                    if memories:
-                        st.subheader(f"Search Results for: '{search_query}'")
-                        for i, memory in enumerate(memories, 1):
-                            memory_content = getattr(memory, "memory", "No content")
-                            with st.expander(f"Result {i}: {memory_content[:50]}..."):
-                                st.write(f"**Memory:** {memory_content}")
-                                topics = getattr(memory, "topics", [])
-                                if topics:
-                                    st.write(f"**Topics:** {', '.join(topics)}")
-                                st.write(
-                                    f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
-                                )
-                    else:
-                        st.info("No matching memories found. Try different keywords.")
+                    except Exception as fallback_error:
+                        st.error(
+                            f"Fallback search also failed: {str(fallback_error)}"
+                        )
+                        memories = []
+
+                if memories:
+                    st.subheader(f"Search Results for: '{search_query}'")
+                    for i, memory in enumerate(memories, 1):
+                        memory_content = getattr(memory, "memory", "No content")
+                        with st.expander(f"Result {i}: {memory_content[:50]}..."):
+                            st.write(f"**Memory:** {memory_content}")
+                            topics = getattr(memory, "topics", [])
+                            if topics:
+                                st.write(f"**Topics:** {', '.join(topics)}")
+                            st.write(
+                                f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                            )
+                            st.write(
+                                f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
+                            )
                 else:
-                    st.error("Memory system not available")
+                    st.info("No matching memories found. Try different keywords.")
             except Exception as e:
                 st.error(f"Error searching memories: {str(e)}")
                 # Show detailed error for debugging
                 import traceback
                 st.code(traceback.format_exc())
+        else:
+            st.error("Memory system not available")
 
     st.header("Debug Info")
     # Debug mode toggle

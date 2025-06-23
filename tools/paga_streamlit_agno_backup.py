@@ -34,176 +34,6 @@ EFFECTIVE_OLLAMA_URL = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
 
-# Helper functions for direct SemanticMemoryManager access
-def get_memory_manager_and_db():
-    """Get direct access to memory manager and database."""
-    if not hasattr(st.session_state, 'agent'):
-        return None, None
-    
-    agent = st.session_state.agent
-    if not (hasattr(agent, 'agno_memory') and agent.agno_memory):
-        return None, None
-    
-    return agent.agno_memory.memory_manager, agent.agno_memory.db
-
-
-def direct_search_memories(query: str, limit: int = 10, similarity_threshold: float = 0.3):
-    """Direct semantic search without agentic retrieval."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return []
-    
-    try:
-        results = memory_manager.search_memories(
-            query=query,
-            db=db,
-            user_id=USER_ID,
-            limit=limit,
-            similarity_threshold=similarity_threshold,
-            search_topics=True,
-            topic_boost=0.5
-        )
-        # Convert results to list of (UserMemory, score) tuples
-        return results
-    except Exception as e:
-        st.error(f"Error in direct memory search: {e}")
-        return []
-
-
-def direct_get_all_memories():
-    """Get all memories directly through SemanticMemoryManager."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return []
-    
-    try:
-        # Use the existing get_user_memories method from agno_memory
-        agent = st.session_state.agent
-        return agent.agno_memory.get_user_memories(user_id=USER_ID)
-    except Exception as e:
-        st.error(f"Error getting all memories: {e}")
-        return []
-
-
-def direct_add_memory(memory_text: str, topics: list = None, input_text: str = None):
-    """Add memory directly through SemanticMemoryManager."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return False, "Memory system not available", None
-    
-    try:
-        return memory_manager.add_memory(
-            memory_text=memory_text,
-            db=db,
-            user_id=USER_ID,
-            topics=topics,
-            input_text=input_text
-        )
-    except Exception as e:
-        return False, f"Error adding memory: {e}", None
-
-
-def direct_clear_memories():
-    """Clear all memories directly through SemanticMemoryManager."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return False, "Memory system not available"
-    
-    try:
-        return memory_manager.clear_memories(db=db, user_id=USER_ID)
-    except Exception as e:
-        return False, f"Error clearing memories: {e}"
-
-
-def direct_get_memory_stats():
-    """Get memory statistics directly through SemanticMemoryManager."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return {"error": "Memory system not available"}
-    
-    try:
-        return memory_manager.get_memory_stats(db, USER_ID)
-    except Exception as e:
-        return {"error": f"Error getting memory stats: {e}"}
-
-
-def direct_delete_memory(memory_id: str):
-    """Delete a specific memory directly through SemanticMemoryManager."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return False, "Memory system not available"
-    
-    try:
-        return memory_manager.delete_memory(memory_id, db, USER_ID)
-    except Exception as e:
-        return False, f"Error deleting memory: {e}"
-
-
-def direct_update_memory(memory_id: str, memory_text: str, topics: list = None, input_text: str = None):
-    """Update a memory directly through SemanticMemoryManager."""
-    memory_manager, db = get_memory_manager_and_db()
-    if not memory_manager or not db:
-        return False, "Memory system not available"
-    
-    try:
-        return memory_manager.update_memory(
-            memory_id=memory_id,
-            memory_text=memory_text,
-            db=db,
-            user_id=USER_ID,
-            topics=topics,
-            input_text=input_text
-        )
-    except Exception as e:
-        return False, f"Error updating memory: {e}"
-
-
-def get_ollama_models(ollama_url):
-    """Query Ollama API to get available models."""
-    try:
-        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            models = [model["name"] for model in data.get("models", [])]
-            return models
-        else:
-            st.error(f"Failed to fetch models from Ollama: {response.status_code}")
-            return []
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error connecting to Ollama at {ollama_url}: {str(e)}")
-        return []
-
-
-async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
-    """Initialize AgnoPersonalAgent with proper async handling."""
-    if existing_agent and isinstance(existing_agent, AgnoPersonalAgent):
-        # Update existing agent's configuration
-        existing_agent.model_name = model_name
-        existing_agent.ollama_base_url = ollama_url
-        # Reinitialize with new settings
-        await existing_agent.initialize()
-        return existing_agent
-    else:
-        # Create new AgnoPersonalAgent
-        agent = AgnoPersonalAgent(
-            model_provider="ollama",
-            model_name=model_name,
-            ollama_base_url=ollama_url,
-            user_id=USER_ID,
-            debug=True,
-            enable_memory=True,
-            enable_mcp=False,  # Disable MCP to avoid conflicts with DuckDuckGo tools
-            storage_dir=AGNO_STORAGE_DIR,
-        )
-        await agent.initialize()
-        return agent
-
-
-def initialize_agent(model_name, ollama_url, existing_agent=None):
-    """Sync wrapper for agent initialization."""
-    return asyncio.run(initialize_agent_async(model_name, ollama_url, existing_agent))
-
-
 def apply_custom_theme():
     """Apply custom CSS for theme switching."""
     # Get current theme from session state
@@ -463,6 +293,52 @@ def apply_custom_theme():
         # Light theme CSS - restore to default Streamlit appearance
         # No custom CSS needed for light mode - let Streamlit use its defaults
         pass
+
+
+def get_ollama_models(ollama_url):
+    """Query Ollama API to get available models."""
+    try:
+        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            models = [model["name"] for model in data.get("models", [])]
+            return models
+        else:
+            st.error(f"Failed to fetch models from Ollama: {response.status_code}")
+            return []
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error connecting to Ollama at {ollama_url}: {str(e)}")
+        return []
+
+
+async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
+    """Initialize AgnoPersonalAgent with proper async handling."""
+    if existing_agent and isinstance(existing_agent, AgnoPersonalAgent):
+        # Update existing agent's configuration
+        existing_agent.model_name = model_name
+        existing_agent.ollama_base_url = ollama_url
+        # Reinitialize with new settings
+        await existing_agent.initialize()
+        return existing_agent
+    else:
+        # Create new AgnoPersonalAgent
+        agent = AgnoPersonalAgent(
+            model_provider="ollama",
+            model_name=model_name,
+            ollama_base_url=ollama_url,
+            user_id=USER_ID,
+            debug=True,
+            enable_memory=True,
+            enable_mcp=False,  # Disable MCP to avoid conflicts with DuckDuckGo tools
+            storage_dir=AGNO_STORAGE_DIR,
+        )
+        await agent.initialize()
+        return agent
+
+
+def initialize_agent(model_name, ollama_url, existing_agent=None):
+    """Sync wrapper for agent initialization."""
+    return asyncio.run(initialize_agent_async(model_name, ollama_url, existing_agent))
 
 
 # Initialize session state variables
@@ -958,20 +834,29 @@ with st.sidebar:
             if st.button(
                 "🗑️ Yes, Delete All Memories", type="primary", use_container_width=True
             ):
-                try:
-                    # Use direct clear memories function
-                    success, message = direct_clear_memories()
-                    st.session_state.show_memory_confirmation = False
-                    
-                    if success:
-                        st.success(f"✅ {message}")
-                        st.balloons()
-                    else:
-                        st.error(f"❌ {message}")
-                    
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error clearing memories: {str(e)}")
+                if "agent" in st.session_state and isinstance(
+                    st.session_state.agent, AgnoPersonalAgent
+                ):
+                    try:
+                        # Clear memories using AgnoPersonalAgent's memory system
+                        if (
+                            hasattr(st.session_state.agent, "agno_memory")
+                            and st.session_state.agent.agno_memory
+                        ):
+                            # Clear all user memories
+                            st.session_state.agent.agno_memory.clear_user_memories(
+                                user_id=USER_ID
+                            )
+                            st.session_state.show_memory_confirmation = False
+                            st.success("⚠️ All agent memories have been cleared!")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("Memory system not available")
+                    except Exception as e:
+                        st.error(f"Error clearing memories: {str(e)}")
+                else:
+                    st.error("No compatible agent found in session state")
 
     if st.button("Show All Memories"):
         if "agent" in st.session_state and isinstance(
@@ -1090,70 +975,92 @@ with st.sidebar:
         help="Search through your stored memories using semantic similarity",
     )
 
-    # Advanced search options
-    col1, col2 = st.columns(2)
-    with col1:
-        similarity_threshold = st.slider(
-            "Similarity Threshold", 
-            min_value=0.1, 
-            max_value=1.0, 
-            value=0.3, 
-            step=0.1,
-            help="Lower values return more results, higher values are more strict"
-        )
-    with col2:
-        search_limit = st.number_input(
-            "Max Results", 
-            min_value=1, 
-            max_value=50, 
-            value=10,
-            help="Maximum number of search results to return"
-        )
-
     if st.button("Search") and search_query:
-        try:
-            # Use direct semantic search (no agentic retrieval)
-            search_results = direct_search_memories(
-                query=search_query,
-                limit=search_limit,
-                similarity_threshold=similarity_threshold
-            )
+        if "agent" in st.session_state and isinstance(
+            st.session_state.agent, AgnoPersonalAgent
+        ):
+            try:
+                # Use AgnoPersonalAgent's memory system directly
+                if (
+                    hasattr(st.session_state.agent, "agno_memory")
+                    and st.session_state.agent.agno_memory
+                ):
+                    # Try different search methods to avoid the KeyError bug
+                    memories = None
 
-            if search_results:
-                st.subheader(f"🔍 Search Results for: '{search_query}'")
-                st.info(f"Found {len(search_results)} results with similarity ≥ {similarity_threshold}")
-                
-                for i, (memory, score) in enumerate(search_results, 1):
-                    memory_content = getattr(memory, "memory", "No content")
-                    score_color = "🟢" if score >= 0.7 else "🟡" if score >= 0.5 else "🔴"
-                    
-                    with st.expander(f"{score_color} Result {i} (Score: {score:.3f}): {memory_content[:50]}..."):
-                        st.write(f"**Memory:** {memory_content}")
-                        st.write(f"**Similarity Score:** {score:.3f}")
-                        
-                        topics = getattr(memory, "topics", [])
-                        if topics:
-                            st.write(f"**Topics:** {', '.join(topics)}")
-                        
-                        st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
-                        st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                        
-                        # Add delete button for each memory
-                        if st.button(f"🗑️ Delete Memory", key=f"delete_{memory.memory_id}"):
-                            success, message = direct_delete_memory(memory.memory_id)
-                            if success:
-                                st.success(f"Memory deleted: {message}")
-                                st.rerun()
+                    # First try the "agentic" method for semantic search
+                    try:
+                        memories = (
+                            st.session_state.agent.agno_memory.search_user_memories(
+                                user_id=USER_ID,
+                                query=search_query,
+                                retrieval_method="agentic",
+                                limit=10,
+                            )
+                        )
+                    except Exception as search_error:
+                        st.warning(f"Semantic search failed: {str(search_error)}")
+                        # Fallback: get all memories and filter manually
+                        try:
+                            all_memories = (
+                                st.session_state.agent.agno_memory.get_user_memories(
+                                    user_id=USER_ID
+                                )
+                            )
+
+                            if all_memories:
+                                filtered_memories = []
+                                search_terms = search_query.lower().split()
+
+                                for memory in all_memories:
+                                    memory_content = getattr(
+                                        memory, "memory", ""
+                                    ).lower()
+                                    memory_topics = getattr(memory, "topics", [])
+                                    topic_text = " ".join(memory_topics).lower()
+
+                                    # Check if any search term appears in memory content or topics
+                                    if any(
+                                        term in memory_content or term in topic_text
+                                        for term in search_terms
+                                    ):
+                                        filtered_memories.append(memory)
+
+                                memories = filtered_memories[:10]
                             else:
-                                st.error(f"Failed to delete memory: {message}")
-            else:
-                st.info("No matching memories found. Try different keywords or lower the similarity threshold.")
-                
-        except Exception as e:
-            st.error(f"Error searching memories: {str(e)}")
-            # Show detailed error for debugging
-            import traceback
-            st.code(traceback.format_exc())
+                                memories = []
+
+                        except Exception as fallback_error:
+                            st.error(
+                                f"Fallback search also failed: {str(fallback_error)}"
+                            )
+                            memories = []
+
+                    if memories:
+                        st.subheader(f"Search Results for: '{search_query}'")
+                        for i, memory in enumerate(memories, 1):
+                            memory_content = getattr(memory, "memory", "No content")
+                            with st.expander(f"Result {i}: {memory_content[:50]}..."):
+                                st.write(f"**Memory:** {memory_content}")
+                                topics = getattr(memory, "topics", [])
+                                if topics:
+                                    st.write(f"**Topics:** {', '.join(topics)}")
+                                st.write(
+                                    f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                                )
+                                st.write(
+                                    f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
+                                )
+                    else:
+                        st.info("No matching memories found. Try different keywords.")
+                else:
+                    st.error("Memory system not available")
+            except Exception as e:
+                st.error(f"Error searching memories: {str(e)}")
+                # Show detailed error for debugging
+                import traceback
+
+                st.code(traceback.format_exc())
 
     st.header("Debug Info")
     # Debug mode toggle

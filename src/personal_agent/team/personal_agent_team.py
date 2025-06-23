@@ -7,7 +7,7 @@ following the pattern from examples/teams/reasoning_multi_purpose_team.py
 
 import asyncio
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
@@ -21,7 +21,7 @@ from .specialized_agents import (
     create_calculator_agent,
     create_file_operations_agent,
     create_finance_agent,
-    create_memory_agent,
+    create_personal_memory_agent,
     create_web_research_agent,
 )
 
@@ -60,7 +60,9 @@ def _create_coordinator_model(
             host=ollama_base_url,
             options={
                 "num_ctx": context_size,
-                "temperature": 0.7,
+                "temperature": 0.3,  # Lower temperature for more consistent function execution
+                "top_p": 0.9,
+                "repeat_penalty": 1.1,
             },
         )
     else:
@@ -85,18 +87,9 @@ def create_personal_agent_team(
     :param debug: Enable debug mode
     :return: Configured team instance
     """
-    logger.info("Creating Personal Agent Team with specialized agents")
+    logger.info("Creating Personal Agent Team - Coordinator as Memory Agent")
 
-    # Create specialized agents
-    memory_agent = create_memory_agent(
-        model_provider=model_provider,
-        model_name=model_name,
-        ollama_base_url=ollama_base_url,
-        storage_dir=storage_dir,
-        user_id=user_id,
-        debug=debug,
-    )
-
+    # Create specialized agents (NO personal memory agent - coordinator handles memory)
     web_research_agent = create_web_research_agent(
         model_provider=model_provider,
         model_name=model_name,
@@ -130,45 +123,213 @@ def create_personal_agent_team(
         model_provider, model_name, ollama_base_url
     )
 
-    # Create team instructions
+    # Create memory system for direct access
+    from ..core.agno_storage import create_agno_memory
+    agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
+    
+    # Get memory tools directly for the coordinator
+    def get_memory_tools():
+        """Get memory tools as native async functions for direct coordinator access."""
+        tools = []
+
+        async def store_user_memory(
+            content: str, topics: Union[List[str], str, None] = None
+        ) -> str:
+            """Store information as a user memory."""
+            try:
+                import json
+                from agno.memory.v2.memory import UserMemory
+
+                if topics is None:
+                    topics = ["general"]
+
+                if isinstance(topics, str):
+                    try:
+                        topics = json.loads(topics)
+                    except (json.JSONDecodeError, ValueError):
+                        topics = [topics]
+
+                if not isinstance(topics, list):
+                    topics = [str(topics)]
+
+                memory_obj = UserMemory(memory=content, topics=topics)
+                memory_id = agno_memory.add_user_memory(
+                    memory=memory_obj, user_id=user_id
+                )
+
+                if memory_id == "duplicate-detected-fake-id":
+                    return f"✅ Memory already exists: {content[:50]}..."
+                elif memory_id is None:
+                    return f"❌ Error storing memory: {content[:50]}..."
+                else:
+                    return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+
+            except Exception as e:
+                return f"❌ Error storing memory: {str(e)}"
+
+        async def query_memory(query: str, limit: Union[int, None] = None) -> str:
+            """Search user memories using semantic search."""
+            try:
+                if not query or not query.strip():
+                    return "❌ Error: Query cannot be empty."
+
+                all_memories = agno_memory.get_user_memories(user_id=user_id)
+                if not all_memories:
+                    return "🔍 No memories found - you haven't shared any information with me yet!"
+
+                # Search through memories
+                query_terms = query.strip().lower().split()
+                matching_memories = []
+
+                for memory in all_memories:
+                    memory_content = getattr(memory, "memory", "").lower()
+                    memory_topics = getattr(memory, "topics", [])
+                    topic_text = " ".join(memory_topics).lower()
+
+                    if any(
+                        term in memory_content or term in topic_text
+                        for term in query_terms
+                    ):
+                        matching_memories.append(memory)
+
+                # Also try semantic search
+                try:
+                    semantic_memories = agno_memory.search_user_memories(
+                        user_id=user_id,
+                        query=query.strip(),
+                        retrieval_method="agentic",
+                        limit=20,
+                    )
+                    for sem_memory in semantic_memories:
+                        if sem_memory not in matching_memories:
+                            matching_memories.append(sem_memory)
+                except Exception:
+                    pass
+
+                if not matching_memories:
+                    return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords!"
+
+                if limit and len(matching_memories) > limit:
+                    display_memories = matching_memories[:limit]
+                    result_note = f"🧠 Found {len(matching_memories)} matches, showing top {limit}:"
+                else:
+                    display_memories = matching_memories
+                    result_note = f"🧠 Found {len(matching_memories)} memories about '{query}':"
+
+                result = f"{result_note}\n\n"
+                for i, memory in enumerate(display_memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                return result
+
+            except Exception as e:
+                return f"❌ Error searching memories: {str(e)}"
+
+        async def get_recent_memories(limit: int = 10) -> str:
+            """Get the most recent user memories."""
+            try:
+                memories = agno_memory.search_user_memories(
+                    user_id=user_id, limit=limit, retrieval_method="last_n"
+                )
+
+                if not memories:
+                    return "📝 No memories found - you haven't shared any information with me yet!"
+
+                result = f"📝 Your most recent {len(memories)} memories:\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                return result
+
+            except Exception as e:
+                return f"❌ Error getting recent memories: {str(e)}"
+
+        # Set proper function names
+        store_user_memory.__name__ = "store_user_memory"
+        query_memory.__name__ = "query_memory"
+        get_recent_memories.__name__ = "get_recent_memories"
+
+        tools.extend([store_user_memory, query_memory, get_recent_memories])
+        return tools
+
+    # Get memory tools for coordinator (sync call)
+    memory_tools = get_memory_tools()
+
+    # Create team instructions - Coordinator IS the personal AI friend
     team_instructions = dedent(
         f"""\
-        You are a team coordinator. Your job is to:
-        1. Analyze the user's request
-        2. Delegate to the appropriate team member
-        3. Wait for their response
-        4. Present the member's response to the user
+        You are a warm, friendly personal AI assistant with memory capabilities and access to specialized team members.
         
-        AVAILABLE TEAM MEMBERS:
-        - member_id: "memory-agent" → Memory Agent (personal information, memories, user data)
-        - member_id: "web-research-agent" → Web Research Agent (web searches, current events, news)
-        - member_id: "finance-agent" → Finance Agent (stock prices, market data, financial information)
-        - member_id: "calculator-agent" → Calculator Agent (math calculations, data analysis)
-        - member_id: "file-operations-agent" → File Operations Agent (file operations, shell commands)
+        ## YOUR IDENTITY
+        - You ARE the user's personal AI friend
+        - You have direct access to memory tools to remember conversations
+        - You can delegate specialized tasks to your team members
+        - You should be conversational, warm, and genuinely interested in the user
         
-        ROUTING RULES:
-        - Memory/personal questions → member_id: "memory-agent"
-        - Web searches/news → member_id: "web-research-agent"
-        - Financial/stock queries → member_id: "finance-agent"
-        - Math/calculations → member_id: "calculator-agent"
-        - File operations → member_id: "file-operations-agent"
+        ## YOUR MEMORY TOOLS (use these directly):
+        - store_user_memory(content, topics): Store new information about the user
+        - query_memory(query): Search through stored memories about the user  
+        - get_recent_memories(limit): Get the user's most recent memories
         
-        WORKFLOW:
-        1. Use transfer_task_to_member with the exact member_id and clear task description
-        2. Wait for the member's response
-        3. Present the member's response directly to the user
-        4. Do NOT show tool calls or technical details to the user
+        ## YOUR TEAM MEMBERS (delegate specialized tasks):
+        - "Web Research Agent": Web searches, current events, news
+        - "Finance Agent": Stock prices, market data, financial information
+        - "Calculator Agent": Math calculations, data analysis
+        - "File Operations Agent": File operations, shell commands
+        
+        ## BEHAVIOR RULES:
+        1. **Memory Operations ONLY**: EXECUTE memory functions directly, don't show code
+           - "What do you remember about me?" → CALL get_recent_memories() and return results
+           - "Do you know my preferences?" → CALL query_memory("preferences") and return results
+           - "Remember that I..." → CALL store_user_memory(content, topics) and confirm
+           - NEVER show function names or code tags - EXECUTE the functions
+           - NEVER delegate memory tasks to team members
+        
+        2. **Math/Calculations**: ALWAYS delegate to Calculator Agent
+           - "Calculate 15% of 250" → route to "Calculator Agent"
+           - "What's 2+2?" → route to "Calculator Agent"
+           - ANY mathematical operation → route to "Calculator Agent"
+           - DO NOT use memory functions for calculations
+        
+        3. **Other Specialized Tasks**: Delegate to appropriate team members
+           - Web searches → route to "Web Research Agent"
+           - Finance queries → route to "Finance Agent"  
+           - File operations → route to "File Operations Agent"
+        
+        4. **Complex Multi-Step Tasks**: Handle memory first, then delegate
+           - For "Remember X, then search Y": 
+             a) First CALL store_user_memory() to store X
+             b) Then delegate search to appropriate team member
+           - Always acknowledge memory storage before proceeding
+        
+        5. **General Conversation**: Respond directly as a friendly AI
+           - Be warm, conversational, and supportive
+           - Reference memories to personalize responses
+           - Ask follow-up questions to show interest
+        
+        ## CRITICAL DELEGATION RULES:
+        - MEMORY tasks: Handle directly with your tools
+        - MATH tasks: Always delegate to Calculator Agent
+        - WEB tasks: Always delegate to Web Research Agent
+        - FINANCE tasks: Always delegate to Finance Agent
+        - FILE tasks: Always delegate to File Operations Agent
+        - DO NOT use memory functions for non-memory tasks
         """
     )
 
-    # Create the team
+    # Create team with route mode for proper delegation
     team = Team(
         name="Personal Agent Team",
+        mode="route",  # Enable routing to team members
         model=coordinator_model,
-        mode="route",  # Use route mode - tools work, just need better response handling
-        tools=[],  # No coordinator tools - let agno handle delegation automatically
+        tools=memory_tools,  # Give coordinator direct access to memory tools
         members=[
-            memory_agent,
             web_research_agent,
             finance_agent,
             calculator_agent,
@@ -176,14 +337,13 @@ def create_personal_agent_team(
         ],
         instructions=team_instructions,
         markdown=True,
-        show_tool_calls=False,  # Hide tool calls to get cleaner responses
-        show_members_responses=True,  # Show individual agent responses
-        enable_agentic_context=True,  # Enable context sharing between agents
-        share_member_interactions=True,  # Share interactions between team members
+        show_tool_calls=debug,  # Only show tool calls in debug mode
+        show_members_responses=False,  # Hide member responses for clean output
     )
 
     logger.info(
-        "Created Personal Agent Team with %d specialized agents", len(team.members)
+        "Created Personal Agent Team - Coordinator with memory + %d specialists", 
+        len(team.members)
     )
     return team
 
