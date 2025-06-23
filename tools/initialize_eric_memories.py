@@ -8,7 +8,6 @@ import argparse
 import asyncio
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 
 # Add the src directory to the path
