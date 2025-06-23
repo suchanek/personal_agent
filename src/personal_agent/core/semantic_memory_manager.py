@@ -617,7 +617,7 @@ class SemanticMemoryManager:
         topic_boost: float = 0.5,
     ) -> List[Tuple[UserMemory, float]]:
         """
-        Search memories using semantic similarity and topic matching.
+        Search memories using semantic similarity and topic matching with enhanced query expansion.
 
         :param query: Search query
         :param db: Memory database instance
@@ -629,6 +629,9 @@ class SemanticMemoryManager:
         :return: List of (UserMemory, combined_score) tuples
         """
         try:
+            # Enhanced query expansion for better semantic matching
+            expanded_queries = self._expand_query(query)
+            
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id)
 
@@ -648,43 +651,59 @@ class SemanticMemoryManager:
             query_lower = query.lower().strip()
 
             for memory in user_memories:
-                # Content similarity (existing method)
-                content_similarity = (
-                    self.duplicate_detector._calculate_semantic_similarity(
-                        query, memory.memory
+                max_similarity = 0.0
+                best_query = query
+                
+                # Test original query and all expanded queries
+                for test_query in expanded_queries:
+                    content_similarity = (
+                        self.duplicate_detector._calculate_semantic_similarity(
+                            test_query, memory.memory
+                        )
                     )
-                )
+                    if content_similarity > max_similarity:
+                        max_similarity = content_similarity
+                        best_query = test_query
 
-                # Topic matching (NEW!)
+                # Topic matching with enhanced search
                 topic_score = 0.0
                 topic_matches = []
 
                 if search_topics and memory.topics:
                     for topic in memory.topics:
-                        if query_lower in topic.lower():
-                            if query_lower == topic.lower():
-                                topic_score = 1.0  # Exact topic match
-                                topic_matches.append(topic)
-                                break
-                            else:
-                                topic_score = max(
-                                    topic_score, 0.8
-                                )  # Partial topic match
-                                topic_matches.append(topic)
+                        # Check original query and expanded queries against topics
+                        for test_query in expanded_queries:
+                            test_query_lower = test_query.lower()
+                            if test_query_lower in topic.lower() or topic.lower() in test_query_lower:
+                                if test_query_lower == topic.lower():
+                                    topic_score = 1.0  # Exact topic match
+                                    topic_matches.append(topic)
+                                    break
+                                else:
+                                    topic_score = max(
+                                        topic_score, 0.8
+                                    )  # Partial topic match
+                                    topic_matches.append(topic)
 
-                # Combined scoring: include if content similarity OR topic match
-                if content_similarity >= similarity_threshold or topic_score > 0:
-                    # Weighted combination: content gets base weight, topics get boost
-                    combined_score = content_similarity + (topic_score * topic_boost)
-                    results.append((memory, combined_score))
+                # Enhanced keyword matching for work-related queries
+                keyword_score = self._calculate_keyword_score(expanded_queries, memory.memory)
+                
+                # Combined scoring: use the best of content similarity, topic match, or keyword match
+                final_score = max(max_similarity, topic_score * topic_boost, keyword_score)
+                
+                if final_score >= similarity_threshold or topic_score > 0 or keyword_score > 0.4:
+                    results.append((memory, final_score))
 
-                    if self.config.debug_mode and topic_matches:
+                    if self.config.debug_mode and (topic_matches or keyword_score > 0.4):
                         logger.debug(
-                            "Topic match found for query '%s': memory='%s', topics=%s, combined_score=%.3f",
+                            "Enhanced match for query '%s': memory='%s', topics=%s, final_score=%.3f (content=%.3f, topic=%.3f, keyword=%.3f)",
                             query,
                             memory.memory[:50],
                             topic_matches,
-                            combined_score,
+                            final_score,
+                            max_similarity,
+                            topic_score,
+                            keyword_score,
                         )
 
             # Sort by combined score (descending) and limit
@@ -694,6 +713,87 @@ class SemanticMemoryManager:
         except Exception as e:
             logger.error("Error searching memories: %s", e)
             return []
+
+    def _expand_query(self, query: str) -> List[str]:
+        """
+        Expand query with synonyms and related terms for better semantic matching.
+        
+        :param query: Original search query
+        :return: List of expanded queries including the original
+        """
+        query_lower = query.lower().strip()
+        expanded = [query]  # Always include original query
+        
+        # Work-related expansions
+        work_synonyms = {
+            "work": ["job", "employment", "career", "occupation", "position", "company", "employer", "workplace"],
+            "workplace": ["work", "job", "office", "company", "employer", "business"],
+            "job": ["work", "employment", "career", "position", "occupation", "role"],
+            "company": ["employer", "business", "organization", "workplace", "firm"],
+            "career": ["job", "work", "profession", "occupation", "employment"],
+        }
+        
+        # Education-related expansions
+        education_synonyms = {
+            "school": ["university", "college", "education", "academic", "institution"],
+            "university": ["college", "school", "education", "academic", "institution"],
+            "degree": ["education", "qualification", "diploma", "certification"],
+            "study": ["education", "learning", "academic", "school", "university"],
+        }
+        
+        # Personal-related expansions
+        personal_synonyms = {
+            "hobby": ["interest", "activity", "pastime", "recreation", "leisure"],
+            "interest": ["hobby", "passion", "activity", "like", "enjoy"],
+            "like": ["enjoy", "prefer", "love", "interest", "hobby"],
+            "preference": ["like", "prefer", "choice", "favorite"],
+        }
+        
+        # Combine all synonym dictionaries
+        all_synonyms = {**work_synonyms, **education_synonyms, **personal_synonyms}
+        
+        # Add synonyms for words in the query
+        query_words = query_lower.split()
+        for word in query_words:
+            if word in all_synonyms:
+                for synonym in all_synonyms[word]:
+                    # Create expanded queries by replacing the word with synonyms
+                    expanded_query = query_lower.replace(word, synonym)
+                    if expanded_query not in expanded:
+                        expanded.append(expanded_query)
+                    
+                    # Also add just the synonym
+                    if synonym not in expanded:
+                        expanded.append(synonym)
+        
+        return expanded
+
+    def _calculate_keyword_score(self, queries: List[str], memory_text: str) -> float:
+        """
+        Calculate keyword-based similarity score for enhanced matching.
+        
+        :param queries: List of query variations to test
+        :param memory_text: Memory text to search in
+        :return: Keyword similarity score (0.0 to 1.0)
+        """
+        memory_lower = memory_text.lower()
+        max_score = 0.0
+        
+        for query in queries:
+            query_words = query.lower().split()
+            if not query_words:
+                continue
+                
+            matches = 0
+            for word in query_words:
+                if len(word) > 2 and word in memory_lower:  # Only count words longer than 2 chars
+                    matches += 1
+            
+            if query_words:
+                score = matches / len(query_words)
+                max_score = max(max_score, score)
+        
+        return max_score
 
     def get_memory_stats(self, db: MemoryDb, user_id: str = USER_ID) -> Dict[str, Any]:
         """
