@@ -270,7 +270,7 @@ def cli_main():
     logger.info("Starting Personal AI Agent in CLI mode")
 
     # Run in CLI mode
-    asyncio.run(run_agno_cli(use_remote_ollama=args.remote_ollama))
+    asyncio.run(run_agno_cli(use_remote_ollama=args.remote))
 
 
 if __name__ == "__main__":

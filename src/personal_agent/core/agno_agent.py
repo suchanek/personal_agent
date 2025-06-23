@@ -144,32 +144,31 @@ class AgnoPersonalAgent:
                 options={
                     "num_ctx": context_size,  # Use dynamically detected context window
                     "temperature": 0.7,  # Optional: set temperature for consistency
+                    "num_predict": -1,  # Allow unlimited prediction length
+                    "top_k": 40,
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1,
                 },
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
-    def _get_direct_memory_access(self):
-        """Get direct access to memory manager and database."""
-        if not self.agno_memory:
-            return None, None
-        return self.agno_memory.memory_manager, self.agno_memory.db
-
-    def _direct_search_memories(self, query: str, limit: int = 10, similarity_threshold: float = 0.3):
+    def _direct_search_memories(
+        self, query: str, limit: int = 10, similarity_threshold: float = 0.3
+    ):
         """Direct semantic search without agentic retrieval."""
-        memory_manager, db = self._get_direct_memory_access()
-        if not memory_manager or not db:
+        if not self.agno_memory:
             return []
-        
+
         try:
-            results = memory_manager.search_memories(
+            results = self.agno_memory.memory_manager.search_memories(
                 query=query,
-                db=db,
+                db=self.agno_memory.db,
                 user_id=self.user_id,
                 limit=limit,
                 similarity_threshold=similarity_threshold,
                 search_topics=True,
-                topic_boost=0.5
+                topic_boost=0.5,
             )
             return results
         except Exception as e:
@@ -186,16 +185,15 @@ class AgnoPersonalAgent:
             logger.warning("Memory not enabled or memory not initialized")
             return []
 
-        # Get direct access to memory manager and database
-        memory_manager, db = self._get_direct_memory_access()
-        if not memory_manager or not db:
-            logger.error("Failed to get direct memory access")
+        # Check if memory is available
+        if not self.agno_memory:
+            logger.error("Memory not initialized")
             return []
 
         tools = []
 
         async def store_user_memory(
-            content: str, topics: Union[List[str], str, None] = None
+            content: str = "", topics: Union[List[str], str, None] = None
         ) -> str:
             """Store information as a user memory using direct SemanticMemoryManager calls.
 
@@ -206,6 +204,9 @@ class AgnoPersonalAgent:
             Returns:
                 str: Success or error message
             """
+            # Validate that content is provided
+            if not content or not content.strip():
+                return "❌ Error: Content is required to store a memory. Please provide the information you want me to remember."
             try:
                 import json
 
@@ -216,25 +217,28 @@ class AgnoPersonalAgent:
                 if isinstance(topics, str):
                     try:
                         topics = json.loads(topics)
-                        logger.debug("Converted topics from JSON string to list: %s", topics)
+                        logger.debug(
+                            "Converted topics from JSON string to list: %s", topics
+                        )
                     except (json.JSONDecodeError, ValueError):
                         topics = [topics]
-                        logger.debug("Treating topics string as single topic: %s", topics)
+                        logger.debug(
+                            "Treating topics string as single topic: %s", topics
+                        )
 
                 # Ensure topics is a list
                 if not isinstance(topics, list):
                     topics = [str(topics)]
 
                 # Direct call to SemanticMemoryManager.add_memory()
-                success, message, memory_id = memory_manager.add_memory(
-                    memory_text=content,
-                    db=db,
-                    user_id=self.user_id,
-                    topics=topics
+                success, message, memory_id = self.agno_memory.memory_manager.add_memory(
+                    memory_text=content, db=self.agno_memory.db, user_id=self.user_id, topics=topics
                 )
 
                 if success:
-                    logger.info("Stored user memory: %s... (ID: %s)", content[:50], memory_id)
+                    logger.info(
+                        "Stored user memory: %s... (ID: %s)", content[:50], memory_id
+                    )
                     return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
                 else:
                     logger.info("Memory rejected: %s", message)
@@ -261,17 +265,19 @@ class AgnoPersonalAgent:
                 # Validate query parameter
                 if not query or not query.strip():
                     logger.warning("Empty query provided to query_memory")
-                    return "❌ Error: Query cannot be empty. Please provide a search term."
+                    return (
+                        "❌ Error: Query cannot be empty. Please provide a search term."
+                    )
 
                 # Direct call to SemanticMemoryManager.search_memories()
-                results = memory_manager.search_memories(
+                results = self.agno_memory.memory_manager.search_memories(
                     query=query.strip(),
-                    db=db,
+                    db=self.agno_memory.db,
                     user_id=self.user_id,
                     limit=limit or 20,
                     similarity_threshold=0.3,
                     search_topics=True,
-                    topic_boost=0.5
+                    topic_boost=0.5,
                 )
 
                 if not results:
@@ -292,14 +298,18 @@ class AgnoPersonalAgent:
 
                 result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
 
-                logger.info("Found %d matching memories for query: %s", len(results), query)
+                logger.info(
+                    "Found %d matching memories for query: %s", len(results), query
+                )
                 return result
 
             except Exception as e:
                 logger.error("Error querying memories: %s", e)
                 return f"❌ Error searching memories: {str(e)}"
 
-        async def update_memory(memory_id: str, content: str, topics: Union[List[str], str, None] = None) -> str:
+        async def update_memory(
+            memory_id: str, content: str, topics: Union[List[str], str, None] = None
+        ) -> str:
             """Update an existing memory using direct SemanticMemoryManager calls.
 
             Args:
@@ -324,12 +334,12 @@ class AgnoPersonalAgent:
                     topics = [str(topics)]
 
                 # Direct call to SemanticMemoryManager.update_memory()
-                success, message = memory_manager.update_memory(
+                success, message = self.agno_memory.memory_manager.update_memory(
                     memory_id=memory_id,
                     memory_text=content,
-                    db=db,
+                    db=self.agno_memory.db,
                     user_id=self.user_id,
-                    topics=topics
+                    topics=topics,
                 )
 
                 if success:
@@ -354,10 +364,8 @@ class AgnoPersonalAgent:
             """
             try:
                 # Direct call to SemanticMemoryManager.delete_memory()
-                success, message = memory_manager.delete_memory(
-                    memory_id=memory_id,
-                    db=db,
-                    user_id=self.user_id
+                success, message = self.agno_memory.memory_manager.delete_memory(
+                    memory_id=memory_id, db=self.agno_memory.db, user_id=self.user_id
                 )
 
                 if success:
@@ -379,9 +387,8 @@ class AgnoPersonalAgent:
             """
             try:
                 # Direct call to SemanticMemoryManager.clear_memories()
-                success, message = memory_manager.clear_memories(
-                    db=db,
-                    user_id=self.user_id
+                success, message = self.agno_memory.memory_manager.clear_memories(
+                    db=self.agno_memory.db, user_id=self.user_id
                 )
 
                 if success:
@@ -406,13 +413,13 @@ class AgnoPersonalAgent:
             """
             try:
                 # Use search_memories with empty query to get all memories, then limit
-                results = memory_manager.search_memories(
+                results = self.agno_memory.memory_manager.search_memories(
                     query="",  # Empty query to get all memories
-                    db=db,
+                    db=self.agno_memory.db,
                     user_id=self.user_id,
                     limit=limit,
                     similarity_threshold=0.0,  # Very low threshold to get all
-                    search_topics=False
+                    search_topics=False,
                 )
 
                 if not results:
@@ -441,13 +448,13 @@ class AgnoPersonalAgent:
             """
             try:
                 # Use search_memories with empty query and no limit to get all memories
-                results = memory_manager.search_memories(
+                results = self.agno_memory.memory_manager.search_memories(
                     query="",  # Empty query to get all memories
-                    db=db,
+                    db=self.agno_memory.db,
                     user_id=self.user_id,
                     limit=1000,  # High limit to get all
                     similarity_threshold=0.0,  # Very low threshold to get all
-                    search_topics=False
+                    search_topics=False,
                 )
 
                 if not results:
@@ -476,7 +483,7 @@ class AgnoPersonalAgent:
             """
             try:
                 # Direct call to SemanticMemoryManager.get_memory_stats()
-                stats = memory_manager.get_memory_stats(db=db, user_id=self.user_id)
+                stats = self.agno_memory.memory_manager.get_memory_stats(db=self.agno_memory.db, user_id=self.user_id)
 
                 if "error" in stats:
                     return f"❌ Error getting memory stats: {stats['error']}"
@@ -485,14 +492,16 @@ class AgnoPersonalAgent:
                 result = "📊 Memory Statistics:\n\n"
                 result += f"Total memories: {stats.get('total_memories', 0)}\n"
                 result += f"Average memory length: {stats.get('average_memory_length', 0):.1f} characters\n"
-                result += f"Recent memories (24h): {stats.get('recent_memories_24h', 0)}\n"
+                result += (
+                    f"Recent memories (24h): {stats.get('recent_memories_24h', 0)}\n"
+                )
 
-                if stats.get('most_common_topic'):
+                if stats.get("most_common_topic"):
                     result += f"Most common topic: {stats['most_common_topic']}\n"
 
-                if stats.get('topic_distribution'):
+                if stats.get("topic_distribution"):
                     result += "\nTopic distribution:\n"
-                    for topic, count in stats['topic_distribution'].items():
+                    for topic, count in stats["topic_distribution"].items():
                         result += f"  - {topic}: {count}\n"
 
                 logger.info("Retrieved memory statistics")
@@ -502,9 +511,23 @@ class AgnoPersonalAgent:
                 logger.error("Error getting memory stats: %s", e)
                 return f"❌ Error getting memory stats: {str(e)}"
 
+        async def search_memory(query: str, limit: Union[int, None] = None) -> str:
+            """Search user memories - alias for query_memory for compatibility.
+
+            Args:
+                query: The query to search for in memories
+                limit: Maximum number of memories to return
+
+            Returns:
+                str: Found memories or message if none found
+            """
+            # This is just an alias for query_memory to maintain compatibility
+            return await query_memory(query, limit)
+
         # Set proper function names for tool identification
         store_user_memory.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
+        search_memory.__name__ = "search_memory"
         update_memory.__name__ = "update_memory"
         delete_memory.__name__ = "delete_memory"
         clear_memories.__name__ = "clear_memories"
@@ -513,18 +536,24 @@ class AgnoPersonalAgent:
         get_memory_stats.__name__ = "get_memory_stats"
 
         # Add tools to the list
-        tools.extend([
-            store_user_memory,
-            query_memory,
-            update_memory,
-            delete_memory,
-            clear_memories,
-            get_recent_memories,
-            get_all_memories,
-            get_memory_stats
-        ])
+        tools.extend(
+            [
+                store_user_memory,
+                query_memory,
+                search_memory,
+                update_memory,
+                delete_memory,
+                clear_memories,
+                get_recent_memories,
+                get_all_memories,
+                get_memory_stats,
+            ]
+        )
 
-        logger.info("Created %d memory tools using direct SemanticMemoryManager calls", len(tools))
+        logger.info(
+            "Created %d memory tools using direct SemanticMemoryManager calls",
+            len(tools),
+        )
         return tools
 
     async def _get_mcp_tools(self) -> List:
@@ -653,8 +682,10 @@ Returns:
         """
         # Get current tool configuration for accurate instructions
         mcp_status = "enabled" if self.enable_mcp else "disabled"
-        memory_status = "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
-        
+        memory_status = (
+            "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
+        )
+
         base_instructions = dedent(
             f"""\
             You are a personal AI friend with comprehensive capabilities and built-in semantic memory. Your purpose is to chat with the user about things and make them feel good.
@@ -667,10 +698,10 @@ Returns:
             
             ## CRITICAL IDENTITY RULES - ABSOLUTELY MANDATORY
             
-            **YOU ARE AN AI ASSISTANT**: You are NOT the user. You are a friendly AI that helps and remembers things about the user.
+            **YOU ARE AN AI ASSISTANT who is a MEMORY EXPERT **: You are NOT the user. You are a friendly AI that helps and remembers things about the user.
             
             **NEVER PRETEND TO BE THE USER**:
-            - You are NOT the user, you are an AI assistant that knows information ABOUT the user
+            - You are NOT the user, you are an AI assistant that knows information ABOUT the user 
             - NEVER say "I'm {self.user_id}" or introduce yourself as the user - this is COMPLETELY WRONG
             - NEVER use first person when talking about user information
             - You are an AI assistant that has stored semantic memories about the user
@@ -686,7 +717,7 @@ Returns:
             - **Be Remembering**: Reference past conversations and show you care
             - **Be Encouraging**: Celebrate their achievements and interests
             
-            ## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED
+            ## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED - YOUR MAIN ROLE!
             
             **SEMANTIC MEMORY FEATURES**:
             - **Automatic Deduplication**: Prevents storing duplicate memories
@@ -696,26 +727,28 @@ Returns:
             
             **MEMORY QUERIES - NO HESITATION RULE**:
             When the user asks ANY of these questions, IMMEDIATELY call the appropriate memory tool:
-            - "What do you remember about me?" → IMMEDIATELY call get_recent_memories()
-            - "Do you know anything about me?" → IMMEDIATELY call get_recent_memories()
-            - "What have I told you?" → IMMEDIATELY call get_recent_memories()
+            - "What do you remember about me?" → IMMEDIATELY call query_memory("personal information about me")
+            - "Do you know anything about me?" → IMMEDIATELY call query_memory("personal information about me")
+            - "What have I told you?" → IMMEDIATELY call query_memory("personal information about me")
             - "Show me all my memories" or "What are all my memories?" → IMMEDIATELY call get_all_memories()
-            - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences")
+            - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences likes interests")
+            - "Recent memories" or "What did I tell you recently?" → IMMEDIATELY call get_recent_memories()
             - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
             
             **SEMANTIC MEMORY STORAGE**: When the user provides new personal information:
             1. **Store it ONCE using store_user_memory** - the system automatically prevents duplicates
-            2. **Include relevant topics** - pass topics as a list like ["hobbies", "preferences"]
+            2. **Include relevant topics** - pass topics as a list like ["hobbies", "preferences"] if known. 
             3. **Acknowledge the storage warmly** - "I'll remember that about you!"
             4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically
             
             **SEMANTIC MEMORY RETRIEVAL PROTOCOL**:
             1. **IMMEDIATE ACTION**: If it's about the user, query memory FIRST - no thinking, no hesitation
-            2. **Primary Tool**: Use get_recent_memories() for general "what do you remember" questions
+            2. **Primary Tool**: Use query_memory("relevant search terms") for general "what do you remember" questions - it uses semantic similarity + topic matching
             3. **Complete Overview**: Use get_all_memories() when user asks for ALL memories or complete history
-            4. **Semantic Search**: Use query_memory("search terms") - it searches ALL memories semantically
-            5. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
-            6. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
+            4. **Chronological Recent**: Use get_recent_memories() only when user specifically asks for "recent" or "latest" memories
+            5. **Semantic Search Power**: query_memory() searches ALL memories semantically with topic boosting for best relevance
+            6. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
+            7. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
             
             **SEMANTIC SEARCH CAPABILITIES**:
             - Searches through ALL stored memories comprehensively
@@ -737,12 +770,22 @@ Returns:
             ## CURRENT AVAILABLE TOOLS - USE THESE IMMEDIATELY
             
             **BUILT-IN TOOLS AVAILABLE**:
-            - **YFinanceTools**: Stock prices, financial analysis, market data
-            - **DuckDuckGoTools**: Web search, news searches, current events
-            - **PythonTools**: Calculations, data analysis, programming help
-            - **ShellTools**: System operations and command execution
-            - **PersonalAgentFilesystemTools**: File reading, writing, directory operations
-            - **Memory Tools**: store_user_memory, query_memory, get_recent_memories, get_all_memories
+            - **YFinanceTools**: Stock prices, financial analysis, market data, company info, fundamentals, analyst recommendations
+            - **DuckDuckGoTools**: Web search (duckduckgo_search), news searches (duckduckgo_news), current events
+            - **PythonTools**: Calculations, data analysis, programming help, code execution
+            - **ShellTools**: System operations and command execution (base directory: current working directory)
+            - **PersonalAgentFilesystemTools**: File reading, writing, directory operations, file management
+            - **KnowledgeTools**: Automatic knowledge base search, reasoning, analysis (when knowledge base enabled)
+            - **Memory Tools**: Complete semantic memory management system
+              - store_user_memory: Store new memories with topic classification
+              - query_memory: Semantic search through all memories
+              - get_recent_memories: Get recent memories (default 100)
+              - get_all_memories: Get all stored memories
+              - update_memory: Update existing memory by ID
+              - delete_memory: Delete specific memory by ID
+              - clear_memories: Clear all memories for user
+              - get_memory_stats: Get memory statistics and analytics
+            - **MCP Server Tools**: Dynamic tools from connected MCP servers (when MCP enabled)
             
             **WEB SEARCH - IMMEDIATE ACTION**:
             - News requests → IMMEDIATELY use DuckDuckGoTools (duckduckgo_news)
@@ -758,12 +801,14 @@ Returns:
             - NO thinking, NO debate, just USE THE TOOLS
             
             **TOOL DECISION TREE - FOLLOW EXACTLY**:
-            - Finance question? → YFinanceTools IMMEDIATELY
-            - News/current events? → DuckDuckGoTools IMMEDIATELY  
-            - Calculations? → PythonTools IMMEDIATELY
+            - Finance question? → YFinanceTools IMMEDIATELY (get_current_stock_price, get_stock_info, etc.)
+            - News/current events? → DuckDuckGoTools IMMEDIATELY (duckduckgo_news, duckduckgo_search)
+            - Calculations/code? → PythonTools IMMEDIATELY
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
+            - Knowledge base queries? → KnowledgeTools AUTOMATICALLY (when knowledge base enabled)
+            - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
             
             ## CRITICAL: NO OVERTHINKING RULE - ELIMINATE HESITATION
             
@@ -785,8 +830,9 @@ Returns:
             - ❌ Fabricating data instead of using tools
             
             **REQUIRED IMMEDIATE RESPONSES**:
-            - ✅ User asks "What do you remember?" → IMMEDIATELY call get_recent_memories()
-            - ✅ User asks about preferences → IMMEDIATELY call query_memory("preferences")
+            - ✅ User asks "What do you remember?" → IMMEDIATELY call query_memory("personal information about me")
+            - ✅ User asks about preferences → IMMEDIATELY call query_memory("preferences likes interests")
+            - ✅ User asks for recent memories → IMMEDIATELY call get_recent_memories()
             - ✅ "Analyze NVDA" → IMMEDIATELY use YFinanceTools
             - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools
             - ✅ "top 5 headlines about..." → IMMEDIATELY use duckduckgo_news()
@@ -975,6 +1021,8 @@ Returns:
                 debug_mode=self.debug,
                 # Enable streaming for intermediate steps
                 stream_intermediate_steps=False,
+                # Force tool calling behavior
+                tool_choice="auto",  # Ensure tools are called when appropriate
             )
 
             if self.enable_memory and self.agno_knowledge:
