@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from personal_agent.config import USER_ID
 from personal_agent.utils import setup_logging
 from personal_agent.core.topic_classifier import TopicClassifier
+import os
 
 logger = setup_logging(__name__)
 
@@ -303,7 +304,12 @@ class SemanticMemoryManager:
 
         self.model = model  # Required by Agno Memory class
         self.config = config
-        self.topic_classifier = TopicClassifier()
+        
+        # Get the correct path to topics.yaml
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        topics_yaml_path = os.path.join(current_dir, "topics.yaml")
+        
+        self.topic_classifier = TopicClassifier(config_path=topics_yaml_path)
         self.duplicate_detector = SemanticDuplicateDetector(
             similarity_threshold=config.similarity_threshold
         )
@@ -446,7 +452,7 @@ class SemanticMemoryManager:
 
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
-            topics = self.topic_classifier.classify_topic(memory_text)
+            topics = self.topic_classifier.classify(memory_text)
 
         # Create the memory
         try:
@@ -512,7 +518,7 @@ class SemanticMemoryManager:
         """
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
-            topics = self.topic_classifier.classify_topic(memory_text)
+            topics = self.topic_classifier.classify(memory_text)
 
         try:
             last_updated = datetime.now()
@@ -892,7 +898,7 @@ class SemanticMemoryManager:
                             "memory_id": memory_id,
                             "memory": statement,
                             "topics": (
-                                self.topic_classifier.classify_topic(statement)
+                                self.topic_classifier.classify(statement)
                                 if self.config.enable_topic_classification
                                 else []
                             ),
@@ -1400,7 +1406,7 @@ def main():
     ]
 
     for text in examples:
-        topics = classifier.classify_topic(text)
+        topics = classifier.classify(text)
         print(f"Input: {text}\nTopics: {topics}\n")
     print(f"\n✅ Demo completed!")
 
