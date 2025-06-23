@@ -6,7 +6,6 @@ Each agent has a specific role and set of tools, following the pattern from
 examples/teams/reasoning_multi_purpose_team.py
 """
 
-import asyncio
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
@@ -16,6 +15,10 @@ from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.file import FileTools
+from agno.tools.github import GithubTools
+from agno.tools.knowledge import KnowledgeTools
+from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
@@ -69,21 +72,16 @@ def _create_model(
         raise ValueError(f"Unsupported model provider: {model_provider}")
 
 
-async def _create_memory_tools(
-    storage_dir: str, user_id: str, debug: bool = False
-) -> List:
-    """Create memory tools for the memory agent.
+async def _get_memory_tools(agno_memory, user_id: str) -> List:
+    """Create memory tools as native async functions compatible with Agno.
 
-    :param storage_dir: Directory for storage files
-    :param user_id: User identifier for memory operations
-    :param debug: Enable debug mode
-    :return: List of memory tool functions
+    This method creates the crucial store_user_memory and query_memory tools
+    that enable the agent to actually create and retrieve memories.
+
+    This follows the exact pattern from AgnoPersonalAgent._get_memory_tools()
     """
-    # Create memory system
-    agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-    
     if not agno_memory:
-        logger.error("Failed to create memory system")
+        logger.warning("Memory not initialized")
         return []
 
     tools = []
@@ -95,24 +93,28 @@ async def _create_memory_tools(
 
         Args:
             content: The information to store as a memory
-            topics: Optional list of topics/categories for the memory
+            topics: Optional list of topics/categories for the memory (can be list or JSON string)
 
         Returns:
             str: Success or error message
         """
         try:
             import json
+
             from agno.memory.v2.memory import UserMemory
 
             if topics is None:
                 topics = ["general"]
 
-            # Handle case where topics comes in as string representation of list
+            # Fix: Handle case where topics comes in as string representation of list
+            # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
             if isinstance(topics, str):
                 try:
+                    # Try to parse as JSON first
                     topics = json.loads(topics)
                     logger.debug("Converted topics from string to list: %s", topics)
                 except (json.JSONDecodeError, ValueError):
+                    # If that fails, treat as a single topic
                     topics = [topics]
                     logger.debug("Treating topics string as single topic: %s", topics)
 
@@ -124,13 +126,23 @@ async def _create_memory_tools(
             memory_id = agno_memory.add_user_memory(memory=memory_obj, user_id=user_id)
 
             if memory_id == "duplicate-detected-fake-id":
-                logger.info("Memory already exists (duplicate detected): %s...", content[:50])
+                # Memory was a duplicate but we return success to avoid agent confusion
+                logger.info(
+                    "Memory already exists (duplicate detected): %s...",
+                    content[:50],
+                )
                 return f"✅ Memory already exists: {content[:50]}..."
             elif memory_id is None:
-                logger.warning("Memory storage failed unexpectedly: %s...", content[:50])
+                # Unexpected error case
+                logger.warning(
+                    "Memory storage failed unexpectedly: %s...", content[:50]
+                )
                 return f"❌ Error storing memory: {content[:50]}..."
             else:
-                logger.info("Stored user memory: %s... (ID: %s)", content[:50], memory_id)
+                # Memory was successfully stored (new memory)
+                logger.info(
+                    "Stored user memory: %s... (ID: %s)", content[:50], memory_id
+                )
                 return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
 
         except Exception as e:
@@ -138,28 +150,29 @@ async def _create_memory_tools(
             return f"❌ Error storing memory: {str(e)}"
 
     async def query_memory(query: str, limit: Union[int, None] = None) -> str:
-        """Search user memories using semantic search.
+        """Search user memories using semantic search through ALL memories.
 
         Args:
             query: The query to search for in memories
-            limit: Maximum number of memories to return
+            limit: Maximum number of memories to return (None = search all, return top matches)
 
         Returns:
             str: Found memories or message if none found
         """
         try:
+            # Validate query parameter
             if not query or not query.strip():
                 logger.warning("Empty query provided to query_memory")
                 return "❌ Error: Query cannot be empty. Please provide a search term."
 
-            # Get all memories first
+            # First, get ALL memories to search through them comprehensively
             all_memories = agno_memory.get_user_memories(user_id=user_id)
 
             if not all_memories:
                 logger.info("No memories stored for user: %s", user_id)
-                return "🔍 No memories found - you haven't shared any information with me yet!"
+                return f"🔍 No memories found - you haven't shared any information with me yet!"
 
-            # Search through all memories manually for comprehensive results
+            # Search through ALL memories manually for comprehensive results
             query_terms = query.strip().lower().split()
             matching_memories = []
 
@@ -169,31 +182,40 @@ async def _create_memory_tools(
                 topic_text = " ".join(memory_topics).lower()
 
                 # Check if any query term appears in memory content or topics
-                if any(term in memory_content or term in topic_text for term in query_terms):
+                if any(
+                    term in memory_content or term in topic_text for term in query_terms
+                ):
                     matching_memories.append(memory)
 
-            # Also try semantic search using direct vector similarity (no inference)
+            # Also try semantic search as a backup to catch semantically similar memories
             try:
                 semantic_memories = agno_memory.search_user_memories(
                     user_id=user_id,
                     query=query.strip(),
-                    retrieval_method="semantic",  # Use semantic instead of agentic to avoid inference
-                    limit=20,
+                    retrieval_method="agentic",
+                    limit=20,  # Get more semantic matches
                 )
 
-                # Add semantic matches that aren't already in results
+                # Add semantic matches that aren't already in our results
                 for sem_memory in semantic_memories:
                     if sem_memory not in matching_memories:
                         matching_memories.append(sem_memory)
 
             except Exception as semantic_error:
-                logger.warning("Semantic search failed, using manual search only: %s", semantic_error)
+                logger.warning(
+                    "Semantic search failed, using manual search only: %s",
+                    semantic_error,
+                )
 
             if not matching_memories:
-                logger.info("No matching memories found for query: %s", query)
-                return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords!"
+                logger.info(
+                    "No matching memories found for query: %s (searched %d total memories)",
+                    query,
+                    len(all_memories),
+                )
+                return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords or ask me to remember something new!"
 
-            # Apply limit if specified
+            # Apply limit if specified, otherwise return all matches
             if limit and len(matching_memories) > limit:
                 display_memories = matching_memories[:limit]
                 result_note = f"🧠 MEMORY RETRIEVAL (showing top {limit} of {len(matching_memories)} matches from {len(all_memories)} total memories)"
@@ -201,8 +223,8 @@ async def _create_memory_tools(
                 display_memories = matching_memories
                 result_note = f"🧠 MEMORY RETRIEVAL (found {len(matching_memories)} matches from {len(all_memories)} total memories)"
 
-            # Format memories
-            result = f"{result_note}: The following memories were found for '{query}':\n\n"
+            # Format memories with explicit instruction to restate in second person
+            result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user. Convert any first-person statements to second-person:\n\n"
 
             for i, memory in enumerate(display_memories, 1):
                 result += f"{i}. {memory.memory}\n"
@@ -210,14 +232,21 @@ async def _create_memory_tools(
                     result += f"   Topics: {', '.join(memory.topics)}\n"
                 result += "\n"
 
-            logger.info("Found %d matching memories for query: %s", len(matching_memories), query)
+            result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
+
+            logger.info(
+                "Found %d matching memories for query: %s (searched %d total)",
+                len(matching_memories),
+                query,
+                len(all_memories),
+            )
             return result
 
         except Exception as e:
             logger.error("Error querying memories: %s", e)
             return f"❌ Error searching memories: {str(e)}"
 
-    async def get_recent_memories(limit: int = 10) -> str:
+    async def get_recent_memories(limit: int = 100) -> str:
         """Get the most recent user memories.
 
         Args:
@@ -234,6 +263,7 @@ async def _create_memory_tools(
             if not memories:
                 return "📝 No memories found."
 
+            # Format memories for display
             result = f"📝 Recent {len(memories)} memories:\n\n"
             for i, memory in enumerate(memories, 1):
                 result += f"{i}. {memory.memory}\n"
@@ -260,6 +290,7 @@ async def _create_memory_tools(
             if not memories:
                 return "📝 No memories found."
 
+            # Format memories for display
             result = f"📝 All {len(memories)} memories:\n\n"
             for i, memory in enumerate(memories, 1):
                 result += f"{i}. {memory.memory}\n"
@@ -281,27 +312,23 @@ async def _create_memory_tools(
     get_all_memories.__name__ = "get_all_memories"
 
     # Add tools to the list
-    tools.extend([store_user_memory, query_memory, get_recent_memories, get_all_memories])
+    tools.append(store_user_memory)
+    tools.append(query_memory)
+    tools.append(get_recent_memories)
+    tools.append(get_all_memories)
 
     logger.info("Created %d memory tools", len(tools))
     return tools
 
 
-def _create_memory_tools_sync(
-    storage_dir: str, user_id: str, debug: bool = False
-) -> List:
-    """Create memory tools for the memory agent synchronously.
+def _create_memory_tools_sync(agno_memory, user_id: str) -> List:
+    """Create memory tools as synchronous functions for use when already in an event loop.
 
-    :param storage_dir: Directory for storage files
-    :param user_id: User identifier for memory operations
-    :param debug: Enable debug mode
-    :return: List of memory tool functions
+    This is a synchronous version of _get_memory_tools() for cases where we're already
+    running in an event loop and can't use asyncio.run().
     """
-    # Create memory system
-    agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-    
     if not agno_memory:
-        logger.error("Failed to create memory system")
+        logger.warning("Memory not initialized")
         return []
 
     tools = []
@@ -309,7 +336,7 @@ def _create_memory_tools_sync(
     def store_user_memory(
         content: str, topics: Union[List[str], str, None] = None
     ) -> str:
-        """Store information as a user memory.
+        """Store information as a user memory (synchronous version).
 
         Args:
             content: The information to store as a memory
@@ -356,7 +383,7 @@ def _create_memory_tools_sync(
             return f"❌ Error storing memory: {str(e)}"
 
     def query_memory(query: str, limit: Union[int, None] = None) -> str:
-        """Search user memories using semantic search.
+        """Search user memories (synchronous version).
 
         Args:
             query: The query to search for in memories
@@ -370,14 +397,13 @@ def _create_memory_tools_sync(
                 logger.warning("Empty query provided to query_memory")
                 return "❌ Error: Query cannot be empty. Please provide a search term."
 
-            # Get all memories first
             all_memories = agno_memory.get_user_memories(user_id=user_id)
 
             if not all_memories:
                 logger.info("No memories stored for user: %s", user_id)
-                return "🔍 No memories found - you haven't shared any information with me yet!"
+                return f"🔍 No memories found - you haven't shared any information with me yet!"
 
-            # Search through all memories manually for comprehensive results
+            # Search through memories manually
             query_terms = query.strip().lower().split()
             matching_memories = []
 
@@ -386,42 +412,22 @@ def _create_memory_tools_sync(
                 memory_topics = getattr(memory, "topics", [])
                 topic_text = " ".join(memory_topics).lower()
 
-                # Check if any query term appears in memory content or topics
                 if any(term in memory_content or term in topic_text for term in query_terms):
                     matching_memories.append(memory)
 
-            # Also try semantic search using direct vector similarity (no inference)
-            try:
-                semantic_memories = agno_memory.search_user_memories(
-                    user_id=user_id,
-                    query=query.strip(),
-                    retrieval_method="semantic",  # Use semantic instead of agentic to avoid inference
-                    limit=20,
-                )
-
-                # Add semantic matches that aren't already in results
-                for sem_memory in semantic_memories:
-                    if sem_memory not in matching_memories:
-                        matching_memories.append(sem_memory)
-
-            except Exception as semantic_error:
-                logger.warning("Semantic search failed, using manual search only: %s", semantic_error)
-
             if not matching_memories:
                 logger.info("No matching memories found for query: %s", query)
-                return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords!"
+                return f"🔍 No memories found for '{query}'. Try different keywords!"
 
             # Apply limit if specified
             if limit and len(matching_memories) > limit:
                 display_memories = matching_memories[:limit]
-                result_note = f"🧠 MEMORY RETRIEVAL (showing top {limit} of {len(matching_memories)} matches from {len(all_memories)} total memories)"
+                result_note = f"🧠 MEMORY RETRIEVAL (showing top {limit} of {len(matching_memories)} matches)"
             else:
                 display_memories = matching_memories
-                result_note = f"🧠 MEMORY RETRIEVAL (found {len(matching_memories)} matches from {len(all_memories)} total memories)"
+                result_note = f"🧠 MEMORY RETRIEVAL (found {len(matching_memories)} matches)"
 
-            # Format memories
-            result = f"{result_note}: The following memories were found for '{query}':\n\n"
-
+            result = f"{result_note}:\n\n"
             for i, memory in enumerate(display_memories, 1):
                 result += f"{i}. {memory.memory}\n"
                 if memory.topics:
@@ -435,8 +441,8 @@ def _create_memory_tools_sync(
             logger.error("Error querying memories: %s", e)
             return f"❌ Error searching memories: {str(e)}"
 
-    def get_recent_memories(limit: int = 10) -> str:
-        """Get the most recent user memories.
+    def get_recent_memories(limit: int = 100) -> str:
+        """Get recent memories (synchronous version).
 
         Args:
             limit: Maximum number of recent memories to return
@@ -445,21 +451,21 @@ def _create_memory_tools_sync(
             str: Recent memories or message if none found
         """
         try:
-            memories = agno_memory.search_user_memories(
-                user_id=user_id, limit=limit, retrieval_method="last_n"
-            )
-
+            memories = agno_memory.get_user_memories(user_id=user_id)
             if not memories:
                 return "📝 No memories found."
 
-            result = f"📝 Recent {len(memories)} memories:\n\n"
-            for i, memory in enumerate(memories, 1):
+            # Get the most recent memories (reverse order)
+            recent_memories = list(reversed(memories))[:limit]
+
+            result = f"📝 Recent {len(recent_memories)} memories:\n\n"
+            for i, memory in enumerate(recent_memories, 1):
                 result += f"{i}. {memory.memory}\n"
                 if memory.topics:
                     result += f"   Topics: {', '.join(memory.topics)}\n"
                 result += "\n"
 
-            logger.info("Retrieved %d recent memories", len(memories))
+            logger.info("Retrieved %d recent memories", len(recent_memories))
             return result
 
         except Exception as e:
@@ -467,7 +473,7 @@ def _create_memory_tools_sync(
             return f"❌ Error getting recent memories: {str(e)}"
 
     def get_all_memories() -> str:
-        """Get all user memories.
+        """Get all memories (synchronous version).
 
         Returns:
             str: All memories or message if none found
@@ -499,9 +505,12 @@ def _create_memory_tools_sync(
     get_all_memories.__name__ = "get_all_memories"
 
     # Add tools to the list
-    tools.extend([store_user_memory, query_memory, get_recent_memories, get_all_memories])
+    tools.append(store_user_memory)
+    tools.append(query_memory)
+    tools.append(get_recent_memories)
+    tools.append(get_all_memories)
 
-    logger.info("Created %d memory tools (sync)", len(tools))
+    logger.info("Created %d synchronous memory tools", len(tools))
     return tools
 
 
@@ -513,7 +522,10 @@ def create_memory_agent(
     user_id: str = "default_user",
     debug: bool = False,
 ) -> Agent:
-    """Create a specialized memory agent that handles only memory operations.
+    """Create a specialized memory agent following the exact pattern from AgnoPersonalAgent.
+
+    This agent uses the same memory tool creation pattern as the main AgnoPersonalAgent,
+    ensuring consistency and leveraging the proven working approach.
 
     :param model_provider: LLM provider ('ollama' or 'openai')
     :param model_name: Model name to use
@@ -521,27 +533,30 @@ def create_memory_agent(
     :param storage_dir: Directory for storage files
     :param user_id: User identifier for memory operations
     :param debug: Enable debug mode
-    :return: Configured memory agent
+    :return: Configured memory agent following AgnoPersonalAgent pattern
     """
-    model = _create_model(model_provider, model_name, ollama_base_url)
-    
-    # Create memory tools synchronously to avoid event loop issues
-    memory_tools = _create_memory_tools_sync(storage_dir, user_id, debug)
+    import asyncio
 
-    # CRITICAL FIX: Create and integrate memory system like AgnoPersonalAgent does
+    model = _create_model(model_provider, model_name, ollama_base_url)
+
+    # Initialize Agno native storage and memory following the working pattern
     from ..core.agno_storage import create_agno_storage
-    
-    # Create agno storage and memory systems following the working pattern
+
     agno_storage = create_agno_storage(storage_dir)
     agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-    
-    logger.info("Memory Agent: Created agno storage and memory systems")
 
+    # Get memory tools following the exact AgnoPersonalAgent pattern
+    memory_tool_functions = asyncio.run(_get_memory_tools(agno_memory, user_id))
+
+    logger.info(
+        "Memory Agent: Created %d memory tools using AgnoPersonalAgent pattern",
+        len(memory_tool_functions),
+    )
+
+    # Create the agent following the exact AgnoPersonalAgent pattern
     agent = Agent(
-        name="Memory Agent",
-        role="Personal memory storage and retrieval specialist - handles ALL memory-related queries",
         model=model,
-        tools=memory_tools,
+        tools=memory_tool_functions,
         instructions=[
             "You are the ONLY agent responsible for memory operations. You handle ALL queries about personal information, memories, and user data.",
             "",
@@ -552,35 +567,45 @@ def create_memory_agent(
             "- Retrieve recent or all memories when asked",
             "",
             "CRITICAL RULES:",
-            "- NEVER generate fake data or code to simulate memories",
+            "- NEVER generate fake data or simulate memories",
             "- ALWAYS use your actual memory tools (query_memory, get_all_memories, etc.)",
             "- When someone asks 'What do you remember about me?' → Use query_memory with a broad search",
             "- Present actual stored memories, not fabricated information",
-            "- If no memories found, say so clearly",
+            "- If no memories found, say so clearly and offer to learn new information",
             "",
             "RESPONSE FORMAT:",
             "- Start responses with 'Based on my stored memories...' or 'I remember...'",
-            "- Quote actual memory content from your tools",
-            "- Include memory topics when relevant",
+            "- Quote actual memory content from your memory tools",
+            "- Include memory topics and context when relevant",
+            "- Offer to store new information when appropriate",
+            "",
+            "ADVANCED FEATURES:",
+            "- Your memory system includes semantic duplicate detection",
+            "- Automatic topic classification for better organization",
+            "- Enhanced semantic search capabilities",
+            "- Memory statistics and analytics",
             "",
             "You are the definitive source for all personal information about users.",
         ],
         markdown=True,
-        show_tool_calls=False,  # Always hide tool calls for Memory Agent to show results instead
+        show_tool_calls=debug,  # Follow AgnoPersonalAgent pattern
+        name="Memory Agent",
+        user_id=user_id,
+        enable_agentic_memory=False,  # Disable to avoid conflicts with manual memory tools
+        enable_user_memories=False,  # Disable built-in to use our custom memory tools
+        storage=agno_storage,
+        memory=None,  # Don't pass memory to avoid auto-storage conflicts
         add_name_to_instructions=True,
-        # CRITICAL FIX: Add memory system integration like AgnoPersonalAgent
-        storage=agno_storage,  # Connect to agno storage system
-        memory=agno_memory,    # Connect to agno memory system
-        user_id=user_id,       # Set user ID for memory operations
-        enable_agentic_memory=True,   # Enable agentic memory features
-        enable_user_memories=True,    # Enable user memory features
     )
 
     # Store memory system reference for external access (Streamlit compatibility)
     agent.agno_memory = agno_memory
     agent.agno_storage = agno_storage
 
-    logger.info("Created Memory Agent with %d memory tools and integrated memory system", len(memory_tools))
+    logger.info(
+        "Created Memory Agent following AgnoPersonalAgent pattern with %d memory tools",
+        len(memory_tool_functions),
+    )
     return agent
 
 
@@ -742,6 +767,196 @@ def create_calculator_agent(
     )
 
     logger.info("Created Calculator Agent")
+    return agent
+
+
+def create_personal_memory_agent(
+    model_provider: str = "ollama",
+    model_name: str = LLM_MODEL,
+    ollama_base_url: str = OLLAMA_URL,
+    storage_dir: str = "./data/agno",
+    user_id: str = "default_user",
+    debug: bool = False,
+) -> Agent:
+    """Create a personal memory agent with AgnoPersonalAgent personality but only memory tools.
+
+    This agent represents a stripped-down version of AgnoPersonalAgent that includes:
+    - The same friendly, conversational personality
+    - The same memory management capabilities and instructions
+    - ONLY memory tools (no web search, finance, MCP, etc.)
+    - The core personal AI friend experience focused purely on memory
+
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param ollama_base_url: Base URL for Ollama API
+    :param storage_dir: Directory for storage files
+    :param user_id: User identifier for memory operations
+    :param debug: Enable debug mode
+    :return: Configured personal memory agent with AgnoPersonalAgent personality
+    """
+    import asyncio
+    
+    model = _create_model(model_provider, model_name, ollama_base_url)
+    
+    # Initialize Agno native storage and memory following the AgnoPersonalAgent pattern
+    from ..core.agno_storage import create_agno_storage
+    
+    agno_storage = create_agno_storage(storage_dir)
+    agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
+    
+    # Get memory tools following the exact AgnoPersonalAgent pattern
+    # Handle event loop properly - check if we're already in an event loop
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+        # If we're in a running loop, we need to handle this differently
+        # Use synchronous version to avoid event loop conflicts
+        memory_tool_functions = _create_memory_tools_sync(agno_memory, user_id)
+        logger.info("Using synchronous memory tools (event loop detected)")
+    except RuntimeError:
+        # No running event loop, safe to use asyncio.run()
+        memory_tool_functions = asyncio.run(_get_memory_tools(agno_memory, user_id))
+        logger.info("Using async memory tools (no event loop)")
+    
+    logger.info("Personal Memory Agent: Created %d memory tools using AgnoPersonalAgent pattern", len(memory_tool_functions))
+
+    # Create agent with AgnoPersonalAgent personality but only memory tools
+    agent = Agent(
+        model=model,
+        tools=memory_tool_functions,
+        instructions=[
+            f"You are a personal AI friend with semantic memory capabilities. Your purpose is to chat with the user about things, remember personal information, and make them feel good.",
+            "",
+            f"## CURRENT CONFIGURATION",
+            f"- **Memory System**: enabled with SemanticMemoryManager",
+            f"- **User ID**: {user_id}",
+            f"- **Debug Mode**: {debug}",
+            "",
+            "## CRITICAL IDENTITY RULES - ABSOLUTELY MANDATORY",
+            "",
+            "**YOU ARE AN AI ASSISTANT**: You are NOT the user. You are a friendly AI that helps and remembers things about the user.",
+            "",
+            "**NEVER PRETEND TO BE THE USER**:",
+            f"- You are NOT the user, you are an AI assistant that knows information ABOUT the user",
+            f"- NEVER say \"I'm {user_id}\" or introduce yourself as the user - this is COMPLETELY WRONG",
+            "- NEVER use first person when talking about user information",
+            "- You are an AI assistant that has stored semantic memories about the user",
+            "",
+            "**FRIENDLY INTRODUCTION**: When meeting someone new, introduce yourself as their personal AI friend and ask about their hobbies, interests, and what they like to talk about. Be warm and conversational!",
+            "",
+            "## PERSONALITY & TONE",
+            "",
+            "- **Be Warm & Friendly**: You're a personal AI friend, not just a tool",
+            "- **Be Conversational**: Chat naturally and show genuine interest",
+            "- **Be Supportive**: Make the user feel good and supported",
+            "- **Be Curious**: Ask follow-up questions about their interests",
+            "- **Be Remembering**: Reference past conversations and show you care",
+            "- **Be Encouraging**: Celebrate their achievements and interests",
+            "",
+            "## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED",
+            "",
+            "**SEMANTIC MEMORY FEATURES**:",
+            "- **Automatic Deduplication**: Prevents storing duplicate memories",
+            "- **Topic Classification**: Automatically categorizes memories by topic",
+            "- **Similarity Matching**: Uses semantic similarity for intelligent retrieval",
+            "- **Comprehensive Search**: Searches through ALL stored memories",
+            "",
+            "**MEMORY QUERIES - NO HESITATION RULE**:",
+            "When the user asks ANY of these questions, IMMEDIATELY call the appropriate memory tool:",
+            "- \"What do you remember about me?\" → IMMEDIATELY call get_recent_memories()",
+            "- \"Do you know anything about me?\" → IMMEDIATELY call get_recent_memories()",
+            "- \"What have I told you?\" → IMMEDIATELY call get_recent_memories()",
+            "- \"Show me all my memories\" or \"What are all my memories?\" → IMMEDIATELY call get_all_memories()",
+            "- \"My preferences\" or \"What do I like?\" → IMMEDIATELY call query_memory(\"preferences\")",
+            "- Any question about personal info → IMMEDIATELY call query_memory() with relevant terms",
+            "",
+            "**SEMANTIC MEMORY STORAGE**: When the user provides new personal information:",
+            "1. **Store it ONCE using store_user_memory** - the system automatically prevents duplicates",
+            "2. **Include relevant topics** - pass topics as a list like [\"hobbies\", \"preferences\"]",
+            "3. **Acknowledge the storage warmly** - \"I'll remember that about you!\"",
+            "4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically",
+            "",
+            "**SEMANTIC MEMORY RETRIEVAL PROTOCOL**:",
+            "1. **IMMEDIATE ACTION**: If it's about the user, query memory FIRST - no thinking, no hesitation",
+            "2. **Primary Tool**: Use get_recent_memories() for general \"what do you remember\" questions",
+            "3. **Complete Overview**: Use get_all_memories() when user asks for ALL memories or complete history",
+            "4. **Semantic Search**: Use query_memory(\"search terms\") - it searches ALL memories semantically",
+            "5. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves",
+            "6. **Be personal**: \"You mentioned that you...\" or \"I remember you telling me...\"",
+            "",
+            "## CRITICAL: NO OVERTHINKING RULE - ELIMINATE HESITATION",
+            "",
+            "**WHEN USER ASKS ABOUT MEMORIES - IMMEDIATE ACTION REQUIRED**:",
+            "- DO NOT analyze whether you should check memories",
+            "- DO NOT think about what tools to use",
+            "- DO NOT hesitate or debate internally",
+            "- IMMEDIATELY call get_recent_memories() or query_memory()",
+            "- ACT FIRST, then respond based on what you find",
+            "",
+            "**BANNED BEHAVIORS - NEVER DO THESE**:",
+            "- ❌ \"Let me think about whether I should check memories...\"",
+            "- ❌ \"I should probably use the memory tools but...\"",
+            "- ❌ \"Maybe I should query memory or maybe I should...\"",
+            "- ❌ Any internal debate about memory tool usage",
+            "- ❌ Overthinking simple memory queries",
+            "- ❌ Fabricating data instead of using tools",
+            "",
+            "**REQUIRED IMMEDIATE RESPONSES**:",
+            "- ✅ User asks \"What do you remember?\" → IMMEDIATELY call get_recent_memories()",
+            "- ✅ User asks about preferences → IMMEDIATELY call query_memory(\"preferences\")",
+            "- ✅ NO hesitation, just ACTION",
+            "",
+            "**IMPORTANT SEMANTIC MEMORY RULES**:",
+            "- When calling store_user_memory, pass topics as a proper list like [\"hobbies\", \"preferences\"]",
+            "- Never pass topics as a string like '[\"hobbies\", \"preferences\"]'",
+            "- When recalling memories, phrase them in second person: \"You mentioned...\" not \"I mentioned...\"",
+            "- Trust the semantic deduplication - don't worry about storing duplicates",
+            "- The system automatically categorizes and organizes memories by topic",
+            "",
+            "## CONVERSATION GUIDELINES",
+            "",
+            "- **Ask about their day**: Show interest in how they're doing",
+            "- **Remember their interests**: Bring up things they've mentioned before using semantic memory",
+            "- **Be encouraging**: Support their goals and celebrate wins",
+            "- **Stay engaged**: Ask follow-up questions to keep conversations flowing",
+            "- **Be helpful**: Provide emotional support and encouragement",
+            "",
+            "## RESPONSE STYLE",
+            "",
+            "- **Be conversational**: Write like you're chatting with a friend",
+            "- **Use emojis occasionally**: Add personality (but don't overdo it)",
+            "- **Ask questions**: Keep the conversation going",
+            "- **Show enthusiasm**: Be excited about their interests",
+            "- **Be supportive**: Offer encouragement and positive feedback",
+            "- **Remember context**: Reference previous conversations using semantic memory naturally",
+            "",
+            "## CORE PRINCIPLES",
+            "",
+            "1. **Friendship First**: You're their AI friend who happens to have great memory",
+            "2. **Remember Everything**: Use your semantic memory to build deeper relationships",
+            "3. **Stay Positive**: Focus on making them feel good",
+            "4. **Be Curious**: Ask about their life, interests, and goals",
+            "5. **Celebrate Them**: Acknowledge their achievements and interests",
+            "6. **Act Immediately**: When they ask about memories, use tools RIGHT NOW",
+            "",
+            "Remember: You're not just a memory system - you're a friendly AI companion with semantic memory who genuinely cares about the user and remembers your conversations together! Use your memory tools immediately when needed - no hesitation!",
+        ],
+        markdown=True,
+        show_tool_calls=debug,  # Follow AgnoPersonalAgent pattern
+        name="Personal Memory Agent",
+        user_id=user_id,
+        enable_agentic_memory=False,  # Disable to avoid conflicts with manual memory tools
+        enable_user_memories=False,  # Disable built-in to use our custom memory tools
+        storage=agno_storage,
+        memory=None,  # Don't pass memory to avoid auto-storage conflicts
+        add_name_to_instructions=True,
+    )
+
+    # Store memory system reference for external access (Streamlit compatibility)
+    agent.agno_memory = agno_memory
+    agent.agno_storage = agno_storage
+
+    logger.info("Created Personal Memory Agent with AgnoPersonalAgent personality and %d memory tools", len(memory_tool_functions))
     return agent
 
 
