@@ -213,26 +213,64 @@ class AgnoPersonalAgent:
                 if topics is None:
                     topics = ["general"]
 
-                # Handle topics parameter - convert string to list if needed
+                # CRITICAL FIX: Ensure topics are ALWAYS stored as a list
                 if isinstance(topics, str):
-                    try:
-                        topics = json.loads(topics)
+                    # Check if it's a JSON string representation of a list
+                    if topics.startswith("[") and topics.endswith("]"):
+                        try:
+                            topics = json.loads(topics)
+                            logger.debug(
+                                "Converted topics from JSON string to list: %s", topics
+                            )
+                        except (json.JSONDecodeError, ValueError):
+                            # If JSON parsing fails, treat as comma-separated string
+                            topics = [
+                                t.strip().strip("'\"")
+                                for t in topics.strip("[]").split(",")
+                            ]
+                            logger.debug(
+                                "Parsed topics from malformed JSON as list: %s", topics
+                            )
+                    elif "," in topics:
+                        # Handle comma-separated topics like "education, personal"
+                        topics = [t.strip().strip("'\"") for t in topics.split(",")]
                         logger.debug(
-                            "Converted topics from JSON string to list: %s", topics
+                            "Split comma-separated topics into list: %s", topics
                         )
-                    except (json.JSONDecodeError, ValueError):
-                        topics = [topics]
+                    else:
+                        # Single topic string
+                        topics = [topics.strip().strip("'\"")]
                         logger.debug(
-                            "Treating topics string as single topic: %s", topics
+                            "Converted single topic string to list: %s", topics
                         )
 
-                # Ensure topics is a list
+                # Final validation: Ensure topics is ALWAYS a list
                 if not isinstance(topics, list):
-                    topics = [str(topics)]
+                    topics = [str(topics).strip("'\"")]
+                    logger.warning(
+                        "Force-converted non-list topics to list: %s", topics
+                    )
+
+                # Clean up topics: remove empty strings, strip whitespace AND quotes
+                topics = [
+                    t.strip().strip("'\"") for t in topics if t and str(t).strip()
+                ]
+
+                # Ensure we have at least one topic
+                if not topics:
+                    topics = ["general"]
 
                 # Direct call to SemanticMemoryManager.add_memory()
-                success, message, memory_id = self.agno_memory.memory_manager.add_memory(
-                    memory_text=content, db=self.agno_memory.db, user_id=self.user_id, topics=topics
+                #                success, message, memory_id = self.agno_memory.memory_manager.add_memory(
+                #                    memory_text=content, db=self.agno_memory.db, user_id=self.user_id, topics=topics
+                #                )
+                success, message, memory_id = (
+                    self.agno_memory.memory_manager.add_memory(
+                        memory_text=content,
+                        db=self.agno_memory.db,
+                        user_id=self.user_id,
+                        topics=topics,
+                    )
                 )
 
                 if success:
@@ -323,15 +361,53 @@ class AgnoPersonalAgent:
             try:
                 import json
 
-                # Handle topics parameter
+                # CRITICAL FIX: Ensure topics are ALWAYS stored as a list (same logic as store_user_memory)
                 if isinstance(topics, str):
-                    try:
-                        topics = json.loads(topics)
-                    except (json.JSONDecodeError, ValueError):
-                        topics = [topics]
+                    # Check if it's a JSON string representation of a list
+                    if topics.startswith("[") and topics.endswith("]"):
+                        try:
+                            topics = json.loads(topics)
+                            logger.debug(
+                                "Converted topics from JSON string to list: %s", topics
+                            )
+                        except (json.JSONDecodeError, ValueError):
+                            # If JSON parsing fails, treat as comma-separated string
+                            topics = [
+                                t.strip().strip("'\"")
+                                for t in topics.strip("[]").split(",")
+                            ]
+                            logger.debug(
+                                "Parsed topics from malformed JSON as list: %s", topics
+                            )
+                    elif "," in topics:
+                        # Handle comma-separated topics like "education, personal"
+                        topics = [t.strip().strip("'\"") for t in topics.split(",")]
+                        logger.debug(
+                            "Split comma-separated topics into list: %s", topics
+                        )
+                    else:
+                        # Single topic string
+                        topics = [topics.strip().strip("'\"")]
+                        logger.debug(
+                            "Converted single topic string to list: %s", topics
+                        )
 
+                # Final validation: Ensure topics is ALWAYS a list
                 if topics and not isinstance(topics, list):
-                    topics = [str(topics)]
+                    topics = [str(topics).strip("'\"")]
+                    logger.warning(
+                        "Force-converted non-list topics to list: %s", topics
+                    )
+
+                # Clean up topics: remove empty strings, strip whitespace AND quotes
+                if topics:
+                    topics = [
+                        t.strip().strip("'\"") for t in topics if t and str(t).strip()
+                    ]
+
+                    # Ensure we have at least one topic if topics were provided
+                    if not topics:
+                        topics = ["general"]
 
                 # Direct call to SemanticMemoryManager.update_memory()
                 success, message = self.agno_memory.memory_manager.update_memory(
@@ -483,7 +559,9 @@ class AgnoPersonalAgent:
             """
             try:
                 # Direct call to SemanticMemoryManager.get_memory_stats()
-                stats = self.agno_memory.memory_manager.get_memory_stats(db=self.agno_memory.db, user_id=self.user_id)
+                stats = self.agno_memory.memory_manager.get_memory_stats(
+                    db=self.agno_memory.db, user_id=self.user_id
+                )
 
                 if "error" in stats:
                     return f"❌ Error getting memory stats: {stats['error']}"
@@ -734,10 +812,9 @@ Returns:
             - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences likes interests")
             - "Recent memories" or "What did I tell you recently?" → IMMEDIATELY call get_recent_memories()
             - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
-            
-            **SEMANTIC MEMORY STORAGE**: When the user provides new personal information:
-            1. **Store it ONCE using store_user_memory** - the system automatically prevents duplicates
-            2. **Include relevant topics** - pass topics as a list like ["hobbies", "preferences"] if known. 
+            - Any statement of fact about personal info 
+            **SEMANTIC MEMORY STORAGE**: When the user provides new personal information → IMMEDIATELY call store_memory(content="the fact",topics=[topic1,topic2,...])
+            2. **DO specify topics** - call store_user_memory(content="the fact", topics=[topic1, topic2,...]) 
             3. **Acknowledge the storage warmly** - "I'll remember that about you!"
             4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically
             
@@ -846,8 +923,8 @@ Returns:
             - Example: "list headlines about Middle East" → duckduckgo_news("Middle East headlines") RIGHT NOW
             
             **IMPORTANT SEMANTIC MEMORY RULES**:
-            - When calling store_user_memory, pass topics as a proper list like ["hobbies", "preferences"]
-            - Never pass topics as a string like '["hobbies", "preferences"]'
+            - When calling store_user_memory, DO NOT pass any topics parameter - call store_user_memory(content="the fact") with ONLY the content parameter
+            - The SemanticMemoryManager will automatically classify and assign appropriate topics
             - When recalling memories, phrase them in second person: "You mentioned..." not "I mentioned..."
             - Trust the semantic deduplication - don't worry about storing duplicates
             - The system automatically categorizes and organizes memories by topic
