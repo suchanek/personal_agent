@@ -149,14 +149,47 @@ class AgnoPersonalAgent:
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
-    async def _get_memory_tools(self) -> List:
-        """Create memory tools as native async functions compatible with Agno.
+    def _get_direct_memory_access(self):
+        """Get direct access to memory manager and database."""
+        if not self.agno_memory:
+            return None, None
+        return self.agno_memory.memory_manager, self.agno_memory.db
 
-        This method creates the crucial store_user_memory and query_memory tools
-        that enable the agent to actually create and retrieve memories.
+    def _direct_search_memories(self, query: str, limit: int = 10, similarity_threshold: float = 0.3):
+        """Direct semantic search without agentic retrieval."""
+        memory_manager, db = self._get_direct_memory_access()
+        if not memory_manager or not db:
+            return []
+        
+        try:
+            results = memory_manager.search_memories(
+                query=query,
+                db=db,
+                user_id=self.user_id,
+                limit=limit,
+                similarity_threshold=similarity_threshold,
+                search_topics=True,
+                topic_boost=0.5
+            )
+            return results
+        except Exception as e:
+            logger.warning("Direct semantic search failed: %s", e)
+            return []
+
+    async def _get_memory_tools(self) -> List:
+        """Create memory tools using direct SemanticMemoryManager method calls.
+
+        This method creates memory tools that directly call SemanticMemoryManager methods
+        instead of using complex wrapper functions, making the code much simpler and more maintainable.
         """
         if not self.enable_memory or not self.agno_memory:
             logger.warning("Memory not enabled or memory not initialized")
+            return []
+
+        # Get direct access to memory manager and database
+        memory_manager, db = self._get_direct_memory_access()
+        if not memory_manager or not db:
+            logger.error("Failed to get direct memory access")
             return []
 
         tools = []
@@ -164,11 +197,11 @@ class AgnoPersonalAgent:
         async def store_user_memory(
             content: str, topics: Union[List[str], str, None] = None
         ) -> str:
-            """Store information as a user memory.
+            """Store information as a user memory using direct SemanticMemoryManager calls.
 
             Args:
                 content: The information to store as a memory
-                topics: Optional list of topics/categories for the memory (can be list or JSON string)
+                topics: Optional list of topics/categories for the memory
 
             Returns:
                 str: Success or error message
@@ -176,64 +209,50 @@ class AgnoPersonalAgent:
             try:
                 import json
 
-                from agno.memory.v2.memory import UserMemory
-
                 if topics is None:
                     topics = ["general"]
 
-                # Fix: Handle case where topics comes in as string representation of list
-                # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
+                # Handle topics parameter - convert string to list if needed
                 if isinstance(topics, str):
                     try:
-                        # Try to parse as JSON first
                         topics = json.loads(topics)
-                        logger.debug("Converted topics from string to list: %s", topics)
+                        logger.debug("Converted topics from JSON string to list: %s", topics)
                     except (json.JSONDecodeError, ValueError):
-                        # If that fails, treat as a single topic
                         topics = [topics]
-                        logger.debug(
-                            "Treating topics string as single topic: %s", topics
-                        )
+                        logger.debug("Treating topics string as single topic: %s", topics)
 
                 # Ensure topics is a list
                 if not isinstance(topics, list):
                     topics = [str(topics)]
 
-                memory_obj = UserMemory(memory=content, topics=topics)
-                memory_id = self.agno_memory.add_user_memory(
-                    memory=memory_obj, user_id=self.user_id
+                # Direct call to SemanticMemoryManager.add_memory()
+                success, message, memory_id = memory_manager.add_memory(
+                    memory_text=content,
+                    db=db,
+                    user_id=self.user_id,
+                    topics=topics
                 )
 
-                if memory_id == "duplicate-detected-fake-id":
-                    # Memory was a duplicate but we return success to avoid agent confusion
-                    logger.info(
-                        "Memory already exists (duplicate detected): %s...",
-                        content[:50],
-                    )
-                    return f"✅ Memory already exists: {content[:50]}..."
-                elif memory_id is None:
-                    # Unexpected error case
-                    logger.warning(
-                        "Memory storage failed unexpectedly: %s...", content[:50]
-                    )
-                    return f"❌ Error storing memory: {content[:50]}..."
-                else:
-                    # Memory was successfully stored (new memory)
-                    logger.info(
-                        "Stored user memory: %s... (ID: %s)", content[:50], memory_id
-                    )
+                if success:
+                    logger.info("Stored user memory: %s... (ID: %s)", content[:50], memory_id)
                     return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+                else:
+                    logger.info("Memory rejected: %s", message)
+                    if "duplicate" in message.lower():
+                        return f"✅ Memory already exists: {content[:50]}..."
+                    else:
+                        return f"❌ Error storing memory: {message}"
 
             except Exception as e:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
         async def query_memory(query: str, limit: Union[int, None] = None) -> str:
-            """Search user memories using semantic search through ALL memories.
+            """Search user memories using direct SemanticMemoryManager calls.
 
             Args:
                 query: The query to search for in memories
-                limit: Maximum number of memories to return (None = search all, return top matches)
+                limit: Maximum number of memories to return
 
             Returns:
                 str: Found memories or message if none found
@@ -242,94 +261,142 @@ class AgnoPersonalAgent:
                 # Validate query parameter
                 if not query or not query.strip():
                     logger.warning("Empty query provided to query_memory")
-                    return (
-                        "❌ Error: Query cannot be empty. Please provide a search term."
-                    )
+                    return "❌ Error: Query cannot be empty. Please provide a search term."
 
-                # First, get ALL memories to search through them comprehensively
-                all_memories = self.agno_memory.get_user_memories(user_id=self.user_id)
+                # Direct call to SemanticMemoryManager.search_memories()
+                results = memory_manager.search_memories(
+                    query=query.strip(),
+                    db=db,
+                    user_id=self.user_id,
+                    limit=limit or 20,
+                    similarity_threshold=0.3,
+                    search_topics=True,
+                    topic_boost=0.5
+                )
 
-                if not all_memories:
-                    logger.info("No memories stored for user: %s", self.user_id)
-                    return f"🔍 No memories found - you haven't shared any information with me yet!"
+                if not results:
+                    logger.info("No matching memories found for query: %s", query)
+                    return f"🔍 No memories found for '{query}'. Try different keywords or ask me to remember something new!"
 
-                # Search through ALL memories manually for comprehensive results
-                query_terms = query.strip().lower().split()
-                matching_memories = []
+                # Format results
+                display_memories = results[:limit] if limit else results
+                result_note = f"🧠 MEMORY RETRIEVAL (found {len(results)} matches via semantic search)"
 
-                for memory in all_memories:
-                    memory_content = getattr(memory, "memory", "").lower()
-                    memory_topics = getattr(memory, "topics", [])
-                    topic_text = " ".join(memory_topics).lower()
+                result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user:\n\n"
 
-                    # Check if any query term appears in memory content or topics
-                    if any(
-                        term in memory_content or term in topic_text
-                        for term in query_terms
-                    ):
-                        matching_memories.append(memory)
-
-                # Also try semantic search as a backup to catch semantically similar memories
-                try:
-                    semantic_memories = self.agno_memory.search_user_memories(
-                        user_id=self.user_id,
-                        query=query.strip(),
-                        retrieval_method="agentic",
-                        limit=20,  # Get more semantic matches
-                    )
-
-                    # Add semantic matches that aren't already in our results
-                    for sem_memory in semantic_memories:
-                        if sem_memory not in matching_memories:
-                            matching_memories.append(sem_memory)
-
-                except Exception as semantic_error:
-                    logger.warning(
-                        "Semantic search failed, using manual search only: %s",
-                        semantic_error,
-                    )
-
-                if not matching_memories:
-                    logger.info(
-                        "No matching memories found for query: %s (searched %d total memories)",
-                        query,
-                        len(all_memories),
-                    )
-                    return f"🔍 No memories found for '{query}' (searched through {len(all_memories)} total memories). Try different keywords or ask me to remember something new!"
-
-                # Apply limit if specified, otherwise return all matches
-                if limit and len(matching_memories) > limit:
-                    display_memories = matching_memories[:limit]
-                    result_note = f"🧠 MEMORY RETRIEVAL (showing top {limit} of {len(matching_memories)} matches from {len(all_memories)} total memories)"
-                else:
-                    display_memories = matching_memories
-                    result_note = f"🧠 MEMORY RETRIEVAL (found {len(matching_memories)} matches from {len(all_memories)} total memories)"
-
-                # Format memories with explicit instruction to restate in second person
-                result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user. Convert any first-person statements to second-person:\n\n"
-
-                for i, memory in enumerate(display_memories, 1):
-                    result += f"{i}. {memory.memory}\n"
+                for i, (memory, score) in enumerate(display_memories, 1):
+                    result += f"{i}. {memory.memory} (similarity: {score:.2f})\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
 
                 result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
 
-                logger.info(
-                    "Found %d matching memories for query: %s (searched %d total)",
-                    len(matching_memories),
-                    query,
-                    len(all_memories),
-                )
+                logger.info("Found %d matching memories for query: %s", len(results), query)
                 return result
 
             except Exception as e:
                 logger.error("Error querying memories: %s", e)
                 return f"❌ Error searching memories: {str(e)}"
 
+        async def update_memory(memory_id: str, content: str, topics: Union[List[str], str, None] = None) -> str:
+            """Update an existing memory using direct SemanticMemoryManager calls.
+
+            Args:
+                memory_id: ID of the memory to update
+                content: New memory content
+                topics: Optional list of topics/categories for the memory
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                import json
+
+                # Handle topics parameter
+                if isinstance(topics, str):
+                    try:
+                        topics = json.loads(topics)
+                    except (json.JSONDecodeError, ValueError):
+                        topics = [topics]
+
+                if topics and not isinstance(topics, list):
+                    topics = [str(topics)]
+
+                # Direct call to SemanticMemoryManager.update_memory()
+                success, message = memory_manager.update_memory(
+                    memory_id=memory_id,
+                    memory_text=content,
+                    db=db,
+                    user_id=self.user_id,
+                    topics=topics
+                )
+
+                if success:
+                    logger.info("Updated memory %s: %s...", memory_id, content[:50])
+                    return f"✅ Successfully updated memory: {content[:50]}..."
+                else:
+                    logger.error("Failed to update memory %s: %s", memory_id, message)
+                    return f"❌ Error updating memory: {message}"
+
+            except Exception as e:
+                logger.error("Error updating memory: %s", e)
+                return f"❌ Error updating memory: {str(e)}"
+
+        async def delete_memory(memory_id: str) -> str:
+            """Delete a memory using direct SemanticMemoryManager calls.
+
+            Args:
+                memory_id: ID of the memory to delete
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                # Direct call to SemanticMemoryManager.delete_memory()
+                success, message = memory_manager.delete_memory(
+                    memory_id=memory_id,
+                    db=db,
+                    user_id=self.user_id
+                )
+
+                if success:
+                    logger.info("Deleted memory %s", memory_id)
+                    return f"✅ Successfully deleted memory: {memory_id}"
+                else:
+                    logger.error("Failed to delete memory %s: %s", memory_id, message)
+                    return f"❌ Error deleting memory: {message}"
+
+            except Exception as e:
+                logger.error("Error deleting memory: %s", e)
+                return f"❌ Error deleting memory: {str(e)}"
+
+        async def clear_memories() -> str:
+            """Clear all memories for the user using direct SemanticMemoryManager calls.
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                # Direct call to SemanticMemoryManager.clear_memories()
+                success, message = memory_manager.clear_memories(
+                    db=db,
+                    user_id=self.user_id
+                )
+
+                if success:
+                    logger.info("Cleared all memories for user %s", self.user_id)
+                    return f"✅ {message}"
+                else:
+                    logger.error("Failed to clear memories: %s", message)
+                    return f"❌ Error clearing memories: {message}"
+
+            except Exception as e:
+                logger.error("Error clearing memories: %s", e)
+                return f"❌ Error clearing memories: {str(e)}"
+
         async def get_recent_memories(limit: int = 100) -> str:
-            """Get the most recent user memories.
+            """Get recent memories by searching all memories and sorting by date.
 
             Args:
                 limit: Maximum number of recent memories to return
@@ -338,22 +405,28 @@ class AgnoPersonalAgent:
                 str: Recent memories or message if none found
             """
             try:
-                memories = self.agno_memory.search_user_memories(
-                    user_id=self.user_id, limit=limit, retrieval_method="last_n"
+                # Use search_memories with empty query to get all memories, then limit
+                results = memory_manager.search_memories(
+                    query="",  # Empty query to get all memories
+                    db=db,
+                    user_id=self.user_id,
+                    limit=limit,
+                    similarity_threshold=0.0,  # Very low threshold to get all
+                    search_topics=False
                 )
 
-                if not memories:
+                if not results:
                     return "📝 No memories found."
 
                 # Format memories for display
-                result = f"📝 Recent {len(memories)} memories:\n\n"
-                for i, memory in enumerate(memories, 1):
+                result = f"📝 Recent {len(results)} memories:\n\n"
+                for i, (memory, _) in enumerate(results, 1):
                     result += f"{i}. {memory.memory}\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
 
-                logger.info("Retrieved %d recent memories", len(memories))
+                logger.info("Retrieved %d recent memories", len(results))
                 return result
 
             except Exception as e:
@@ -361,45 +434,97 @@ class AgnoPersonalAgent:
                 return f"❌ Error getting recent memories: {str(e)}"
 
         async def get_all_memories() -> str:
-            """Get all user memories.
+            """Get all user memories using direct SemanticMemoryManager calls.
 
             Returns:
                 str: All memories or message if none found
             """
             try:
-                memories = self.agno_memory.get_user_memories(user_id=self.user_id)
+                # Use search_memories with empty query and no limit to get all memories
+                results = memory_manager.search_memories(
+                    query="",  # Empty query to get all memories
+                    db=db,
+                    user_id=self.user_id,
+                    limit=1000,  # High limit to get all
+                    similarity_threshold=0.0,  # Very low threshold to get all
+                    search_topics=False
+                )
 
-                if not memories:
+                if not results:
                     return "📝 No memories found."
 
                 # Format memories for display
-                result = f"📝 All {len(memories)} memories:\n\n"
-                for i, memory in enumerate(memories, 1):
+                result = f"📝 All {len(results)} memories:\n\n"
+                for i, (memory, _) in enumerate(results, 1):
                     result += f"{i}. {memory.memory}\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
 
-                logger.info("Retrieved %d total memories", len(memories))
+                logger.info("Retrieved %d total memories", len(results))
                 return result
 
             except Exception as e:
                 logger.error("Error getting all memories: %s", e)
                 return f"❌ Error getting all memories: {str(e)}"
 
+        async def get_memory_stats() -> str:
+            """Get memory statistics using direct SemanticMemoryManager calls.
+
+            Returns:
+                str: Memory statistics
+            """
+            try:
+                # Direct call to SemanticMemoryManager.get_memory_stats()
+                stats = memory_manager.get_memory_stats(db=db, user_id=self.user_id)
+
+                if "error" in stats:
+                    return f"❌ Error getting memory stats: {stats['error']}"
+
+                # Format stats for display
+                result = "📊 Memory Statistics:\n\n"
+                result += f"Total memories: {stats.get('total_memories', 0)}\n"
+                result += f"Average memory length: {stats.get('average_memory_length', 0):.1f} characters\n"
+                result += f"Recent memories (24h): {stats.get('recent_memories_24h', 0)}\n"
+
+                if stats.get('most_common_topic'):
+                    result += f"Most common topic: {stats['most_common_topic']}\n"
+
+                if stats.get('topic_distribution'):
+                    result += "\nTopic distribution:\n"
+                    for topic, count in stats['topic_distribution'].items():
+                        result += f"  - {topic}: {count}\n"
+
+                logger.info("Retrieved memory statistics")
+                return result
+
+            except Exception as e:
+                logger.error("Error getting memory stats: %s", e)
+                return f"❌ Error getting memory stats: {str(e)}"
+
         # Set proper function names for tool identification
         store_user_memory.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
+        update_memory.__name__ = "update_memory"
+        delete_memory.__name__ = "delete_memory"
+        clear_memories.__name__ = "clear_memories"
         get_recent_memories.__name__ = "get_recent_memories"
         get_all_memories.__name__ = "get_all_memories"
+        get_memory_stats.__name__ = "get_memory_stats"
 
         # Add tools to the list
-        tools.append(store_user_memory)
-        tools.append(query_memory)
-        tools.append(get_recent_memories)
-        tools.append(get_all_memories)
+        tools.extend([
+            store_user_memory,
+            query_memory,
+            update_memory,
+            delete_memory,
+            clear_memories,
+            get_recent_memories,
+            get_all_memories,
+            get_memory_stats
+        ])
 
-        logger.info("Created %d memory tools", len(tools))
+        logger.info("Created %d memory tools using direct SemanticMemoryManager calls", len(tools))
         return tools
 
     async def _get_mcp_tools(self) -> List:
