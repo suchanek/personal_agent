@@ -148,6 +148,7 @@ def create_combined_knowledge_base(
 
     :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
     :param knowledge_dir: Directory containing knowledge files to load (defaults to DATA_DIR/knowledge)
+    :param db_url: SqliteStorage for the database
     :return: Configured CombinedKnowledgeBase instance or None if no knowledge found
     """
     if storage_dir is None:

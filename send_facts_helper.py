@@ -8,7 +8,7 @@ def get_fact_categories():
     """Return organized categories of facts for easy sending to the agent."""
     
     categories = {
-        "basic_info": [
+        "personal_info": [
             "My name is Eric G. Suchanek.",
             "I have a Ph.D. degree.",
             "I live at 4264 Meadow Creek CT Liberty TWP, OH 45011.",

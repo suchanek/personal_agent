@@ -460,9 +460,223 @@ def apply_custom_theme():
             unsafe_allow_html=True,
         )
     else:
-        # Light theme CSS - restore to default Streamlit appearance
-        # No custom CSS needed for light mode - let Streamlit use its defaults
-        pass
+        # Light theme CSS - explicitly remove dark theme styles
+        st.markdown(
+            """
+        <style>
+        /* Remove all dark theme overrides to restore Streamlit defaults */
+        .stApp {
+            background-color: white !important;
+            color: black !important;
+        }
+        
+        .main .block-container {
+            background-color: white !important;
+            color: black !important;
+        }
+        
+        .stApp > header {
+            background-color: white !important;
+        }
+        
+        .stMainBlockContainer {
+            background-color: white !important;
+        }
+        
+        .stBottom {
+            background-color: white !important;
+        }
+        
+        .stChatFloatingInputContainer {
+            background-color: white !important;
+            border-top: 1px solid #e0e0e0 !important;
+        }
+        
+        section[data-testid="stChatFloatingInputContainer"] {
+            background-color: white !important;
+        }
+        
+        div[data-testid="stChatInput"] {
+            background-color: white !important;
+        }
+        
+        .stChatInput {
+            background-color: white !important;
+        }
+        
+        .stChatInput > div {
+            background-color: white !important;
+        }
+        
+        .stChatInput div:not([data-baseweb="textarea"]) {
+            background-color: white !important;
+        }
+        
+        .stApp > div:last-child {
+            background-color: white !important;
+        }
+        
+        .stApp footer {
+            background-color: white !important;
+        }
+        
+        .stChatFloatingInputContainer div {
+            background-color: white !important;
+        }
+        
+        [data-testid="stChatFloatingInputContainer"] > div {
+            background-color: white !important;
+        }
+        
+        [data-testid="stChatFloatingInputContainer"] > div > div {
+            background-color: white !important;
+        }
+        
+        .main {
+            background-color: white !important;
+        }
+        
+        .main > div {
+            background-color: white !important;
+        }
+        
+        div[data-testid="stAppViewContainer"] {
+            background-color: white !important;
+        }
+        
+        div[data-testid="stMain"] {
+            background-color: white !important;
+        }
+        
+        section[data-testid="stSidebar"] ~ div {
+            background-color: white !important;
+        }
+        
+        .stApp > div {
+            background-color: white !important;
+        }
+        
+        .stApp section {
+            background-color: white !important;
+        }
+        
+        /* Override the nuclear option from dark theme */
+        .stApp * {
+            background-color: unset !important;
+        }
+        
+        /* Restore light theme colors for interactive elements */
+        button {
+            background-color: unset !important;
+            color: unset !important;
+        }
+        
+        .stSidebar {
+            background-color: #f0f2f6 !important;
+        }
+        
+        .stSidebar > div {
+            background-color: #f0f2f6 !important;
+        }
+        
+        .stSidebar .stMarkdown {
+            color: black !important;
+        }
+        
+        .stSidebar .stSelectbox > div > div {
+            background-color: white !important;
+            color: black !important;
+        }
+        
+        .stTextInput > div > div > input {
+            background-color: white !important;
+            color: black !important;
+            border: 1px solid #e0e0e0 !important;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            border-color: #0066cc !important;
+            box-shadow: 0 0 0 1px #0066cc !important;
+        }
+        
+        .stButton > button {
+            background-color: white !important;
+            color: black !important;
+            border: 1px solid #e0e0e0 !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #f0f0f0 !important;
+            border: 1px solid #d0d0d0 !important;
+        }
+        
+        .stExpander {
+            background-color: white !important;
+            border: 1px solid #e0e0e0 !important;
+        }
+        
+        .stExpander > div > div > div > div {
+            background-color: white !important;
+        }
+        
+        .stChatMessage {
+            background-color: white !important;
+        }
+        
+        .stChatMessage > div {
+            background-color: white !important;
+        }
+        
+        .stMetric {
+            background-color: white !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 5px !important;
+            padding: 10px !important;
+        }
+        
+        .stAlert {
+            background-color: white !important;
+            border: 1px solid #e0e0e0 !important;
+        }
+        
+        .stSelectbox > div > div {
+            background-color: white !important;
+            color: black !important;
+        }
+        
+        .stCheckbox > label {
+            color: black !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: black !important;
+        }
+        
+        p, div, span {
+            color: black !important;
+        }
+        
+        /* Reset custom scrollbar to default */
+        ::-webkit-scrollbar {
+            width: unset;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: unset;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: unset;
+            border-radius: unset;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: unset;
+        }
+        </style>
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 # Initialize session state variables
@@ -528,304 +742,556 @@ with col2:
         st.session_state.dark_theme = not st.session_state.dark_theme
         st.rerun()
 
-# Display chat messages from history on app rerun
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# Create tabs for different sections
+tab1, tab2 = st.tabs(["💬 Chat", "🧠 Memory Manager"])
 
-# Accept user input
-if prompt := st.chat_input("What would you like to talk about?"):
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+with tab1:
+    # Chat Tab Content
+    st.markdown("### Have a conversation with your AI friend")
+    
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    # Display user message in chat message container
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    # Accept user input
+    if prompt := st.chat_input("What would you like to talk about?"):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # Get agent response
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            # Start timing
-            start_time = time.time()
-            start_timestamp = datetime.now()
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-            try:
-                # Handle async agent response
-                if isinstance(st.session_state.agent, AgnoPersonalAgent):
-                    response_content = asyncio.run(st.session_state.agent.run(prompt))
-                else:
-                    # Fallback for other agent types
-                    response = st.session_state.agent.run(prompt)
-                    response_content = (
-                        response.content
-                        if hasattr(response, "content")
-                        else str(response)
+        # Get agent response
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                # Start timing
+                start_time = time.time()
+                start_timestamp = datetime.now()
+
+                try:
+                    # Handle async agent response
+                    if isinstance(st.session_state.agent, AgnoPersonalAgent):
+                        response_content = asyncio.run(st.session_state.agent.run(prompt))
+                    else:
+                        # Fallback for other agent types
+                        response = st.session_state.agent.run(prompt)
+                        response_content = (
+                            response.content
+                            if hasattr(response, "content")
+                            else str(response)
+                        )
+
+                    # End timing
+                    end_time = time.time()
+                    response_time = end_time - start_time
+
+                    # Calculate token estimates (rough approximation)
+                    input_tokens = len(prompt.split()) * 1.3  # Rough token estimate
+                    output_tokens = 0
+                    if response_content:
+                        output_tokens = len(response_content.split()) * 1.3
+
+                    total_tokens = input_tokens + output_tokens
+
+                    # For AgnoPersonalAgent, get tool call details from the agent
+                    tool_call_info = st.session_state.agent.get_last_tool_calls()
+                    tool_calls_made = tool_call_info.get("tool_calls_count", 0)
+                    tool_call_details = tool_call_info.get("tool_call_details", [])
+
+                    # Update performance stats
+                    stats = st.session_state.performance_stats
+                    stats["total_requests"] += 1
+                    stats["total_response_time"] += response_time
+                    stats["average_response_time"] = (
+                        stats["total_response_time"] / stats["total_requests"]
                     )
+                    stats["total_tokens"] += total_tokens
+                    stats["average_tokens"] = (
+                        stats["total_tokens"] / stats["total_requests"]
+                    )
+                    stats["fastest_response"] = min(
+                        stats["fastest_response"], response_time
+                    )
+                    stats["slowest_response"] = max(
+                        stats["slowest_response"], response_time
+                    )
+                    stats["tool_calls_count"] += tool_calls_made
 
-                # End timing
-                end_time = time.time()
-                response_time = end_time - start_time
+                    # Store detailed debug metrics
+                    debug_entry = {
+                        "timestamp": start_timestamp.strftime("%H:%M:%S"),
+                        "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
+                        "response_time": round(response_time, 3),
+                        "input_tokens": round(input_tokens),
+                        "output_tokens": round(output_tokens),
+                        "total_tokens": round(total_tokens),
+                        "tool_calls": tool_calls_made,
+                        "tool_call_details": tool_call_details,
+                        "response_type": (
+                            "AgnoPersonalAgent"
+                            if isinstance(st.session_state.agent, AgnoPersonalAgent)
+                            else "Unknown"
+                        ),
+                        "success": True,
+                    }
 
-                # Calculate token estimates (rough approximation)
-                input_tokens = len(prompt.split()) * 1.3  # Rough token estimate
-                output_tokens = 0
-                if response_content:
-                    output_tokens = len(response_content.split()) * 1.3
+                    # Keep only last 10 debug entries
+                    st.session_state.debug_metrics.append(debug_entry)
+                    if len(st.session_state.debug_metrics) > 10:
+                        st.session_state.debug_metrics.pop(0)
 
-                total_tokens = input_tokens + output_tokens
+                    # Enhanced debug information
+                    if st.session_state.get("show_debug", False):
+                        with st.expander("🔍 **Detailed Debug Info**", expanded=False):
+                            col1, col2, col3 = st.columns(3)
 
-                # For AgnoPersonalAgent, get tool call details from the agent
-                tool_call_info = st.session_state.agent.get_last_tool_calls()
-                tool_calls_made = tool_call_info.get("tool_calls_count", 0)
-                tool_call_details = tool_call_info.get("tool_call_details", [])
+                            with col1:
+                                st.metric("⏱️ Response Time", f"{response_time:.3f}s")
+                                st.metric("🔢 Input Tokens", f"{round(input_tokens)}")
 
-                # Update performance stats
-                stats = st.session_state.performance_stats
-                stats["total_requests"] += 1
-                stats["total_response_time"] += response_time
-                stats["average_response_time"] = (
-                    stats["total_response_time"] / stats["total_requests"]
-                )
-                stats["total_tokens"] += total_tokens
-                stats["average_tokens"] = (
-                    stats["total_tokens"] / stats["total_requests"]
-                )
-                stats["fastest_response"] = min(
-                    stats["fastest_response"], response_time
-                )
-                stats["slowest_response"] = max(
-                    stats["slowest_response"], response_time
-                )
-                stats["tool_calls_count"] += tool_calls_made
+                            with col2:
+                                st.metric("📝 Output Tokens", f"{round(output_tokens)}")
+                                st.metric("📊 Total Tokens", f"{round(total_tokens)}")
 
-                # Store detailed debug metrics
-                debug_entry = {
-                    "timestamp": start_timestamp.strftime("%H:%M:%S"),
-                    "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
-                    "response_time": round(response_time, 3),
-                    "input_tokens": round(input_tokens),
-                    "output_tokens": round(output_tokens),
-                    "total_tokens": round(total_tokens),
-                    "tool_calls": tool_calls_made,
-                    "tool_call_details": tool_call_details,
-                    "response_type": (
-                        "AgnoPersonalAgent"
-                        if isinstance(st.session_state.agent, AgnoPersonalAgent)
-                        else "Unknown"
-                    ),
-                    "success": True,
-                }
-
-                # Keep only last 10 debug entries
-                st.session_state.debug_metrics.append(debug_entry)
-                if len(st.session_state.debug_metrics) > 10:
-                    st.session_state.debug_metrics.pop(0)
-
-                # Enhanced debug information
-                if st.session_state.get("show_debug", False):
-                    with st.expander("🔍 **Detailed Debug Info**", expanded=False):
-                        col1, col2, col3 = st.columns(3)
-
-                        with col1:
-                            st.metric("⏱️ Response Time", f"{response_time:.3f}s")
-                            st.metric("🔢 Input Tokens", f"{round(input_tokens)}")
-
-                        with col2:
-                            st.metric("📝 Output Tokens", f"{round(output_tokens)}")
-                            st.metric("📊 Total Tokens", f"{round(total_tokens)}")
-
-                        with col3:
-                            st.metric("🛠️ Tool Calls", tool_calls_made)
-                            st.metric(
-                                "📋 Response Type",
-                                (
-                                    "AgnoPersonalAgent"
-                                    if isinstance(
-                                        st.session_state.agent, AgnoPersonalAgent
-                                    )
-                                    else "Unknown"
-                                ),
-                            )
-
-                        st.write("**Response Object Details:**")
-
-                        # Enhanced tool call display for new format
-                        if tool_call_details:
-                            st.write("**🛠️ Tool Calls Made:**")
-                            for i, tool_call in enumerate(tool_call_details, 1):
-                                st.write(f"**Tool Call {i}:**")
-                                # Handle new dictionary format from get_last_tool_calls()
-                                if isinstance(tool_call, dict):
-                                    st.write(
-                                        f"  - Type: {tool_call.get('type', 'function')}"
-                                    )
-                                    st.write(
-                                        f"  - Function: {tool_call.get('function_name', 'unknown')}"
-                                    )
-                                    args = tool_call.get("function_args", {})
-                                    # Format arguments nicely
-                                    if isinstance(args, dict) and args:
-                                        formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
-                                        st.write(f"  - Arguments: {formatted_args}")
-                                        st.write(f"  - ✅ Arguments parsed successfully")
-                                    elif args:
-                                        st.write(f"  - Arguments: {args}")
-                                        st.write(f"  - ✅ Arguments available")
-                                    else:
-                                        st.write(f"  - Arguments: (none)")
-                                        st.write(f"  - ℹ️ No arguments required")
-                                # Handle legacy format for compatibility
-                                elif hasattr(tool_call, "function"):
-                                    st.write(f"  - Function: {tool_call.function.name}")
-                                    st.write(
-                                        f"  - Arguments: {tool_call.function.arguments}"
-                                    )
-                                elif hasattr(tool_call, "name"):
-                                    st.write(f"  - Tool: {tool_call.name}")
-                                    if hasattr(tool_call, "input"):
-                                        st.write(f"  - Input: {tool_call.input}")
-                                else:
-                                    st.write(f"  - Tool Call: {str(tool_call)}")
-                                st.write("---")
-                        else:
-                            st.write("- No tool calls detected")
-
-                        # Show debug info from get_last_tool_calls if available
-                        if isinstance(st.session_state.agent, AgnoPersonalAgent):
-                            debug_info = tool_call_info.get("debug_info", {})
-                            if debug_info:
-                                st.write("**🔍 Tool Call Debug Info:**")
-                                st.write(
-                                    f"  - Response has messages: {debug_info.get('has_messages', False)}"
-                                )
-                                st.write(
-                                    f"  - Messages count: {debug_info.get('messages_count', 0)}"
-                                )
-                                st.write(
-                                    f"  - Has tool_calls attr: {debug_info.get('has_tool_calls_attr', False)}"
-                                )
-                                response_attrs = debug_info.get(
-                                    "response_attributes", []
-                                )
-                                if response_attrs:
-                                    st.write(
-                                        f"  - Response attributes: {response_attrs}"
-                                    )
-
-                        # For AgnoPersonalAgent, we only have response_content (string)
-                        if isinstance(st.session_state.agent, AgnoPersonalAgent):
-                            st.write("- Response format: String content")
-                            if response_content:
-                                content_preview = (
-                                    response_content[:200] + "..."
-                                    if len(response_content) > 200
-                                    else response_content
-                                )
-                                st.write(f"- Content preview: {content_preview}")
-                        else:
-                            # For other agent types that have response objects
-                            if (
-                                "response" in locals()
-                                and hasattr(response, "messages")
-                                and response.messages
-                            ):
-                                st.write(f"- Messages count: {len(response.messages)}")
-                                st.write("**Message Details:**")
-                                for i, msg in enumerate(response.messages):
-                                    st.write(f"**Message {i+1}:**")
-                                    st.write(
-                                        f"  - Role: {getattr(msg, 'role', 'Unknown')}"
-                                    )
-                                    if hasattr(msg, "content"):
-                                        content_preview = (
-                                            str(msg.content)[:200] + "..."
-                                            if len(str(msg.content)) > 200
-                                            else str(msg.content)
+                            with col3:
+                                st.metric("🛠️ Tool Calls", tool_calls_made)
+                                st.metric(
+                                    "📋 Response Type",
+                                    (
+                                        "AgnoPersonalAgent"
+                                        if isinstance(
+                                            st.session_state.agent, AgnoPersonalAgent
                                         )
-                                        st.write(f"  - Content: {content_preview}")
-                                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                        else "Unknown"
+                                    ),
+                                )
+
+                            st.write("**Response Object Details:**")
+
+                            # Enhanced tool call display for new format
+                            if tool_call_details:
+                                st.write("**🛠️ Tool Calls Made:**")
+                                for i, tool_call in enumerate(tool_call_details, 1):
+                                    st.write(f"**Tool Call {i}:**")
+                                    # Handle new dictionary format from get_last_tool_calls()
+                                    if isinstance(tool_call, dict):
                                         st.write(
-                                            f"  - Tool calls: {len(msg.tool_calls)}"
+                                            f"  - Type: {tool_call.get('type', 'function')}"
+                                        )
+                                        st.write(
+                                            f"  - Function: {tool_call.get('function_name', 'unknown')}"
+                                        )
+                                        args = tool_call.get("function_args", {})
+                                        # Format arguments nicely
+                                        if isinstance(args, dict) and args:
+                                            formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
+                                            st.write(f"  - Arguments: {formatted_args}")
+                                            st.write(f"  - ✅ Arguments parsed successfully")
+                                        elif args:
+                                            st.write(f"  - Arguments: {args}")
+                                            st.write(f"  - ✅ Arguments available")
+                                        else:
+                                            st.write(f"  - Arguments: (none)")
+                                            st.write(f"  - ℹ️ No arguments required")
+                                    # Handle legacy format for compatibility
+                                    elif hasattr(tool_call, "function"):
+                                        st.write(f"  - Function: {tool_call.function.name}")
+                                        st.write(
+                                            f"  - Arguments: {tool_call.function.arguments}"
+                                        )
+                                    elif hasattr(tool_call, "name"):
+                                        st.write(f"  - Tool: {tool_call.name}")
+                                        if hasattr(tool_call, "input"):
+                                            st.write(f"  - Input: {tool_call.input}")
+                                    else:
+                                        st.write(f"  - Tool Call: {str(tool_call)}")
+                                    st.write("---")
+                            else:
+                                st.write("- No tool calls detected")
+
+                            # Show debug info from get_last_tool_calls if available
+                            if isinstance(st.session_state.agent, AgnoPersonalAgent):
+                                debug_info = tool_call_info.get("debug_info", {})
+                                if debug_info:
+                                    st.write("**🔍 Tool Call Debug Info:**")
+                                    st.write(
+                                        f"  - Response has messages: {debug_info.get('has_messages', False)}"
+                                    )
+                                    st.write(
+                                        f"  - Messages count: {debug_info.get('messages_count', 0)}"
+                                    )
+                                    st.write(
+                                        f"  - Has tool_calls attr: {debug_info.get('has_tool_calls_attr', False)}"
+                                    )
+                                    response_attrs = debug_info.get(
+                                        "response_attributes", []
+                                    )
+                                    if response_attrs:
+                                        st.write(
+                                            f"  - Response attributes: {response_attrs}"
                                         )
 
-                            if (
-                                "response" in locals()
-                                and hasattr(response, "model")
-                                and response.model
-                            ):
-                                st.write(f"- Model used: {response.model}")
-
-                            # Show raw response attributes
-                            if "response" in locals():
-                                st.write("**Available Response Attributes:**")
-                                response_attrs = [
-                                    attr
-                                    for attr in dir(response)
-                                    if not attr.startswith("_")
-                                ]
-                                st.write(response_attrs)
-
-                                # Show full response object for deep debugging
-                                st.write("**Full Response Object (Advanced):**")
-                                st.code(str(response))
+                            # For AgnoPersonalAgent, we only have response_content (string)
+                            if isinstance(st.session_state.agent, AgnoPersonalAgent):
+                                st.write("- Response format: String content")
+                                if response_content:
+                                    content_preview = (
+                                        response_content[:200] + "..."
+                                        if len(response_content) > 200
+                                        else response_content
+                                    )
+                                    st.write(f"- Content preview: {content_preview}")
                             else:
-                                st.write(
-                                    "- No response object available (AgnoPersonalAgent returns string)"
-                                )
+                                # For other agent types that have response objects
+                                if (
+                                    "response" in locals()
+                                    and hasattr(response, "messages")
+                                    and response.messages
+                                ):
+                                    st.write(f"- Messages count: {len(response.messages)}")
+                                    st.write("**Message Details:**")
+                                    for i, msg in enumerate(response.messages):
+                                        st.write(f"**Message {i+1}:**")
+                                        st.write(
+                                            f"  - Role: {getattr(msg, 'role', 'Unknown')}"
+                                        )
+                                        if hasattr(msg, "content"):
+                                            content_preview = (
+                                                str(msg.content)[:200] + "..."
+                                                if len(str(msg.content)) > 200
+                                                else str(msg.content)
+                                            )
+                                            st.write(f"  - Content: {content_preview}")
+                                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                            st.write(
+                                                f"  - Tool calls: {len(msg.tool_calls)}"
+                                            )
 
-                # Display the response content
-                if response_content:
-                    st.markdown(response_content)
-                    # Add assistant response to chat history
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": response_content}
-                    )
-                else:
-                    # Handle case where response might not have content
-                    error_msg = "Agent returned empty response"
+                                if (
+                                    "response" in locals()
+                                    and hasattr(response, "model")
+                                    and response.model
+                                ):
+                                    st.write(f"- Model used: {response.model}")
+
+                                # Show raw response attributes
+                                if "response" in locals():
+                                    st.write("**Available Response Attributes:**")
+                                    response_attrs = [
+                                        attr
+                                        for attr in dir(response)
+                                        if not attr.startswith("_")
+                                    ]
+                                    st.write(response_attrs)
+
+                                    # Show full response object for deep debugging
+                                    st.write("**Full Response Object (Advanced):**")
+                                    st.code(str(response))
+                                else:
+                                    st.write(
+                                        "- No response object available (AgnoPersonalAgent returns string)"
+                                    )
+
+                    # Display the response content
+                    if response_content:
+                        st.markdown(response_content)
+                        # Add assistant response to chat history
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": response_content}
+                        )
+                    else:
+                        # Handle case where response might not have content
+                        error_msg = "Agent returned empty response"
+                        st.error(error_msg)
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": error_msg}
+                        )
+
+                except Exception as e:
+                    end_time = time.time()
+                    response_time = end_time - start_time
+
+                    # Log failed request
+                    debug_entry = {
+                        "timestamp": start_timestamp.strftime("%H:%M:%S"),
+                        "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
+                        "response_time": round(response_time, 3),
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                        "tool_calls": 0,
+                        "response_type": "Error",
+                        "success": False,
+                        "error": str(e),
+                    }
+                    st.session_state.debug_metrics.append(debug_entry)
+                    if len(st.session_state.debug_metrics) > 10:
+                        st.session_state.debug_metrics.pop(0)
+
+                    error_msg = f"Sorry, I encountered an error: {str(e)}"
                     st.error(error_msg)
+
+                    # Show enhanced error debug info
+                    if st.session_state.get("show_debug", False):
+                        with st.expander("❌ **Error Debug Info**", expanded=True):
+                            st.write(f"**Error Time:** {response_time:.3f}s")
+                            st.write(f"**Error Type:** {type(e).__name__}")
+                            st.write(f"**Error Message:** {str(e)}")
+
+                            import traceback
+
+                            st.code(traceback.format_exc())
+
                     st.session_state.messages.append(
                         {"role": "assistant", "content": error_msg}
                     )
 
-            except Exception as e:
-                end_time = time.time()
-                response_time = end_time - start_time
+with tab2:
+    # Memory Manager Tab Content
+    st.markdown("### Comprehensive Memory Management")
+    
+    # Store New Facts Section
+    st.markdown("---")
+    st.subheader("📝 Store New Facts")
+    st.markdown("*Add facts directly to memory without agent inference*")
 
-                # Log failed request
-                debug_entry = {
-                    "timestamp": start_timestamp.strftime("%H:%M:%S"),
-                    "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
-                    "response_time": round(response_time, 3),
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "total_tokens": 0,
-                    "tool_calls": 0,
-                    "response_type": "Error",
-                    "success": False,
-                    "error": str(e),
-                }
-                st.session_state.debug_metrics.append(debug_entry)
-                if len(st.session_state.debug_metrics) > 10:
-                    st.session_state.debug_metrics.pop(0)
+    # Category selection
+    categories = [
+        "personal", "work", "education", "hobbies", "preferences", 
+        "goals", "health", "family", "travel", "technology", "other"
+    ]
+    selected_category = st.selectbox("Category:", categories, key="fact_category")
 
-                error_msg = f"Sorry, I encountered an error: {str(e)}"
-                st.error(error_msg)
+    # Chat input for fact storage - automatically clears after submission
+    if fact_input := st.chat_input("Enter a fact to store (e.g., I work at Google as a software engineer)"):
+        if fact_input.strip():
+            success, message, memory_id = direct_add_memory(
+                memory_text=fact_input.strip(),
+                topics=[selected_category],
+                input_text="Direct fact storage"
+            )
+            
+            if success:
+                # More prominent success message with longer duration
+                st.success("🎉 **Fact Successfully Stored!** 🎉")
+                st.success("Your fact has been added to memory and is now searchable.")
+                
+                if memory_id:
+                    st.info(f"📂 **Category:** {selected_category} | **Memory ID:** {memory_id}")
+                else:
+                    st.info(f"📂 **Category:** {selected_category}")
+                
+                # Brief pause to show success message
+                time.sleep(2)
+                
+                # Rerun to show the cleared input
+                st.rerun()
+            else:
+                st.error(f"❌ Failed to store fact: {message}")
 
-                # Show enhanced error debug info
-                if st.session_state.get("show_debug", False):
-                    with st.expander("❌ **Error Debug Info**", expanded=True):
-                        st.write(f"**Error Time:** {response_time:.3f}s")
-                        st.write(f"**Error Type:** {type(e).__name__}")
-                        st.write(f"**Error Message:** {str(e)}")
+    # Search Memories Section
+    st.markdown("---")
+    st.subheader("🔍 Search Memories")
+    st.markdown("*Search through stored memories using semantic similarity*")
 
-                        import traceback
+    # Advanced search options
+    col1, col2 = st.columns(2)
+    with col1:
+        similarity_threshold = st.slider(
+            "Similarity Threshold", 
+            min_value=0.1, 
+            max_value=1.0, 
+            value=0.3, 
+            step=0.1,
+            help="Lower values return more results, higher values are more strict",
+            key="memory_similarity_threshold"
+        )
+    with col2:
+        search_limit = st.number_input(
+            "Max Results", 
+            min_value=1, 
+            max_value=50, 
+            value=10,
+            help="Maximum number of search results to return",
+            key="memory_search_limit"
+        )
 
-                        st.code(traceback.format_exc())
+    # Chat input for memory search - automatically clears after submission
+    if search_query := st.chat_input("Enter keywords to search your memories (e.g., work, hobbies, travel)"):
+        try:
+            # Use direct semantic search (no agentic retrieval)
+            search_results = direct_search_memories(
+                query=search_query,
+                limit=search_limit,
+                similarity_threshold=similarity_threshold
+            )
 
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": error_msg}
-                )
+            if search_results:
+                st.subheader(f"🔍 Search Results for: '{search_query}'")
+                st.info(f"Found {len(search_results)} results with similarity ≥ {similarity_threshold}")
+                
+                for i, (memory, score) in enumerate(search_results, 1):
+                    memory_content = getattr(memory, "memory", "No content")
+                    score_color = "🟢" if score >= 0.7 else "🟡" if score >= 0.5 else "🔴"
+                    
+                    with st.expander(f"{score_color} Result {i} (Score: {score:.3f}): {memory_content[:50]}..."):
+                        st.write(f"**Memory:** {memory_content}")
+                        st.write(f"**Similarity Score:** {score:.3f}")
+                        
+                        topics = getattr(memory, "topics", [])
+                        if topics:
+                            st.write(f"**Topics:** {', '.join(topics)}")
+                        
+                        st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
+                        st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
+                        
+                        # Add delete button for each memory
+                        if st.button(f"🗑️ Delete Memory", key=f"delete_search_{memory.memory_id}"):
+                            success, message = direct_delete_memory(memory.memory_id)
+                            if success:
+                                st.success(f"Memory deleted: {message}")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to delete memory: {message}")
+            else:
+                st.info("No matching memories found. Try different keywords or lower the similarity threshold.")
+                
+        except Exception as e:
+            st.error(f"Error searching memories: {str(e)}")
+
+    # Browse All Memories Section
+    st.markdown("---")
+    st.subheader("📚 Browse All Memories")
+    st.markdown("*View, edit, and manage all stored memories*")
+
+    if st.button("📋 Load All Memories", key="load_all_memories_btn"):
+        try:
+            memories = direct_get_all_memories()
+            if memories:
+                st.info(f"Found {len(memories)} total memories")
+                for i, memory in enumerate(memories, 1):
+                    memory_content = getattr(memory, "memory", "No content")
+                    with st.expander(f"Memory {i}: {memory_content[:50]}..."):
+                        st.write(f"**Content:** {memory_content}")
+                        st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
+                        st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
+                        st.write(f"**Input:** {getattr(memory, 'input', 'N/A')}")
+                        topics = getattr(memory, "topics", [])
+                        if topics:
+                            st.write(f"**Topics:** {', '.join(topics)}")
+                        
+                        # Add delete button for each memory
+                        if st.button(f"🗑️ Delete", key=f"delete_browse_{memory.memory_id}"):
+                            success, message = direct_delete_memory(memory.memory_id)
+                            if success:
+                                st.success(f"Memory deleted: {message}")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to delete memory: {message}")
+            else:
+                st.info("No memories stored yet. Start chatting or store some facts!")
+        except Exception as e:
+            st.error(f"Error retrieving memories: {str(e)}")
+
+    # Memory Statistics Section
+    st.markdown("---")
+    st.subheader("📊 Memory Statistics")
+    st.markdown("*Analytics and insights about your stored memories*")
+
+    if st.button("📈 Show Statistics", key="show_stats_btn"):
+        try:
+            stats = direct_get_memory_stats()
+            
+            if "error" not in stats:
+                # Display basic stats
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Memories", stats.get("total_memories", 0))
+                with col2:
+                    st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
+                with col3:
+                    avg_length = stats.get("average_memory_length", 0)
+                    st.metric("Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A")
+
+                # Topic distribution
+                topic_dist = stats.get("topic_distribution", {})
+                if topic_dist:
+                    st.subheader("📈 Topic Distribution")
+                    for topic, count in sorted(topic_dist.items(), key=lambda x: x[1], reverse=True):
+                        st.write(f"**{topic.title()}:** {count} memories")
+                
+                # Most common topic
+                most_common = stats.get("most_common_topic", "None")
+                if most_common and most_common != "None":
+                    st.info(f"🏆 Most common topic: **{most_common}**")
+            else:
+                st.error(f"Error getting statistics: {stats['error']}")
+        except Exception as e:
+            st.error(f"Error getting memory statistics: {str(e)}")
+
+    # Memory Settings Section
+    st.markdown("---")
+    st.subheader("⚙️ Memory Settings")
+    st.markdown("*Configure and manage memory system settings*")
+
+    # Memory reset with confirmation
+    if st.button("🗑️ Reset All Memories", key="reset_memories_btn"):
+        st.session_state.show_memory_confirmation = True
+
+    # Confirmation dialog
+    if st.session_state.show_memory_confirmation:
+        st.markdown("### ⚠️ Confirm Memory Deletion")
+        st.error(
+            "**WARNING**: This will permanently delete ALL stored memories and "
+            "personal information. This action CANNOT be undone!"
+        )
+        st.info(
+            "💡 **Remember**: Your AI friend's memories help create better, "
+            "more personalized conversations over time."
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("❌ Cancel", use_container_width=True, key="cancel_reset"):
+                st.session_state.show_memory_confirmation = False
+                st.rerun()
+
+        with col2:
+            if st.button("🗑️ Yes, Delete All", type="primary", use_container_width=True, key="confirm_reset"):
+                try:
+                    success, message = direct_clear_memories()
+                    st.session_state.show_memory_confirmation = False
+                    
+                    if success:
+                        st.success(f"✅ {message}")
+                        st.balloons()
+                    else:
+                        st.error(f"❌ {message}")
+                    
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error clearing memories: {str(e)}")
+
+    # Memory system configuration display
+    try:
+        if "agent" in st.session_state and hasattr(st.session_state.agent, "agno_memory"):
+            memory_manager = st.session_state.agent.agno_memory.memory_manager
+            if hasattr(memory_manager, "config"):
+                config = memory_manager.config
+                st.subheader("🔧 Current Configuration")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
+                    st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
+                    st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
+                with col2:
+                    st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
+                    st.write(f"**Max Memory Length:** {config.max_memory_length}")
+                    st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
+    except Exception as e:
+        st.warning(f"Could not load memory configuration: {str(e)}")
 
 # Sidebar with agent info and controls
 with st.sidebar:
@@ -1381,10 +1847,4 @@ with st.sidebar:
 
 # Instructions for running
 if __name__ == "__main__":
-    st.markdown(
-        """
-    ---
-    **Talk to the agent!**
-    
-    """
-    )
+    pass
