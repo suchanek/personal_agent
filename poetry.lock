@@ -283,6 +283,23 @@ test = ["anyio[trio]", "blockbuster (>=1.5.23)", "coverage[toml] (>=7)", "except
 trio = ["trio (>=0.26.1)"]
 
 [[package]]
+name = "arxiv"
+version = "2.2.0"
+description = "Python wrapper for the arXiv API: https://arxiv.org/help/api/"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+markers = "python_version >= \"3.12\" or python_version == \"3.11\""
+files = [
+    {file = "arxiv-2.2.0-py3-none-any.whl", hash = "sha256:545b8af5ab301efff7697cd112b5189e631b80521ccbc33fbc1e1f9cff63ca4d"},
+    {file = "arxiv-2.2.0.tar.gz", hash = "sha256:6072a2211e95697092ef32acde0144d7de2cfa71208e2751724316c9df322cc0"},
+]
+
+[package.dependencies]
+feedparser = ">=6.0.10,<6.1.0"
+requests = ">=2.32.0,<2.33.0"
+
+[[package]]
 name = "attrs"
 version = "25.3.0"
 description = "Classes Without Boilerplate"
@@ -4947,4 +4964,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "24b37e466f372ab56caeccf6d55a6bb751f3e220f84657520e9e9d3b543be145"
+content-hash = "3339bc82804948c12de1f89033e9ec212a132b3cbb1f056fc0a15f8c2cb08708"

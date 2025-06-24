@@ -1000,7 +1000,7 @@ Returns:
 
                 # Create knowledge base (sync creation)
                 self.agno_knowledge = create_combined_knowledge_base(
-                    self.storage_dir, self.knowledge_dir
+                    self.storage_dir, self.knowledge_dir, self.agno_storage
                 )
 
                 # Load knowledge base content (async loading) - matches working example

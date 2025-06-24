@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Optional
 
 from agno.embedder.ollama import OllamaEmbedder
+from agno.knowledge.arxiv import ArxivKnowledgeBase
 from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.knowledge.pdf import PDFKnowledgeBase
 from agno.knowledge.text import TextKnowledgeBase
@@ -141,7 +142,7 @@ def create_agno_memory(storage_dir: str = None, debug_mode: bool = False) -> Mem
 
 
 def create_combined_knowledge_base(
-    storage_dir: str = None, knowledge_dir: str = None
+    storage_dir: str = None, knowledge_dir: str = None, db_url: SqliteStorage = None
 ) -> Optional[CombinedKnowledgeBase]:
     """Create a combined knowledge base with text and PDF sources (synchronous creation).
 
@@ -217,6 +218,18 @@ def create_combined_knowledge_base(
         )
         knowledge_sources.append(pdf_kb)
         logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
+
+    # Create a knowledge base with the ArXiv documents
+    arxiv_vector_db = LanceDb(
+        uri=str(storage_path / "lancedb"),
+        table_name="arxive_knowledge",
+        search_type=SearchType.hybrid,
+        embedder=embedder,
+    )
+    arxive_kb = ArxivKnowledgeBase(vector_db=arxiv_vector_db)
+
+    # knowledge_sources.append(arxive_kb)
+    # logger.info("Created Arxive KnowledgeBase")
 
     # Create combined knowledge base
     if knowledge_sources:
