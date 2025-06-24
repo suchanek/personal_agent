@@ -13,19 +13,26 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import from the correct path
-from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, REMOTE_OLLAMA_URL, USER_ID
+from personal_agent.config import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    LLM_MODEL,
+    OLLAMA_URL,
+    REMOTE_OLLAMA_URL,
+    USER_ID,
+)
 from personal_agent.core.agno_agent import AgnoPersonalAgent
+
 
 # Parse command line arguments
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Personal Agent Streamlit App")
     parser.add_argument(
-        "--remote", 
-        action="store_true", 
-        help="Use remote Ollama URL instead of local"
+        "--remote", action="store_true", help="Use remote Ollama URL instead of local"
     )
     return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
+
 
 # Parse arguments and determine Ollama URL
 args, unknown = parse_args()
@@ -37,22 +44,24 @@ db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 # Helper functions for direct SemanticMemoryManager access
 def get_memory_manager_and_db():
     """Get direct access to memory manager and database."""
-    if not hasattr(st.session_state, 'agent'):
+    if not hasattr(st.session_state, "agent"):
         return None, None
-    
+
     agent = st.session_state.agent
-    if not (hasattr(agent, 'agno_memory') and agent.agno_memory):
+    if not (hasattr(agent, "agno_memory") and agent.agno_memory):
         return None, None
-    
+
     return agent.agno_memory.memory_manager, agent.agno_memory.db
 
 
-def direct_search_memories(query: str, limit: int = 10, similarity_threshold: float = 0.3):
+def direct_search_memories(
+    query: str, limit: int = 10, similarity_threshold: float = 0.3
+):
     """Direct semantic search without agentic retrieval."""
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return []
-    
+
     try:
         results = memory_manager.search_memories(
             query=query,
@@ -61,7 +70,7 @@ def direct_search_memories(query: str, limit: int = 10, similarity_threshold: fl
             limit=limit,
             similarity_threshold=similarity_threshold,
             search_topics=True,
-            topic_boost=0.5
+            topic_boost=0.5,
         )
         # Convert results to list of (UserMemory, score) tuples
         return results
@@ -75,7 +84,7 @@ def direct_get_all_memories():
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return []
-    
+
     try:
         # Use the existing get_user_memories method from agno_memory
         agent = st.session_state.agent
@@ -90,14 +99,14 @@ def direct_add_memory(memory_text: str, topics: list = None, input_text: str = N
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return False, "Memory system not available", None
-    
+
     try:
         return memory_manager.add_memory(
             memory_text=memory_text,
             db=db,
             user_id=USER_ID,
             topics=topics,
-            input_text=input_text
+            input_text=input_text,
         )
     except Exception as e:
         return False, f"Error adding memory: {e}", None
@@ -108,7 +117,7 @@ def direct_clear_memories():
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return False, "Memory system not available"
-    
+
     try:
         return memory_manager.clear_memories(db=db, user_id=USER_ID)
     except Exception as e:
@@ -120,7 +129,7 @@ def direct_get_memory_stats():
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return {"error": "Memory system not available"}
-    
+
     try:
         return memory_manager.get_memory_stats(db, USER_ID)
     except Exception as e:
@@ -132,19 +141,21 @@ def direct_delete_memory(memory_id: str):
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return False, "Memory system not available"
-    
+
     try:
         return memory_manager.delete_memory(memory_id, db, USER_ID)
     except Exception as e:
         return False, f"Error deleting memory: {e}"
 
 
-def direct_update_memory(memory_id: str, memory_text: str, topics: list = None, input_text: str = None):
+def direct_update_memory(
+    memory_id: str, memory_text: str, topics: list = None, input_text: str = None
+):
     """Update a memory directly through SemanticMemoryManager."""
     memory_manager, db = get_memory_manager_and_db()
     if not memory_manager or not db:
         return False, "Memory system not available"
-    
+
     try:
         return memory_manager.update_memory(
             memory_id=memory_id,
@@ -152,10 +163,38 @@ def direct_update_memory(memory_id: str, memory_text: str, topics: list = None, 
             db=db,
             user_id=USER_ID,
             topics=topics,
-            input_text=input_text
+            input_text=input_text,
         )
     except Exception as e:
         return False, f"Error updating memory: {e}"
+
+
+# Helper functions for direct Knowledge Base access
+def get_knowledge_manager():
+    """Get direct access to knowledge manager."""
+    if not hasattr(st.session_state, "agent"):
+        return None
+
+    agent = st.session_state.agent
+    if not (hasattr(agent, "agno_knowledge") and agent.agno_knowledge):
+        return None
+
+    return agent.agno_knowledge
+
+
+def direct_search_knowledge(query: str, limit: int = 10):
+    """Direct knowledge base search."""
+    knowledge_manager = get_knowledge_manager()
+    if not knowledge_manager:
+        return []
+
+    try:
+        # Use the knowledge manager's search functionality
+        results = knowledge_manager.search(query=query, num_documents=limit)
+        return results
+    except Exception as e:
+        st.error(f"Error in knowledge search: {e}")
+        return []
 
 
 def get_ollama_models(ollama_url):
@@ -194,6 +233,7 @@ async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
             enable_memory=True,
             enable_mcp=False,  # Disable MCP to avoid conflicts with DuckDuckGo tools
             storage_dir=AGNO_STORAGE_DIR,
+            knowledge_dir=AGNO_KNOWLEDGE_DIR,
         )
         await agent.initialize()
         return agent
@@ -743,12 +783,12 @@ with col2:
         st.rerun()
 
 # Create tabs for different sections
-tab1, tab2 = st.tabs(["💬 Chat", "🧠 Memory Manager"])
+tab1, tab2, tab3 = st.tabs(["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"])
 
 with tab1:
     # Chat Tab Content
     st.markdown("### Have a conversation with your AI friend")
-    
+
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -773,7 +813,9 @@ with tab1:
                 try:
                     # Handle async agent response
                     if isinstance(st.session_state.agent, AgnoPersonalAgent):
-                        response_content = asyncio.run(st.session_state.agent.run(prompt))
+                        response_content = asyncio.run(
+                            st.session_state.agent.run(prompt)
+                        )
                     else:
                         # Fallback for other agent types
                         response = st.session_state.agent.run(prompt)
@@ -886,9 +928,13 @@ with tab1:
                                         args = tool_call.get("function_args", {})
                                         # Format arguments nicely
                                         if isinstance(args, dict) and args:
-                                            formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
+                                            formatted_args = ", ".join(
+                                                [f"{k}={v}" for k, v in args.items()]
+                                            )
                                             st.write(f"  - Arguments: {formatted_args}")
-                                            st.write(f"  - ✅ Arguments parsed successfully")
+                                            st.write(
+                                                f"  - ✅ Arguments parsed successfully"
+                                            )
                                         elif args:
                                             st.write(f"  - Arguments: {args}")
                                             st.write(f"  - ✅ Arguments available")
@@ -897,7 +943,9 @@ with tab1:
                                             st.write(f"  - ℹ️ No arguments required")
                                     # Handle legacy format for compatibility
                                     elif hasattr(tool_call, "function"):
-                                        st.write(f"  - Function: {tool_call.function.name}")
+                                        st.write(
+                                            f"  - Function: {tool_call.function.name}"
+                                        )
                                         st.write(
                                             f"  - Arguments: {tool_call.function.arguments}"
                                         )
@@ -950,7 +998,9 @@ with tab1:
                                     and hasattr(response, "messages")
                                     and response.messages
                                 ):
-                                    st.write(f"- Messages count: {len(response.messages)}")
+                                    st.write(
+                                        f"- Messages count: {len(response.messages)}"
+                                    )
                                     st.write("**Message Details:**")
                                     for i, msg in enumerate(response.messages):
                                         st.write(f"**Message {i+1}:**")
@@ -964,7 +1014,10 @@ with tab1:
                                                 else str(msg.content)
                                             )
                                             st.write(f"  - Content: {content_preview}")
-                                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                        if (
+                                            hasattr(msg, "tool_calls")
+                                            and msg.tool_calls
+                                        ):
                                             st.write(
                                                 f"  - Tool calls: {len(msg.tool_calls)}"
                                             )
@@ -1051,7 +1104,7 @@ with tab1:
 with tab2:
     # Memory Manager Tab Content
     st.markdown("### Comprehensive Memory Management")
-    
+
     # Store New Facts Section
     st.markdown("---")
     st.subheader("📝 Store New Facts")
@@ -1059,33 +1112,46 @@ with tab2:
 
     # Category selection
     categories = [
-        "personal", "work", "education", "hobbies", "preferences", 
-        "goals", "health", "family", "travel", "technology", "other"
+        "personal",
+        "work",
+        "education",
+        "hobbies",
+        "preferences",
+        "goals",
+        "health",
+        "family",
+        "travel",
+        "technology",
+        "other",
     ]
     selected_category = st.selectbox("Category:", categories, key="fact_category")
 
     # Chat input for fact storage - automatically clears after submission
-    if fact_input := st.chat_input("Enter a fact to store (e.g., I work at Google as a software engineer)"):
+    if fact_input := st.chat_input(
+        "Enter a fact to store (e.g., I work at Google as a software engineer)"
+    ):
         if fact_input.strip():
             success, message, memory_id = direct_add_memory(
                 memory_text=fact_input.strip(),
                 topics=[selected_category],
-                input_text="Direct fact storage"
+                input_text="Direct fact storage",
             )
-            
+
             if success:
                 # More prominent success message with longer duration
                 st.success("🎉 **Fact Successfully Stored!** 🎉")
                 st.success("Your fact has been added to memory and is now searchable.")
-                
+
                 if memory_id:
-                    st.info(f"📂 **Category:** {selected_category} | **Memory ID:** {memory_id}")
+                    st.info(
+                        f"📂 **Category:** {selected_category} | **Memory ID:** {memory_id}"
+                    )
                 else:
                     st.info(f"📂 **Category:** {selected_category}")
-                
+
                 # Brief pause to show success message
                 time.sleep(2)
-                
+
                 # Rerun to show the cleared input
                 st.rerun()
             else:
@@ -1100,55 +1166,69 @@ with tab2:
     col1, col2 = st.columns(2)
     with col1:
         similarity_threshold = st.slider(
-            "Similarity Threshold", 
-            min_value=0.1, 
-            max_value=1.0, 
-            value=0.3, 
+            "Similarity Threshold",
+            min_value=0.1,
+            max_value=1.0,
+            value=0.3,
             step=0.1,
             help="Lower values return more results, higher values are more strict",
-            key="memory_similarity_threshold"
+            key="memory_similarity_threshold",
         )
     with col2:
         search_limit = st.number_input(
-            "Max Results", 
-            min_value=1, 
-            max_value=50, 
+            "Max Results",
+            min_value=1,
+            max_value=50,
             value=10,
             help="Maximum number of search results to return",
-            key="memory_search_limit"
+            key="memory_search_limit",
         )
 
     # Chat input for memory search - automatically clears after submission
-    if search_query := st.chat_input("Enter keywords to search your memories (e.g., work, hobbies, travel)"):
+    if search_query := st.chat_input(
+        "Enter keywords to search your memories (e.g., work, hobbies, travel)"
+    ):
         try:
             # Use direct semantic search (no agentic retrieval)
             search_results = direct_search_memories(
                 query=search_query,
                 limit=search_limit,
-                similarity_threshold=similarity_threshold
+                similarity_threshold=similarity_threshold,
             )
 
             if search_results:
                 st.subheader(f"🔍 Search Results for: '{search_query}'")
-                st.info(f"Found {len(search_results)} results with similarity ≥ {similarity_threshold}")
-                
+                st.info(
+                    f"Found {len(search_results)} results with similarity ≥ {similarity_threshold}"
+                )
+
                 for i, (memory, score) in enumerate(search_results, 1):
                     memory_content = getattr(memory, "memory", "No content")
-                    score_color = "🟢" if score >= 0.7 else "🟡" if score >= 0.5 else "🔴"
-                    
-                    with st.expander(f"{score_color} Result {i} (Score: {score:.3f}): {memory_content[:50]}..."):
+                    score_color = (
+                        "🟢" if score >= 0.7 else "🟡" if score >= 0.5 else "🔴"
+                    )
+
+                    with st.expander(
+                        f"{score_color} Result {i} (Score: {score:.3f}): {memory_content[:50]}..."
+                    ):
                         st.write(f"**Memory:** {memory_content}")
                         st.write(f"**Similarity Score:** {score:.3f}")
-                        
+
                         topics = getattr(memory, "topics", [])
                         if topics:
                             st.write(f"**Topics:** {', '.join(topics)}")
-                        
-                        st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
-                        st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                        
+
+                        st.write(
+                            f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                        )
+                        st.write(
+                            f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
+                        )
+
                         # Add delete button for each memory
-                        if st.button(f"🗑️ Delete Memory", key=f"delete_search_{memory.memory_id}"):
+                        if st.button(
+                            f"🗑️ Delete Memory", key=f"delete_search_{memory.memory_id}"
+                        ):
                             success, message = direct_delete_memory(memory.memory_id)
                             if success:
                                 st.success(f"Memory deleted: {message}")
@@ -1156,8 +1236,10 @@ with tab2:
                             else:
                                 st.error(f"Failed to delete memory: {message}")
             else:
-                st.info("No matching memories found. Try different keywords or lower the similarity threshold.")
-                
+                st.info(
+                    "No matching memories found. Try different keywords or lower the similarity threshold."
+                )
+
         except Exception as e:
             st.error(f"Error searching memories: {str(e)}")
 
@@ -1175,15 +1257,21 @@ with tab2:
                     memory_content = getattr(memory, "memory", "No content")
                     with st.expander(f"Memory {i}: {memory_content[:50]}..."):
                         st.write(f"**Content:** {memory_content}")
-                        st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                        st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
+                        st.write(
+                            f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
+                        )
+                        st.write(
+                            f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                        )
                         st.write(f"**Input:** {getattr(memory, 'input', 'N/A')}")
                         topics = getattr(memory, "topics", [])
                         if topics:
                             st.write(f"**Topics:** {', '.join(topics)}")
-                        
+
                         # Add delete button for each memory
-                        if st.button(f"🗑️ Delete", key=f"delete_browse_{memory.memory_id}"):
+                        if st.button(
+                            f"🗑️ Delete", key=f"delete_browse_{memory.memory_id}"
+                        ):
                             success, message = direct_delete_memory(memory.memory_id)
                             if success:
                                 st.success(f"Memory deleted: {message}")
@@ -1203,7 +1291,7 @@ with tab2:
     if st.button("📈 Show Statistics", key="show_stats_btn"):
         try:
             stats = direct_get_memory_stats()
-            
+
             if "error" not in stats:
                 # Display basic stats
                 col1, col2, col3 = st.columns(3)
@@ -1213,15 +1301,19 @@ with tab2:
                     st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
                 with col3:
                     avg_length = stats.get("average_memory_length", 0)
-                    st.metric("Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A")
+                    st.metric(
+                        "Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A"
+                    )
 
                 # Topic distribution
                 topic_dist = stats.get("topic_distribution", {})
                 if topic_dist:
                     st.subheader("📈 Topic Distribution")
-                    for topic, count in sorted(topic_dist.items(), key=lambda x: x[1], reverse=True):
+                    for topic, count in sorted(
+                        topic_dist.items(), key=lambda x: x[1], reverse=True
+                    ):
                         st.write(f"**{topic.title()}:** {count} memories")
-                
+
                 # Most common topic
                 most_common = stats.get("most_common_topic", "None")
                 if most_common and most_common != "None":
@@ -1259,24 +1351,31 @@ with tab2:
                 st.rerun()
 
         with col2:
-            if st.button("🗑️ Yes, Delete All", type="primary", use_container_width=True, key="confirm_reset"):
+            if st.button(
+                "🗑️ Yes, Delete All",
+                type="primary",
+                use_container_width=True,
+                key="confirm_reset",
+            ):
                 try:
                     success, message = direct_clear_memories()
                     st.session_state.show_memory_confirmation = False
-                    
+
                     if success:
                         st.success(f"✅ {message}")
                         st.balloons()
                     else:
                         st.error(f"❌ {message}")
-                    
+
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error clearing memories: {str(e)}")
 
     # Memory system configuration display
     try:
-        if "agent" in st.session_state and hasattr(st.session_state.agent, "agno_memory"):
+        if "agent" in st.session_state and hasattr(
+            st.session_state.agent, "agno_memory"
+        ):
             memory_manager = st.session_state.agent.agno_memory.memory_manager
             if hasattr(memory_manager, "config"):
                 config = memory_manager.config
@@ -1284,14 +1383,117 @@ with tab2:
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
-                    st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
-                    st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
+                    st.write(
+                        f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}"
+                    )
+                    st.write(
+                        f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}"
+                    )
                 with col2:
-                    st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
+                    st.write(
+                        f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}"
+                    )
                     st.write(f"**Max Memory Length:** {config.max_memory_length}")
                     st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
     except Exception as e:
         st.warning(f"Could not load memory configuration: {str(e)}")
+
+with tab3:
+    # Knowledge Base Tab Content
+    st.markdown("### Knowledge Base Search & Management")
+
+    # Search Knowledge Section
+    st.markdown("---")
+    st.subheader("🔍 Search Knowledge Base")
+    st.markdown("*Search through stored knowledge using semantic similarity*")
+
+    # Advanced search options for knowledge
+    col1, col2 = st.columns(2)
+    with col1:
+        knowledge_search_limit = st.number_input(
+            "Max Results",
+            min_value=1,
+            max_value=50,
+            value=10,
+            help="Maximum number of search results to return",
+            key="knowledge_search_limit",
+        )
+    with col2:
+        st.write("")  # Empty space for alignment
+
+    # Chat input for knowledge search - automatically clears after submission
+    if knowledge_search_query := st.chat_input(
+        "Enter keywords to search the knowledge base (e.g., programming, science, history)"
+    ):
+        try:
+            # Use direct knowledge search
+            search_results = direct_search_knowledge(
+                query=knowledge_search_query, limit=knowledge_search_limit
+            )
+
+            if search_results:
+                st.subheader(
+                    f"🔍 Knowledge Search Results for: '{knowledge_search_query}'"
+                )
+                st.info(f"Found {len(search_results)} results")
+
+                for i, knowledge_entry in enumerate(search_results, 1):
+                    # Handle different knowledge entry formats
+                    if hasattr(knowledge_entry, "content"):
+                        content = knowledge_entry.content
+                        title = getattr(knowledge_entry, "title", "Untitled")
+                        source = getattr(knowledge_entry, "source", "Unknown")
+                        knowledge_id = getattr(knowledge_entry, "id", "N/A")
+                    elif isinstance(knowledge_entry, dict):
+                        content = knowledge_entry.get("content", "No content")
+                        title = knowledge_entry.get("title", "Untitled")
+                        source = knowledge_entry.get("source", "Unknown")
+                        knowledge_id = knowledge_entry.get("id", "N/A")
+                    else:
+                        content = str(knowledge_entry)
+                        title = "Untitled"
+                        source = "Unknown"
+                        knowledge_id = "N/A"
+
+                    with st.expander(
+                        f"📚 Result {i}: {title if title != 'Untitled' else content[:50]}..."
+                    ):
+                        st.write(f"**Title:** {title}")
+                        st.write(f"**Content:** {content}")
+                        st.write(f"**Source:** {source}")
+                        st.write(f"**Knowledge ID:** {knowledge_id}")
+
+                        # Note: Individual knowledge entry deletion not available
+                        # Knowledge base is loaded from files and managed at the file level
+            else:
+                st.info("No matching knowledge found. Try different keywords.")
+
+        except Exception as e:
+            st.error(f"Error searching knowledge base: {str(e)}")
+
+    # Knowledge Base Information
+    st.markdown("---")
+    st.subheader("📚 Knowledge Base Information")
+    st.markdown("*Information about the knowledge base system*")
+
+    knowledge_manager = get_knowledge_manager()
+    if knowledge_manager:
+        st.info("✅ Knowledge base is available and ready for searching")
+        
+        # Show knowledge base type and basic info
+        kb_type = type(knowledge_manager).__name__
+        st.write(f"**Knowledge Base Type:** {kb_type}")
+        
+        # Check if knowledge base exists
+        if hasattr(knowledge_manager, 'exists') and knowledge_manager.exists():
+            st.success("📚 Knowledge base contains data and is ready for queries")
+        else:
+            st.warning("📭 Knowledge base appears to be empty or not loaded")
+            st.info("💡 **Tip:** Load some documents into your knowledge base to enable searching")
+    else:
+        st.warning("⚠️ Knowledge base is not available")
+        st.info("💡 **Note:** Knowledge base functionality requires proper initialization")
+
 
 # Sidebar with agent info and controls
 with st.sidebar:
@@ -1311,6 +1513,10 @@ with st.sidebar:
         ):
             st.session_state.dark_theme = not st.session_state.dark_theme
             st.rerun()
+
+    # User ID section - prominently displayed
+    st.header("👤 Current User")
+    st.write(f"**🆔 {USER_ID}**")
 
     st.header("Model Selection")
 
@@ -1379,247 +1585,18 @@ with st.sidebar:
     st.header("Agent Information")
     st.write(f"**Current Model:** {st.session_state.current_model}")
     st.write(f"**Current Ollama URL:** {st.session_state.current_ollama_url}")
-    
+
     # Show remote mode indicator
-    if hasattr(args, 'remote') and args.remote:
+    if hasattr(args, "remote") and args.remote:
         st.success("🌐 **Remote Mode:** Using remote Ollama server")
     else:
         st.info("🏠 **Local Mode:** Using local Ollama server")
-    
-    st.write(f"**User ID:** {USER_ID}")
 
     st.header("Controls")
     if st.button("Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
 
-    # Semantic Memory Manager Controls
-    st.header("🧠 Semantic Memory")
-
-    # Memory reset button
-    if st.button("Reset User Memory"):
-        st.session_state.show_memory_confirmation = True
-
-    # Confirmation dialog popup
-    if st.session_state.show_memory_confirmation:
-        st.markdown("---")
-        st.markdown("### ⚠️ Confirm Memory Deletion")
-        st.error(
-            "**WARNING**: This will permanently delete ALL stored memories and "
-            "personal information about you. This action CANNOT be undone!"
-        )
-        st.info(
-            "💡 **Remember**: Your AI friend's memories help create better, "
-            "more personalized conversations over time."
-        )
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button("❌ Cancel", use_container_width=True):
-                st.session_state.show_memory_confirmation = False
-                st.rerun()
-
-        with col2:
-            if st.button(
-                "🗑️ Yes, Delete All Memories", type="primary", use_container_width=True
-            ):
-                try:
-                    # Use direct clear memories function
-                    success, message = direct_clear_memories()
-                    st.session_state.show_memory_confirmation = False
-                    
-                    if success:
-                        st.success(f"✅ {message}")
-                        st.balloons()
-                    else:
-                        st.error(f"❌ {message}")
-                    
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error clearing memories: {str(e)}")
-
-    if st.button("Show All Memories"):
-        if "agent" in st.session_state and isinstance(
-            st.session_state.agent, AgnoPersonalAgent
-        ):
-            try:
-                # Get all memories from the AgnoPersonalAgent's memory system
-                if (
-                    hasattr(st.session_state.agent, "agno_memory")
-                    and st.session_state.agent.agno_memory
-                ):
-                    memories = st.session_state.agent.agno_memory.get_user_memories(
-                        user_id=USER_ID
-                    )
-                    if memories:
-                        st.subheader("Stored Memories")
-                        for i, memory in enumerate(memories, 1):
-                            # UserMemory objects have direct attributes, not dictionary access
-                            memory_content = getattr(memory, "memory", "No content")
-                            with st.expander(f"Memory {i}: {memory_content[:50]}..."):
-                                st.write(f"**Content:** {memory_content}")
-                                st.write(
-                                    f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**Input:** {getattr(memory, 'input', 'N/A')}"
-                                )
-                                topics = getattr(memory, "topics", [])
-                                if topics:
-                                    st.write(f"**Topics:** {', '.join(topics)}")
-                    else:
-                        st.info(
-                            "No memories stored yet. Start chatting to create some memories!"
-                        )
-                else:
-                    st.error("Memory system not available")
-            except Exception as e:
-                st.error(f"Error retrieving memories: {str(e)}")
-
-    # Memory Statistics
-    if st.button("📊 Show Memory Statistics"):
-        if "agent" in st.session_state and isinstance(
-            st.session_state.agent, AgnoPersonalAgent
-        ):
-            try:
-                # Get semantic memory manager from the AgnoPersonalAgent's memory system
-                if (
-                    hasattr(st.session_state.agent, "agno_memory")
-                    and st.session_state.agent.agno_memory
-                ):
-                    # Access the SemanticMemoryManager through the Memory object
-                    memory_manager = st.session_state.agent.agno_memory.memory_manager
-                    if hasattr(memory_manager, "get_memory_stats"):
-                        stats = memory_manager.get_memory_stats(
-                            st.session_state.agent.agno_memory.db, USER_ID
-                        )
-
-                        st.subheader("🧠 Semantic Memory Statistics")
-
-                        # Display basic stats
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Total Memories", stats.get("total_memories", 0))
-                            st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
-
-                        with col2:
-                            avg_length = stats.get("average_memory_length", 0)
-                            st.metric(
-                                "Avg Length",
-                                f"{avg_length:.1f} chars" if avg_length else "N/A",
-                            )
-                            most_common = stats.get("most_common_topic", "None")
-                            st.metric("Top Topic", most_common if most_common else "None")
-
-                        # Topic distribution
-                        topic_dist = stats.get("topic_distribution", {})
-                        if topic_dist:
-                            st.subheader("📈 Topic Distribution")
-                            for topic, count in sorted(
-                                topic_dist.items(), key=lambda x: x[1], reverse=True
-                            ):
-                                st.write(f"**{topic.title()}:** {count} memories")
-
-                        # Show SemanticMemoryManager configuration
-                        st.subheader("⚙️ Memory Configuration")
-                        config = memory_manager.config
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
-                            st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
-                            st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
-                        with col2:
-                            st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
-                            st.write(f"**Max Memory Length:** {config.max_memory_length}")
-                            st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
-
-                    else:
-                        st.info(
-                            "Memory statistics not available - SemanticMemoryManager not found"
-                        )
-                else:
-                    st.error("Memory system not available")
-            except Exception as e:
-                st.error(f"Error getting memory statistics: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
-
-    # Memory Search
-    st.subheader("🔍 Search Memories")
-    search_query = st.text_input(
-        "Search Query:",
-        placeholder="Enter keywords to search your memories...",
-        help="Search through your stored memories using semantic similarity",
-    )
-
-    # Advanced search options
-    col1, col2 = st.columns(2)
-    with col1:
-        similarity_threshold = st.slider(
-            "Similarity Threshold", 
-            min_value=0.1, 
-            max_value=1.0, 
-            value=0.3, 
-            step=0.1,
-            help="Lower values return more results, higher values are more strict"
-        )
-    with col2:
-        search_limit = st.number_input(
-            "Max Results", 
-            min_value=1, 
-            max_value=50, 
-            value=10,
-            help="Maximum number of search results to return"
-        )
-
-    if st.button("Search") and search_query:
-        try:
-            # Use direct semantic search (no agentic retrieval)
-            search_results = direct_search_memories(
-                query=search_query,
-                limit=search_limit,
-                similarity_threshold=similarity_threshold
-            )
-
-            if search_results:
-                st.subheader(f"🔍 Search Results for: '{search_query}'")
-                st.info(f"Found {len(search_results)} results with similarity ≥ {similarity_threshold}")
-                
-                for i, (memory, score) in enumerate(search_results, 1):
-                    memory_content = getattr(memory, "memory", "No content")
-                    score_color = "🟢" if score >= 0.7 else "🟡" if score >= 0.5 else "🔴"
-                    
-                    with st.expander(f"{score_color} Result {i} (Score: {score:.3f}): {memory_content[:50]}..."):
-                        st.write(f"**Memory:** {memory_content}")
-                        st.write(f"**Similarity Score:** {score:.3f}")
-                        
-                        topics = getattr(memory, "topics", [])
-                        if topics:
-                            st.write(f"**Topics:** {', '.join(topics)}")
-                        
-                        st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
-                        st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                        
-                        # Add delete button for each memory
-                        if st.button(f"🗑️ Delete Memory", key=f"delete_{memory.memory_id}"):
-                            success, message = direct_delete_memory(memory.memory_id)
-                            if success:
-                                st.success(f"Memory deleted: {message}")
-                                st.rerun()
-                            else:
-                                st.error(f"Failed to delete memory: {message}")
-            else:
-                st.info("No matching memories found. Try different keywords or lower the similarity threshold.")
-                
-        except Exception as e:
-            st.error(f"Error searching memories: {str(e)}")
-            # Show detailed error for debugging
-            import traceback
-            st.code(traceback.format_exc())
 
     st.header("Debug Info")
     # Debug mode toggle
@@ -1742,11 +1719,17 @@ with st.sidebar:
                         st.write("**🛠️ Tools Used:**")
                         for j, tool_call in enumerate(entry["tool_call_details"], 1):
                             if isinstance(tool_call, dict):
-                                function_name = tool_call.get("function_name", "unknown")
+                                function_name = tool_call.get(
+                                    "function_name", "unknown"
+                                )
                                 args = tool_call.get("function_args", {})
                                 if isinstance(args, dict) and args:
-                                    formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
-                                    st.write(f"  {j}. {function_name}({formatted_args})")
+                                    formatted_args = ", ".join(
+                                        [f"{k}={v}" for k, v in args.items()]
+                                    )
+                                    st.write(
+                                        f"  {j}. {function_name}({formatted_args})"
+                                    )
                                 else:
                                     st.write(f"  {j}. {function_name}()")
                             elif hasattr(tool_call, "function") and hasattr(
