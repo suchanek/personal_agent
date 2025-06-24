@@ -1,3 +1,26 @@
+"""
+Topic Classifier Module
+
+This module defines a TopicClassifier class that can be used to classify the topic(s) of a given text. The key features of this class are:
+
+1. Configuration Loading:
+   - The class loads a configuration file (default is 'topics.yaml') that contains the topic categories and associated keywords/phrases.
+   - The configuration data is stored in the 'categories' and 'phrases' attributes.
+
+2. Text Cleaning:
+   - The 'clean_text' method preprocesses the input text by converting it to lowercase, removing non-alphabetic characters, and removing stopwords.
+
+3. Topic Classification:
+   - The 'classify' method takes in a text input and returns either a list of topic names or a dictionary of topic names and their confidence scores.
+   - The classification is done by first checking for matching phrases (with higher weight) and then checking for individual keywords.
+   - The final scores are normalized and a confidence threshold is applied to determine the relevant topics.
+
+4. Example Usage:
+   - The module includes an example usage section that demonstrates how to use the TopicClassifier class to classify sample text inputs.
+
+The TopicClassifier class provides a convenient way to categorize text data into predefined topics based on keyword and phrase matching. This could be useful in a variety of applications, such as content analysis, customer support, or information retrieval. The module's design allows for easy customization of the topic categories and associated keywords/phrases by modifying the configuration file.
+"""
+
 import re
 from dataclasses import dataclass
 from typing import Dict, List, Pattern
@@ -17,36 +40,97 @@ import re
 
 
 class TopicClassifier:
-    def __init__(self, config_path="topics.yaml"):
+    def __init__(self, config_path="src/personal_agent/core/topics.yaml"):
         self.load_config(config_path)
         self.stopwords = set(
             [
                 "i",
+                "me",
+                "my",
+                "myself",
+                "we",
+                "our",
+                "ours",
+                "ourselves",
+                "you",
+                "your",
+                "yours",
+                "yourself",
+                "yourselves",
+                "he",
+                "him",
+                "his",
+                "himself",
+                "she",
+                "her",
+                "hers",
+                "herself",
+                "it",
+                "its",
+                "itself",
+                "they",
+                "them",
+                "their",
+                "theirs",
+                "themselves",
+                "what",
+                "which",
+                "who",
+                "whom",
+                "this",
+                "that",
+                "these",
+                "those",
+                "am",
+                "is",
+                "are",
+                "was",
+                "were",
+                "be",
+                "been",
+                "being",
                 "have",
                 "has",
                 "had",
-                "my",
-                "is",
-                "am",
-                "was",
-                "were",
-                "the",
+                "having",
+                "do",
+                "does",
+                "did",
+                "doing",
                 "a",
                 "an",
-                "of",
-                "in",
-                "on",
+                "the",
                 "and",
+                "but",
+                "if",
+                "or",
+                "because",
+                "as",
+                "until",
+                "while",
+                "of",
+                "at",
+                "by",
                 "for",
                 "with",
-                "at",
-                "to",
-                "by",
-                "from",
-                "that",
-                "this",
-                "it",
-                "as",
+                "through",
+                "during",
+                "before",
+                "after",
+                "above",
+                "below",
+                "up",
+                "down",
+                "in",
+                "out",
+                "on",
+                "off",
+                "over",
+                "under",
+                "again",
+                "further",
+                "then",
+                "once",
             ]
         )
         self.confidence_threshold = 0.1
