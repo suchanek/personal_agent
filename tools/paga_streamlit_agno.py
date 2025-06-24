@@ -500,11 +500,11 @@ def apply_custom_theme():
             unsafe_allow_html=True,
         )
     else:
-        # Light theme CSS - explicitly remove dark theme styles
+        # Light theme CSS - minimal styling to avoid breaking interaction icons
         st.markdown(
             """
         <style>
-        /* Remove all dark theme overrides to restore Streamlit defaults */
+        /* Light theme - only override essential elements, preserve interaction icons */
         .stApp {
             background-color: white !important;
             color: black !important;
@@ -515,107 +515,7 @@ def apply_custom_theme():
             color: black !important;
         }
         
-        .stApp > header {
-            background-color: white !important;
-        }
-        
-        .stMainBlockContainer {
-            background-color: white !important;
-        }
-        
-        .stBottom {
-            background-color: white !important;
-        }
-        
-        .stChatFloatingInputContainer {
-            background-color: white !important;
-            border-top: 1px solid #e0e0e0 !important;
-        }
-        
-        section[data-testid="stChatFloatingInputContainer"] {
-            background-color: white !important;
-        }
-        
-        div[data-testid="stChatInput"] {
-            background-color: white !important;
-        }
-        
-        .stChatInput {
-            background-color: white !important;
-        }
-        
-        .stChatInput > div {
-            background-color: white !important;
-        }
-        
-        .stChatInput div:not([data-baseweb="textarea"]) {
-            background-color: white !important;
-        }
-        
-        .stApp > div:last-child {
-            background-color: white !important;
-        }
-        
-        .stApp footer {
-            background-color: white !important;
-        }
-        
-        .stChatFloatingInputContainer div {
-            background-color: white !important;
-        }
-        
-        [data-testid="stChatFloatingInputContainer"] > div {
-            background-color: white !important;
-        }
-        
-        [data-testid="stChatFloatingInputContainer"] > div > div {
-            background-color: white !important;
-        }
-        
-        .main {
-            background-color: white !important;
-        }
-        
-        .main > div {
-            background-color: white !important;
-        }
-        
-        div[data-testid="stAppViewContainer"] {
-            background-color: white !important;
-        }
-        
-        div[data-testid="stMain"] {
-            background-color: white !important;
-        }
-        
-        section[data-testid="stSidebar"] ~ div {
-            background-color: white !important;
-        }
-        
-        .stApp > div {
-            background-color: white !important;
-        }
-        
-        .stApp section {
-            background-color: white !important;
-        }
-        
-        /* Override the nuclear option from dark theme */
-        .stApp * {
-            background-color: unset !important;
-        }
-        
-        /* Restore light theme colors for interactive elements */
-        button {
-            background-color: unset !important;
-            color: unset !important;
-        }
-        
         .stSidebar {
-            background-color: #f0f2f6 !important;
-        }
-        
-        .stSidebar > div {
             background-color: #f0f2f6 !important;
         }
         
@@ -623,11 +523,7 @@ def apply_custom_theme():
             color: black !important;
         }
         
-        .stSidebar .stSelectbox > div > div {
-            background-color: white !important;
-            color: black !important;
-        }
-        
+        /* Only target specific input elements to avoid breaking icons */
         .stTextInput > div > div > input {
             background-color: white !important;
             color: black !important;
@@ -639,60 +535,8 @@ def apply_custom_theme():
             box-shadow: 0 0 0 1px #0066cc !important;
         }
         
-        .stButton > button {
-            background-color: white !important;
-            color: black !important;
-            border: 1px solid #e0e0e0 !important;
-        }
-        
-        .stButton > button:hover {
-            background-color: #f0f0f0 !important;
-            border: 1px solid #d0d0d0 !important;
-        }
-        
-        .stExpander {
-            background-color: white !important;
-            border: 1px solid #e0e0e0 !important;
-        }
-        
-        .stExpander > div > div > div > div {
-            background-color: white !important;
-        }
-        
-        .stChatMessage {
-            background-color: white !important;
-        }
-        
-        .stChatMessage > div {
-            background-color: white !important;
-        }
-        
-        .stMetric {
-            background-color: white !important;
-            border: 1px solid #e0e0e0 !important;
-            border-radius: 5px !important;
-            padding: 10px !important;
-        }
-        
-        .stAlert {
-            background-color: white !important;
-            border: 1px solid #e0e0e0 !important;
-        }
-        
-        .stSelectbox > div > div {
-            background-color: white !important;
-            color: black !important;
-        }
-        
-        .stCheckbox > label {
-            color: black !important;
-        }
-        
+        /* Headers and main text only */
         h1, h2, h3, h4, h5, h6 {
-            color: black !important;
-        }
-        
-        p, div, span {
             color: black !important;
         }
         
@@ -1636,7 +1480,7 @@ with st.sidebar:
                     import pandas as pd
 
                     df = pd.DataFrame(st.session_state.debug_metrics)
-                    df = df[df["success"] == True]  # Only successful requests
+                    df = df[df["success"]]  # Only successful requests
 
                     if not df.empty and len(df) > 1:
                         # Create a simple line chart of response times
