@@ -242,8 +242,8 @@ def create_combined_knowledge_base(
     )
     arxive_kb = ArxivKnowledgeBase(vector_db=arxiv_vector_db)
 
-    # knowledge_sources.append(arxive_kb)
-    # logger.info("Created Arxive KnowledgeBase")
+    knowledge_sources.append(arxive_kb)
+    logger.info("Created Arxive KnowledgeBase")
 
     # Create combined knowledge base
     if knowledge_sources:
