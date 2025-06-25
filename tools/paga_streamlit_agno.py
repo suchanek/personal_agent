@@ -281,105 +281,6 @@ def apply_custom_theme():
             background-color: #0e1117 !important;
         }
         
-        /* Chat input outer container and all wrapper elements */
-        .stChatFloatingInputContainer {
-            /* background-color: #0e1117 !important; */
-            border-top: 1px solid #4a4a4a !important;
-        }
-        
-        /* Additional selectors for chat input area containers */
-        section[data-testid="stChatFloatingInputContainer"] {
-            /* background-color: #0e1117 !important; */
-        }
-        
-        div[data-testid="stChatInput"] {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Chat input wrapper */
-        .stChatInput {
-            background-color: #0e1117 !important;
-        }
-        
-        .stChatInput > div {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Target any remaining white containers around chat input */
-        .stChatInput div:not([data-baseweb="textarea"]) {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Bottom area containers - more comprehensive targeting */
-        .stApp > div:last-child {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Additional bottom area selectors */
-        .stApp footer {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Target any remaining white divs in the bottom area */
-        .stChatFloatingInputContainer div {
-            background-color: #0e1117 !important;
-        }
-        
-        /* More specific chat input container targeting */
-        [data-testid="stChatFloatingInputContainer"] > div {
-            background-color: #0e1117 !important;
-        }
-        
-        [data-testid="stChatFloatingInputContainer"] > div > div {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Target the main viewport and large background areas */
-        .main {
-            background-color: #0e1117 !important;
-        }
-        
-        .main > div {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Target any large white background containers */
-        div[data-testid="stAppViewContainer"] {
-            background-color: #0e1117 !important;
-        }
-        
-        div[data-testid="stMain"] {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Target the bottom section specifically */
-        section[data-testid="stSidebar"] ~ div {
-            background-color: #0e1117 !important;
-        }
-        
-        /* More aggressive targeting of large containers */
-        .stApp > div {
-            background-color: #0e1117 !important;
-        }
-        
-        .stApp section {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Nuclear option - target everything then exclude input */
-        .stApp * {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Restore input box to default */
-        .stChatInput textarea,
-        .stChatInput input,
-        textarea,
-        input[type="text"] {
-            background-color: unset !important;
-            color: unset !important;
-            border: unset !important;
-        }
         
         /* Restore other interactive elements */
         button {
@@ -956,6 +857,7 @@ with tab2:
 
     # Category selection
     categories = [
+        "automatic",
         "personal",
         "work",
         "education",
@@ -975,9 +877,11 @@ with tab2:
         "Enter a fact to store (e.g., I work at Google as a software engineer)"
     ):
         if fact_input.strip():
+            # Use automatic classification if 'automatic' is selected
+            topic_list = None if selected_category == "automatic" else [selected_category]
             success, message, memory_id = direct_add_memory(
                 memory_text=fact_input.strip(),
-                topics=[selected_category],
+                topics=topic_list,
                 input_text="Direct fact storage",
             )
 
