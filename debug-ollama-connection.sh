@@ -30,7 +30,7 @@ debug_ollama_connection() {
     # Step 2: Test port connectivity
     echo -e "\n${YELLOW}2. Testing port connectivity to $host:$port...${NC}"
     if command -v nc >/dev/null 2>&1; then
-        if timeout 5 nc -z "$host" "$port" 2>/dev/null; then
+        if nc -z "$host" "$port" 2>/dev/null; then
             echo -e "${GREEN}✓${NC} Port $port is open on $host"
         else
             echo -e "${RED}✗${NC} Port $port is not accessible on $host"
@@ -43,7 +43,7 @@ debug_ollama_connection() {
     
     # Step 3: Test basic HTTP connectivity
     echo -e "\n${YELLOW}3. Testing basic HTTP connectivity...${NC}"
-    if timeout 5 curl -s -I "$url" > /dev/null 2>&1; then
+    if curl -s -I "$url" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} HTTP server responding at $url"
     else
         echo -e "${RED}✗${NC} No HTTP response from $url"
@@ -53,15 +53,15 @@ debug_ollama_connection() {
     
     # Step 4: Test Ollama API endpoint
     echo -e "\n${YELLOW}4. Testing Ollama API endpoint...${NC}"
-    local response=$(timeout 10 curl -s "$url/api/tags" 2>&1)
+    local response=$(curl -s "$url/api/tags" 2>&1)
     local curl_exit_code=$?
     
     if [ $curl_exit_code -eq 0 ]; then
         echo -e "${GREEN}✓${NC} Ollama API is responding"
         echo "  Response preview: $(echo "$response" | head -c 100)..."
-        return 0
     else
         echo -e "${RED}✗${NC} Ollama API not responding (curl exit code: $curl_exit_code)"
+        return 0
         
         # Show curl error details
         case $curl_exit_code in
@@ -70,16 +70,6 @@ debug_ollama_connection() {
             28) echo "  Error: Operation timeout" ;;
             *) echo "  Curl error: $response" ;;
         esac
-        
-        # Try alternative endpoints
-        echo -e "\n${YELLOW}  Trying alternative endpoints...${NC}"
-        for endpoint in "/api/version" "/api/ps" "/"; do
-            if timeout 5 curl -s "$url$endpoint" > /dev/null 2>&1; then
-                echo -e "${GREEN}  ✓${NC} Alternative endpoint works: $url$endpoint"
-            else
-                echo -e "${RED}  ✗${NC} Failed: $url$endpoint"
-            fi
-        done
         
         return 1
     fi

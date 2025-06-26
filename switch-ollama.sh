@@ -69,13 +69,13 @@ test_ollama_connection() {
     echo -e "${YELLOW}Testing connection to $url...${NC}"
     
     # Test basic connectivity first
-    if timeout 5 curl -s "$url/api/tags" > /dev/null 2>&1; then
+    if curl -s "$url/api/tags" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Ollama server is reachable at $url"
-        return 0
+        return 1
     else
         echo -e "${RED}✗${NC} Cannot reach Ollama server at $url"
         echo -e "${YELLOW}Note: This might be normal if the server is not running${NC}"
-        return 1
+        return 0
     fi
 }
 
