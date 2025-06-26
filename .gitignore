@@ -10,6 +10,7 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+backups/
 
 # Distribution / packaging
 .Python
@@ -186,4 +187,3 @@ weaviate_data/
 .DS_Store
 data/
 cookbook/
-

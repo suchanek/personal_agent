@@ -94,15 +94,25 @@ async def initialize_rag():
     print(f"Using LLM model: {llm_model}")
     print(f"Using embedding model: {embedding_model}")
 
+    # Increased timeout settings for PDF processing
+    llm_timeout = int(os.getenv("LLM_TIMEOUT", "1800"))  # 30 minutes for LLM
+    embedding_timeout = int(os.getenv("EMBEDDING_TIMEOUT", "600"))  # 10 minutes for embedding
+
+    print(f"LLM timeout: {llm_timeout} seconds")
+    print(f"Embedding timeout: {embedding_timeout} seconds")
+
     rag = LightRAG(
         working_dir=WORKING_DIR,
         llm_model_func=ollama_model_complete,
         llm_model_name=llm_model,
-        llm_model_max_token_size=32768,
+        llm_model_max_token_size=8192,
         llm_model_kwargs={
-            "host": os.getenv("LLM_BINDING_HOST", "http://localhost:11434"),
-            "options": {"num_ctx": 16384},
-            "timeout": int(os.getenv("TIMEOUT", "1800")),
+            "host": os.getenv("OLLAMA_URL", "http://localhost:11434"),
+            "options": {
+                "num_ctx": 8192,
+                "temperature": 0.1,  # Lower temperature for more consistent processing
+            },
+            "timeout": llm_timeout,  # Increased timeout for PDF processing
         },
         embedding_func=EmbeddingFunc(
             embedding_dim=768,  # Fixed to 768 for nomic-embed-text
@@ -110,7 +120,8 @@ async def initialize_rag():
             func=lambda texts: ollama_embed(
                 texts,
                 embed_model=embedding_model,
-                host=os.getenv("EMBEDDING_BINDING_HOST", "http://localhost:11434"),
+                host=os.getenv("OLLAMA_URL", "http://localhost:11434"),
+                timeout=embedding_timeout,  # Increased timeout for embedding
             ),
         ),
     )
@@ -119,6 +130,72 @@ async def initialize_rag():
     await initialize_pipeline_status()
 
     return rag
+
+
+async def process_pdf_with_retry(rag, pdf_path, max_retries=3):
+    """Process PDF with retry logic and better error handling"""
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"\nAttempt {attempt + 1}/{max_retries} to process PDF: {pdf_path}")
+            
+            # Read PDF content (you might need to install PyPDF2 or similar)
+            try:
+                import PyPDF2
+                with open(pdf_path, 'rb') as file:
+                    pdf_reader = PyPDF2.PdfReader(file)
+                    text_content = ""
+                    for page in pdf_reader.pages:
+                        text_content += page.extract_text() + "\n"
+                
+                print(f"Extracted {len(text_content)} characters from PDF")
+                
+                # Process in smaller chunks if the content is very large
+                chunk_size = int(os.getenv("PDF_CHUNK_SIZE", "10000"))  # 10KB chunks
+                
+                if len(text_content) > chunk_size:
+                    print(f"Processing PDF in chunks of {chunk_size} characters")
+                    chunks = [text_content[i:i+chunk_size] for i in range(0, len(text_content), chunk_size)]
+                    
+                    for i, chunk in enumerate(chunks):
+                        print(f"Processing chunk {i+1}/{len(chunks)}")
+                        await rag.ainsert(chunk)
+                        # Small delay between chunks to avoid overwhelming Ollama
+                        await asyncio.sleep(1)
+                else:
+                    await rag.ainsert(text_content)
+                
+                print(f"Successfully processed PDF: {pdf_path}")
+                return True
+                
+            except ImportError:
+                print("PyPDF2 not installed. Install with: pip install PyPDF2")
+                # Fallback: try to read as text file (won't work for binary PDFs)
+                with open(pdf_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    await rag.ainsert(content)
+                return True
+                
+        except asyncio.TimeoutError:
+            print(f"Timeout on attempt {attempt + 1}. Retrying...")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 30  # Exponential backoff
+                print(f"Waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)
+            else:
+                print("Max retries reached. PDF processing failed.")
+                return False
+        except Exception as e:
+            print(f"Error on attempt {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10
+                print(f"Waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)
+            else:
+                print("Max retries reached. PDF processing failed.")
+                return False
+    
+    return False
 
 
 async def print_stream(stream):
@@ -157,6 +234,18 @@ async def main():
         print("========================")
         print(f"Test dict: {test_text}")
         print(f"Detected embedding dimension: {embedding_dim}\n\n")
+
+        # Process PDF files if they exist
+        pdf_files = [f for f in os.listdir('.') if f.endswith('.pdf')]
+        if pdf_files:
+            print(f"Found {len(pdf_files)} PDF files to process:")
+            for pdf_file in pdf_files:
+                print(f"  - {pdf_file}")
+                success = await process_pdf_with_retry(rag, pdf_file)
+                if not success:
+                    print(f"Failed to process {pdf_file}, skipping...")
+        else:
+            print("No PDF files found in current directory")
 
         # Check if book.txt exists, if not create a sample text
         book_path = "./book.txt"
