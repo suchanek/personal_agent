@@ -128,12 +128,12 @@ class LightRAGDocumentManager:
 
     def clear_cache(self, modes: List[str] = None) -> bool:
         """Clear cache data from the LLM response cache storage
-        
+
         Args:
             modes: List of cache modes to clear. Valid modes include:
                    "default", "naive", "local", "global", "hybrid", "mix".
                    If None, clears all cache.
-        
+
         Returns:
             bool: True if cache clearing was successful, False otherwise
         """
@@ -149,12 +149,12 @@ class LightRAGDocumentManager:
                     print(f"Valid modes are: {valid_modes}")
                     return False
                 request_body["modes"] = modes
-            
+
             response = requests.post(
                 f"{self.base_url}/documents/clear_cache",
                 json=request_body
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 print(f"✅ Cache cleared successfully: {result.get('message', 'Cache cleared')}")
@@ -168,7 +168,7 @@ class LightRAGDocumentManager:
             else:
                 print(f"❌ Error clearing cache: {response.status_code} - {response.text}")
                 return False
-                
+
         except requests.exceptions.RequestException as e:
             print(f"❌ Error clearing cache: {e}")
             return False
@@ -178,18 +178,18 @@ class LightRAGDocumentManager:
         try:
             # Use the correct endpoint for individual document deletion
             response = requests.delete(
-                f"{self.base_url}/documents/delete_document", 
+                f"{self.base_url}/documents/delete_document",
                 json={"doc_id": doc_id}
             )
 
             if response.status_code in [200, 204]:
                 print(f"✅ Successfully deleted document: {doc_id}")
-                
+
                 # Clear cache after successful deletion
                 if clear_cache_after:
                     print("🧹 Clearing cache after deletion...")
                     self.clear_cache()
-                
+
                 return True
             elif response.status_code == 404:
                 print(f"❌ Document {doc_id} not found")
@@ -202,12 +202,12 @@ class LightRAGDocumentManager:
                 )
                 if response.status_code in [200, 204]:
                     print(f"✅ Successfully deleted document: {doc_id}")
-                    
+
                     # Clear cache after successful deletion
                     if clear_cache_after:
                         print("🧹 Clearing cache after deletion...")
                         self.clear_cache()
-                    
+
                     return True
                 else:
                     print(f"❌ Alternative method also failed: {response.status_code} - {response.text}")
@@ -360,6 +360,276 @@ class LightRAGDocumentManager:
         for status, count in status_counts.items():
             print(f"  {status}: {count}")
 
+    def scan_documents(self) -> bool:
+        """Trigger scanning process for new documents"""
+        try:
+            response = requests.post(f"{self.base_url}/documents/scan")
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ {result.get('message', 'Scanning initiated')}")
+                return True
+            else:
+                print(f"❌ Error scanning documents: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error scanning documents: {e}")
+            return False
+
+    def upload_file_to_input_dir(self, file_path: str) -> bool:
+        """Upload a file to the input directory and index it"""
+        if not os.path.exists(file_path):
+            print(f"❌ File not found: {file_path}")
+            return False
+
+        if not os.path.isfile(file_path):
+            print(f"❌ Path is not a file: {file_path}")
+            return False
+
+        try:
+            filename = os.path.basename(file_path)
+            with open(file_path, "rb") as f:
+                files = {"file": (filename, f, "application/octet-stream")}
+                response = requests.post(
+                    f"{self.base_url}/documents/upload", files=files
+                )
+
+            if response.status_code in [200, 201]:
+                result = response.json()
+                print(f"✅ {result.get('message', f'File {filename} uploaded successfully')}")
+                return True
+            else:
+                print(f"❌ Error uploading file: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error uploading file: {e}")
+            return False
+
+    def insert_text(self, text: str, metadata: Dict[str, Any] = None) -> bool:
+        """Insert text into the RAG system"""
+        try:
+            request_body = {"text": text}
+            if metadata:
+                request_body["metadata"] = metadata
+
+            response = requests.post(
+                f"{self.base_url}/documents/text",
+                json=request_body
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ {result.get('message', 'Text inserted successfully')}")
+                return True
+            else:
+                print(f"❌ Error inserting text: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error inserting text: {e}")
+            return False
+
+    def insert_texts(self, texts: List[str], metadata_list: List[Dict[str, Any]] = None) -> bool:
+        """Insert multiple texts into the RAG system"""
+        try:
+            request_body = {"texts": texts}
+            if metadata_list:
+                request_body["metadata_list"] = metadata_list
+
+            response = requests.post(
+                f"{self.base_url}/documents/texts",
+                json=request_body
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ {result.get('message', f'Successfully inserted {len(texts)} texts')}")
+                return True
+            else:
+                print(f"❌ Error inserting texts: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error inserting texts: {e}")
+            return False
+
+    def insert_file_direct(self, file_path: str) -> bool:
+        """Insert a file directly into the RAG system"""
+        if not os.path.exists(file_path):
+            print(f"❌ File not found: {file_path}")
+            return False
+
+        if not os.path.isfile(file_path):
+            print(f"❌ Path is not a file: {file_path}")
+            return False
+
+        try:
+            filename = os.path.basename(file_path)
+            with open(file_path, "rb") as f:
+                files = {"file": (filename, f, "application/octet-stream")}
+                response = requests.post(
+                    f"{self.base_url}/documents/file", files=files
+                )
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ {result.get('message', f'File {filename} processed successfully')}")
+                return True
+            else:
+                print(f"❌ Error processing file: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error processing file: {e}")
+            return False
+
+    def insert_batch_files(self, file_paths: List[str]) -> bool:
+        """Process multiple files in batch mode"""
+        if not file_paths:
+            print("❌ No file paths provided")
+            return False
+
+        # Validate all files exist
+        missing_files = [fp for fp in file_paths if not os.path.exists(fp)]
+        if missing_files:
+            print(f"❌ Missing files: {missing_files}")
+            return False
+
+        try:
+            files = []
+            for file_path in file_paths:
+                filename = os.path.basename(file_path)
+                files.append(("files", (filename, open(file_path, "rb"), "application/octet-stream")))
+
+            response = requests.post(
+                f"{self.base_url}/documents/file_batch", files=files
+            )
+
+            # Close all file handles
+            for _, (_, file_handle, _) in files:
+                file_handle.close()
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ {result.get('message', f'Batch processing completed for {len(file_paths)} files')}")
+                return True
+            else:
+                print(f"❌ Error in batch processing: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error in batch processing: {e}")
+            return False
+
+    def clear_all_documents(self, confirm: bool = True) -> bool:
+        """Clear all documents from the system"""
+        if confirm:
+            response = input("⚠️  This will delete ALL documents. Are you sure? (y/N): ")
+            if response.lower() not in ["y", "yes"]:
+                print("Operation cancelled.")
+                return False
+
+        try:
+            response = requests.delete(f"{self.base_url}/documents")
+
+            if response.status_code in [200, 204]:
+                result = response.json() if response.content else {}
+                print(f"✅ {result.get('message', 'All documents cleared successfully')}")
+                return True
+            else:
+                print(f"❌ Error clearing documents: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error clearing documents: {e}")
+            return False
+
+    def get_pipeline_status(self) -> Dict[str, Any]:
+        """Get pipeline status information"""
+        try:
+            response = requests.get(f"{self.base_url}/documents/pipeline_status")
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"❌ Error getting pipeline status: {response.status_code} - {response.text}")
+                return {}
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error getting pipeline status: {e}")
+            return {}
+
+    def delete_entity(self, entity_name: str, confirm: bool = True) -> bool:
+        """Delete an entity from the knowledge graph"""
+        if confirm:
+            response = input(f"Delete entity '{entity_name}'? (y/N): ")
+            if response.lower() not in ["y", "yes"]:
+                print("Deletion cancelled.")
+                return False
+
+        try:
+            response = requests.delete(
+                f"{self.base_url}/documents/delete_entity",
+                json={"entity_name": entity_name}
+            )
+
+            if response.status_code in [200, 204]:
+                print(f"✅ Entity '{entity_name}' deleted successfully")
+                return True
+            else:
+                print(f"❌ Error deleting entity: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error deleting entity: {e}")
+            return False
+
+    def delete_relation(self, source_entity: str, target_entity: str, confirm: bool = True) -> bool:
+        """Delete a relation between entities"""
+        if confirm:
+            response = input(f"Delete relation between '{source_entity}' and '{target_entity}'? (y/N): ")
+            if response.lower() not in ["y", "yes"]:
+                print("Deletion cancelled.")
+                return False
+
+        try:
+            response = requests.delete(
+                f"{self.base_url}/documents/delete_relation",
+                json={"source_entity": source_entity, "target_entity": target_entity}
+            )
+
+            if response.status_code in [200, 204]:
+                print(f"✅ Relation between '{source_entity}' and '{target_entity}' deleted successfully")
+                return True
+            else:
+                print(f"❌ Error deleting relation: {response.status_code} - {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error deleting relation: {e}")
+            return False
+
+    def query_text(self, query: str, mode: str = "hybrid") -> Dict[str, Any]:
+        """Query the RAG system"""
+        try:
+            request_body = {"query": query, "mode": mode}
+            response = requests.post(
+                f"{self.base_url}/query",
+                json=request_body
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"❌ Error querying: {response.status_code} - {response.text}")
+                return {}
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error querying: {e}")
+            return {}
+
     def ingest_file(self, filename: str, confirm: bool = True) -> bool:
         """Ingest a specific file from the default knowledge base location"""
         file_path = os.path.join(WORKING_DIR, filename)
@@ -384,29 +654,7 @@ class LightRAGDocumentManager:
                 print("Ingestion cancelled.")
                 return False
 
-        try:
-            # Send file to LightRAG server for ingestion
-            with open(file_path, "rb") as f:
-                files = {"file": (filename, f, "application/octet-stream")}
-                response = requests.post(
-                    f"{self.base_url}/documents/upload", files=files
-                )
-
-            if response.status_code in [200, 201]:
-                print(f"✅ Successfully ingested file: {filename}")
-                return True
-            else:
-                print(
-                    f"❌ Error ingesting file {filename}: {response.status_code} - {response.text}"
-                )
-                return False
-
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Error ingesting file {filename}: {e}")
-            return False
-        except Exception as e:
-            print(f"❌ Unexpected error ingesting file {filename}: {e}")
-            return False
+        return self.upload_file_to_input_dir(file_path)
 
 
 async def process_pdf_with_retry(rag, pdf_path, max_retries=3):
@@ -507,6 +755,42 @@ def main():
         help="Clear cache data. Optionally specify modes: default, naive, local, global, hybrid, mix. If no modes specified, clears all cache.",
     )
     parser.add_argument(
+        "--scan", action="store_true", help="Trigger scanning for new documents"
+    )
+    parser.add_argument(
+        "--upload-file", type=str, help="Upload a file to input directory"
+    )
+    parser.add_argument(
+        "--insert-text", type=str, help="Insert text into the RAG system"
+    )
+    parser.add_argument(
+        "--insert-file", type=str, help="Insert a file directly into RAG system"
+    )
+    parser.add_argument(
+        "--batch-files", nargs="+", help="Process multiple files in batch mode"
+    )
+    parser.add_argument(
+        "--clear-all", action="store_true", help="Clear ALL documents from the system"
+    )
+    parser.add_argument(
+        "--pipeline-status", action="store_true", help="Get pipeline status"
+    )
+    parser.add_argument(
+        "--delete-entity", type=str, help="Delete an entity from knowledge graph"
+    )
+    parser.add_argument(
+        "--delete-relation", nargs=2, metavar=("SOURCE", "TARGET"),
+        help="Delete relation between two entities"
+    )
+    parser.add_argument(
+        "--query", type=str, help="Query the RAG system"
+    )
+    parser.add_argument(
+        "--query-mode", type=str, default="hybrid",
+        choices=["naive", "local", "global", "hybrid", "mix"],
+        help="Query mode (default: hybrid)"
+    )
+    parser.add_argument(
         "--no-confirm", action="store_true", help="Skip confirmation prompts"
     )
 
@@ -514,31 +798,122 @@ def main():
 
     manager = LightRAGDocumentManager(args.url)
 
+    # Determine which action to take based on provided arguments
+    action = None
     if args.list:
-        manager.list_all_documents()
+        action = "list"
     elif args.delete_failed:
-        manager.delete_failed_documents(confirm=not args.no_confirm)
+        action = "delete_failed"
     elif args.delete_ids:
-        manager.delete_specific_documents(args.delete_ids, confirm=not args.no_confirm)
+        action = "delete_ids"
     elif args.ingest_file:
-        manager.ingest_file(args.ingest_file, confirm=not args.no_confirm)
+        action = "ingest_file"
     elif args.clear_cache is not None:
-        # If --clear-cache is provided with no arguments, clear all cache
-        # If --clear-cache is provided with arguments, clear specific modes
-        modes = args.clear_cache if args.clear_cache else None
-        manager.clear_cache(modes)
+        action = "clear_cache"
+    elif args.scan:
+        action = "scan"
+    elif args.upload_file:
+        action = "upload_file"
+    elif args.insert_text:
+        action = "insert_text"
+    elif args.insert_file:
+        action = "insert_file"
+    elif args.batch_files:
+        action = "batch_files"
+    elif args.clear_all:
+        action = "clear_all"
+    elif args.pipeline_status:
+        action = "pipeline_status"
+    elif args.delete_entity:
+        action = "delete_entity"
+    elif args.delete_relation:
+        action = "delete_relation"
+    elif args.query:
+        action = "query"
     else:
-        print("No action specified. Use --help for available options.")
-        print("\nQuick examples:")
-        print("  python lightrag_docmgr.py --list")
-        print("  python lightrag_docmgr.py --delete-failed")
-        print(
-            "  python lightrag_docmgr.py --delete-ids doc-726db79638518e14b6a257 doc-e46e8b403a2224cb473dd9"
-        )
-        print("  python lightrag_docmgr.py --ingest-file document.pdf")
-        print("  python lightrag_docmgr.py --clear-cache")
-        print("  python lightrag_docmgr.py --clear-cache default naive")
-        print(f"\nDefault knowledge base location: {WORKING_DIR}")
+        action = "help"
+
+    # Use match statement to handle different actions
+    match action:
+        case "list":
+            manager.list_all_documents()
+        
+        case "delete_failed":
+            manager.delete_failed_documents(confirm=not args.no_confirm)
+        
+        case "delete_ids":
+            manager.delete_specific_documents(args.delete_ids, confirm=not args.no_confirm)
+        
+        case "ingest_file":
+            manager.ingest_file(args.ingest_file, confirm=not args.no_confirm)
+        
+        case "clear_cache":
+            # If --clear-cache is provided with no arguments, clear all cache
+            # If --clear-cache is provided with arguments, clear specific modes
+            modes = args.clear_cache if args.clear_cache else None
+            manager.clear_cache(modes)
+        
+        case "scan":
+            manager.scan_documents()
+        
+        case "upload_file":
+            manager.upload_file_to_input_dir(args.upload_file)
+        
+        case "insert_text":
+            manager.insert_text(args.insert_text)
+        
+        case "insert_file":
+            manager.insert_file_direct(args.insert_file)
+        
+        case "batch_files":
+            manager.insert_batch_files(args.batch_files)
+        
+        case "clear_all":
+            manager.clear_all_documents(confirm=not args.no_confirm)
+        
+        case "pipeline_status":
+            status = manager.get_pipeline_status()
+            if status:
+                print("📊 Pipeline Status:")
+                print(json.dumps(status, indent=2))
+        
+        case "delete_entity":
+            manager.delete_entity(args.delete_entity, confirm=not args.no_confirm)
+        
+        case "delete_relation":
+            source, target = args.delete_relation
+            manager.delete_relation(source, target, confirm=not args.no_confirm)
+        
+        case "query":
+            result = manager.query_text(args.query, args.query_mode)
+            if result:
+                print("🔍 Query Result:")
+                print(json.dumps(result, indent=2))
+        
+        case "help" | _:
+            print("No action specified. Use --help for available options.")
+            print("\n📚 Document Management:")
+            print("  python lightrag_docmgr.py --list")
+            print("  python lightrag_docmgr.py --scan")
+            print("  python lightrag_docmgr.py --upload-file /path/to/file.pdf")
+            print("  python lightrag_docmgr.py --insert-file /path/to/file.txt")
+            print("  python lightrag_docmgr.py --batch-files file1.pdf file2.txt file3.docx")
+            print("  python lightrag_docmgr.py --ingest-file document.pdf")
+            print("  python lightrag_docmgr.py --insert-text 'Your text here'")
+            print("\n🗑️  Deletion Operations:")
+            print("  python lightrag_docmgr.py --delete-failed")
+            print("  python lightrag_docmgr.py --delete-ids doc-123 doc-456")
+            print("  python lightrag_docmgr.py --clear-all")
+            print("  python lightrag_docmgr.py --delete-entity 'Entity Name'")
+            print("  python lightrag_docmgr.py --delete-relation 'Source Entity' 'Target Entity'")
+            print("\n🧹 Cache Management:")
+            print("  python lightrag_docmgr.py --clear-cache")
+            print("  python lightrag_docmgr.py --clear-cache default naive")
+            print("\n🔍 Query & Status:")
+            print("  python lightrag_docmgr.py --query 'What is machine learning?'")
+            print("  python lightrag_docmgr.py --query 'AI concepts' --query-mode local")
+            print("  python lightrag_docmgr.py --pipeline-status")
+            print(f"\n📁 Default knowledge base location: {WORKING_DIR}")
 
 
 if __name__ == "__main__":
