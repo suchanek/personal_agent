@@ -169,7 +169,7 @@ def direct_update_memory(
         return False, f"Error updating memory: {e}"
 
 
-def direct_search_rag(query: str):
+def direct_search_rag(query: str, mode: str = "naive"):
     """Direct search of the RAG KB"""
     agent = st.session_state.agent
     if not (hasattr(agent, "lightrag_knowledge")):
@@ -1192,9 +1192,11 @@ with tab3:
         try:
             # Use direct RAG search
             search_results = direct_search_rag(query=knowledge_search_query)
-            
+
             if search_results:
-                st.subheader(f"🔍 RAG Knowledge Search Results for: '{knowledge_search_query}'")
+                st.subheader(
+                    f"🔍 RAG Knowledge Search Results for: '{knowledge_search_query}'"
+                )
                 # Display the markdown results directly
                 st.markdown(search_results)
             else:
