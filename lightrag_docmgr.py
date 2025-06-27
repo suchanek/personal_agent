@@ -47,7 +47,7 @@ def configure_logging():
 
     # Get log directory path from environment variable or use current directory
     log_dir = os.getenv("LOG_DIR", os.getcwd())
-    log_file_path = os.path.abspath(os.path.join(log_dir, "lightrag_ollama_demo.log"))
+    log_file_path = os.path.abspath(os.path.join(log_dir, "lightrag.log"))
 
     print(f"\nLightRAG compatible demo log file: {log_file_path}\n")
     os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
@@ -112,7 +112,7 @@ class LightRAGDocumentManager:
     def get_documents(self) -> Dict[str, Any]:
         """Fetch all documents from the LightRAG server"""
         try:
-            response = requests.get(f"{self.base_url}/documents")
+            response = requests.get(f"{self.base_url}/documents", timeout=360)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -151,13 +151,14 @@ class LightRAGDocumentManager:
                 request_body["modes"] = modes
 
             response = requests.post(
-                f"{self.base_url}/documents/clear_cache",
-                json=request_body
+                f"{self.base_url}/documents/clear_cache", json=request_body
             )
 
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ Cache cleared successfully: {result.get('message', 'Cache cleared')}")
+                print(
+                    f"✅ Cache cleared successfully: {result.get('message', 'Cache cleared')}"
+                )
                 return True
             elif response.status_code == 400:
                 print(f"❌ Invalid cache modes specified: {response.text}")
@@ -166,7 +167,9 @@ class LightRAGDocumentManager:
                 print(f"❌ Server error while clearing cache: {response.text}")
                 return False
             else:
-                print(f"❌ Error clearing cache: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error clearing cache: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -178,8 +181,7 @@ class LightRAGDocumentManager:
         try:
             # Use the correct endpoint for individual document deletion
             response = requests.delete(
-                f"{self.base_url}/documents/delete_document",
-                json={"doc_id": doc_id}
+                f"{self.base_url}/documents/delete_document", json={"doc_id": doc_id}
             )
 
             if response.status_code in [200, 204]:
@@ -210,7 +212,9 @@ class LightRAGDocumentManager:
 
                     return True
                 else:
-                    print(f"❌ Alternative method also failed: {response.status_code} - {response.text}")
+                    print(
+                        f"❌ Alternative method also failed: {response.status_code} - {response.text}"
+                    )
                     return False
             else:
                 print(
@@ -370,7 +374,9 @@ class LightRAGDocumentManager:
                 print(f"✅ {result.get('message', 'Scanning initiated')}")
                 return True
             else:
-                print(f"❌ Error scanning documents: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error scanning documents: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -397,10 +403,14 @@ class LightRAGDocumentManager:
 
             if response.status_code in [200, 201]:
                 result = response.json()
-                print(f"✅ {result.get('message', f'File {filename} uploaded successfully')}")
+                print(
+                    f"✅ {result.get('message', f'File {filename} uploaded successfully')}"
+                )
                 return True
             else:
-                print(f"❌ Error uploading file: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error uploading file: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -415,8 +425,7 @@ class LightRAGDocumentManager:
                 request_body["metadata"] = metadata
 
             response = requests.post(
-                f"{self.base_url}/documents/text",
-                json=request_body
+                f"{self.base_url}/documents/text", json=request_body
             )
 
             if response.status_code == 200:
@@ -424,14 +433,18 @@ class LightRAGDocumentManager:
                 print(f"✅ {result.get('message', 'Text inserted successfully')}")
                 return True
             else:
-                print(f"❌ Error inserting text: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error inserting text: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
             print(f"❌ Error inserting text: {e}")
             return False
 
-    def insert_texts(self, texts: List[str], metadata_list: List[Dict[str, Any]] = None) -> bool:
+    def insert_texts(
+        self, texts: List[str], metadata_list: List[Dict[str, Any]] = None
+    ) -> bool:
         """Insert multiple texts into the RAG system"""
         try:
             request_body = {"texts": texts}
@@ -439,16 +452,19 @@ class LightRAGDocumentManager:
                 request_body["metadata_list"] = metadata_list
 
             response = requests.post(
-                f"{self.base_url}/documents/texts",
-                json=request_body
+                f"{self.base_url}/documents/texts", json=request_body
             )
 
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ {result.get('message', f'Successfully inserted {len(texts)} texts')}")
+                print(
+                    f"✅ {result.get('message', f'Successfully inserted {len(texts)} texts')}"
+                )
                 return True
             else:
-                print(f"❌ Error inserting texts: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error inserting texts: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -469,16 +485,18 @@ class LightRAGDocumentManager:
             filename = os.path.basename(file_path)
             with open(file_path, "rb") as f:
                 files = {"file": (filename, f, "application/octet-stream")}
-                response = requests.post(
-                    f"{self.base_url}/documents/file", files=files
-                )
+                response = requests.post(f"{self.base_url}/documents/file", files=files)
 
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ {result.get('message', f'File {filename} processed successfully')}")
+                print(
+                    f"✅ {result.get('message', f'File {filename} processed successfully')}"
+                )
                 return True
             else:
-                print(f"❌ Error processing file: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error processing file: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -501,7 +519,12 @@ class LightRAGDocumentManager:
             files = []
             for file_path in file_paths:
                 filename = os.path.basename(file_path)
-                files.append(("files", (filename, open(file_path, "rb"), "application/octet-stream")))
+                files.append(
+                    (
+                        "files",
+                        (filename, open(file_path, "rb"), "application/octet-stream"),
+                    )
+                )
 
             response = requests.post(
                 f"{self.base_url}/documents/file_batch", files=files
@@ -513,10 +536,14 @@ class LightRAGDocumentManager:
 
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ {result.get('message', f'Batch processing completed for {len(file_paths)} files')}")
+                print(
+                    f"✅ {result.get('message', f'Batch processing completed for {len(file_paths)} files')}"
+                )
                 return True
             else:
-                print(f"❌ Error in batch processing: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error in batch processing: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -536,10 +563,14 @@ class LightRAGDocumentManager:
 
             if response.status_code in [200, 204]:
                 result = response.json() if response.content else {}
-                print(f"✅ {result.get('message', 'All documents cleared successfully')}")
+                print(
+                    f"✅ {result.get('message', 'All documents cleared successfully')}"
+                )
                 return True
             else:
-                print(f"❌ Error clearing documents: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error clearing documents: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -554,7 +585,9 @@ class LightRAGDocumentManager:
             if response.status_code == 200:
                 return response.json()
             else:
-                print(f"❌ Error getting pipeline status: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error getting pipeline status: {response.status_code} - {response.text}"
+                )
                 return {}
 
         except requests.exceptions.RequestException as e:
@@ -572,24 +605,30 @@ class LightRAGDocumentManager:
         try:
             response = requests.delete(
                 f"{self.base_url}/documents/delete_entity",
-                json={"entity_name": entity_name}
+                json={"entity_name": entity_name},
             )
 
             if response.status_code in [200, 204]:
                 print(f"✅ Entity '{entity_name}' deleted successfully")
                 return True
             else:
-                print(f"❌ Error deleting entity: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error deleting entity: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
             print(f"❌ Error deleting entity: {e}")
             return False
 
-    def delete_relation(self, source_entity: str, target_entity: str, confirm: bool = True) -> bool:
+    def delete_relation(
+        self, source_entity: str, target_entity: str, confirm: bool = True
+    ) -> bool:
         """Delete a relation between entities"""
         if confirm:
-            response = input(f"Delete relation between '{source_entity}' and '{target_entity}'? (y/N): ")
+            response = input(
+                f"Delete relation between '{source_entity}' and '{target_entity}'? (y/N): "
+            )
             if response.lower() not in ["y", "yes"]:
                 print("Deletion cancelled.")
                 return False
@@ -597,14 +636,18 @@ class LightRAGDocumentManager:
         try:
             response = requests.delete(
                 f"{self.base_url}/documents/delete_relation",
-                json={"source_entity": source_entity, "target_entity": target_entity}
+                json={"source_entity": source_entity, "target_entity": target_entity},
             )
 
             if response.status_code in [200, 204]:
-                print(f"✅ Relation between '{source_entity}' and '{target_entity}' deleted successfully")
+                print(
+                    f"✅ Relation between '{source_entity}' and '{target_entity}' deleted successfully"
+                )
                 return True
             else:
-                print(f"❌ Error deleting relation: {response.status_code} - {response.text}")
+                print(
+                    f"❌ Error deleting relation: {response.status_code} - {response.text}"
+                )
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -615,10 +658,7 @@ class LightRAGDocumentManager:
         """Query the RAG system"""
         try:
             request_body = {"query": query, "mode": mode}
-            response = requests.post(
-                f"{self.base_url}/query",
-                json=request_body
-            )
+            response = requests.post(f"{self.base_url}/query", json=request_body)
 
             if response.status_code == 200:
                 return response.json()
@@ -779,16 +819,18 @@ def main():
         "--delete-entity", type=str, help="Delete an entity from knowledge graph"
     )
     parser.add_argument(
-        "--delete-relation", nargs=2, metavar=("SOURCE", "TARGET"),
-        help="Delete relation between two entities"
+        "--delete-relation",
+        nargs=2,
+        metavar=("SOURCE", "TARGET"),
+        help="Delete relation between two entities",
     )
+    parser.add_argument("--query", type=str, help="Query the RAG system")
     parser.add_argument(
-        "--query", type=str, help="Query the RAG system"
-    )
-    parser.add_argument(
-        "--query-mode", type=str, default="hybrid",
+        "--query-mode",
+        type=str,
+        default="hybrid",
         choices=["naive", "local", "global", "hybrid", "mix"],
-        help="Query mode (default: hybrid)"
+        help="Query mode (default: hybrid)",
     )
     parser.add_argument(
         "--no-confirm", action="store_true", help="Skip confirmation prompts"
@@ -837,59 +879,61 @@ def main():
     match action:
         case "list":
             manager.list_all_documents()
-        
+
         case "delete_failed":
             manager.delete_failed_documents(confirm=not args.no_confirm)
-        
+
         case "delete_ids":
-            manager.delete_specific_documents(args.delete_ids, confirm=not args.no_confirm)
-        
+            manager.delete_specific_documents(
+                args.delete_ids, confirm=not args.no_confirm
+            )
+
         case "ingest_file":
             manager.ingest_file(args.ingest_file, confirm=not args.no_confirm)
-        
+
         case "clear_cache":
             # If --clear-cache is provided with no arguments, clear all cache
             # If --clear-cache is provided with arguments, clear specific modes
             modes = args.clear_cache if args.clear_cache else None
             manager.clear_cache(modes)
-        
+
         case "scan":
             manager.scan_documents()
-        
+
         case "upload_file":
             manager.upload_file_to_input_dir(args.upload_file)
-        
+
         case "insert_text":
             manager.insert_text(args.insert_text)
-        
+
         case "insert_file":
             manager.insert_file_direct(args.insert_file)
-        
+
         case "batch_files":
             manager.insert_batch_files(args.batch_files)
-        
+
         case "clear_all":
             manager.clear_all_documents(confirm=not args.no_confirm)
-        
+
         case "pipeline_status":
             status = manager.get_pipeline_status()
             if status:
                 print("📊 Pipeline Status:")
                 print(json.dumps(status, indent=2))
-        
+
         case "delete_entity":
             manager.delete_entity(args.delete_entity, confirm=not args.no_confirm)
-        
+
         case "delete_relation":
             source, target = args.delete_relation
             manager.delete_relation(source, target, confirm=not args.no_confirm)
-        
+
         case "query":
             result = manager.query_text(args.query, args.query_mode)
             if result:
                 print("🔍 Query Result:")
                 print(json.dumps(result, indent=2))
-        
+
         case "help" | _:
             print("No action specified. Use --help for available options.")
             print("\n📚 Document Management:")
@@ -897,7 +941,9 @@ def main():
             print("  python lightrag_docmgr.py --scan")
             print("  python lightrag_docmgr.py --upload-file /path/to/file.pdf")
             print("  python lightrag_docmgr.py --insert-file /path/to/file.txt")
-            print("  python lightrag_docmgr.py --batch-files file1.pdf file2.txt file3.docx")
+            print(
+                "  python lightrag_docmgr.py --batch-files file1.pdf file2.txt file3.docx"
+            )
             print("  python lightrag_docmgr.py --ingest-file document.pdf")
             print("  python lightrag_docmgr.py --insert-text 'Your text here'")
             print("\n🗑️  Deletion Operations:")
@@ -905,13 +951,17 @@ def main():
             print("  python lightrag_docmgr.py --delete-ids doc-123 doc-456")
             print("  python lightrag_docmgr.py --clear-all")
             print("  python lightrag_docmgr.py --delete-entity 'Entity Name'")
-            print("  python lightrag_docmgr.py --delete-relation 'Source Entity' 'Target Entity'")
+            print(
+                "  python lightrag_docmgr.py --delete-relation 'Source Entity' 'Target Entity'"
+            )
             print("\n🧹 Cache Management:")
             print("  python lightrag_docmgr.py --clear-cache")
             print("  python lightrag_docmgr.py --clear-cache default naive")
             print("\n🔍 Query & Status:")
             print("  python lightrag_docmgr.py --query 'What is machine learning?'")
-            print("  python lightrag_docmgr.py --query 'AI concepts' --query-mode local")
+            print(
+                "  python lightrag_docmgr.py --query 'AI concepts' --query-mode local"
+            )
             print("  python lightrag_docmgr.py --pipeline-status")
             print(f"\n📁 Default knowledge base location: {WORKING_DIR}")
 
