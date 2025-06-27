@@ -1166,12 +1166,12 @@ with tab3:
     # Knowledge Base Tab Content
     st.markdown("### Knowledge Base Search & Management")
 
-    # Search Knowledge Section
+    # SQLite/LanceDB Knowledge Search Section
     st.markdown("---")
-    st.subheader("🔍 Search Knowledge Base")
-    st.markdown("*Search through stored knowledge using semantic similarity*")
+    st.subheader("🔍 SQLite/LanceDB Knowledge Search")
+    st.markdown("*Search through stored knowledge using the original sqlite and lancedb knowledge sources*")
 
-    # Advanced search options for knowledge
+    # Advanced search options for original knowledge search
     col1, col2 = st.columns(2)
     with col1:
         knowledge_search_limit = st.number_input(
@@ -1185,17 +1185,72 @@ with tab3:
     with col2:
         st.write("")  # Empty space for alignment
 
-    # Chat input for knowledge search - automatically clears after submission
+    # Chat input for original knowledge search - automatically clears after submission
     if knowledge_search_query := st.chat_input(
-        "Enter keywords to search the knowledge base (e.g., programming, science, history)"
+        "Enter keywords to search the SQLite/LanceDB knowledge base (e.g., programming, science, history)"
     ):
         try:
-            # Use direct RAG search
-            search_results = direct_search_rag(query=knowledge_search_query)
+            # Use direct knowledge search (original sqlite/lancedb)
+            search_results = direct_search_knowledge(
+                query=knowledge_search_query, limit=knowledge_search_limit
+            )
 
             if search_results:
                 st.subheader(
-                    f"🔍 RAG Knowledge Search Results for: '{knowledge_search_query}'"
+                    f"🔍 SQLite/LanceDB Knowledge Search Results for: '{knowledge_search_query}'"
+                )
+                st.info(f"Found {len(search_results)} results")
+
+                for i, knowledge_entry in enumerate(search_results, 1):
+                    # Handle different knowledge entry formats
+                    if hasattr(knowledge_entry, "content"):
+                        content = knowledge_entry.content
+                        title = getattr(knowledge_entry, "title", "Untitled")
+                        source = getattr(knowledge_entry, "source", "Unknown")
+                        knowledge_id = getattr(knowledge_entry, "id", "N/A")
+                    elif isinstance(knowledge_entry, dict):
+                        content = knowledge_entry.get("content", "No content")
+                        title = knowledge_entry.get("title", "Untitled")
+                        source = knowledge_entry.get("source", "Unknown")
+                        knowledge_id = knowledge_entry.get("id", "N/A")
+                    else:
+                        content = str(knowledge_entry)
+                        title = "Untitled"
+                        source = "Unknown"
+                        knowledge_id = "N/A"
+
+                    with st.expander(
+                        f"📚 Result {i}: {title if title != 'Untitled' else content[:50]}..."
+                    ):
+                        st.write(f"**Title:** {title}")
+                        st.write(f"**Content:** {content}")
+                        st.write(f"**Source:** {source}")
+                        st.write(f"**Knowledge ID:** {knowledge_id}")
+
+                        # Note: Individual knowledge entry deletion not available
+                        # Knowledge base is loaded from files and managed at the file level
+            else:
+                st.info("No matching knowledge found. Try different keywords.")
+
+        except Exception as e:
+            st.error(f"Error searching SQLite/LanceDB knowledge base: {str(e)}")
+
+    # RAG Knowledge Search Section
+    st.markdown("---")
+    st.subheader("🤖 RAG Knowledge Search")
+    st.markdown("*Search through knowledge using direct RAG query*")
+
+    # Chat input for RAG knowledge search - automatically clears after submission
+    if rag_search_query := st.chat_input(
+        "Enter keywords to search the RAG knowledge base (e.g., programming, science, history)"
+    ):
+        try:
+            # Use direct RAG search
+            search_results = direct_search_rag(query=rag_search_query)
+
+            if search_results:
+                st.subheader(
+                    f"🤖 RAG Knowledge Search Results for: '{rag_search_query}'"
                 )
                 # Display the markdown results directly
                 st.markdown(search_results)
@@ -1203,16 +1258,18 @@ with tab3:
                 st.info("No matching knowledge found. Try different keywords.")
 
         except Exception as e:
-            st.error(f"Error searching knowledge base: {str(e)}")
+            st.error(f"Error searching RAG knowledge base: {str(e)}")
 
     # Knowledge Base Information
     st.markdown("---")
     st.subheader("📚 Knowledge Base Information")
-    st.markdown("*Information about the knowledge base system*")
+    st.markdown("*Information about both knowledge base systems*")
 
+    # Original Knowledge Base Information
+    st.markdown("#### SQLite/LanceDB Knowledge Base")
     knowledge_manager = get_knowledge_manager()
     if knowledge_manager:
-        st.info("✅ Knowledge base is available and ready for searching")
+        st.info("✅ SQLite/LanceDB knowledge base is available and ready for searching")
 
         # Show knowledge base type and basic info
         kb_type = type(knowledge_manager).__name__
@@ -1220,17 +1277,27 @@ with tab3:
 
         # Check if knowledge base exists
         if hasattr(knowledge_manager, "exists") and knowledge_manager.exists():
-            st.success("📚 Knowledge base contains data and is ready for queries")
+            st.success("📚 SQLite/LanceDB knowledge base contains data and is ready for queries")
         else:
-            st.warning("📭 Knowledge base appears to be empty or not loaded")
+            st.warning("📭 SQLite/LanceDB knowledge base appears to be empty or not loaded")
             st.info(
                 "💡 **Tip:** Load some documents into your knowledge base to enable searching"
             )
     else:
-        st.warning("⚠️ Knowledge base is not available")
+        st.warning("⚠️ SQLite/LanceDB knowledge base is not available")
         st.info(
-            "💡 **Note:** Knowledge base functionality requires proper initialization"
+            "💡 **Note:** SQLite/LanceDB knowledge base functionality requires proper initialization"
         )
+
+    # RAG Knowledge Base Information
+    st.markdown("#### RAG Knowledge Base")
+    agent = st.session_state.agent
+    if hasattr(agent, "lightrag_knowledge"):
+        st.info("✅ RAG knowledge base is available and ready for searching")
+        st.success("📚 RAG knowledge base is ready for queries")
+    else:
+        st.warning("⚠️ RAG knowledge base is not available")
+        st.info("💡 **Note:** RAG knowledge base functionality requires proper initialization")
 
 
 # Sidebar with agent info and controls
