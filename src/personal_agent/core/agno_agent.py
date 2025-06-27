@@ -11,6 +11,9 @@ import os
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
 
+# pylint: disable=C0413
+import aiohttp
+
 # Set logging levels for better telemetry
 if "RUST_LOG" not in os.environ:
     # Enable more verbose Rust logging for debugging
@@ -48,6 +51,7 @@ from .agno_storage import (
     create_agno_storage,
     create_combined_knowledge_base,
     load_combined_knowledge_base,
+    load_lightrag_knowledge_base,
 )
 
 # Configure logging
@@ -96,10 +100,12 @@ class AgnoPersonalAgent:
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
+        self.recreate = recreate
 
         # Agno native storage components
         self.agno_storage = None
         self.agno_knowledge = None
+        self.lightrag_knowledge = None
         self.agno_memory = None
 
         # MCP configuration
@@ -288,6 +294,24 @@ class AgnoPersonalAgent:
             except Exception as e:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
+
+        async def query_knowledge_base(
+            query: str, base_url: str = "http://localhost:9621", mode: str = "hybrid"
+        ) -> dict:
+            """
+            Query the LightRAG knowledge base.
+
+            :param query: The query string to search in the knowledge base
+            :param base_url: Base URL for the LightRAG server
+            :param mode: Query mode (default: "hybrid")
+            :return: Dictionary with query results
+            """
+            url = f"{base_url}/query"
+            payload = {"query": query, "mode": mode}
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, timeout=120) as resp:
+                    resp.raise_for_status()
+                    return await resp.json()
 
         async def query_memory(query: str, limit: Union[int, None] = None) -> str:
             """Search user memories using direct SemanticMemoryManager calls.
@@ -812,7 +836,8 @@ Returns:
             - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences likes interests")
             - "Recent memories" or "What did I tell you recently?" → IMMEDIATELY call get_recent_memories()
             - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
-            - Any statement of fact about personal info 
+            - Any statement of fact about personal info → IMMEDIATELY call store_user_memory(content="the fact", topics=["personal", "user info"])
+            
             **SEMANTIC MEMORY STORAGE**: When the user provides new personal information → IMMEDIATELY call store_memory(content="the fact",topics=[topic1,topic2,...])
             2. **DO specify topics** - call store_user_memory(content="the fact", topics=[topic1, topic2,...]) 
             3. **Acknowledge the storage warmly** - "I'll remember that about you!"
@@ -833,6 +858,12 @@ Returns:
             - Automatically falls back to keyword matching if needed
             - Returns relevant memories even if exact words don't match
             
+            **KNOWLEDGE BASE QUERIES**:
+            - When the user asks for knowledge base information immediately call the tool query_knowledge_base("search terms")
+            and provide a summary of the results.
+            - If the user asks for specific information, use query_knowledge_base("specific topic") to retrieve relevant knowledge base entries..
+            If that returns no results, then use the web search tool to find current information.
+
             **DECISION TREE - FOLLOW THIS EXACTLY**:
             - Question about user? → Query memory tools IMMEDIATELY
             - Found memories? → Share them warmly and personally
@@ -841,8 +872,8 @@ Returns:
             
             **TOOL PRIORITY**: For personal information queries:
             1. **Memory tools (query_memory, get_recent_memories) - HIGHEST PRIORITY - USE IMMEDIATELY**
-            2. Knowledge base search - only for general knowledge
-            3. Web search - only for current/external information
+            2. Knowledge base search - call query_knowledge_base("information about {self.user_id}).
+            3. Web search - as a last resort current/external information
             
             ## CURRENT AVAILABLE TOOLS - USE THESE IMMEDIATELY
             
@@ -852,7 +883,6 @@ Returns:
             - **PythonTools**: Calculations, data analysis, programming help, code execution
             - **ShellTools**: System operations and command execution (base directory: current working directory)
             - **PersonalAgentFilesystemTools**: File reading, writing, directory operations, file management
-            - **KnowledgeTools**: Automatic knowledge base search, reasoning, analysis (when knowledge base enabled)
             - **Memory Tools**: Complete semantic memory management system
               - store_user_memory: Store new memories with topic classification
               - query_memory: Semantic search through all memories
@@ -884,7 +914,7 @@ Returns:
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
-            - Knowledge base queries? → KnowledgeTools AUTOMATICALLY (when knowledge base enabled)
+            - Knowledge base queries? → Query KnowledgeBase IMMEDIATELY
             - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
             
             ## CRITICAL: NO OVERTHINKING RULE - ELIMINATE HESITATION
@@ -895,6 +925,8 @@ Returns:
             - DO NOT hesitate or debate internally
             - IMMEDIATELY call get_recent_memories() or query_memory()
             - ACT FIRST, then respond based on what you find
+
+            **BANNED BEHAVIORS - NEVER DO THESE**
             
             **BANNED BEHAVIORS - NEVER DO THESE**:
             - ❌ "Let me think about whether I should check memories..."
@@ -1020,12 +1052,23 @@ Returns:
                             add_instructions=True,  # Use built-in instructions
                             add_few_shot=True,  # Add example interactions
                         )
-                        tools.append(knowledge_tools)
-                        logger.info(
-                            "Added KnowledgeTools for automatic knowledge base search and reasoning"
-                        )
+                        # tools.append(knowledge_tools)
+                        # logger.info(
+                        #    "Added KnowledgeTools for automatic knowledge base search and reasoning"
+                        # )
                     except Exception as e:
                         logger.warning("Failed to add KnowledgeTools: %s", e)
+
+                    # Add Lightrag knowledge if enabled
+                    if self.enable_memory:
+                        try:
+                            self.lightrag_knowledge = await load_lightrag_knowledge_base()
+                            logger.info(
+                                "Loaded Lightrag knowledge base metadata"
+                            )
+                        except Exception as e:
+                            logger.warning("Failed to load Lightrag knowledge base: %s", e)
+                            self.lightrag_knowledge = None
 
                 # Create memory with SemanticMemoryManager (debug mode passed through)
                 self.agno_memory = create_agno_memory(
@@ -1457,6 +1500,62 @@ Returns:
             )
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
+
+    async def query_knowledge_base(
+        self, query: str, base_url: str = "http://localhost:9621", mode: str = "hybrid"
+    ) -> str:
+        """
+        Query the LightRAG knowledge base - return raw response exactly as received.
+
+        :param query: The query string to search in the knowledge base
+        :param base_url: Base URL for the LightRAG server
+        :param mode: Query mode (default: "hybrid")
+        :return: String with query results exactly as LightRAG returns them
+        """
+        try:
+            url = f"{base_url}/query"
+            payload = {"query": query, "mode": mode}
+            
+            logger.info(f"Querying LightRAG: {url} with query: '{query}', mode: {mode}")
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, timeout=120) as resp:
+                    logger.info(f"LightRAG response status: {resp.status}")
+                    
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        logger.error(f"LightRAG server error {resp.status}: {error_text}")
+                        return f"LightRAG server error {resp.status}: {error_text}"
+                    
+                    result = await resp.json()
+                    logger.info(f"LightRAG response received, returning raw content...")
+                    
+                    # Extract response content - simple and direct, NO FILTERING
+                    if isinstance(result, dict) and "response" in result:
+                        response_content = result["response"]
+                    elif isinstance(result, dict) and "content" in result:
+                        response_content = result["content"]
+                    elif isinstance(result, dict) and "answer" in result:
+                        response_content = result["answer"]
+                    else:
+                        response_content = str(result)
+                    
+                    # Return exactly as received - NO PROCESSING OR FILTERING
+                    logger.info(f"Returning raw LightRAG response: {len(response_content)} characters")
+                    return response_content
+                        
+        except aiohttp.ClientConnectorError as e:
+            error_msg = f"Cannot connect to LightRAG server at {base_url}. Is the server running? Error: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
+        except asyncio.TimeoutError as e:
+            error_msg = f"Timeout connecting to LightRAG server at {base_url}. Error: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
+        except Exception as e:
+            error_msg = f"Error querying knowledge base: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
 
     def get_agent_info(self) -> Dict[str, Any]:
         """Get comprehensive information about the agent configuration and tools.

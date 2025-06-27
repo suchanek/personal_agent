@@ -36,6 +36,7 @@ Removed redundant functions (v0.5.3):
 from pathlib import Path
 from typing import Optional
 
+import aiohttp
 from agno.embedder.ollama import OllamaEmbedder
 from agno.knowledge.arxiv import ArxivKnowledgeBase
 from agno.knowledge.combined import CombinedKnowledgeBase
@@ -50,18 +51,25 @@ from agno.vectordb.lancedb import LanceDb, SearchType
 try:
     from ..config import DATA_DIR, OLLAMA_URL
     from ..utils import setup_logging
-    from .semantic_memory_manager import SemanticMemoryManager, SemanticMemoryManagerConfig
+    from .semantic_memory_manager import (
+        SemanticMemoryManager,
+        SemanticMemoryManagerConfig,
+    )
 except ImportError:
     # When running directly, use absolute imports
-    import sys
     import os
+    import sys
+
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    
+
     from personal_agent.config import DATA_DIR, OLLAMA_URL
+    from personal_agent.core.semantic_memory_manager import (
+        SemanticMemoryManager,
+        SemanticMemoryManagerConfig,
+    )
     from personal_agent.utils import setup_logging
-    from personal_agent.core.semantic_memory_manager import SemanticMemoryManager, SemanticMemoryManagerConfig
 
 logger = setup_logging(__name__)
 
@@ -288,49 +296,57 @@ async def load_combined_knowledge_base(
     logger.info("Combined knowledge base loaded successfully")
 
 
-# REMOVED: load_personal_knowledge() and load_personal_knowledge_async() functions
-# These functions were redundant with create_combined_knowledge_base()
-# which properly handles both text and PDF sources in a unified manner.
+async def load_lightrag_knowledge_base(base_url: str = "http://localhost:9621") -> dict:
+    """
+    Load the LightRAG knowledge base metadata.
 
-
-# REMOVED: load_pdf_knowledge() and load_pdf_knowledge_async() functions
-# These functions were redundant with create_combined_knowledge_base()
-# which properly handles both text and PDF sources in a unified manner.
+    :param base_url: Base URL for the LightRAG server
+    :return: Dictionary with knowledge base status/info
+    """
+    url = f"{base_url}/documents"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, timeout=60) as resp:
+            resp.raise_for_status()
+            return await resp.json()
 
 
 async def main():
     """Demonstrate knowledge base loading functionality.
-    
+
     This main routine shows how to:
     1. Create a combined knowledge base with text and PDF sources
     2. Load the knowledge base content
     3. Display basic information about the loaded knowledge base
     """
     import asyncio
-    import sys
     import os
-    
+    import sys
+
     # Add the project root to Python path for imports when running directly
     if __name__ == "__main__":
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("🚀 AGNO KNOWLEDGE BASE LOADING DEMO")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Create storage and memory components
     print("\n📦 Creating storage components...")
     try:
         storage = create_agno_storage()
-        memory = create_agno_memory(debug_mode=False)  # Disable debug for cleaner output
+        memory = create_agno_memory(
+            debug_mode=False
+        )  # Disable debug for cleaner output
         print("   ✅ Storage and memory components created successfully")
     except Exception as e:
         print(f"   ❌ Failed to create storage components: {e}")
-        print("   💡 Make sure Ollama is running and the required dependencies are installed")
+        print(
+            "   💡 Make sure Ollama is running and the required dependencies are installed"
+        )
         return
-    
+
     # Create combined knowledge base
     print("\n🧠 Creating combined knowledge base...")
     try:
@@ -338,7 +354,7 @@ async def main():
     except Exception as e:
         print(f"   ❌ Failed to create knowledge base: {e}")
         return
-    
+
     if knowledge_base is None:
         print("   ⚠️  No knowledge base created - no knowledge files found")
         print("\n📋 To test knowledge base loading:")
@@ -346,17 +362,17 @@ async def main():
         print("   2. Add some .txt, .md, or .pdf files to it")
         print("   3. Run this demo again")
         return
-    
+
     # Load the knowledge base content
     print("\n📚 Loading knowledge base content...")
     try:
         await load_combined_knowledge_base(knowledge_base, recreate=False)
         print("   ✅ Knowledge base loaded successfully!")
-        
+
         # Display basic information about the knowledge base
-        print(f"\n📊 Knowledge Base Information:")
+        print("\n📊 Knowledge Base Information:")
         print(f"   📁 Total Sources: {len(knowledge_base.sources)}")
-        
+
         for i, source in enumerate(knowledge_base.sources):
             source_type = type(source).__name__
             if source_type == "TextKnowledgeBase":
@@ -368,49 +384,51 @@ async def main():
             else:
                 icon = "📋"
                 description = source_type
-            
+
             print(f"   {icon} Source {i + 1}: {description}")
-        
+
         # Test a simple search if the knowledge base has content
-        print(f"\n🔍 Testing knowledge base search...")
+        print("\n🔍 Testing knowledge base search...")
         try:
             # Perform a simple search query
             search_results = knowledge_base.search("knowledge")
             print(f"   📈 Search results found: {len(search_results)}")
-            
+
             if search_results:
                 print("   🎯 Sample results:")
                 for i, result in enumerate(search_results[:2]):  # Show first 2 results
-                    preview = str(result)[:80].replace('\n', ' ').strip()
+                    preview = str(result)[:80].replace("\n", " ").strip()
                     print(f"      {i + 1}. {preview}...")
             else:
                 print("   📝 No results found for 'knowledge' query")
-                
+
         except Exception as search_error:
             print(f"   ⚠️  Search test failed: {search_error}")
-            print("   💡 This might be due to Ollama not running - that's okay for the demo")
-        
+            print(
+                "   💡 This might be due to Ollama not running - that's okay for the demo"
+            )
+
     except Exception as load_error:
         print(f"   ❌ Failed to load knowledge base: {load_error}")
         return
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("🎉 DEMO COMPLETED SUCCESSFULLY!")
-    print("="*60)
+    print("=" * 60)
     print("💡 Your knowledge base is ready to use with the personal agent")
     print()
 
 
 if __name__ == "__main__":
     import asyncio
-    import sys
     import os
-    
+    import sys
+
     # Add the project root to Python path for imports when running directly
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    
+
     asyncio.run(main())
 
 # end of file
