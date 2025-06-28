@@ -1,0 +1,142 @@
+/* Dark theme styles */
+.stApp {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Main content area */
+.main .block-container {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Header area */
+.stApp > header {
+    background-color: #0e1117 !important;
+}
+
+/* Main content wrapper */
+.stMainBlockContainer {
+    background-color: #0e1117 !important;
+}
+
+/* Bottom toolbar/footer */
+.stBottom {
+    background-color: #0e1117 !important;
+}
+
+
+/* Restore other interactive elements */
+button {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+}
+
+/* Sidebar */
+.stSidebar {
+    background-color: #262730 !important;
+}
+
+.stSidebar .stMarkdown {
+    color: #fafafa !important;
+}
+
+.stSidebar .stSelectbox > div > div {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+}
+
+/* Text inputs */
+.stTextInput > div > div > input {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+.stTextInput > div > div > input:focus {
+    border-color: #6a6a6a !important;
+    box-shadow: 0 0 0 1px #6a6a6a !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+.stButton > button:hover {
+    background-color: #3a3a3a !important;
+    border: 1px solid #6a6a6a !important;
+}
+
+/* Expanders */
+.stExpander {
+    background-color: #1e1e1e !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+.stExpander > div > div > div > div {
+    background-color: #1e1e1e !important;
+}
+
+/* Chat messages */
+.stChatMessage {
+    background-color: #1e1e1e !important;
+}
+
+.stChatMessage > div {
+    background-color: #1e1e1e !important;
+}
+
+/* Metrics */
+.stMetric {
+    background-color: #1e1e1e !important;
+    border: 1px solid #4a4a4a !important;
+    border-radius: 5px !important;
+    padding: 10px !important;
+}
+
+/* Alerts */
+.stAlert {
+    background-color: #1e1e1e !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+/* Selectbox */
+.stSelectbox > div > div {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+}
+
+/* Checkbox */
+.stCheckbox > label {
+    color: #fafafa !important;
+}
+
+/* Headers and text */
+h1, h2, h3, h4, h5, h6 {
+    color: #fafafa !important;
+}
+
+p, div, span {
+    color: #fafafa !important;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #262730;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6a6a6a;
+}
