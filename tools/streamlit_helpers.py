@@ -111,11 +111,11 @@ class StreamlitKnowledgeHelper:
             st.error(f"Error in knowledge search: {e}")
             return []
 
-    def search_rag(self, query: str):
+    def search_rag(self, query: str, search_type: str = "naive"):
         if not self.agent or not (hasattr(self.agent, "lightrag_knowledge")):
             return None
         try:
-            return asyncio.run(self.agent.query_knowledge_base(query, mode="naive"))
+            return asyncio.run(self.agent.query_knowledge_base(query, mode=search_type))
         except Exception as e:
             st.error(f"Error querying knowledge base: {e}")
             return None

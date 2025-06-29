@@ -19,3 +19,4 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "tesla.local:192.168.1.126"

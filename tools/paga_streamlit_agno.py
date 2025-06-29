@@ -397,9 +397,29 @@ def render_memory_tab():
                 st.rerun()
 
 
+def render_knowledge_status(knowledge_helper):
+    """Renders the status of the knowledge bases in an expander."""
+    with st.expander("ℹ️ Knowledge Base Status"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**SQLite/LanceDB**")
+            if knowledge_helper.knowledge_manager:
+                st.success("✅ Ready")
+            else:
+                st.warning("⚠️ Offline")
+        with col2:
+            st.markdown("**RAG**")
+            agent = st.session_state.get(SESSION_KEY_AGENT)
+            if agent and hasattr(agent, "lightrag_knowledge"):
+                st.success("✅ Ready")
+            else:
+                st.warning("⚠️ Offline")
+
+
 def render_knowledge_tab():
     st.markdown("### Knowledge Base Search & Management")
     knowledge_helper = st.session_state[SESSION_KEY_KNOWLEDGE_HELPER]
+    render_knowledge_status(knowledge_helper)
 
     # SQLite/LanceDB Knowledge Search Section
     st.markdown("---")
@@ -439,29 +459,18 @@ def render_knowledge_tab():
     st.markdown("---")
     st.subheader("🤖 RAG Knowledge Search")
     st.markdown("*Search through knowledge using direct RAG query*")
+    search_type = st.selectbox(
+        "Select RAG Search Type:",
+        ("naive", "local", "global", "hybrid", "mix"),
+        key="rag_search_type"
+    )
     if rag_search_query := st.chat_input("Enter keywords to search the RAG knowledge base"):
-        search_results = knowledge_helper.search_rag(query=rag_search_query)
+        search_results = knowledge_helper.search_rag(query=rag_search_query, search_type=search_type)
         if search_results:
-            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query}'")
+            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query}' (Type: {search_type})")
             st.markdown(search_results)
         else:
             st.info("No matching knowledge found.")
-
-    # Knowledge Base Information
-    st.markdown("---")
-    st.subheader("📚 Knowledge Base Information")
-    st.markdown("*Information about both knowledge base systems*")
-    st.markdown("#### SQLite/LanceDB Knowledge Base")
-    if knowledge_helper.knowledge_manager:
-        st.info("✅ SQLite/LanceDB knowledge base is available and ready for searching")
-    else:
-        st.warning("⚠️ SQLite/LanceDB knowledge base is not available")
-    st.markdown("#### RAG Knowledge Base")
-    agent = st.session_state[SESSION_KEY_AGENT]
-    if hasattr(agent, "lightrag_knowledge"):
-        st.info("✅ RAG knowledge base is available and ready for searching")
-    else:
-        st.warning("⚠️ RAG knowledge base is not available")
 
 
 def render_sidebar():
@@ -511,10 +520,7 @@ def render_sidebar():
         st.header("Agent Information")
         st.write(f"**Current Model:** {st.session_state[SESSION_KEY_CURRENT_MODEL]}")
         st.write(f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}")
-        if hasattr(args, "remote") and args.remote:
-            st.success("🌐 **Remote Mode:** Using remote Ollama server")
-        else:
-            st.info("🏠 **Local Mode:** Using local Ollama server")
+        
 
         st.header("Controls")
         if st.button("Clear Chat History"):

@@ -1,19 +1,17 @@
 /* Light theme - only override essential elements, preserve interaction icons */
 .stApp {
     background-color: white !important;
-    color: black !important;
 }
 
 .main .block-container {
     background-color: white !important;
-    color: black !important;
 }
 
 .stSidebar {
     background-color: #f0f2f6 !important;
 }
 
-.stSidebar .stMarkdown {
+.stSidebar .stMarkdown, .main .stMarkdown {
     color: black !important;
 }
 
@@ -33,6 +31,7 @@
 h1, h2, h3, h4, h5, h6 {
     color: black !important;
 }
+
 
 /* Reset custom scrollbar to default */
 ::-webkit-scrollbar {
