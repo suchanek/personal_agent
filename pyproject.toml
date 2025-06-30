@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.7.7-rag"
+version = "0.7.8"
 license = "BSD-3-Clause"
 description = "Personal AI agent with MCP and Memory, powered by Agno and Ollama"
 authors = ["Eric Suchanek <suchanek@mac.com>"]

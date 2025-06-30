@@ -10,6 +10,7 @@ A sophisticated personal AI assistant powered by the **Agno Framework** with nat
 
 - 🤖 **Agno Framework**: Built on modern async Agno framework with native tool integration
 - 🧠 **Semantic Memory**: Advanced memory system with intelligent duplicate detection and search
+- 📚 **RAG Knowledge Base**: Advanced document knowledge base powered by LightRAG.
 - 🔧 **MCP Integration**: Native Model Context Protocol support with 6 integrated servers
 - 🌐 **Streamlit Interface**: Modern web UI with real-time model selection and memory management
 - ⚡ **Local AI**: Powered by Ollama with dynamic model switching
@@ -35,10 +36,16 @@ A sophisticated personal AI assistant powered by the **Agno Framework** with nat
 ## 🏗️ Architecture
 
 ```text
+                               ┌─────────────────┐
+                               │ Streamlit Web   │
+                               │   Interface     │
+                               └───────┬─────────┘
+                                       │
+                                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Streamlit Web   │───▶│   Agno Agent    │───▶│   Ollama LLM    │
-│   Interface     │    │  (Async Core)   │    │ (Dynamic Model) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+│  Ollama LLM     │◀───│   Agno Agent    │───▶│  LightRAG Server│
+│ (Dynamic Model) │    │  (Async Core)   │    │ (RAG Knowledge) │
+└─────────────────┘    └───────┬─────────┘    └─────────────────┘
                                │
                                ▼
                    ┌─────────────────────────────────────────┐
@@ -49,9 +56,9 @@ A sophisticated personal AI assistant powered by the **Agno Framework** with nat
                    │  │    Manager      │  │ (6 servers)   │ │
                    │  └─────────────────┘  └───────────────┘ │
                    │                                         │
-                   │  📁 Filesystem     🐙 GitHub           │
-                   │  🌍 DuckDuckGo     🌐 Puppeteer        │
-                   │  💰 Finance        💻 Python           │
+                   │  📁 Filesystem     🐙 GitHub             │
+                   │  🌍 DuckDuckGo     🌐 Puppeteer          │
+                   │  💰 Finance        💻 Python             │
                    └─────────────────────────────────────────┘
 ```
 
@@ -168,6 +175,11 @@ store-fact            # Store facts directly in memory
 - **store_user_memory**: Store personal information with topic classification
 - **query_memory**: Search through stored memories using semantic similarity
 - **get_recent_memories**: Retrieve recent interactions and stored information
+
+### Knowledge Tools
+
+- **query_knowledge_base**: Search the RAG knowledge base with multiple modes (hybrid, local, etc.).
+- **Semantic Search**: Search through SQLite/LanceDB knowledge sources.
 
 ### MCP-Powered Tools
 
@@ -336,21 +348,18 @@ personal_agent/
 
 ## 🔄 Recent Updates
 
-### v0.7.1-dev (Current)
+### v0.7.8-rag (Current)
 
-- ✅ **Tool Call Visibility**: Fixed tool call detection in Streamlit interface
-- ✅ **Finance Tools**: Resolved Yahoo Finance 401 errors with working endpoints
-- ✅ **Memory Search**: Complete memory search implementation (searches ALL memories)
-- ✅ **Tool Usage Fix**: Eliminated agent hesitation on tool usage
-- ✅ **Performance**: 50x faster memory operations with semantic similarity
+- ✅ **RAG Knowledge Base**: Integrated LightRAG for advanced document-based knowledge.
+- ✅ **Streamlit UI**: Added a new "Knowledge Base" tab with RAG search capabilities.
+- ✅ **Raw Responses**: `query_knowledge_base` now returns detailed, unfiltered responses from the RAG server.
+- ✅ **Enhanced UI**: Knowledge Base tab now shows the status of different knowledge bases.
 
 ### Key Improvements
 
-- **Complete Tool Visibility**: All tool calls now visible in debug panels
-- **Working Finance Data**: Real stock prices and financial information
-- **Comprehensive Memory Search**: Searches through all stored memories, not just recent ones
-- **Immediate Tool Usage**: Agent uses tools immediately when requested
-- **Enhanced Performance**: Dramatic improvements in response times
+- **Direct RAG Interaction**: New UI for querying the RAG knowledge base.
+- **Detailed Knowledge**: Get raw, detailed responses from the RAG server.
+- **Improved UX**: Dedicated tab for knowledge management with status indicators.
 
 ## 📄 License
 
