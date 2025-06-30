@@ -7,18 +7,15 @@ from typing import TYPE_CHECKING
 
 from langchain.tools import tool
 
+from ..config import DATA_DIR, HOME_DIR, USE_MCP, USE_WEAVIATE
+
 if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient
     from ..core.memory import WeaviateVectorStore
 
-# These will be injected by the main module
-USE_MCP = True
-USE_WEAVIATE = True
 mcp_client: "SimpleMCPClient" = None
 vector_store: "WeaviateVectorStore" = None
 store_interaction = None
-
-from ..config import DATA_DIR, HOME_DIR, USE_WEAVIATE
 
 logger = None
 

@@ -11,6 +11,9 @@ import os
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
 
+# pylint: disable=C0413
+import aiohttp
+
 # Set logging levels for better telemetry
 if "RUST_LOG" not in os.environ:
     # Enable more verbose Rust logging for debugging
@@ -25,6 +28,7 @@ from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
@@ -35,18 +39,20 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentWebTools,
 )
+from ..tools.working_yfinance_tools import WorkingYFinanceTools
 from ..utils import setup_logging
 from .agno_storage import (
     create_agno_memory,
     create_agno_storage,
     create_combined_knowledge_base,
     load_combined_knowledge_base,
+    load_lightrag_knowledge_base,
 )
-from .anti_duplicate_memory import AntiDuplicateMemory
 
 # Configure logging
 logger = setup_logging(__name__)
@@ -94,10 +100,12 @@ class AgnoPersonalAgent:
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
+        self.recreate = recreate
 
         # Agno native storage components
         self.agno_storage = None
         self.agno_knowledge = None
+        self.lightrag_knowledge = None
         self.agno_memory = None
 
         # MCP configuration
@@ -123,28 +131,77 @@ class AgnoPersonalAgent:
         if self.model_provider == "openai":
             return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
-            # Use Ollama-compatible interface for Ollama
+            # Get dynamic context size for this model
+            context_size, detection_method = get_model_context_size_sync(
+                self.model_name, self.ollama_base_url
+            )
+
+            logger.info(
+                "Using context size %d for model %s (detected via: %s)",
+                context_size,
+                self.model_name,
+                detection_method,
+            )
+
+            # Use Ollama-compatible interface for Ollama with dynamic context window
             return Ollama(
                 id=self.model_name,
                 host=self.ollama_base_url,
+                options={
+                    "num_ctx": context_size,  # Use dynamically detected context window
+                    "temperature": 0.7,  # Optional: set temperature for consistency
+                    "num_predict": -1,  # Allow unlimited prediction length
+                    "top_k": 40,
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1,
+                },
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
-    async def _get_memory_tools(self) -> List:
-        """Create memory tools as native async functions compatible with Agno.
+    def _direct_search_memories(
+        self, query: str, limit: int = 10, similarity_threshold: float = 0.3
+    ):
+        """Direct semantic search without agentic retrieval."""
+        if not self.agno_memory:
+            return []
 
-        This method creates the crucial store_user_memory and query_memory tools
-        that enable the agent to actually create and retrieve memories.
+        try:
+            results = self.agno_memory.memory_manager.search_memories(
+                query=query,
+                db=self.agno_memory.db,
+                user_id=self.user_id,
+                limit=limit,
+                similarity_threshold=similarity_threshold,
+                search_topics=True,
+                topic_boost=0.5,
+            )
+            return results
+        except Exception as e:
+            logger.warning("Direct semantic search failed: %s", e)
+            return []
+
+    async def _get_memory_tools(self) -> List:
+        """Create memory tools using direct SemanticMemoryManager method calls.
+
+        This method creates memory tools that directly call SemanticMemoryManager methods
+        instead of using complex wrapper functions, making the code much simpler and more maintainable.
         """
         if not self.enable_memory or not self.agno_memory:
             logger.warning("Memory not enabled or memory not initialized")
             return []
 
+        # Check if memory is available
+        if not self.agno_memory:
+            logger.error("Memory not initialized")
+            return []
+
         tools = []
 
-        async def store_user_memory(content: str, topics: List[str] = None) -> str:
-            """Store information as a user memory.
+        async def store_user_memory(
+            content: str = "", topics: Union[List[str], str, None] = None
+        ) -> str:
+            """Store information as a user memory using direct SemanticMemoryManager calls.
 
             Args:
                 content: The information to store as a memory
@@ -153,62 +210,111 @@ class AgnoPersonalAgent:
             Returns:
                 str: Success or error message
             """
+            # Validate that content is provided
+            if not content or not content.strip():
+                return "❌ Error: Content is required to store a memory. Please provide the information you want me to remember."
             try:
                 import json
-
-                from agno.memory.v2.memory import UserMemory
 
                 if topics is None:
                     topics = ["general"]
 
-                # Fix: Handle case where topics comes in as string representation of list
-                # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
+                # CRITICAL FIX: Ensure topics are ALWAYS stored as a list
                 if isinstance(topics, str):
-                    try:
-                        # Try to parse as JSON first
-                        topics = json.loads(topics)
-                        logger.debug("Converted topics from string to list: %s", topics)
-                    except (json.JSONDecodeError, ValueError):
-                        # If that fails, treat as a single topic
-                        topics = [topics]
+                    # Check if it's a JSON string representation of a list
+                    if topics.startswith("[") and topics.endswith("]"):
+                        try:
+                            topics = json.loads(topics)
+                            logger.debug(
+                                "Converted topics from JSON string to list: %s", topics
+                            )
+                        except (json.JSONDecodeError, ValueError):
+                            # If JSON parsing fails, treat as comma-separated string
+                            topics = [
+                                t.strip().strip("'\"")
+                                for t in topics.strip("[]").split(",")
+                            ]
+                            logger.debug(
+                                "Parsed topics from malformed JSON as list: %s", topics
+                            )
+                    elif "," in topics:
+                        # Handle comma-separated topics like "education, personal"
+                        topics = [t.strip().strip("'\"") for t in topics.split(",")]
                         logger.debug(
-                            "Treating topics string as single topic: %s", topics
+                            "Split comma-separated topics into list: %s", topics
+                        )
+                    else:
+                        # Single topic string
+                        topics = [topics.strip().strip("'\"")]
+                        logger.debug(
+                            "Converted single topic string to list: %s", topics
                         )
 
-                # Ensure topics is a list
+                # Final validation: Ensure topics is ALWAYS a list
                 if not isinstance(topics, list):
-                    topics = [str(topics)]
+                    topics = [str(topics).strip("'\"")]
+                    logger.warning(
+                        "Force-converted non-list topics to list: %s", topics
+                    )
 
-                memory_obj = UserMemory(memory=content, topics=topics)
-                memory_id = self.agno_memory.add_user_memory(
-                    memory=memory_obj, user_id=self.user_id
+                # Clean up topics: remove empty strings, strip whitespace AND quotes
+                topics = [
+                    t.strip().strip("'\"") for t in topics if t and str(t).strip()
+                ]
+
+                # Ensure we have at least one topic
+                if not topics:
+                    topics = ["general"]
+
+                # Direct call to SemanticMemoryManager.add_memory()
+                #                success, message, memory_id = self.agno_memory.memory_manager.add_memory(
+                #                    memory_text=content, db=self.agno_memory.db, user_id=self.user_id, topics=topics
+                #                )
+                success, message, memory_id = (
+                    self.agno_memory.memory_manager.add_memory(
+                        memory_text=content,
+                        db=self.agno_memory.db,
+                        user_id=self.user_id,
+                        topics=topics,
+                    )
                 )
 
-                if memory_id == "duplicate-detected-fake-id":
-                    # Memory was a duplicate but we return success to avoid agent confusion
-                    logger.info(
-                        "Memory already exists (duplicate detected): %s...", content[:50]
-                    )
-                    return f"✅ Memory already exists: {content[:50]}..."
-                elif memory_id is None:
-                    # Unexpected error case
-                    logger.warning(
-                        "Memory storage failed unexpectedly: %s...", content[:50]
-                    )
-                    return f"❌ Error storing memory: {content[:50]}..."
-                else:
-                    # Memory was successfully stored (new memory)
+                if success:
                     logger.info(
                         "Stored user memory: %s... (ID: %s)", content[:50], memory_id
                     )
                     return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+                else:
+                    logger.info("Memory rejected: %s", message)
+                    if "duplicate" in message.lower():
+                        return f"✅ Memory already exists: {content[:50]}..."
+                    else:
+                        return f"❌ Error storing memory: {message}"
 
             except Exception as e:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_memory(query: str, limit: int = 5) -> str:
-            """Search user memories using semantic search.
+        async def query_knowledge_base(
+            query: str, base_url: str = "http://localhost:9621", mode: str = "hybrid"
+        ) -> dict:
+            """
+            Query the LightRAG knowledge base.
+
+            :param query: The query string to search in the knowledge base
+            :param base_url: Base URL for the LightRAG server
+            :param mode: Query mode (default: "hybrid")
+            :return: Dictionary with query results
+            """
+            url = f"{base_url}/query"
+            payload = {"query": query, "mode": mode}
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, timeout=120) as resp:
+                    resp.raise_for_status()
+                    return await resp.json()
+
+        async def query_memory(query: str, limit: Union[int, None] = None) -> str:
+            """Search user memories using direct SemanticMemoryManager calls.
 
             Args:
                 query: The query to search for in memories
@@ -218,34 +324,186 @@ class AgnoPersonalAgent:
                 str: Found memories or message if none found
             """
             try:
-                memories = self.agno_memory.search_user_memories(
+                # Validate query parameter
+                if not query or not query.strip():
+                    logger.warning("Empty query provided to query_memory")
+                    return (
+                        "❌ Error: Query cannot be empty. Please provide a search term."
+                    )
+
+                # Direct call to SemanticMemoryManager.search_memories()
+                results = self.agno_memory.memory_manager.search_memories(
+                    query=query.strip(),
+                    db=self.agno_memory.db,
                     user_id=self.user_id,
-                    query=query,
-                    retrieval_method="agentic",
-                    limit=limit,
+                    limit=limit or 20,
+                    similarity_threshold=0.3,
+                    search_topics=True,
+                    topic_boost=0.5,
                 )
 
-                if not memories:
-                    logger.info("No memories found for query: %s", query)
-                    return f"🔍 No memories found for: {query}"
+                if not results:
+                    logger.info("No matching memories found for query: %s", query)
+                    return f"🔍 No memories found for '{query}'. Try different keywords or ask me to remember something new!"
 
-                # Format memories for display
-                result = f"🧠 Found {len(memories)} memories for '{query}':\n\n"
-                for i, memory in enumerate(memories, 1):
-                    result += f"{i}. {memory.memory}\n"
+                # Format results
+                display_memories = results[:limit] if limit else results
+                result_note = f"🧠 MEMORY RETRIEVAL (found {len(results)} matches via semantic search)"
+
+                result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user:\n\n"
+
+                for i, (memory, score) in enumerate(display_memories, 1):
+                    result += f"{i}. {memory.memory} (similarity: {score:.2f})\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
 
-                logger.info("Found %d memories for query: %s", len(memories), query)
+                result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
+
+                logger.info(
+                    "Found %d matching memories for query: %s", len(results), query
+                )
                 return result
 
             except Exception as e:
                 logger.error("Error querying memories: %s", e)
                 return f"❌ Error searching memories: {str(e)}"
 
-        async def get_recent_memories(limit: int = 10) -> str:
-            """Get the most recent user memories.
+        async def update_memory(
+            memory_id: str, content: str, topics: Union[List[str], str, None] = None
+        ) -> str:
+            """Update an existing memory using direct SemanticMemoryManager calls.
+
+            Args:
+                memory_id: ID of the memory to update
+                content: New memory content
+                topics: Optional list of topics/categories for the memory
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                import json
+
+                # CRITICAL FIX: Ensure topics are ALWAYS stored as a list (same logic as store_user_memory)
+                if isinstance(topics, str):
+                    # Check if it's a JSON string representation of a list
+                    if topics.startswith("[") and topics.endswith("]"):
+                        try:
+                            topics = json.loads(topics)
+                            logger.debug(
+                                "Converted topics from JSON string to list: %s", topics
+                            )
+                        except (json.JSONDecodeError, ValueError):
+                            # If JSON parsing fails, treat as comma-separated string
+                            topics = [
+                                t.strip().strip("'\"")
+                                for t in topics.strip("[]").split(",")
+                            ]
+                            logger.debug(
+                                "Parsed topics from malformed JSON as list: %s", topics
+                            )
+                    elif "," in topics:
+                        # Handle comma-separated topics like "education, personal"
+                        topics = [t.strip().strip("'\"") for t in topics.split(",")]
+                        logger.debug(
+                            "Split comma-separated topics into list: %s", topics
+                        )
+                    else:
+                        # Single topic string
+                        topics = [topics.strip().strip("'\"")]
+                        logger.debug(
+                            "Converted single topic string to list: %s", topics
+                        )
+
+                # Final validation: Ensure topics is ALWAYS a list
+                if topics and not isinstance(topics, list):
+                    topics = [str(topics).strip("'\"")]
+                    logger.warning(
+                        "Force-converted non-list topics to list: %s", topics
+                    )
+
+                # Clean up topics: remove empty strings, strip whitespace AND quotes
+                if topics:
+                    topics = [
+                        t.strip().strip("'\"") for t in topics if t and str(t).strip()
+                    ]
+
+                    # Ensure we have at least one topic if topics were provided
+                    if not topics:
+                        topics = ["general"]
+
+                # Direct call to SemanticMemoryManager.update_memory()
+                success, message = self.agno_memory.memory_manager.update_memory(
+                    memory_id=memory_id,
+                    memory_text=content,
+                    db=self.agno_memory.db,
+                    user_id=self.user_id,
+                    topics=topics,
+                )
+
+                if success:
+                    logger.info("Updated memory %s: %s...", memory_id, content[:50])
+                    return f"✅ Successfully updated memory: {content[:50]}..."
+                else:
+                    logger.error("Failed to update memory %s: %s", memory_id, message)
+                    return f"❌ Error updating memory: {message}"
+
+            except Exception as e:
+                logger.error("Error updating memory: %s", e)
+                return f"❌ Error updating memory: {str(e)}"
+
+        async def delete_memory(memory_id: str) -> str:
+            """Delete a memory using direct SemanticMemoryManager calls.
+
+            Args:
+                memory_id: ID of the memory to delete
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                # Direct call to SemanticMemoryManager.delete_memory()
+                success, message = self.agno_memory.memory_manager.delete_memory(
+                    memory_id=memory_id, db=self.agno_memory.db, user_id=self.user_id
+                )
+
+                if success:
+                    logger.info("Deleted memory %s", memory_id)
+                    return f"✅ Successfully deleted memory: {memory_id}"
+                else:
+                    logger.error("Failed to delete memory %s: %s", memory_id, message)
+                    return f"❌ Error deleting memory: {message}"
+
+            except Exception as e:
+                logger.error("Error deleting memory: %s", e)
+                return f"❌ Error deleting memory: {str(e)}"
+
+        async def clear_memories() -> str:
+            """Clear all memories for the user using direct SemanticMemoryManager calls.
+
+            Returns:
+                str: Success or error message
+            """
+            try:
+                # Direct call to SemanticMemoryManager.clear_memories()
+                success, message = self.agno_memory.memory_manager.clear_memories(
+                    db=self.agno_memory.db, user_id=self.user_id
+                )
+
+                if success:
+                    logger.info("Cleared all memories for user %s", self.user_id)
+                    return f"✅ {message}"
+                else:
+                    logger.error("Failed to clear memories: %s", message)
+                    return f"❌ Error clearing memories: {message}"
+
+            except Exception as e:
+                logger.error("Error clearing memories: %s", e)
+                return f"❌ Error clearing memories: {str(e)}"
+
+        async def get_recent_memories(limit: int = 100) -> str:
+            """Get recent memories by searching all memories and sorting by date.
 
             Args:
                 limit: Maximum number of recent memories to return
@@ -254,34 +512,150 @@ class AgnoPersonalAgent:
                 str: Recent memories or message if none found
             """
             try:
-                memories = self.agno_memory.search_user_memories(
-                    user_id=self.user_id, limit=limit, retrieval_method="last_n"
+                # Use search_memories with empty query to get all memories, then limit
+                results = self.agno_memory.memory_manager.search_memories(
+                    query="",  # Empty query to get all memories
+                    db=self.agno_memory.db,
+                    user_id=self.user_id,
+                    limit=limit,
+                    similarity_threshold=0.0,  # Very low threshold to get all
+                    search_topics=False,
                 )
 
-                if not memories:
+                if not results:
                     return "📝 No memories found."
 
                 # Format memories for display
-                result = f"📝 Recent {len(memories)} memories:\n\n"
-                for i, memory in enumerate(memories, 1):
+                result = f"📝 Recent {len(results)} memories:\n\n"
+                for i, (memory, _) in enumerate(results, 1):
                     result += f"{i}. {memory.memory}\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
 
-                logger.info("Retrieved %d recent memories", len(memories))
+                logger.info("Retrieved %d recent memories", len(results))
                 return result
 
             except Exception as e:
                 logger.error("Error getting recent memories: %s", e)
                 return f"❌ Error getting recent memories: {str(e)}"
 
-        # Add tools to the list
-        tools.append(store_user_memory)
-        tools.append(query_memory)
-        tools.append(get_recent_memories)
+        async def get_all_memories() -> str:
+            """Get all user memories using direct SemanticMemoryManager calls.
 
-        logger.info("Created %d memory tools", len(tools))
+            Returns:
+                str: All memories or message if none found
+            """
+            try:
+                # Use search_memories with empty query and no limit to get all memories
+                results = self.agno_memory.memory_manager.search_memories(
+                    query="",  # Empty query to get all memories
+                    db=self.agno_memory.db,
+                    user_id=self.user_id,
+                    limit=1000,  # High limit to get all
+                    similarity_threshold=0.0,  # Very low threshold to get all
+                    search_topics=False,
+                )
+
+                if not results:
+                    return "📝 No memories found."
+
+                # Format memories for display
+                result = f"📝 All {len(results)} memories:\n\n"
+                for i, (memory, _) in enumerate(results, 1):
+                    result += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+
+                logger.info("Retrieved %d total memories", len(results))
+                return result
+
+            except Exception as e:
+                logger.error("Error getting all memories: %s", e)
+                return f"❌ Error getting all memories: {str(e)}"
+
+        async def get_memory_stats() -> str:
+            """Get memory statistics using direct SemanticMemoryManager calls.
+
+            Returns:
+                str: Memory statistics
+            """
+            try:
+                # Direct call to SemanticMemoryManager.get_memory_stats()
+                stats = self.agno_memory.memory_manager.get_memory_stats(
+                    db=self.agno_memory.db, user_id=self.user_id
+                )
+
+                if "error" in stats:
+                    return f"❌ Error getting memory stats: {stats['error']}"
+
+                # Format stats for display
+                result = "📊 Memory Statistics:\n\n"
+                result += f"Total memories: {stats.get('total_memories', 0)}\n"
+                result += f"Average memory length: {stats.get('average_memory_length', 0):.1f} characters\n"
+                result += (
+                    f"Recent memories (24h): {stats.get('recent_memories_24h', 0)}\n"
+                )
+
+                if stats.get("most_common_topic"):
+                    result += f"Most common topic: {stats['most_common_topic']}\n"
+
+                if stats.get("topic_distribution"):
+                    result += "\nTopic distribution:\n"
+                    for topic, count in stats["topic_distribution"].items():
+                        result += f"  - {topic}: {count}\n"
+
+                logger.info("Retrieved memory statistics")
+                return result
+
+            except Exception as e:
+                logger.error("Error getting memory stats: %s", e)
+                return f"❌ Error getting memory stats: {str(e)}"
+
+        async def search_memory(query: str, limit: Union[int, None] = None) -> str:
+            """Search user memories - alias for query_memory for compatibility.
+
+            Args:
+                query: The query to search for in memories
+                limit: Maximum number of memories to return
+
+            Returns:
+                str: Found memories or message if none found
+            """
+            # This is just an alias for query_memory to maintain compatibility
+            return await query_memory(query, limit)
+
+        # Set proper function names for tool identification
+        store_user_memory.__name__ = "store_user_memory"
+        query_memory.__name__ = "query_memory"
+        search_memory.__name__ = "search_memory"
+        update_memory.__name__ = "update_memory"
+        delete_memory.__name__ = "delete_memory"
+        clear_memories.__name__ = "clear_memories"
+        get_recent_memories.__name__ = "get_recent_memories"
+        get_all_memories.__name__ = "get_all_memories"
+        get_memory_stats.__name__ = "get_memory_stats"
+
+        # Add tools to the list
+        tools.extend(
+            [
+                store_user_memory,
+                query_memory,
+                search_memory,
+                update_memory,
+                delete_memory,
+                clear_memories,
+                get_recent_memories,
+                get_all_memories,
+                get_memory_stats,
+            ]
+        )
+
+        logger.info(
+            "Created %d memory tools using direct SemanticMemoryManager calls",
+            len(tools),
+        )
         return tools
 
     async def _get_mcp_tools(self) -> List:
@@ -408,71 +782,214 @@ Returns:
 
         :return: Formatted instruction string for the agent
         """
+        # Get current tool configuration for accurate instructions
+        mcp_status = "enabled" if self.enable_mcp else "disabled"
+        memory_status = (
+            "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
+        )
+
         base_instructions = dedent(
-            """\
-            You are an advanced personal AI assistant with comprehensive capabilities and built-in memory.
+            f"""\
+            You are a personal AI friend with comprehensive capabilities and built-in semantic memory. Your purpose is to chat with the user about things and make them feel good.
             
-            ## MEMORY USAGE RULES - CRITICAL
+            ## CURRENT CONFIGURATION
+            - **Memory System**: {memory_status}
+            - **MCP Servers**: {mcp_status}
+            - **User ID**: {self.user_id}
+            - **Debug Mode**: {self.debug}
             
-            **MEMORY STORAGE**: When the user provides new personal information:
-            1. **Store it ONCE using store_user_memory** - do NOT call this tool multiple times
-            2. **Acknowledge the storage** - confirm you've saved the information
-            3. **Do NOT over-think** - simple facts should be stored immediately
+            ## CRITICAL IDENTITY RULES - ABSOLUTELY MANDATORY
             
-            **MEMORY RETRIEVAL**: When asked about personal information:
-            1. **Use query_memory to search** for relevant information
-            2. **Use get_recent_memories** to see recent context
-            3. **Do NOT use web search** for personal details
+            **YOU ARE AN AI ASSISTANT who is a MEMORY EXPERT **: You are NOT the user. You are a friendly AI that helps and remembers things about the user.
             
-            ## Core Guidelines
+            **NEVER PRETEND TO BE THE USER**:
+            - You are NOT the user, you are an AI assistant that knows information ABOUT the user 
+            - NEVER say "I'm {self.user_id}" or introduce yourself as the user - this is COMPLETELY WRONG
+            - NEVER use first person when talking about user information
+            - You are an AI assistant that has stored semantic memories about the user
             
-            - **Be Direct**: Execute tasks immediately without excessive reasoning
-            - **One Tool Call Per Task**: Don't repeat the same tool call multiple times
-            - **Built-in Memory**: You have persistent memory across conversations
-            - **Use Tools Efficiently**: Choose the right tool and use it once
-            - **Be Thorough**: When searching or researching, provide complete results
-            - **Show Reasoning**: Use reasoning for complex problems, not simple storage
+            **FRIENDLY INTRODUCTION**: When meeting someone new, introduce yourself as their personal AI friend and ask about their hobbies, interests, and what they like to talk about. Be warm and conversational!
             
-            ## CRITICAL TOOL USAGE RULES
+            ## PERSONALITY & TONE
             
-            1. **For Memory Storage**: Use store_user_memory ONCE per new fact
-            2. **For Memory Retrieval**: Use query_memory or get_recent_memories
-            3. **For GitHub Tasks**: Use available GitHub tools for repository information
-            4. **For File Operations**: Use filesystem tools for file management
-            5. **For Research**: Use web search tools for current information
-            6. **Never repeat tool calls** - if a tool succeeds, move on
+            - **Be Warm & Friendly**: You're a personal AI friend, not just a tool
+            - **Be Conversational**: Chat naturally and show genuine interest
+            - **Be Supportive**: Make the user feel good and supported
+            - **Be Curious**: Ask follow-up questions about their interests
+            - **Be Remembering**: Reference past conversations and show you care
+            - **Be Encouraging**: Celebrate their achievements and interests
             
-            ## Available Capabilities
+            ## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED - YOUR MAIN ROLE!
             
-            - **Memory Management**: Store and retrieve personal information efficiently
-            - **GitHub Integration**: Search repositories, analyze code, get repository information
-            - **File System Operations**: Read, write, and manage files and directories  
-            - **Web Research**: Search for current information and technical details
-            - **Python Execution**: Run code snippets and calculations
-            - **Shell Commands**: Execute system commands when needed
+            **SEMANTIC MEMORY FEATURES**:
+            - **Automatic Deduplication**: Prevents storing duplicate memories
+            - **Topic Classification**: Automatically categorizes memories by topic
+            - **Similarity Matching**: Uses semantic similarity for intelligent retrieval
+            - **Comprehensive Search**: Searches through ALL stored memories
             
-            ## Response Format
+            **MEMORY QUERIES - NO HESITATION RULE**:
+            When the user asks ANY of these questions, IMMEDIATELY call the appropriate memory tool:
+            - "What do you remember about me?" → IMMEDIATELY call query_memory("personal information about me")
+            - "Do you know anything about me?" → IMMEDIATELY call query_memory("personal information about me")
+            - "What have I told you?" → IMMEDIATELY call query_memory("personal information about me")
+            - "Show me all my memories" or "What are all my memories?" → IMMEDIATELY call get_all_memories()
+            - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences likes interests")
+            - "Recent memories" or "What did I tell you recently?" → IMMEDIATELY call get_recent_memories()
+            - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
+            - Any statement of fact about personal info → IMMEDIATELY call store_user_memory(content="the fact", topics=["personal", "user info"])
             
-            - Use markdown formatting for better readability
-            - Present data in tables when showing multiple items
-            - Include relevant links when helpful
-            - Keep responses concise and focused
+            **SEMANTIC MEMORY STORAGE**: When the user provides new personal information → IMMEDIATELY call store_memory(content="the fact",topics=[topic1,topic2,...])
+            2. **DO specify topics** - call store_user_memory(content="the fact", topics=[topic1, topic2,...]) 
+            3. **Acknowledge the storage warmly** - "I'll remember that about you!"
+            4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically
             
-            ## Core Principles
+            **SEMANTIC MEMORY RETRIEVAL PROTOCOL**:
+            1. **IMMEDIATE ACTION**: If it's about the user, query memory FIRST - no thinking, no hesitation
+            2. **Primary Tool**: Use query_memory("relevant search terms") for general "what do you remember" questions - it uses semantic similarity + topic matching
+            3. **Complete Overview**: Use get_all_memories() when user asks for ALL memories or complete history
+            4. **Chronological Recent**: Use get_recent_memories() only when user specifically asks for "recent" or "latest" memories
+            5. **Semantic Search Power**: query_memory() searches ALL memories semantically with topic boosting for best relevance
+            6. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
+            7. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
             
-            1. **Be Efficient**: Use tools once and effectively
-            2. **Be Accurate**: Verify information and cite sources when possible
-            3. **Be Contextual**: Consider past interactions and user preferences
-            4. **Be Clear**: Provide well-structured, easy-to-understand responses
-            5. **Avoid Repetition**: Don't call the same tool multiple times unnecessarily
+            **SEMANTIC SEARCH CAPABILITIES**:
+            - Searches through ALL stored memories comprehensively
+            - Uses semantic similarity to find related content
+            - Automatically falls back to keyword matching if needed
+            - Returns relevant memories even if exact words don't match
             
-            ## Tool Usage Strategy
-            - **Simple Facts**: Store immediately with store_user_memory (once)
-            - **Personal Questions**: Query memory first, then provide answer
-            - **Complex Tasks**: Break down into steps, use appropriate tools
-            - **Current Information**: Use web search for recent/external data
-            - **Technical Details**: Use reasoning and appropriate technical tools
-            - **Error Recovery**: Handle tool failures gracefully with alternatives
+            **KNOWLEDGE BASE QUERIES**:
+            - When the user asks for knowledge base information immediately call the tool query_knowledge_base("search terms")
+            and provide a summary of the results.
+            - If the user asks for specific information, use query_knowledge_base("specific topic") to retrieve relevant knowledge base entries..
+            If that returns no results, then use the web search tool to find current information.
+
+            **DECISION TREE - FOLLOW THIS EXACTLY**:
+            - Question about user? → Query memory tools IMMEDIATELY
+            - Found memories? → Share them warmly and personally
+            - No memories found? → "I don't have any memories stored about you yet. Tell me about yourself!"
+            - Never overthink memory queries - just DO IT
+            
+            **TOOL PRIORITY**: For personal information queries:
+            1. **Memory tools (query_memory, get_recent_memories) - HIGHEST PRIORITY - USE IMMEDIATELY**
+            2. Knowledge base search - call query_knowledge_base("information about {self.user_id}).
+            3. Web search - as a last resort current/external information
+            
+            ## CURRENT AVAILABLE TOOLS - USE THESE IMMEDIATELY
+            
+            **BUILT-IN TOOLS AVAILABLE**:
+            - **YFinanceTools**: Stock prices, financial analysis, market data, company info, fundamentals, analyst recommendations
+            - **DuckDuckGoTools**: Web search (duckduckgo_search), news searches (duckduckgo_news), current events
+            - **PythonTools**: Calculations, data analysis, programming help, code execution
+            - **ShellTools**: System operations and command execution (base directory: current working directory)
+            - **PersonalAgentFilesystemTools**: File reading, writing, directory operations, file management
+            - **Memory Tools**: Complete semantic memory management system
+              - store_user_memory: Store new memories with topic classification
+              - query_memory: Semantic search through all memories
+              - get_recent_memories: Get recent memories (default 100)
+              - get_all_memories: Get all stored memories
+              - update_memory: Update existing memory by ID
+              - delete_memory: Delete specific memory by ID
+              - clear_memories: Clear all memories for user
+              - get_memory_stats: Get memory statistics and analytics
+            - **MCP Server Tools**: Dynamic tools from connected MCP servers (when MCP enabled)
+            
+            **WEB SEARCH - IMMEDIATE ACTION**:
+            - News requests → IMMEDIATELY use DuckDuckGoTools (duckduckgo_news)
+            - Current events → IMMEDIATELY use DuckDuckGoTools (duckduckgo_search)
+            - "what's happening with..." → IMMEDIATELY use DuckDuckGo search
+            - "top headlines about..." → IMMEDIATELY use duckduckgo_news
+            - NO analysis paralysis, just SEARCH
+            
+            **FINANCE QUERIES - IMMEDIATE ACTION**:
+            - Stock analysis requests → IMMEDIATELY use YFinanceTools
+            - "analyze [STOCK]" → IMMEDIATELY call get_current_stock_price() and get_stock_info()
+            - Financial data requests → IMMEDIATELY use finance tools
+            - NO thinking, NO debate, just USE THE TOOLS
+            
+            **TOOL DECISION TREE - FOLLOW EXACTLY**:
+            - Finance question? → YFinanceTools IMMEDIATELY (get_current_stock_price, get_stock_info, etc.)
+            - News/current events? → DuckDuckGoTools IMMEDIATELY (duckduckgo_news, duckduckgo_search)
+            - Calculations/code? → PythonTools IMMEDIATELY
+            - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
+            - System commands? → ShellTools IMMEDIATELY
+            - Personal info? → Memory tools IMMEDIATELY
+            - Knowledge base queries? → Query KnowledgeBase IMMEDIATELY
+            - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
+            
+            ## CRITICAL: NO OVERTHINKING RULE - ELIMINATE HESITATION
+            
+            **WHEN USER ASKS ABOUT MEMORIES - IMMEDIATE ACTION REQUIRED**:
+            - DO NOT analyze whether you should check memories
+            - DO NOT think about what tools to use
+            - DO NOT hesitate or debate internally
+            - IMMEDIATELY call get_recent_memories() or query_memory()
+            - ACT FIRST, then respond based on what you find
+
+            **BANNED BEHAVIORS - NEVER DO THESE**
+            
+            **BANNED BEHAVIORS - NEVER DO THESE**:
+            - ❌ "Let me think about whether I should check memories..."
+            - ❌ "I should probably use the memory tools but..."
+            - ❌ "Maybe I should query memory or maybe I should..."
+            - ❌ Any internal debate about memory tool usage
+            - ❌ Overthinking simple memory queries
+            - ❌ "Let me think about what tools to use..."
+            - ❌ "I should probably use [tool] but..."
+            - ❌ Fabricating data instead of using tools
+            
+            **REQUIRED IMMEDIATE RESPONSES**:
+            - ✅ User asks "What do you remember?" → IMMEDIATELY call query_memory("personal information about me")
+            - ✅ User asks about preferences → IMMEDIATELY call query_memory("preferences likes interests")
+            - ✅ User asks for recent memories → IMMEDIATELY call get_recent_memories()
+            - ✅ "Analyze NVDA" → IMMEDIATELY use YFinanceTools
+            - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools
+            - ✅ "top 5 headlines about..." → IMMEDIATELY use duckduckgo_news()
+            - ✅ "Calculate..." → IMMEDIATELY use PythonTools
+            - ✅ NO hesitation, just ACTION
+            
+            **CRITICAL: STOP ALL THINKING FOR TOOL REQUESTS**
+            - When user asks for tool usage, DO NOT use <think> tags
+            - DO NOT analyze what to do - just DO IT
+            - IMMEDIATELY call the requested tool
+            - Example: "list headlines about Middle East" → duckduckgo_news("Middle East headlines") RIGHT NOW
+            
+            **IMPORTANT SEMANTIC MEMORY RULES**:
+            - When calling store_user_memory, DO NOT pass any topics parameter - call store_user_memory(content="the fact") with ONLY the content parameter
+            - The SemanticMemoryManager will automatically classify and assign appropriate topics
+            - When recalling memories, phrase them in second person: "You mentioned..." not "I mentioned..."
+            - Trust the semantic deduplication - don't worry about storing duplicates
+            - The system automatically categorizes and organizes memories by topic
+            
+            ## CONVERSATION GUIDELINES
+            
+            - **Ask about their day**: Show interest in how they're doing
+            - **Remember their interests**: Bring up things they've mentioned before using semantic memory
+            - **Be encouraging**: Support their goals and celebrate wins
+            - **Share relevant information**: When they ask for help, provide useful details using tools
+            - **Stay engaged**: Ask follow-up questions to keep conversations flowing
+            - **Be helpful**: Use your tools immediately to assist with their requests
+            
+            ## RESPONSE STYLE
+            
+            - **Be conversational**: Write like you're chatting with a friend
+            - **Use emojis occasionally**: Add personality (but don't overdo it)
+            - **Ask questions**: Keep the conversation going
+            - **Show enthusiasm**: Be excited about their interests
+            - **Be supportive**: Offer encouragement and positive feedback
+            - **Remember context**: Reference previous conversations using semantic memory naturally
+            
+            ## CORE PRINCIPLES
+            
+            1. **Friendship First**: You're their AI friend who happens to be very capable
+            2. **Remember Everything**: Use your semantic memory to build deeper relationships
+            3. **Be Genuinely Helpful**: Use your tools immediately to assist with real needs
+            4. **Stay Positive**: Focus on making them feel good
+            5. **Be Curious**: Ask about their life, interests, and goals
+            6. **Celebrate Them**: Acknowledge their achievements and interests
+            7. **Act Immediately**: When they ask for information, use tools RIGHT NOW
+            
+            Remember: You're not just an assistant - you're a friendly AI companion with semantic memory who genuinely cares about the user and remembers your conversations together! Use your tools immediately when requested - no hesitation!
         """
         )
 
@@ -491,12 +1008,21 @@ Returns:
 
             # Prepare tools list
             tools = [
+                # Add DuckDuckGo tools directly for web search functionality
                 DuckDuckGoTools(),
-                YFinanceTools(),
+                YFinanceTools(
+                    stock_price=True,
+                    company_info=True,
+                    stock_fundamentals=True,
+                    key_financial_ratios=True,
+                    analyst_recommendations=True,
+                ),
                 PythonTools(),
-                ShellTools(base_dir="/"),  # Configured for security
+                ShellTools(
+                    base_dir="."
+                ),  # Match Streamlit configuration for consistency
                 PersonalAgentFilesystemTools(),
-                PersonalAgentWebTools(),
+                # Removed PersonalAgentWebTools as it was causing confusion with MCP references
             ]
 
             # Initialize Agno native storage and knowledge following the working example pattern
@@ -506,7 +1032,7 @@ Returns:
 
                 # Create knowledge base (sync creation)
                 self.agno_knowledge = create_combined_knowledge_base(
-                    self.storage_dir, self.knowledge_dir
+                    self.storage_dir, self.knowledge_dir, self.agno_storage
                 )
 
                 # Load knowledge base content (async loading) - matches working example
@@ -516,34 +1042,46 @@ Returns:
                     )
                     logger.info("Loaded Agno combined knowledge base content")
 
-                    # Knowledge tools will be automatically added via search_knowledge=True
-                    # DO NOT manually add KnowledgeTools to avoid naming conflicts
+                    # Add KnowledgeTools for automatic knowledge base search and reasoning
+                    try:
+                        knowledge_tools = KnowledgeTools(
+                            knowledge=self.agno_knowledge,
+                            think=True,  # Enable reasoning scratchpad
+                            search=True,  # Enable knowledge search
+                            analyze=True,  # Enable analysis capabilities
+                            add_instructions=True,  # Use built-in instructions
+                            add_few_shot=True,  # Add example interactions
+                        )
+                        # tools.append(knowledge_tools)
+                        # logger.info(
+                        #    "Added KnowledgeTools for automatic knowledge base search and reasoning"
+                        # )
+                    except Exception as e:
+                        logger.warning("Failed to add KnowledgeTools: %s", e)
 
-                self.agno_memory = create_agno_memory(self.storage_dir)
+                    # Add Lightrag knowledge if enabled
+                    if self.enable_memory:
+                        try:
+                            self.lightrag_knowledge = await load_lightrag_knowledge_base()
+                            logger.info(
+                                "Loaded Lightrag knowledge base metadata"
+                            )
+                        except Exception as e:
+                            logger.warning("Failed to load Lightrag knowledge base: %s", e)
+                            self.lightrag_knowledge = None
 
-                # Wrap with anti-duplicate memory system if memory was created successfully
+                # Create memory with SemanticMemoryManager (debug mode passed through)
+                self.agno_memory = create_agno_memory(
+                    self.storage_dir, debug_mode=self.debug
+                )
+
                 if self.agno_memory:
-                    # Create model for the anti-duplicate memory
-                    memory_model = self._create_model()
-
-                    # Extract the database from the regular memory
-                    memory_db = self.agno_memory.db
-
-                    # Create anti-duplicate memory with proper parameters
-                    self.agno_memory = AntiDuplicateMemory(
-                        db=memory_db,
-                        model=memory_model,
-                        similarity_threshold=0.85,  # 85% similarity threshold
-                        enable_semantic_dedup=True,
-                        enable_exact_dedup=True,
-                        debug_mode=self.debug,
-                    )
                     logger.info(
-                        "Created Agno memory with anti-duplicate protection at: %s",
+                        "Created Agno memory with SemanticMemoryManager at: %s",
                         self.storage_dir,
                     )
                 else:
-                    logger.error("Failed to create base memory system")
+                    logger.error("Failed to create memory system")
 
                 logger.info("Initialized Agno storage and knowledge backend")
             else:
@@ -555,14 +1093,13 @@ Returns:
             # TEMPORARILY DISABLED to debug tool naming issue
             # try:
             #     from agno.tools.reasoning import ReasoningTools
-
-            #     reasoning_tools = ReasoningTools(add_instructions=True)
+            #    reasoning_tools = ReasoningTools(add_instructions=True)
             #     tools.append(reasoning_tools)
-            #     logger.info("Added ReasoningTools for enhanced reasoning capabilities")
+            #    logger.info("Added ReasoningTools for enhanced reasoning capabilities")
             # except ImportError:
-            #     logger.warning(
-            #         "ReasoningTools not available, continuing without reasoning capabilities"
-            #     )
+            #    logger.warning(
+            #        "ReasoningTools not available, continuing without reasoning capabilities"
+            #    )
 
             # Get MCP tools as function wrappers (no pre-initialization)
             if self.enable_mcp:
@@ -595,12 +1132,17 @@ Returns:
                 add_history_to_messages=False,
                 num_history_responses=5,
                 knowledge=self.agno_knowledge if self.enable_memory else None,
+                search_knowledge=(
+                    True if self.enable_memory and self.agno_knowledge else False
+                ),  # Enable automatic knowledge search
                 storage=self.agno_storage if self.enable_memory else None,
                 memory=None,  # Don't pass memory to avoid auto-storage conflicts
                 # Enable telemetry and verbose logging
                 debug_mode=self.debug,
                 # Enable streaming for intermediate steps
                 stream_intermediate_steps=False,
+                # Force tool calling behavior
+                tool_choice="auto",  # Ensure tools are called when appropriate
             )
 
             if self.enable_memory and self.agno_knowledge:
@@ -626,13 +1168,13 @@ Returns:
 
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
-    ) -> str:
+    ) -> Union[str, Dict[str, Any]]:
         """Run a query through the agno agent.
 
         :param query: User query to process
         :param stream: Whether to stream the response
         :param add_thought_callback: Optional callback for adding thoughts during processing
-        :return: Agent response
+        :return: Agent response (string) or dict with response and tool call info
         """
         if not self.agent:
             raise RuntimeError("Agent not initialized. Call initialize() first.")
@@ -665,6 +1207,9 @@ Returns:
                 if add_thought_callback and self.enable_memory:
                     add_thought_callback("💾 Memory automatically updated by Agno")
 
+                # Store the last response for tool call extraction
+                self._last_response = response
+
                 return response.content
 
         except Exception as e:
@@ -672,6 +1217,275 @@ Returns:
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
+
+    def get_last_tool_calls(self) -> Dict[str, Any]:
+        """Get tool call information from the last response.
+
+        :return: Dictionary with tool call details
+        """
+        if not hasattr(self, "_last_response") or not self._last_response:
+            return {
+                "tool_calls_count": 0,
+                "tool_call_details": [],
+                "has_tool_calls": False,
+            }
+
+        try:
+            import json
+
+            response = self._last_response
+            tool_calls = []
+            tool_calls_count = 0
+
+            # Helper function to safely parse arguments
+            def parse_arguments(args_str):
+                """Parse arguments string into a proper dict or return formatted string."""
+                if not args_str or args_str == "{}":
+                    return {}
+
+                try:
+                    # Try to parse as JSON
+                    if isinstance(args_str, str):
+                        parsed = json.loads(args_str)
+                        return parsed
+                    elif isinstance(args_str, dict):
+                        return args_str
+                    else:
+                        return str(args_str)
+                except (json.JSONDecodeError, TypeError):
+                    # If parsing fails, return the string as-is
+                    return str(args_str)
+
+            # Helper function to extract function signature from content
+            def extract_function_signature(content_str):
+                """Extract function name and arguments from content like 'duckduckgo_search(max_results=5, query=top 5 trends in AI)'"""
+                import re
+
+                if not content_str:
+                    return None, {}
+
+                # Pattern to match function_name(arg1=value1, arg2=value2)
+                pattern = r"(\w+)\((.*?)\)"
+                match = re.search(pattern, content_str)
+
+                if match:
+                    func_name = match.group(1)
+                    args_str = match.group(2)
+
+                    # Parse arguments
+                    args_dict = {}
+                    if args_str.strip():
+                        # Split by comma and parse key=value pairs
+                        arg_pairs = [arg.strip() for arg in args_str.split(",")]
+                        for pair in arg_pairs:
+                            if "=" in pair:
+                                key, value = pair.split("=", 1)
+                                key = key.strip()
+                                value = value.strip()
+                                # Remove quotes if present
+                                if (value.startswith('"') and value.endswith('"')) or (
+                                    value.startswith("'") and value.endswith("'")
+                                ):
+                                    value = value[1:-1]
+                                args_dict[key] = value
+
+                    return func_name, args_dict
+
+                return None, {}
+
+            # Check if response has formatted_tool_calls (agno-specific) - PRIMARY SOURCE
+            if (
+                hasattr(response, "formatted_tool_calls")
+                and response.formatted_tool_calls
+            ):
+                tool_calls_count = len(response.formatted_tool_calls)
+                for tool_call in response.formatted_tool_calls:
+                    # Handle the case where formatted_tool_calls contains strings like 'duckduckgo_news(query=artificial intelligence)'
+                    if isinstance(tool_call, str):
+                        # Extract function name and arguments from the string
+                        extracted_name, extracted_args = extract_function_signature(
+                            tool_call
+                        )
+                        if extracted_name:
+                            tool_info = {
+                                "type": "function",
+                                "function_name": extracted_name,
+                                "function_args": extracted_args,
+                            }
+                            tool_calls.append(tool_info)
+                        else:
+                            # Fallback if parsing fails
+                            tool_info = {
+                                "type": "function",
+                                "function_name": tool_call,
+                                "function_args": {},
+                            }
+                            tool_calls.append(tool_info)
+                    else:
+                        # Handle object format (original code)
+                        tool_info = {
+                            "type": getattr(tool_call, "type", "function"),
+                        }
+
+                        if hasattr(tool_call, "function"):
+                            raw_args = getattr(tool_call.function, "arguments", "{}")
+                            parsed_args = parse_arguments(raw_args)
+                            function_name = getattr(
+                                tool_call.function, "name", "unknown"
+                            )
+
+                            # If arguments are empty but we have content, try to extract from content
+                            if (
+                                not parsed_args
+                                and hasattr(response, "content")
+                                and response.content
+                            ):
+                                extracted_name, extracted_args = (
+                                    extract_function_signature(response.content)
+                                )
+                                if extracted_name == function_name and extracted_args:
+                                    parsed_args = extracted_args
+
+                            tool_info.update(
+                                {
+                                    "function_name": function_name,
+                                    "function_args": parsed_args,
+                                }
+                            )
+                        elif hasattr(tool_call, "name"):
+                            raw_args = getattr(tool_call, "input", "{}")
+                            parsed_args = parse_arguments(raw_args)
+                            tool_info.update(
+                                {
+                                    "function_name": tool_call.name,
+                                    "function_args": parsed_args,
+                                }
+                            )
+                        else:
+                            # Handle dict format
+                            if isinstance(tool_call, dict):
+                                raw_args = tool_call.get("arguments", "{}")
+                                parsed_args = parse_arguments(raw_args)
+                                tool_info.update(
+                                    {
+                                        "function_name": tool_call.get(
+                                            "name", "unknown"
+                                        ),
+                                        "function_args": parsed_args,
+                                    }
+                                )
+                            else:
+                                tool_info.update(
+                                    {
+                                        "function_name": str(tool_call),
+                                        "function_args": {},
+                                    }
+                                )
+
+                        tool_calls.append(tool_info)
+
+            # Check if response has messages with tool calls
+            elif hasattr(response, "messages") and response.messages:
+                for message in response.messages:
+                    if hasattr(message, "tool_calls") and message.tool_calls:
+                        tool_calls_count += len(message.tool_calls)
+                        for tool_call in message.tool_calls:
+                            tool_info = {
+                                "type": getattr(tool_call, "type", "function"),
+                            }
+
+                            if hasattr(tool_call, "function"):
+                                raw_args = getattr(
+                                    tool_call.function, "arguments", "{}"
+                                )
+                                parsed_args = parse_arguments(raw_args)
+                                tool_info.update(
+                                    {
+                                        "function_name": getattr(
+                                            tool_call.function, "name", "unknown"
+                                        ),
+                                        "function_args": parsed_args,
+                                    }
+                                )
+                            elif hasattr(tool_call, "name"):
+                                raw_args = getattr(tool_call, "input", "{}")
+                                parsed_args = parse_arguments(raw_args)
+                                tool_info.update(
+                                    {
+                                        "function_name": tool_call.name,
+                                        "function_args": parsed_args,
+                                    }
+                                )
+
+                            tool_calls.append(tool_info)
+
+            # Also check if response has direct tool call information
+            elif hasattr(response, "tool_calls") and response.tool_calls:
+                tool_calls_count = len(response.tool_calls)
+                for tool_call in response.tool_calls:
+                    tool_info = {
+                        "type": getattr(tool_call, "type", "function"),
+                    }
+
+                    if hasattr(tool_call, "function"):
+                        raw_args = getattr(tool_call.function, "arguments", "{}")
+                        parsed_args = parse_arguments(raw_args)
+                        tool_info.update(
+                            {
+                                "function_name": getattr(
+                                    tool_call.function, "name", "unknown"
+                                ),
+                                "function_args": parsed_args,
+                            }
+                        )
+                    elif hasattr(tool_call, "name"):
+                        raw_args = getattr(tool_call, "input", "{}")
+                        parsed_args = parse_arguments(raw_args)
+                        tool_info.update(
+                            {
+                                "function_name": tool_call.name,
+                                "function_args": parsed_args,
+                            }
+                        )
+
+                    tool_calls.append(tool_info)
+
+            return {
+                "tool_calls_count": tool_calls_count,
+                "tool_call_details": tool_calls,
+                "has_tool_calls": tool_calls_count > 0,
+                "response_type": "AgnoPersonalAgent",
+                "debug_info": {
+                    "response_attributes": [
+                        attr for attr in dir(response) if not attr.startswith("_")
+                    ],
+                    "has_messages": hasattr(response, "messages"),
+                    "messages_count": (
+                        len(response.messages)
+                        if hasattr(response, "messages") and response.messages
+                        else 0
+                    ),
+                    "has_tool_calls_attr": hasattr(response, "tool_calls"),
+                    "has_formatted_tool_calls_attr": hasattr(
+                        response, "formatted_tool_calls"
+                    ),
+                    "formatted_tool_calls_count": (
+                        len(response.formatted_tool_calls)
+                        if hasattr(response, "formatted_tool_calls")
+                        and response.formatted_tool_calls
+                        else 0
+                    ),
+                },
+            }
+
+        except Exception as e:
+            logger.error("Error extracting tool calls: %s", e)
+            return {
+                "tool_calls_count": 0,
+                "tool_call_details": [],
+                "has_tool_calls": False,
+                "error": str(e),
+            }
 
     async def cleanup(self) -> None:
         """Clean up resources.
@@ -686,6 +1500,62 @@ Returns:
             )
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
+
+    async def query_knowledge_base(
+        self, query: str, base_url: str = "http://localhost:9621", mode: str = "hybrid"
+    ) -> str:
+        """
+        Query the LightRAG knowledge base - return raw response exactly as received.
+
+        :param query: The query string to search in the knowledge base
+        :param base_url: Base URL for the LightRAG server
+        :param mode: Query mode (default: "hybrid")
+        :return: String with query results exactly as LightRAG returns them
+        """
+        try:
+            url = f"{base_url}/query"
+            payload = {"query": query, "mode": mode}
+            
+            logger.info(f"Querying LightRAG: {url} with query: '{query}', mode: {mode}")
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, timeout=120) as resp:
+                    logger.info(f"LightRAG response status: {resp.status}")
+                    
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        logger.error(f"LightRAG server error {resp.status}: {error_text}")
+                        return f"LightRAG server error {resp.status}: {error_text}"
+                    
+                    result = await resp.json()
+                    logger.info(f"LightRAG response received, returning raw content...")
+                    
+                    # Extract response content - simple and direct, NO FILTERING
+                    if isinstance(result, dict) and "response" in result:
+                        response_content = result["response"]
+                    elif isinstance(result, dict) and "content" in result:
+                        response_content = result["content"]
+                    elif isinstance(result, dict) and "answer" in result:
+                        response_content = result["answer"]
+                    else:
+                        response_content = str(result)
+                    
+                    # Return exactly as received - NO PROCESSING OR FILTERING
+                    logger.info(f"Returning raw LightRAG response: {len(response_content)} characters")
+                    return response_content
+                        
+        except aiohttp.ClientConnectorError as e:
+            error_msg = f"Cannot connect to LightRAG server at {base_url}. Is the server running? Error: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
+        except asyncio.TimeoutError as e:
+            error_msg = f"Timeout connecting to LightRAG server at {base_url}. Error: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
+        except Exception as e:
+            error_msg = f"Error querying knowledge base: {str(e)}"
+            logger.error(error_msg)
+            return error_msg
 
     def get_agent_info(self) -> Dict[str, Any]:
         """Get comprehensive information about the agent configuration and tools.

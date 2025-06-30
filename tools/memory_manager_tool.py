@@ -54,18 +54,24 @@ console = Console()
 class MemoryManager:
     """Memory database manager with comprehensive inspection and management capabilities."""
 
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: str = None, table_name: str = None):
         """Initialize the memory manager.
 
         :param db_path: Path to the SQLite memory database. If None, uses the configured path from settings.
+        :param table_name: Name of the memory table. If None, tries to detect automatically.
         """
         if db_path is None:
             # Use the proper database path from configuration
             db_path = f"{AGNO_STORAGE_DIR}/agent_memory.db"
 
         self.db_path = Path(db_path)
+        
+        # Auto-detect table name if not provided
+        if table_name is None:
+            table_name = self._detect_table_name()
+        
         self.db = SqliteMemoryDb(
-            table_name="personal_agent_memory",  # Use the same table name as the actual agent
+            table_name=table_name,
             db_file=str(self.db_path),
         )
         self.memory = Memory(model=Ollama(id="llama3.1:8b"), db=self.db)
@@ -78,6 +84,45 @@ class MemoryManager:
             console.print(
                 f"[yellow]Warning: Database file does not exist: {self.db_path}[/yellow]"
             )
+
+    def _detect_table_name(self) -> str:
+        """Auto-detect the memory table name by checking what tables exist in the database.
+        
+        :return: The detected table name, defaults to 'personal_agent_memory'
+        """
+        import sqlite3
+        
+        if not self.db_path.exists():
+            return "personal_agent_memory"  # Default table name
+            
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            
+            # Get all table names
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            
+            # Look for common memory table names
+            if "memory" in tables:
+                console.print(f"[green]Detected table name: 'memory'[/green]")
+                return "memory"
+            elif "personal_agent_memory" in tables:
+                console.print(f"[green]Detected table name: 'personal_agent_memory'[/green]")
+                return "personal_agent_memory"
+            elif tables:
+                # Use the first table if we can't find a standard name
+                table_name = tables[0]
+                console.print(f"[yellow]Using first available table: '{table_name}'[/yellow]")
+                return table_name
+            else:
+                console.print("[yellow]No tables found, using default: 'personal_agent_memory'[/yellow]")
+                return "personal_agent_memory"
+                
+        except Exception as e:
+            console.print(f"[yellow]Could not detect table name ({e}), using default: 'personal_agent_memory'[/yellow]")
+            return "personal_agent_memory"
 
     def list_users(self) -> List[str]:
         """List all unique user IDs in the memory database.

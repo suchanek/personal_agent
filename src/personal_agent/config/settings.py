@@ -2,18 +2,25 @@
 
 import logging
 import os
+from pathlib import Path
 
 import dotenv
 from dotenv import load_dotenv
 
+# Define the project's base directory.
+# This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+dotenv_path = BASE_DIR / ".env"
+
+
 # Load environment variables from .env file
-dotenv_loaded = load_dotenv()
+dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
 
 # Store loaded environment variables if dotenv succeeded
 _env_vars = {}
 if dotenv_loaded:
     # Load all variables from .env file into a cache
-    _env_vars = dotenv.dotenv_values()
+    _env_vars = dotenv.dotenv_values(dotenv_path=dotenv_path)
 
 
 def get_env_var(key: str, fallback: str = "") -> str:
@@ -65,3 +72,25 @@ LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7B")
 
 # User configuration
 USER_ID = get_env_var("USER_ID", "default_user")  # Default user ID for agent
+
+if __name__ == "__main__":
+    print("Loaded environment variables from .env:")
+    for key, value in _env_vars.items():
+        print(f"{key}={value}")
+
+    print("\n--- Configuration Constants ---")
+    print(f"WEAVIATE_URL: {WEAVIATE_URL}")
+    print(f"OLLAMA_URL: {OLLAMA_URL}")
+    print(f"REMOTE_OLLAMA_URL: {REMOTE_OLLAMA_URL}")
+    print(f"USE_WEAVIATE: {USE_WEAVIATE}")
+    print(f"USE_MCP: {USE_MCP}")
+    print(f"ROOT_DIR: {ROOT_DIR}")
+    print(f"HOME_DIR: {HOME_DIR}")
+    print(f"DATA_DIR: {DATA_DIR}")
+    print(f"REPO_DIR: {REPO_DIR}")
+    print(f"STORAGE_BACKEND: {STORAGE_BACKEND}")
+    print(f"AGNO_STORAGE_DIR: {AGNO_STORAGE_DIR}")
+    print(f"AGNO_KNOWLEDGE_DIR: {AGNO_KNOWLEDGE_DIR}")
+    print(f"LOG_LEVEL: {LOG_LEVEL_STR}")
+    print(f"LLM_MODEL: {LLM_MODEL}")
+    print(f"USER_ID: {USER_ID}")

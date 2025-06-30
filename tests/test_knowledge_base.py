@@ -39,7 +39,7 @@ async def test_knowledge_base():
             print(f"🔍 Search results: {search_results}")
 
             # Try different search terms
-            for term in ["Eric", "Suchanek", "user name", "Name:"]:
+            for term in ["Eric", "Suchanek", "user name", "Name"]:
                 results = knowledge_db.search(term)
                 print(f"🔍 Search '{term}': {len(results) if results else 0} results")
                 if results:

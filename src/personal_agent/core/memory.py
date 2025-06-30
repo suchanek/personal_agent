@@ -222,3 +222,66 @@ def reset_weaviate_if_corrupted() -> bool:
         # Not a corruption error, re-raise
         logger.error("Non-corruption Weaviate error: %s", e)
         return False
+
+
+def is_agno_storage_connected() -> bool:
+    """
+    Check if Agno storage is available and connected.
+
+    :return: True if Agno storage directories exist and are accessible, False otherwise
+    """
+    from ..config import STORAGE_BACKEND, AGNO_STORAGE_DIR, AGNO_KNOWLEDGE_DIR
+    
+    if STORAGE_BACKEND != "agno":
+        return False
+    
+    try:
+        import os
+        from pathlib import Path
+        
+        # Check if storage directories exist and are accessible
+        storage_path = Path(AGNO_STORAGE_DIR)
+        knowledge_path = Path(AGNO_KNOWLEDGE_DIR)
+        
+        # Create directories if they don't exist (this is normal for Agno)
+        storage_path.mkdir(parents=True, exist_ok=True)
+        knowledge_path.mkdir(parents=True, exist_ok=True)
+        
+        # Test write access to storage directory
+        test_file = storage_path / ".connection_test"
+        try:
+            test_file.write_text("test")
+            test_file.unlink()  # Remove test file
+        except (OSError, PermissionError):
+            logger.debug("Cannot write to Agno storage directory: %s", storage_path)
+            return False
+        
+        # Check if we can import required Agno modules
+        try:
+            from agno.storage.sqlite import SqliteStorage
+            from agno.memory.v2.db.sqlite import SqliteMemoryDb
+            return True
+        except ImportError as e:
+            logger.debug("Agno modules not available: %s", e)
+            return False
+            
+    except Exception as e:
+        logger.debug("Agno storage connection check failed: %s", e)
+        return False
+
+
+def is_memory_connected() -> bool:
+    """
+    Check if the configured memory backend is connected.
+    
+    :return: True if the configured memory backend is connected, False otherwise
+    """
+    from ..config import STORAGE_BACKEND
+    
+    if STORAGE_BACKEND == "weaviate":
+        return is_weaviate_connected()
+    elif STORAGE_BACKEND == "agno":
+        return is_agno_storage_connected()
+    else:
+        logger.warning("Unknown storage backend: %s", STORAGE_BACKEND)
+        return False

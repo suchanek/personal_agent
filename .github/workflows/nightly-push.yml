@@ -1,0 +1,64 @@
+name: Nightly Branch Push
+
+on:
+  schedule:
+    # Run at 12:01 AM UTC every day
+    - cron: '1 0 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  push-to-nightly:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Fetch all branches and history
+        fetch-depth: 0
+        # Use a token with write permissions
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Get current branch name
+      id: branch
+      run: |
+        # Get the currently active branch name
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        echo "current_branch=$CURRENT_BRANCH" >> $GITHUB_OUTPUT
+        echo "Current active branch: $CURRENT_BRANCH"
+    
+    - name: Push to nightly branch
+      run: |
+        CURRENT_BRANCH="${{ steps.branch.outputs.current_branch }}"
+        
+        # Store the current commit hash
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        echo "Current commit: $CURRENT_COMMIT"
+        
+        # Check if nightly branch exists remotely
+        if git ls-remote --heads origin nightly | grep -q nightly; then
+          echo "Nightly branch exists, checking it out..."
+          git checkout -B nightly origin/nightly
+        else
+          echo "Creating new nightly branch..."
+          git checkout -b nightly
+        fi
+        
+        # Reset nightly branch to the current active branch's commit
+        git reset --hard $CURRENT_COMMIT
+        
+        # Push to nightly branch
+        git push origin nightly --force
+        
+        echo "Successfully pushed $CURRENT_BRANCH (commit: $CURRENT_COMMIT) to nightly branch"
+    
+    - name: Summary
+      run: |
+        echo "✅ Nightly push completed successfully"
+        echo "📅 Timestamp: $(date)"
+        echo "🌙 Current branch content has been pushed to nightly branch"

@@ -1,0 +1,343 @@
+categories:
+  academic:
+    - phd
+    - doctorate
+    - professor
+    - university
+    - postdoc
+    - biophysics
+    - structural biology
+    - biochemistry
+    - research scientist
+    - college
+    - degree
+    - study
+    - studied
+    - student
+    - graduate
+    - education
+    - school
+    - biology
+  health:
+    - hospital
+    - patient
+    - symptom
+    - diagnosis
+    - therapy
+    - healthcare
+    - surgery
+    - treatment
+    - allergy
+    - allergic
+    - doctor
+    - medicine
+    - medical
+    - illness
+    - sick
+    - diet
+    - exercise
+    - fitness
+    - peanut
+  finance:
+    - stock
+    - investment
+    - retirement
+    - 401k
+    - dividend
+    - portfolio
+    - bond market
+    - capital gains
+    - interest rate
+    - money
+    - salary
+    - income
+    - budget
+    - savings
+    - financial
+  technology:
+    - ai
+    - machine learning
+    - deep learning
+    - neural network
+    - artificial intelligence
+    - quantum computing
+    - blockchain
+    - programming
+    - software development
+    - computer
+    - tech
+    - google
+    - microsoft
+    - apple
+    - software
+    - hardware
+  astronomy:
+    - astronomy
+    - astrophysics
+    - telescope
+    - stars
+    - planets
+    - cosmology
+    - galaxy
+    - observatory
+    - solar system
+    - black hole
+    - space
+    - universe
+    - mars
+    - moon
+  automotive:
+    - bmw
+    - engine
+    - horsepower
+    - torque
+    - braking system
+    - vehicle
+    - drivetrain
+    - suspension
+    - aerodynamics
+    - winter tires
+    - car
+    - truck
+    - motorcycle
+    - driving
+  personal_info:
+    - name
+    - age
+    - birthday
+    - born
+    - live
+    - address
+    - phone
+    - email
+    - john
+    - years
+    - old
+  work:
+    - work
+    - job
+    - career
+    - company
+    - office
+    - boss
+    - colleague
+    - employed
+    - unemployment
+    - business
+    - profession
+    - occupation
+  family:
+    - family
+    - parent
+    - mother
+    - father
+    - mom
+    - dad
+    - sibling
+    - brother
+    - sister
+    - child
+    - kids
+    - married
+    - spouse
+    - wife
+    - husband
+    - grandma
+    - grandpa
+    - woman
+    - man
+  hobbies:
+    - hobby
+    - enjoy
+    - love
+    - like
+    - play
+    - watch
+    - read
+    - listen
+    - music
+    - sport
+    - game
+    - travel
+    - piano
+    - guitar
+    - singing
+    - dancing
+    - cooking
+    - painting
+    - photography
+    - hiking
+    - running
+    - swimming
+    - cycling
+    - fishing
+    - gardening
+    - knitting
+    - sewing
+    - woodworking
+    - crafts
+    - drawing
+    - writing
+    - blogging
+    - collecting
+    - chess
+    - cards
+    - board games
+    - video games
+    - movies
+    - books
+    - theater
+    - concerts
+    - festivals
+    - camping
+    - skiing
+    - surfing
+    - yoga
+    - meditation
+    - martial arts
+    - tennis
+    - golf
+    - basketball
+    - football
+    - soccer
+    - baseball
+    - volleyball
+  preferences:
+    - prefer
+    - favorite
+    - favourite
+    - best
+    - worst
+    - hate
+    - dislike
+    - coffee
+    - tea
+    - food
+    - drink
+    - taste
+    - opinion
+  goals:
+    - goal
+    - plan
+    - want
+    - hope
+    - dream
+    - aspire
+    - achieve
+    - target
+    - climb
+    - mount
+    - everest
+    - ambition
+    - future
+  pets:
+    - pet
+    - pets
+    - dog
+    - cat
+    - puppy
+    - kitten
+    - animal
+    - animals
+    - bird
+    - fish
+    - hamster
+    - rabbit
+    - guinea pig
+    - turtle
+    - snake
+    - lizard
+    - parrot
+    - goldfish
+    - veterinarian
+    - vet
+    - pet food
+    - pet care
+    - walking
+    - feeding
+    - grooming
+    - training
+    - breed
+    - rescue
+    - adoption
+    - shelter
+
+phrases:
+  academic:
+    - phd in biophysics
+    - postdoc in structural biology
+    - doctoral research
+    - faculty position
+    - studied biology
+    - at university
+    - college degree
+  health:
+    - undergoing surgery
+    - diagnosed with
+    - health insurance
+    - peanut allergy
+    - have allergy
+    - allergic to
+  finance:
+    - retirement portfolio
+    - capital gains tax
+    - 401k contribution
+  technology:
+    - neural network model
+    - deep learning framework
+    - machine learning pipeline
+    - work at google
+    - software company
+  astronomy:
+    - observing the night sky
+    - galactic cluster
+    - solar eclipse
+  automotive:
+    - brake upgrade
+    - winter driving conditions
+    - engine tuning
+  personal_info:
+    - my name is
+    - years old
+    - live in
+    - am from
+  work:
+    - work at
+    - my job
+    - work for
+    - employed at
+  family:
+    - my family
+    - married to
+    - have kids
+    - wonderful woman
+  hobbies:
+    - love to play
+    - enjoy playing
+    - like to travel
+    - play piano
+  preferences:
+    - prefer coffee
+    - like better
+    - favorite drink
+  goals:
+    - plan to climb
+    - want to achieve
+    - climb mount everest
+    - my goal
+  pets:
+    - have a dog
+    - have a cat
+    - my pet
+    - pet owner
+    - dog owner
+    - cat owner
+    - walk the dog
+    - feed the cat
+    - pet training
+    - vet appointment
+    - adopted a pet
+    - rescue animal
+    - pet care
+    - love animals
+    - animal lover
