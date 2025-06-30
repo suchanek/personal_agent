@@ -22,8 +22,8 @@ from personal_agent.config import (
     REMOTE_OLLAMA_URL,
     USER_ID,
 )
-from personal_agent.core.agno_agent import AgnoPersonalAgent
-from tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+from personal_agent.core.agno_agent import AgnoPersonalAgent, create_agno_agent
+from tools.streamlit_helpers import StreamlitKnowledgeHelper, StreamlitMemoryHelper
 
 # Constants for session state keys
 SESSION_KEY_MESSAGES = "messages"
@@ -41,11 +41,13 @@ SESSION_KEY_KNOWLEDGE_HELPER = "knowledge_helper"
 
 # Optional imports
 try:
-    import pandas as pd
     import altair as alt
+    import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
+
 
 # Parse command line arguments
 def parse_args():
@@ -90,20 +92,18 @@ async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
         await existing_agent.initialize()
         return existing_agent
     else:
-        # Create new AgnoPersonalAgent
-        agent = AgnoPersonalAgent(
+        # Create new AgnoPersonalAgent using the factory
+        return await create_agno_agent(
             model_provider="ollama",
             model_name=model_name,
             ollama_base_url=ollama_url,
             user_id=USER_ID,
             debug=True,
             enable_memory=True,
-            enable_mcp=False,  # Disable MCP to avoid conflicts with DuckDuckGo tools
+            enable_mcp=True,
             storage_dir=AGNO_STORAGE_DIR,
             knowledge_dir=AGNO_KNOWLEDGE_DIR,
         )
-        await agent.initialize()
-        return agent
 
 
 def initialize_agent(model_name, ollama_url, existing_agent=None):
@@ -132,14 +132,19 @@ def initialize_session_state():
 
     if SESSION_KEY_AGENT not in st.session_state:
         st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-            st.session_state[SESSION_KEY_CURRENT_MODEL], st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+            st.session_state[SESSION_KEY_CURRENT_MODEL],
+            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
         )
 
     if SESSION_KEY_MEMORY_HELPER not in st.session_state:
-        st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(st.session_state[SESSION_KEY_AGENT])
+        st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
+            st.session_state[SESSION_KEY_AGENT]
+        )
 
     if SESSION_KEY_KNOWLEDGE_HELPER not in st.session_state:
-        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(st.session_state[SESSION_KEY_AGENT])
+        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(
+            st.session_state[SESSION_KEY_AGENT]
+        )
 
     if SESSION_KEY_MESSAGES not in st.session_state:
         st.session_state[SESSION_KEY_MESSAGES] = []
@@ -172,7 +177,9 @@ def render_chat_tab():
             st.markdown(message["content"])
 
     if prompt := st.chat_input("What would you like to talk about?"):
-        st.session_state[SESSION_KEY_MESSAGES].append({"role": "user", "content": prompt})
+        st.session_state[SESSION_KEY_MESSAGES].append(
+            {"role": "user", "content": prompt}
+        )
         with st.chat_message("user"):
             st.markdown(prompt)
 
@@ -187,30 +194,46 @@ def render_chat_tab():
                         response_content = asyncio.run(agent.run(prompt))
                     else:
                         response = agent.run(prompt)
-                        response_content = response.content if hasattr(response, "content") else str(response)
+                        response_content = (
+                            response.content
+                            if hasattr(response, "content")
+                            else str(response)
+                        )
 
                     end_time = time.time()
                     response_time = end_time - start_time
 
                     # Calculate token estimates
                     input_tokens = len(prompt.split()) * 1.3
-                    output_tokens = len(response_content.split()) * 1.3 if response_content else 0
+                    output_tokens = (
+                        len(response_content.split()) * 1.3 if response_content else 0
+                    )
                     total_tokens = input_tokens + output_tokens
 
-                    # Get tool call info
+                    # Get tool call info with structured response support
                     tool_call_info = agent.get_last_tool_calls()
                     tool_calls_made = tool_call_info.get("tool_calls_count", 0)
                     tool_call_details = tool_call_info.get("tool_call_details", [])
+                    response_metadata = tool_call_info.get("metadata", {})
+                    response_type = tool_call_info.get("response_type", "Unknown")
 
                     # Update performance stats
                     stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
                     stats["total_requests"] += 1
                     stats["total_response_time"] += response_time
-                    stats["average_response_time"] = stats["total_response_time"] / stats["total_requests"]
+                    stats["average_response_time"] = (
+                        stats["total_response_time"] / stats["total_requests"]
+                    )
                     stats["total_tokens"] += total_tokens
-                    stats["average_tokens"] = stats["total_tokens"] / stats["total_requests"]
-                    stats["fastest_response"] = min(stats["fastest_response"], response_time)
-                    stats["slowest_response"] = max(stats["slowest_response"], response_time)
+                    stats["average_tokens"] = (
+                        stats["total_tokens"] / stats["total_requests"]
+                    )
+                    stats["fastest_response"] = min(
+                        stats["fastest_response"], response_time
+                    )
+                    stats["slowest_response"] = max(
+                        stats["slowest_response"], response_time
+                    )
                     stats["tool_calls_count"] += tool_calls_made
 
                     # Store debug metrics
@@ -223,36 +246,102 @@ def render_chat_tab():
                         "total_tokens": round(total_tokens),
                         "tool_calls": tool_calls_made,
                         "tool_call_details": tool_call_details,
-                        "response_type": "AgnoPersonalAgent" if isinstance(agent, AgnoPersonalAgent) else "Unknown",
+                        "response_type": (
+                            "AgnoPersonalAgent"
+                            if isinstance(agent, AgnoPersonalAgent)
+                            else "Unknown"
+                        ),
                         "success": True,
                     }
                     st.session_state[SESSION_KEY_DEBUG_METRICS].append(debug_entry)
                     if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 10:
                         st.session_state[SESSION_KEY_DEBUG_METRICS].pop(0)
 
-                    # Display debug info if enabled
+                    # Display structured response metadata if available
+                    if response_metadata and response_type == "StructuredResponse":
+                        confidence = response_metadata.get("confidence")
+                        sources = response_metadata.get("sources", [])
+                        metadata_response_type = response_metadata.get(
+                            "response_type", "structured"
+                        )
+
+                        # Create a compact metadata display
+                        metadata_parts = []
+                        if confidence is not None:
+                            confidence_color = (
+                                "🟢"
+                                if confidence > 0.8
+                                else "🟡" if confidence > 0.6 else "🔴"
+                            )
+                            metadata_parts.append(
+                                f"{confidence_color} **Confidence:** {confidence:.2f}"
+                            )
+
+                        if sources:
+                            metadata_parts.append(
+                                f"📚 **Sources:** {', '.join(sources[:3])}"
+                            )  # Show first 3 sources
+
+                        metadata_parts.append(f"🔧 **Type:** {metadata_response_type}")
+
+                        if metadata_parts:
+                            with st.expander("📊 Response Metadata", expanded=False):
+                                st.markdown(" | ".join(metadata_parts))
+                                if len(sources) > 3:
+                                    st.markdown(
+                                        f"**All Sources:** {', '.join(sources)}"
+                                    )
+
+                    # Display debug info if enabled (moved to sidebar)
                     if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
-                        with st.expander("🔍 **Detailed Debug Info**", expanded=False):
-                            # ... (Detailed debug UI from original file)
-                            pass
+                        with st.expander("🔍 **Basic Debug Info**", expanded=False):
+                            st.write(f"**Response Type:** {response_type}")
+                            st.write(f"**Tool Calls Made:** {tool_calls_made}")
+                            st.write(f"**Response Time:** {response_time:.3f}s")
+                            st.write(f"**Total Tokens:** {total_tokens:.0f}")
+
+                            if response_metadata:
+                                st.write("**Structured Response Metadata:**")
+                                st.json(response_metadata)
 
                     st.markdown(response_content)
-                    st.session_state[SESSION_KEY_MESSAGES].append({"role": "assistant", "content": response_content})
+
+                    # Store message with metadata for future reference
+                    message_data = {
+                        "role": "assistant",
+                        "content": response_content,
+                        "metadata": (
+                            response_metadata
+                            if response_type == "StructuredResponse"
+                            else None
+                        ),
+                        "response_type": response_type,
+                        "tool_calls": tool_calls_made,
+                        "response_time": response_time,
+                    }
+                    st.session_state[SESSION_KEY_MESSAGES].append(message_data)
 
                 except Exception as e:
                     end_time = time.time()
                     response_time = end_time - start_time
                     error_msg = f"Sorry, I encountered an error: {str(e)}"
                     st.error(error_msg)
-                    st.session_state[SESSION_KEY_MESSAGES].append({"role": "assistant", "content": error_msg})
+                    st.session_state[SESSION_KEY_MESSAGES].append(
+                        {"role": "assistant", "content": error_msg}
+                    )
 
                     # Log failed request
                     debug_entry = {
                         "timestamp": start_timestamp.strftime("%H:%M:%S"),
                         "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
                         "response_time": round(response_time, 3),
-                        "input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "tool_calls": 0,
-                        "response_type": "Error", "success": False, "error": str(e),
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                        "tool_calls": 0,
+                        "response_type": "Error",
+                        "success": False,
+                        "error": str(e),
                     }
                     st.session_state[SESSION_KEY_DEBUG_METRICS].append(debug_entry)
                     if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 10:
@@ -261,6 +350,7 @@ def render_chat_tab():
                     if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
                         with st.expander("❌ **Error Debug Info**", expanded=True):
                             import traceback
+
                             st.write(f"**Error Time:** {response_time:.3f}s")
                             st.write(f"**Error Type:** {type(e).__name__}")
                             st.write(f"**Error Message:** {str(e)}")
@@ -275,13 +365,32 @@ def render_memory_tab():
     st.markdown("---")
     st.subheader("📝 Store New Facts")
     st.markdown("*Add facts directly to memory without agent inference*")
-    categories = ["automatic", "personal", "work", "education", "hobbies", "preferences", "goals", "health", "family", "travel", "technology", "other"]
+    categories = [
+        "automatic",
+        "personal",
+        "work",
+        "education",
+        "hobbies",
+        "preferences",
+        "goals",
+        "health",
+        "family",
+        "travel",
+        "technology",
+        "other",
+    ]
     selected_category = st.selectbox("Category:", categories, key="fact_category")
-    if fact_input := st.chat_input("Enter a fact to store (e.g., I work at Google as a software engineer)"):
+    if fact_input := st.chat_input(
+        "Enter a fact to store (e.g., I work at Google as a software engineer)"
+    ):
         if fact_input.strip():
-            topic_list = None if selected_category == "automatic" else [selected_category]
+            topic_list = (
+                None if selected_category == "automatic" else [selected_category]
+            )
             success, message, memory_id = memory_helper.add_memory(
-                memory_text=fact_input.strip(), topics=topic_list, input_text="Direct fact storage"
+                memory_text=fact_input.strip(),
+                topics=topic_list,
+                input_text="Direct fact storage",
             )
             if success:
                 st.success("🎉 **Fact Successfully Stored!** 🎉")
@@ -296,23 +405,42 @@ def render_memory_tab():
     st.markdown("*Search through stored memories using semantic similarity*")
     col1, col2 = st.columns(2)
     with col1:
-        similarity_threshold = st.slider("Similarity Threshold", 0.1, 1.0, 0.3, 0.1, key="memory_similarity_threshold")
+        similarity_threshold = st.slider(
+            "Similarity Threshold",
+            0.1,
+            1.0,
+            0.3,
+            0.1,
+            key="memory_similarity_threshold",
+        )
     with col2:
-        search_limit = st.number_input("Max Results", 1, 50, 10, key="memory_search_limit")
+        search_limit = st.number_input(
+            "Max Results", 1, 50, 10, key="memory_search_limit"
+        )
     if search_query := st.chat_input("Enter keywords to search your memories"):
-        search_results = memory_helper.search_memories(query=search_query, limit=search_limit, similarity_threshold=similarity_threshold)
+        search_results = memory_helper.search_memories(
+            query=search_query,
+            limit=search_limit,
+            similarity_threshold=similarity_threshold,
+        )
         if search_results:
             st.subheader(f"🔍 Search Results for: '{search_query}'")
             for i, (memory, score) in enumerate(search_results, 1):
-                with st.expander(f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}..."):
+                with st.expander(
+                    f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}..."
+                ):
                     st.write(f"**Memory:** {memory.memory}")
                     st.write(f"**Similarity Score:** {score:.3f}")
                     topics = getattr(memory, "topics", [])
                     if topics:
                         st.write(f"**Topics:** {', '.join(topics)}")
-                    st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
+                    st.write(
+                        f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                    )
                     st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                    if st.button(f"🗑️ Delete Memory", key=f"delete_search_{memory.memory_id}"):
+                    if st.button(
+                        f"🗑️ Delete Memory", key=f"delete_search_{memory.memory_id}"
+                    ):
                         success, message = memory_helper.delete_memory(memory.memory_id)
                         if success:
                             st.success(f"Memory deleted: {message}")
@@ -334,7 +462,9 @@ def render_memory_tab():
                 with st.expander(f"Memory: {memory.memory[:50]}..."):
                     st.write(f"**Content:** {memory.memory}")
                     st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                    st.write(f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}")
+                    st.write(
+                        f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                    )
                     st.write(f"**Input:** {getattr(memory, 'input', 'N/A')}")
                     topics = getattr(memory, "topics", [])
                     if topics:
@@ -363,11 +493,15 @@ def render_memory_tab():
                 st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
             with col3:
                 avg_length = stats.get("average_memory_length", 0)
-                st.metric("Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A")
+                st.metric(
+                    "Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A"
+                )
             topic_dist = stats.get("topic_distribution", {})
             if topic_dist:
                 st.subheader("📈 Topic Distribution")
-                for topic, count in sorted(topic_dist.items(), key=lambda x: x[1], reverse=True):
+                for topic, count in sorted(
+                    topic_dist.items(), key=lambda x: x[1], reverse=True
+                ):
                     st.write(f"**{topic.title()}:** {count} memories")
         else:
             st.error(f"Error getting statistics: {stats['error']}")
@@ -424,12 +558,22 @@ def render_knowledge_tab():
     # SQLite/LanceDB Knowledge Search Section
     st.markdown("---")
     st.subheader("🔍 SQLite/LanceDB Knowledge Search")
-    st.markdown("*Search through stored knowledge using the original sqlite and lancedb knowledge sources*")
-    knowledge_search_limit = st.number_input("Max Results", 1, 50, 10, key="knowledge_search_limit")
-    if knowledge_search_query := st.chat_input("Enter keywords to search the SQLite/LanceDB knowledge base"):
-        search_results = knowledge_helper.search_knowledge(query=knowledge_search_query, limit=knowledge_search_limit)
+    st.markdown(
+        "*Search through stored knowledge using the original sqlite and lancedb knowledge sources*"
+    )
+    knowledge_search_limit = st.number_input(
+        "Max Results", 1, 50, 10, key="knowledge_search_limit"
+    )
+    if knowledge_search_query := st.chat_input(
+        "Enter keywords to search the SQLite/LanceDB knowledge base"
+    ):
+        search_results = knowledge_helper.search_knowledge(
+            query=knowledge_search_query, limit=knowledge_search_limit
+        )
         if search_results:
-            st.subheader(f"🔍 SQLite/LanceDB Knowledge Search Results for: '{knowledge_search_query}'")
+            st.subheader(
+                f"🔍 SQLite/LanceDB Knowledge Search Results for: '{knowledge_search_query}'"
+            )
             for i, knowledge_entry in enumerate(search_results, 1):
                 if hasattr(knowledge_entry, "content"):
                     content = knowledge_entry.content
@@ -447,7 +591,9 @@ def render_knowledge_tab():
                     source = "Unknown"
                     knowledge_id = "N/A"
 
-                with st.expander(f"📚 Result {i}: {title if title != 'Untitled' else content[:50]}..."):
+                with st.expander(
+                    f"📚 Result {i}: {title if title != 'Untitled' else content[:50]}..."
+                ):
                     st.write(f"**Title:** {title}")
                     st.write(f"**Content:** {content}")
                     st.write(f"**Source:** {source}")
@@ -462,12 +608,18 @@ def render_knowledge_tab():
     search_type = st.selectbox(
         "Select RAG Search Type:",
         ("naive", "local", "global", "hybrid", "mix"),
-        key="rag_search_type"
+        key="rag_search_type",
     )
-    if rag_search_query := st.chat_input("Enter keywords to search the RAG knowledge base"):
-        search_results = knowledge_helper.search_rag(query=rag_search_query, search_type=search_type)
+    if rag_search_query := st.chat_input(
+        "Enter keywords to search the RAG knowledge base"
+    ):
+        search_results = knowledge_helper.search_rag(
+            query=rag_search_query, search_type=search_type
+        )
         if search_results:
-            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query}' (Type: {search_type})")
+            st.subheader(
+                f"🤖 RAG Knowledge Search Results for: '{rag_search_query}' (Type: {search_type})"
+            )
             st.markdown(search_results)
         else:
             st.info("No matching knowledge found.")
@@ -480,14 +632,18 @@ def render_sidebar():
         theme_icon = "🌙" if is_dark else "☀️"
         theme_text = "Dark" if is_dark else "Light"
         if st.button(f"{theme_icon} {theme_text} Mode", key="sidebar_theme_toggle"):
-            st.session_state[SESSION_KEY_DARK_THEME] = not st.session_state[SESSION_KEY_DARK_THEME]
+            st.session_state[SESSION_KEY_DARK_THEME] = not st.session_state[
+                SESSION_KEY_DARK_THEME
+            ]
             st.rerun()
 
         st.header("👤 Current User")
         st.write(f"**🆔 {USER_ID}**")
 
         st.header("Model Selection")
-        new_ollama_url = st.text_input("Ollama URL:", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL])
+        new_ollama_url = st.text_input(
+            "Ollama URL:", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+        )
         if st.button("🔄 Fetch Available Models"):
             with st.spinner("Fetching models..."):
                 available_models = get_ollama_models(new_ollama_url)
@@ -498,17 +654,39 @@ def render_sidebar():
                 else:
                     st.error("No models found or connection failed")
 
-        if SESSION_KEY_AVAILABLE_MODELS in st.session_state and st.session_state[SESSION_KEY_AVAILABLE_MODELS]:
+        if (
+            SESSION_KEY_AVAILABLE_MODELS in st.session_state
+            and st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+        ):
             current_model_index = 0
-            if st.session_state[SESSION_KEY_CURRENT_MODEL] in st.session_state[SESSION_KEY_AVAILABLE_MODELS]:
-                current_model_index = st.session_state[SESSION_KEY_AVAILABLE_MODELS].index(st.session_state[SESSION_KEY_CURRENT_MODEL])
-            selected_model = st.selectbox("Select Model:", st.session_state[SESSION_KEY_AVAILABLE_MODELS], index=current_model_index)
+            if (
+                st.session_state[SESSION_KEY_CURRENT_MODEL]
+                in st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+            ):
+                current_model_index = st.session_state[
+                    SESSION_KEY_AVAILABLE_MODELS
+                ].index(st.session_state[SESSION_KEY_CURRENT_MODEL])
+            selected_model = st.selectbox(
+                "Select Model:",
+                st.session_state[SESSION_KEY_AVAILABLE_MODELS],
+                index=current_model_index,
+            )
             if st.button("🚀 Apply Model Selection"):
-                if selected_model != st.session_state[SESSION_KEY_CURRENT_MODEL] or new_ollama_url != st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]:
+                if (
+                    selected_model != st.session_state[SESSION_KEY_CURRENT_MODEL]
+                    or new_ollama_url
+                    != st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+                ):
                     with st.spinner("Reinitializing agent..."):
                         st.session_state[SESSION_KEY_CURRENT_MODEL] = selected_model
-                        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_ollama_url
-                        st.session_state[SESSION_KEY_AGENT] = initialize_agent(selected_model, new_ollama_url, st.session_state[SESSION_KEY_AGENT])
+                        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = (
+                            new_ollama_url
+                        )
+                        st.session_state[SESSION_KEY_AGENT] = initialize_agent(
+                            selected_model,
+                            new_ollama_url,
+                            st.session_state[SESSION_KEY_AGENT],
+                        )
                         st.session_state[SESSION_KEY_MESSAGES] = []
                         st.success(f"Agent updated to use model: {selected_model}")
                         st.rerun()
@@ -519,8 +697,9 @@ def render_sidebar():
 
         st.header("Agent Information")
         st.write(f"**Current Model:** {st.session_state[SESSION_KEY_CURRENT_MODEL]}")
-        st.write(f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}")
-        
+        st.write(
+            f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
+        )
 
         st.header("Controls")
         if st.button("Clear Chat History"):
@@ -528,7 +707,10 @@ def render_sidebar():
             st.rerun()
 
         st.header("Debug Info")
-        st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox("Enable Debug Mode", value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, False))
+        st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox(
+            "Enable Debug Mode",
+            value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, False),
+        )
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
             st.subheader("📊 Performance Statistics")
             stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
@@ -536,8 +718,17 @@ def render_sidebar():
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("Total Requests", stats["total_requests"])
-                    st.metric("Avg Response Time", f"{stats['average_response_time']:.3f}s")
-                    st.metric("Fastest Response", f"{stats['fastest_response']:.3f}s" if stats["fastest_response"] != float("inf") else "N/A")
+                    st.metric(
+                        "Avg Response Time", f"{stats['average_response_time']:.3f}s"
+                    )
+                    st.metric(
+                        "Fastest Response",
+                        (
+                            f"{stats['fastest_response']:.3f}s"
+                            if stats["fastest_response"] != float("inf")
+                            else "N/A"
+                        ),
+                    )
                 with col2:
                     st.metric("Total Tool Calls", stats["tool_calls_count"])
                     st.metric("Avg Tokens/Request", f"{stats['average_tokens']:.0f}")
@@ -545,25 +736,72 @@ def render_sidebar():
             else:
                 st.info("No requests made yet.")
 
-            if PANDAS_AVAILABLE and len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 1:
+            if (
+                PANDAS_AVAILABLE
+                and len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 1
+            ):
                 st.subheader("📈 Response Time Trend")
                 df = pd.DataFrame(st.session_state[SESSION_KEY_DEBUG_METRICS])
                 df = df[df["success"]]
                 if not df.empty and len(df) > 1:
-                    chart_data = df[["timestamp", "response_time"]].copy().set_index("timestamp")
-                    chart = alt.Chart(chart_data.reset_index()).mark_line(point=True).encode(
-                        x=alt.X("timestamp:O", title="Time"),
-                        y=alt.Y("response_time:Q", title="Response Time (s)"),
-                        tooltip=["timestamp:O", "response_time:Q"]
-                    ).properties(title="Response Time Trend")
+                    chart_data = (
+                        df[["timestamp", "response_time"]].copy().set_index("timestamp")
+                    )
+                    chart = (
+                        alt.Chart(chart_data.reset_index())
+                        .mark_line(point=True)
+                        .encode(
+                            x=alt.X("timestamp:O", title="Time"),
+                            y=alt.Y("response_time:Q", title="Response Time (s)"),
+                            tooltip=["timestamp:O", "response_time:Q"],
+                        )
+                        .properties(title="Response Time Trend")
+                    )
                     st.altair_chart(chart, use_container_width=True)
+
+            st.subheader("🔧 Recent Tool Calls")
+            if st.session_state[SESSION_KEY_DEBUG_METRICS]:
+                # Filter entries that have tool calls
+                tool_call_entries = [entry for entry in st.session_state[SESSION_KEY_DEBUG_METRICS] if entry.get('tool_calls', 0) > 0]
+                
+                if tool_call_entries:
+                    for entry in reversed(tool_call_entries[-5:]):  # Show last 5 tool call entries
+                        tool_call_details = entry.get('tool_call_details', [])
+                        with st.expander(
+                            f"🔧 {entry['timestamp']} - {entry['tool_calls']} tool(s) - {entry['response_time']}s"
+                        ):
+                            st.write(f"**Prompt:** {entry['prompt']}")
+                            st.write(f"**Response Time:** {entry['response_time']}s")
+                            st.write(f"**Tool Calls Made:** {entry['tool_calls']}")
+                            
+                            if tool_call_details:
+                                st.write("**Tool Call Details:**")
+                                for i, tool_call in enumerate(tool_call_details, 1):
+                                    st.write(f"**Tool {i}:** {tool_call.get('function_name', 'Unknown')}")
+                                    if tool_call.get("function_args"):
+                                        st.json(tool_call["function_args"])
+                                    if tool_call.get("reasoning"):
+                                        st.write(f"**Reasoning:** {tool_call['reasoning']}")
+                else:
+                    st.info("No tool calls made yet.")
+            else:
+                st.info("No debug metrics available yet.")
 
             st.subheader("🔍 Recent Request Details")
             if st.session_state[SESSION_KEY_DEBUG_METRICS]:
                 for entry in reversed(st.session_state[SESSION_KEY_DEBUG_METRICS][-5:]):
-                    with st.expander(f"{'✅' if entry['success'] else '❌'} {entry['timestamp']} - {entry['response_time']}s"):
+                    with st.expander(
+                        f"{'✅' if entry['success'] else '❌'} {entry['timestamp']} - {entry['response_time']}s"
+                    ):
                         st.write(f"**Prompt:** {entry['prompt']}")
-                        # ... (display other debug details)
+                        st.write(f"**Response Time:** {entry['response_time']}s")
+                        st.write(f"**Input Tokens:** {entry['input_tokens']}")
+                        st.write(f"**Output Tokens:** {entry['output_tokens']}")
+                        st.write(f"**Total Tokens:** {entry['total_tokens']}")
+                        st.write(f"**Tool Calls:** {entry['tool_calls']}")
+                        st.write(f"**Response Type:** {entry['response_type']}")
+                        if not entry['success']:
+                            st.write(f"**Error:** {entry.get('error', 'Unknown error')}")
             else:
                 st.info("No debug metrics available yet.")
 
@@ -581,10 +819,14 @@ def main():
     col1, col2 = st.columns([4, 1])
     with col1:
         st.title("🤖 Personal AI Friend with Memory")
-        st.markdown("*A friendly AI agent that remembers your conversations and learns about you*")
+        st.markdown(
+            "*A friendly AI agent that remembers your conversations and learns about you*"
+        )
     with col2:
         if st.button(f"{theme_icon} {theme_text} Mode", key="theme_toggle"):
-            st.session_state[SESSION_KEY_DARK_THEME] = not st.session_state[SESSION_KEY_DARK_THEME]
+            st.session_state[SESSION_KEY_DARK_THEME] = not st.session_state[
+                SESSION_KEY_DARK_THEME
+            ]
             st.rerun()
 
     tab1, tab2, tab3 = st.tabs(["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"])

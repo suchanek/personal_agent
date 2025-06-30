@@ -143,10 +143,10 @@ class AgnoPersonalAgent:
                 detection_method,
             )
 
-            # Use Ollama-compatible interface for Ollama with dynamic context window
+            # Use Ollama-compatible interface with optimized configuration
             return Ollama(
                 id=self.model_name,
-                host=self.ollama_base_url,
+                host=self.ollama_base_url,  # Use host parameter for Ollama
                 options={
                     "num_ctx": context_size,  # Use dynamically detected context window
                     "temperature": 0.7,  # Optional: set temperature for consistency
@@ -664,8 +664,20 @@ class AgnoPersonalAgent:
         Returns:
             List of MCP tool functions
         """
-        if not self.enable_mcp or not self.mcp_servers:
-            logger.info("MCP not enabled or no MCP servers configured")
+        logger.info(
+            "_get_mcp_tools called - enable_mcp: %s, mcp_servers: %s",
+            self.enable_mcp,
+            self.mcp_servers,
+        )
+
+        if not self.enable_mcp:
+            logger.info("MCP disabled - enable_mcp is False")
+            return []
+
+        if not self.mcp_servers:
+            logger.info(
+                "No MCP servers configured - mcp_servers is empty: %s", self.mcp_servers
+            )
             return []
 
         tools = []
@@ -1062,12 +1074,14 @@ Returns:
                     # Add Lightrag knowledge if enabled
                     if self.enable_memory:
                         try:
-                            self.lightrag_knowledge = await load_lightrag_knowledge_base()
-                            logger.info(
-                                "Loaded Lightrag knowledge base metadata"
+                            self.lightrag_knowledge = (
+                                await load_lightrag_knowledge_base()
                             )
+                            logger.info("Loaded Lightrag knowledge base metadata")
                         except Exception as e:
-                            logger.warning("Failed to load Lightrag knowledge base: %s", e)
+                            logger.warning(
+                                "Failed to load Lightrag knowledge base: %s", e
+                            )
                             self.lightrag_knowledge = None
 
                 # Create memory with SemanticMemoryManager (debug mode passed through)
@@ -1102,11 +1116,14 @@ Returns:
             #    )
 
             # Get MCP tools as function wrappers (no pre-initialization)
+            mcp_tool_functions = []
             if self.enable_mcp:
                 mcp_tool_functions = await self._get_mcp_tools()
                 tools.extend(mcp_tool_functions)
+                logger.info("Added %d MCP tools to agent", len(mcp_tool_functions))
 
             # Get memory tools - CRITICAL: This was missing!
+            memory_tool_functions = []
             if self.enable_memory:
                 memory_tool_functions = await self._get_memory_tools()
                 tools.extend(memory_tool_functions)
@@ -1114,14 +1131,11 @@ Returns:
                     "Added %d memory tools to agent", len(memory_tool_functions)
                 )
 
-            # Create agent instructions
-            instructions = self._create_agent_instructions()
-
             # Create the agno agent with direct parameter passing for visibility
             self.agent = Agent(
                 model=model,
                 tools=tools,
-                instructions=instructions,
+                instructions=self._create_agent_instructions(),
                 markdown=True,
                 show_tool_calls=self.debug,
                 name="Personal AI Agent",
@@ -1141,18 +1155,14 @@ Returns:
                 debug_mode=self.debug,
                 # Enable streaming for intermediate steps
                 stream_intermediate_steps=False,
-                # Force tool calling behavior
-                tool_choice="auto",  # Ensure tools are called when appropriate
             )
 
             if self.enable_memory and self.agno_knowledge:
                 logger.info("Agent configured with knowledge base search")
 
-            # Calculate tool counts for logging
-            mcp_tool_count = len(await self._get_mcp_tools()) if self.enable_mcp else 0
-            memory_tool_count = (
-                len(await self._get_memory_tools()) if self.enable_memory else 0
-            )
+            # Calculate tool counts for logging using already-created tool lists
+            mcp_tool_count = len(mcp_tool_functions)
+            memory_tool_count = len(memory_tool_functions)
 
             logger.info(
                 "Successfully initialized agno agent with native storage: %d total tools (%d MCP, %d memory)",
@@ -1169,48 +1179,28 @@ Returns:
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
     ) -> Union[str, Dict[str, Any]]:
-        """Run a query through the agno agent.
+        """Run a query through the agno agent, allowing for native tool execution.
 
         :param query: User query to process
         :param stream: Whether to stream the response
         :param add_thought_callback: Optional callback for adding thoughts during processing
-        :return: Agent response (string) or dict with response and tool call info
+        :return: Agent's final string response
         """
         if not self.agent:
             raise RuntimeError("Agent not initialized. Call initialize() first.")
 
         try:
-            # Add thoughts during processing if callback provided
             if add_thought_callback:
-                add_thought_callback("🔄 Preparing agno agent...")
+                add_thought_callback("🚀 Executing agno agent...")
+
+            # The agent will handle the full tool-use loop internally
+            response = await self.agent.arun(query, user_id=self.user_id)
+            self._last_response = response  # Store for tool call inspection
 
             if add_thought_callback:
-                if self.enable_memory:
-                    add_thought_callback("🧠 Memory context available via Agno")
-                add_thought_callback("🚀 Executing agno agent with MCP tools...")
+                add_thought_callback("✅ Agent execution complete.")
 
-            if stream:
-                # For streaming, we'll need to handle this differently
-                # For now, return the complete response
-                response = await self.agent.arun(query, user_id=self.user_id)
-                return response.content
-            else:
-                if add_thought_callback:
-                    add_thought_callback("⚡ Running async reasoning...")
-
-                response = await self.agent.arun(query, user_id=self.user_id)
-
-                if add_thought_callback:
-                    add_thought_callback("✅ Agent response generated")
-
-                # Memory is automatically handled by Agno
-                if add_thought_callback and self.enable_memory:
-                    add_thought_callback("💾 Memory automatically updated by Agno")
-
-                # Store the last response for tool call extraction
-                self._last_response = response
-
-                return response.content
+            return response.content
 
         except Exception as e:
             logger.error("Error running agno agent: %s", e)
@@ -1218,8 +1208,106 @@ Returns:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
 
+    def _extract_tool_call_info(self, tool_call) -> Optional[Dict[str, Any]]:
+        """Extract tool call information from various tool call formats."""
+        try:
+            logger.info(f"--- Inspecting tool_call object ---")
+            logger.info(f"Type: {type(tool_call)}")
+            logger.info(f"Object: {tool_call}")
+            logger.info(f"Attributes: {dir(tool_call)}")
+            
+            # Handle dict format (Ollama API format)
+            if isinstance(tool_call, dict):
+                if "function" in tool_call:
+                    function_data = tool_call["function"]
+                    func_name = function_data.get("name", "unknown")
+                    func_args = function_data.get("arguments", {})
+                    
+                    # Handle arguments as JSON string (Ollama format)
+                    if isinstance(func_args, str):
+                        try:
+                            import json
+                            func_args = json.loads(func_args)
+                        except (json.JSONDecodeError, ValueError) as e:
+                            logger.warning(f"Failed to parse arguments JSON: {e}")
+                            func_args = {"raw_arguments": func_args}
+                    
+                    return {
+                        "type": "function",
+                        "function_name": func_name,
+                        "function_args": func_args,
+                        "reasoning": tool_call.get("reasoning", None),
+                    }
+                else:
+                    # Direct dict format
+                    func_args = tool_call.get("arguments", {})
+                    if isinstance(func_args, str):
+                        try:
+                            import json
+                            func_args = json.loads(func_args)
+                        except (json.JSONDecodeError, ValueError) as e:
+                            logger.warning(f"Failed to parse arguments JSON: {e}")
+                            func_args = {"raw_arguments": func_args}
+                    
+                    return {
+                        "type": "function",
+                        "function_name": tool_call.get("name", "unknown"),
+                        "function_args": func_args,
+                        "reasoning": tool_call.get("reasoning", None),
+                    }
+            
+            # Handle object format (agno/other frameworks)
+            elif hasattr(tool_call, "function"):
+                function_obj = tool_call.function
+                func_name = "unknown"
+                if hasattr(function_obj, "name"):
+                    func_name = function_obj.name
+                elif hasattr(function_obj, "__name__"):
+                    func_name = function_obj.__name__
+                elif isinstance(function_obj, str):
+                    func_name = function_obj
+
+                func_args = getattr(function_obj, "arguments", {})
+                if isinstance(func_args, str):
+                    try:
+                        import json
+                        func_args = json.loads(func_args)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        logger.warning(f"Failed to parse arguments JSON: {e}")
+                        func_args = {"raw_arguments": func_args}
+
+                return {
+                    "type": "function",
+                    "function_name": func_name,
+                    "function_args": func_args,
+                    "reasoning": getattr(tool_call, "reasoning", None),
+                }
+            
+            # Handle direct name attribute
+            elif hasattr(tool_call, "name"):
+                func_args = getattr(tool_call, "arguments", {})
+                if isinstance(func_args, str):
+                    try:
+                        import json
+                        func_args = json.loads(func_args)
+                    except (json.JSONDecodeError, ValueError) as e:
+                        logger.warning(f"Failed to parse arguments JSON: {e}")
+                        func_args = {"raw_arguments": func_args}
+                
+                return {
+                    "type": "function",
+                    "function_name": tool_call.name,
+                    "function_args": func_args,
+                    "reasoning": getattr(tool_call, "reasoning", None),
+                }
+                
+        except Exception as e:
+            logger.warning(f"Failed to extract tool call info: {e}")
+
+        return None
+
     def get_last_tool_calls(self) -> Dict[str, Any]:
-        """Get tool call information from the last response.
+        """Get tool call information from the last response object with enhanced detection.
 
         :return: Dictionary with tool call details
         """
@@ -1228,264 +1316,101 @@ Returns:
                 "tool_calls_count": 0,
                 "tool_call_details": [],
                 "has_tool_calls": False,
+                "response_type": "AgnoNative",
+                "metadata": {},
             }
 
-        try:
-            import json
+        response = self._last_response
+        tool_calls = []
+        tool_calls_count = 0
 
-            response = self._last_response
-            tool_calls = []
-            tool_calls_count = 0
+        # Enhanced tool call detection with multiple fallback methods
+        logger.debug(f"Analyzing response object: {type(response)}")
+        logger.debug(f"Response attributes: {dir(response)}")
 
-            # Helper function to safely parse arguments
-            def parse_arguments(args_str):
-                """Parse arguments string into a proper dict or return formatted string."""
-                if not args_str or args_str == "{}":
-                    return {}
-
-                try:
-                    # Try to parse as JSON
-                    if isinstance(args_str, str):
-                        parsed = json.loads(args_str)
-                        return parsed
-                    elif isinstance(args_str, dict):
-                        return args_str
-                    else:
-                        return str(args_str)
-                except (json.JSONDecodeError, TypeError):
-                    # If parsing fails, return the string as-is
-                    return str(args_str)
-
-            # Helper function to extract function signature from content
-            def extract_function_signature(content_str):
-                """Extract function name and arguments from content like 'duckduckgo_search(max_results=5, query=top 5 trends in AI)'"""
-                import re
-
-                if not content_str:
-                    return None, {}
-
-                # Pattern to match function_name(arg1=value1, arg2=value2)
-                pattern = r"(\w+)\((.*?)\)"
-                match = re.search(pattern, content_str)
-
-                if match:
-                    func_name = match.group(1)
-                    args_str = match.group(2)
-
-                    # Parse arguments
-                    args_dict = {}
-                    if args_str.strip():
-                        # Split by comma and parse key=value pairs
-                        arg_pairs = [arg.strip() for arg in args_str.split(",")]
-                        for pair in arg_pairs:
-                            if "=" in pair:
-                                key, value = pair.split("=", 1)
-                                key = key.strip()
-                                value = value.strip()
-                                # Remove quotes if present
-                                if (value.startswith('"') and value.endswith('"')) or (
-                                    value.startswith("'") and value.endswith("'")
-                                ):
-                                    value = value[1:-1]
-                                args_dict[key] = value
-
-                    return func_name, args_dict
-
-                return None, {}
-
-            # Check if response has formatted_tool_calls (agno-specific) - PRIMARY SOURCE
-            if (
-                hasattr(response, "formatted_tool_calls")
-                and response.formatted_tool_calls
-            ):
-                tool_calls_count = len(response.formatted_tool_calls)
-                for tool_call in response.formatted_tool_calls:
-                    # Handle the case where formatted_tool_calls contains strings like 'duckduckgo_news(query=artificial intelligence)'
-                    if isinstance(tool_call, str):
-                        # Extract function name and arguments from the string
-                        extracted_name, extracted_args = extract_function_signature(
-                            tool_call
-                        )
-                        if extracted_name:
-                            tool_info = {
-                                "type": "function",
-                                "function_name": extracted_name,
-                                "function_args": extracted_args,
-                            }
-                            tool_calls.append(tool_info)
-                        else:
-                            # Fallback if parsing fails
-                            tool_info = {
-                                "type": "function",
-                                "function_name": tool_call,
-                                "function_args": {},
-                            }
-                            tool_calls.append(tool_info)
-                    else:
-                        # Handle object format (original code)
-                        tool_info = {
-                            "type": getattr(tool_call, "type", "function"),
-                        }
-
-                        if hasattr(tool_call, "function"):
-                            raw_args = getattr(tool_call.function, "arguments", "{}")
-                            parsed_args = parse_arguments(raw_args)
-                            function_name = getattr(
-                                tool_call.function, "name", "unknown"
-                            )
-
-                            # If arguments are empty but we have content, try to extract from content
-                            if (
-                                not parsed_args
-                                and hasattr(response, "content")
-                                and response.content
-                            ):
-                                extracted_name, extracted_args = (
-                                    extract_function_signature(response.content)
-                                )
-                                if extracted_name == function_name and extracted_args:
-                                    parsed_args = extracted_args
-
-                            tool_info.update(
-                                {
-                                    "function_name": function_name,
-                                    "function_args": parsed_args,
-                                }
-                            )
-                        elif hasattr(tool_call, "name"):
-                            raw_args = getattr(tool_call, "input", "{}")
-                            parsed_args = parse_arguments(raw_args)
-                            tool_info.update(
-                                {
-                                    "function_name": tool_call.name,
-                                    "function_args": parsed_args,
-                                }
-                            )
-                        else:
-                            # Handle dict format
-                            if isinstance(tool_call, dict):
-                                raw_args = tool_call.get("arguments", "{}")
-                                parsed_args = parse_arguments(raw_args)
-                                tool_info.update(
-                                    {
-                                        "function_name": tool_call.get(
-                                            "name", "unknown"
-                                        ),
-                                        "function_args": parsed_args,
-                                    }
-                                )
-                            else:
-                                tool_info.update(
-                                    {
-                                        "function_name": str(tool_call),
-                                        "function_args": {},
-                                    }
-                                )
-
-                        tool_calls.append(tool_info)
-
-            # Check if response has messages with tool calls
-            elif hasattr(response, "messages") and response.messages:
-                for message in response.messages:
-                    if hasattr(message, "tool_calls") and message.tool_calls:
-                        tool_calls_count += len(message.tool_calls)
-                        for tool_call in message.tool_calls:
-                            tool_info = {
-                                "type": getattr(tool_call, "type", "function"),
-                            }
-
-                            if hasattr(tool_call, "function"):
-                                raw_args = getattr(
-                                    tool_call.function, "arguments", "{}"
-                                )
-                                parsed_args = parse_arguments(raw_args)
-                                tool_info.update(
-                                    {
-                                        "function_name": getattr(
-                                            tool_call.function, "name", "unknown"
-                                        ),
-                                        "function_args": parsed_args,
-                                    }
-                                )
-                            elif hasattr(tool_call, "name"):
-                                raw_args = getattr(tool_call, "input", "{}")
-                                parsed_args = parse_arguments(raw_args)
-                                tool_info.update(
-                                    {
-                                        "function_name": tool_call.name,
-                                        "function_args": parsed_args,
-                                    }
-                                )
-
-                            tool_calls.append(tool_info)
-
-            # Also check if response has direct tool call information
-            elif hasattr(response, "tool_calls") and response.tool_calls:
-                tool_calls_count = len(response.tool_calls)
-                for tool_call in response.tool_calls:
-                    tool_info = {
-                        "type": getattr(tool_call, "type", "function"),
-                    }
-
-                    if hasattr(tool_call, "function"):
-                        raw_args = getattr(tool_call.function, "arguments", "{}")
-                        parsed_args = parse_arguments(raw_args)
-                        tool_info.update(
-                            {
-                                "function_name": getattr(
-                                    tool_call.function, "name", "unknown"
-                                ),
-                                "function_args": parsed_args,
-                            }
-                        )
-                    elif hasattr(tool_call, "name"):
-                        raw_args = getattr(tool_call, "input", "{}")
-                        parsed_args = parse_arguments(raw_args)
-                        tool_info.update(
-                            {
-                                "function_name": tool_call.name,
-                                "function_args": parsed_args,
-                            }
-                        )
-
+        # Method 1: Standard tool_calls attribute
+        if hasattr(response, "tool_calls") and response.tool_calls:
+            logger.debug(
+                f"Found tool_calls attribute with {len(response.tool_calls)} calls"
+            )
+            tool_calls_count = len(response.tool_calls)
+            for tool_call in response.tool_calls:
+                tool_info = self._extract_tool_call_info(tool_call)
+                if tool_info:
                     tool_calls.append(tool_info)
 
-            return {
-                "tool_calls_count": tool_calls_count,
-                "tool_call_details": tool_calls,
-                "has_tool_calls": tool_calls_count > 0,
-                "response_type": "AgnoPersonalAgent",
-                "debug_info": {
-                    "response_attributes": [
-                        attr for attr in dir(response) if not attr.startswith("_")
-                    ],
-                    "has_messages": hasattr(response, "messages"),
-                    "messages_count": (
-                        len(response.messages)
-                        if hasattr(response, "messages") and response.messages
-                        else 0
-                    ),
-                    "has_tool_calls_attr": hasattr(response, "tool_calls"),
-                    "has_formatted_tool_calls_attr": hasattr(
-                        response, "formatted_tool_calls"
-                    ),
-                    "formatted_tool_calls_count": (
-                        len(response.formatted_tool_calls)
-                        if hasattr(response, "formatted_tool_calls")
-                        and response.formatted_tool_calls
-                        else 0
-                    ),
-                },
-            }
+        # Method 2: Check messages for tool calls
+        elif hasattr(response, "messages") and response.messages:
+            logger.debug("Checking messages for tool calls")
+            for message in response.messages:
+                if hasattr(message, "tool_calls") and message.tool_calls:
+                    for tool_call in message.tool_calls:
+                        tool_info = self._extract_tool_call_info(tool_call)
+                        if tool_info:
+                            tool_calls.append(tool_info)
+                            tool_calls_count += 1
 
-        except Exception as e:
-            logger.error("Error extracting tool calls: %s", e)
-            return {
-                "tool_calls_count": 0,
-                "tool_call_details": [],
-                "has_tool_calls": False,
-                "error": str(e),
-            }
+        # Method 3: Check run_response for tool usage
+        elif hasattr(response, "run_response") and response.run_response:
+            logger.debug("Checking run_response for tool calls")
+            run_resp = response.run_response
+            if hasattr(run_resp, "tool_calls") and run_resp.tool_calls:
+                for tool_call in run_resp.tool_calls:
+                    tool_info = self._extract_tool_call_info(tool_call)
+                    if tool_info:
+                        tool_calls.append(tool_call)
+                        tool_calls_count += 1
+
+        # Method 4: Check for tools used in response metadata
+        elif hasattr(response, "metadata") and response.metadata:
+            logger.debug("Checking metadata for tool usage")
+            metadata = response.metadata
+            if isinstance(metadata, dict) and "tools_used" in metadata:
+                tools_used = metadata["tools_used"]
+                if isinstance(tools_used, list):
+                    tool_calls_count = len(tools_used)
+                    for tool_name in tools_used:
+                        tool_calls.append(
+                            {
+                                "type": "function",
+                                "function_name": tool_name,
+                                "function_args": {},
+                                "reasoning": None,
+                            }
+                        )
+
+        # Method 5: Check for any attribute containing "tool" in the name
+        else:
+            logger.debug("Checking for any tool-related attributes")
+            for attr_name in dir(response):
+                if "tool" in attr_name.lower() and not attr_name.startswith("_"):
+                    attr_value = getattr(response, attr_name, None)
+                    if attr_value:
+                        logger.debug(
+                            f"Found tool-related attribute: {attr_name} = {attr_value}"
+                        )
+
+        # Extract metadata if available
+        metadata = {}
+        if hasattr(response, "metadata"):
+            metadata = response.metadata or {}
+
+        # Get response type information
+        response_type = "AgnoNative"
+        if hasattr(response, "response_type"):
+            response_type = response.response_type
+        elif hasattr(response, "type"):
+            response_type = response.type
+
+        logger.info(f"Tool call detection complete: {tool_calls_count} calls found")
+
+        return {
+            "tool_calls_count": tool_calls_count,
+            "tool_call_details": tool_calls,
+            "has_tool_calls": tool_calls_count > 0,
+            "response_type": response_type,
+            "metadata": metadata,
+        }
 
     async def cleanup(self) -> None:
         """Clean up resources.
@@ -1515,21 +1440,23 @@ Returns:
         try:
             url = f"{base_url}/query"
             payload = {"query": query, "mode": mode}
-            
+
             logger.info(f"Querying LightRAG: {url} with query: '{query}', mode: {mode}")
-            
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=120) as resp:
                     logger.info(f"LightRAG response status: {resp.status}")
-                    
+
                     if resp.status != 200:
                         error_text = await resp.text()
-                        logger.error(f"LightRAG server error {resp.status}: {error_text}")
+                        logger.error(
+                            f"LightRAG server error {resp.status}: {error_text}"
+                        )
                         return f"LightRAG server error {resp.status}: {error_text}"
-                    
+
                     result = await resp.json()
                     logger.info(f"LightRAG response received, returning raw content...")
-                    
+
                     # Extract response content - simple and direct, NO FILTERING
                     if isinstance(result, dict) and "response" in result:
                         response_content = result["response"]
@@ -1539,17 +1466,21 @@ Returns:
                         response_content = result["answer"]
                     else:
                         response_content = str(result)
-                    
+
                     # Return exactly as received - NO PROCESSING OR FILTERING
-                    logger.info(f"Returning raw LightRAG response: {len(response_content)} characters")
+                    logger.info(
+                        f"Returning raw LightRAG response: {len(response_content)} characters"
+                    )
                     return response_content
-                        
+
         except aiohttp.ClientConnectorError as e:
             error_msg = f"Cannot connect to LightRAG server at {base_url}. Is the server running? Error: {str(e)}"
             logger.error(error_msg)
             return error_msg
         except asyncio.TimeoutError as e:
-            error_msg = f"Timeout connecting to LightRAG server at {base_url}. Error: {str(e)}"
+            error_msg = (
+                f"Timeout connecting to LightRAG server at {base_url}. Error: {str(e)}"
+            )
             logger.error(error_msg)
             return error_msg
         except Exception as e:
