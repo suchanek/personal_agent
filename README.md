@@ -82,20 +82,26 @@ cd personal_agent
 poetry install
 ```
 
-2. **Install MCP Servers**
+2. **Start LightRAG Server**
+
+```bash
+docker-compose up -d
+```
+
+3. **Install MCP Servers**
 
 ```bash
 poetry run python scripts/install_mcp.py
 ```
 
-3. **Setup Ollama**
+4. **Setup Ollama**
 
 ```bash
 # Install Ollama (macOS)
 brew install ollama
 
 # Start Ollama service
-ollama serve
+ollama serve -d
 
 # Pull recommended models
 ollama pull qwen2.5:7b-instruct
@@ -103,7 +109,7 @@ ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 ```
 
-4. **Configure Environment**
+5. **Configure Environment**
 
 Copy `.env.example` to `.env` and configure:
 
@@ -117,7 +123,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
 BRAVE_API_KEY=your_api_key_here
 ```
 
-5. **Start the Agent**
+6. **Start the Agent**
 
 ```bash
 # Web interface (recommended)
