@@ -8,6 +8,7 @@ including native MCP support, async operations, and advanced agent features.
 
 import asyncio
 import os
+from enum import Enum, auto
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
 
@@ -28,6 +29,7 @@ from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.knowledge import KnowledgeTools
 from agno.tools.mcp import MCPTools
 from agno.tools.python import PythonTools
@@ -38,7 +40,7 @@ from mcp.client.stdio import stdio_client
 from rich.console import Console
 from rich.table import Table
 
-from ..config import LLM_MODEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..config import LLM_MODEL, LOG_LEVEL, OLLAMA_URL, USE_MCP, get_mcp_servers
 from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
@@ -55,7 +57,16 @@ from .agno_storage import (
 )
 
 # Configure logging
-logger = setup_logging(__name__)
+logger = setup_logging(__name__, level=LOG_LEVEL)
+
+
+class InstructionLevel(Enum):
+    """Defines the sophistication level for agent instructions."""
+
+    MINIMAL = auto()  # For highly capable models needing minimal guidance
+    CONCISE = auto()  # For capable models, focuses on capabilities over rules
+    STANDARD = auto()  # The current, highly-detailed instructions
+    EXPLICIT = auto()  # Even more verbose, for models that need extra guidance
 
 
 class AgnoPersonalAgent:
@@ -78,6 +89,8 @@ class AgnoPersonalAgent:
         ollama_base_url: str = OLLAMA_URL,
         user_id: str = "default_user",
         recreate: bool = False,
+        instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+        seed: int = None,
     ) -> None:
         """Initialize the Agno Personal Agent.
 
@@ -90,6 +103,7 @@ class AgnoPersonalAgent:
         :param debug: Enable debug logging and tool call visibility
         :param ollama_base_url: Base URL for Ollama API
         :param user_id: User identifier for memory operations
+        :param instruction_level: The sophistication level for agent instructions
         """
         self.model_provider = model_provider
         self.model_name = model_name
@@ -101,6 +115,8 @@ class AgnoPersonalAgent:
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
         self.recreate = recreate
+        self.instruction_level = instruction_level
+        self.seed = seed
 
         # Agno native storage components
         self.agno_storage = None
@@ -154,6 +170,7 @@ class AgnoPersonalAgent:
                     "top_k": 40,
                     "top_p": 0.9,
                     "repeat_penalty": 1.1,
+                    "seed": self.seed,
                 },
             )
         else:
@@ -296,14 +313,14 @@ class AgnoPersonalAgent:
                 return f"❌ Error storing memory: {str(e)}"
 
         async def query_knowledge_base(
-            query: str, base_url: str = "http://localhost:9621", mode: str = "hybrid"
+            query: str, base_url: str = "http://localhost:9621", mode: str = "naive"
         ) -> dict:
             """
             Query the LightRAG knowledge base.
 
             :param query: The query string to search in the knowledge base
             :param base_url: Base URL for the LightRAG server
-            :param mode: Query mode (default: "hybrid")
+            :param mode: Query mode (default: "naive")
             :return: Dictionary with query results
             """
             url = f"{base_url}/query"
@@ -790,71 +807,138 @@ Returns:
         return tools
 
     def _create_agent_instructions(self) -> str:
-        """Create comprehensive instructions for the agno agent.
+        """Create instructions for the agent based on the sophistication level."""
+        level = self.instruction_level
 
-        :return: Formatted instruction string for the agent
-        """
-        # Get current tool configuration for accurate instructions
+        # Common parts for most levels
+        header = self._get_header_instructions()
+        identity = self._get_identity_rules()
+        personality = self._get_personality_and_tone()
+        tool_list = self._get_tool_list()
+        principles = self._get_core_principles()
+        parts = []
+
+        if level == InstructionLevel.MINIMAL:
+            # Minimal just has a basic prompt and the tool list
+            parts = [
+                header,
+                "You are a helpful AI assistant. Use your tools to answer the user's request.",
+                tool_list,
+            ]
+
+        elif level == InstructionLevel.CONCISE:
+            # Concise adds identity, personality, concise rules, and principles
+            parts = [
+                header,
+                identity,
+                personality,
+                self._get_concise_memory_rules(),
+                self._get_concise_tool_rules(),
+                tool_list,
+                principles,
+            ]
+
+        elif level == InstructionLevel.STANDARD:
+            # Standard uses the more detailed rules instead of the concise ones
+            parts = [
+                header,
+                identity,
+                personality,
+                self._get_detailed_memory_rules(),
+                self._get_detailed_tool_rules(),
+                tool_list,
+                principles,
+            ]
+
+        elif level == InstructionLevel.EXPLICIT:
+            # Explicit is like Standard but adds the anti-hesitation rules
+            parts = [
+                header,
+                identity,
+                personality,
+                self._get_detailed_memory_rules(),
+                self._get_detailed_tool_rules(),
+                self._get_anti_hesitation_rules(),  # The extra part
+                tool_list,
+                principles,
+            ]
+
+        return "\n\n".join(dedent(p) for p in parts)
+
+    def _get_header_instructions(self) -> str:
+        """Returns the header section of the instructions."""
         mcp_status = "enabled" if self.enable_mcp else "disabled"
         memory_status = (
             "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
         )
-
-        base_instructions = dedent(
-            f"""\
+        return f"""
             You are a personal AI friend with comprehensive capabilities and built-in semantic memory. Your purpose is to chat with the user about things and make them feel good.
-            
+
             ## CURRENT CONFIGURATION
             - **Memory System**: {memory_status}
             - **MCP Servers**: {mcp_status}
             - **User ID**: {self.user_id}
             - **Debug Mode**: {self.debug}
-            
+        """
+
+    def _get_identity_rules(self) -> str:
+        """Returns the critical identity rules for the agent."""
+        return f"""
             ## CRITICAL IDENTITY RULES - ABSOLUTELY MANDATORY
-            
-            **YOU ARE AN AI ASSISTANT who is a MEMORY EXPERT **: You are NOT the user. You are a friendly AI that helps and remembers things about the user.
-            
+            **YOU ARE AN AI ASSISTANT who is a MEMORY EXPERT**: You are NOT the user. You are a friendly AI that helps and remembers things about the user.
+
             **NEVER PRETEND TO BE THE USER**:
-            - You are NOT the user, you are an AI assistant that knows information ABOUT the user 
+            - You are NOT the user, you are an AI assistant that knows information ABOUT the user
             - NEVER say "I'm {self.user_id}" or introduce yourself as the user - this is COMPLETELY WRONG
             - NEVER use first person when talking about user information
             - You are an AI assistant that has stored semantic memories about the user
-            
+
             **FRIENDLY INTRODUCTION**: When meeting someone new, introduce yourself as their personal AI friend and ask about their hobbies, interests, and what they like to talk about. Be warm and conversational!
-            
+        """
+
+    def _get_personality_and_tone(self) -> str:
+        """Returns the personality and tone guidelines."""
+        return """
             ## PERSONALITY & TONE
-            
             - **Be Warm & Friendly**: You're a personal AI friend, not just a tool
             - **Be Conversational**: Chat naturally and show genuine interest
             - **Be Supportive**: Make the user feel good and supported
             - **Be Curious**: Ask follow-up questions about their interests
             - **Be Remembering**: Reference past conversations and show you care
             - **Be Encouraging**: Celebrate their achievements and interests
-            
+        """
+
+    def _get_concise_memory_rules(self) -> str:
+        """Returns concise rules for the semantic memory system."""
+        return """
+            ## SEMANTIC MEMORY
+            - Use `store_user_memory` to save new information about the user.
+            - Use `query_memory` to retrieve information about the user.
+            - Use `get_all_memories` or `get_recent_memories` for broad queries.
+            - Always check memory first when asked about the user.
+        """
+
+    def _get_detailed_memory_rules(self) -> str:
+        """Returns detailed, prescriptive memory usage rules."""
+        return """
             ## SEMANTIC MEMORY SYSTEM - CRITICAL & IMMEDIATE ACTION REQUIRED - YOUR MAIN ROLE!
-            
-            **SEMANTIC MEMORY FEATURES**:
-            - **Automatic Deduplication**: Prevents storing duplicate memories
-            - **Topic Classification**: Automatically categorizes memories by topic
-            - **Similarity Matching**: Uses semantic similarity for intelligent retrieval
-            - **Comprehensive Search**: Searches through ALL stored memories
-            
+
             **MEMORY QUERIES - NO HESITATION RULE**:
             When the user asks ANY of these questions, IMMEDIATELY call the appropriate memory tool:
-            - "What do you remember about me?" → IMMEDIATELY call query_memory("personal information about me")
-            - "Do you know anything about me?" → IMMEDIATELY call query_memory("personal information about me")
+            - "What do you remember about me?" → IMMEDIATELY call query_memory("personal information about {self.user_id}")
+            - "Do you know anything about me?" → IMMEDIATELY call query_memory("personal information about {self.user_id}")
             - "What have I told you?" → IMMEDIATELY call query_memory("personal information about me")
             - "Show me all my memories" or "What are all my memories?" → IMMEDIATELY call get_all_memories()
             - "My preferences" or "What do I like?" → IMMEDIATELY call query_memory("preferences likes interests")
             - "Recent memories" or "What did I tell you recently?" → IMMEDIATELY call get_recent_memories()
             - Any question about personal info → IMMEDIATELY call query_memory() with relevant terms
             - Any statement of fact about personal info → IMMEDIATELY call store_user_memory(content="the fact", topics=["personal", "user info"])
-            
+
             **SEMANTIC MEMORY STORAGE**: When the user provides new personal information → IMMEDIATELY call store_memory(content="the fact",topics=[topic1,topic2,...])
-            2. **DO specify topics** - call store_user_memory(content="the fact", topics=[topic1, topic2,...]) 
+            2. **DO specify topics** - call store_user_memory(content="the fact", topics=[topic1, topic2,...])
             3. **Acknowledge the storage warmly** - "I'll remember that about you!"
             4. **Trust the deduplication** - the semantic memory manager handles duplicates automatically
-            
+
             **SEMANTIC MEMORY RETRIEVAL PROTOCOL**:
             1. **IMMEDIATE ACTION**: If it's about the user, query memory FIRST - no thinking, no hesitation
             2. **Primary Tool**: Use query_memory("relevant search terms") for general "what do you remember" questions - it uses semantic similarity + topic matching
@@ -863,74 +947,51 @@ Returns:
             5. **Semantic Search Power**: query_memory() searches ALL memories semantically with topic boosting for best relevance
             6. **RESPOND AS AN AI FRIEND** who has information about the user, not as the user themselves
             7. **Be personal**: "You mentioned that you..." or "I remember you telling me..."
-            
-            **SEMANTIC SEARCH CAPABILITIES**:
-            - Searches through ALL stored memories comprehensively
-            - Uses semantic similarity to find related content
-            - Automatically falls back to keyword matching if needed
-            - Returns relevant memories even if exact words don't match
-            
-            **KNOWLEDGE BASE QUERIES**:
-            - When the user asks for knowledge base information immediately call the tool query_knowledge_base("search terms")
-            and provide a summary of the results.
-            - If the user asks for specific information, use query_knowledge_base("specific topic") to retrieve relevant knowledge base entries..
-            If that returns no results, then use the web search tool to find current information.
+        """
 
-            **DECISION TREE - FOLLOW THIS EXACTLY**:
-            - Question about user? → Query memory tools IMMEDIATELY
-            - Found memories? → Share them warmly and personally
-            - No memories found? → "I don't have any memories stored about you yet. Tell me about yourself!"
-            - Never overthink memory queries - just DO IT
-            
-            **TOOL PRIORITY**: For personal information queries:
-            1. **Memory tools (query_memory, get_recent_memories) - HIGHEST PRIORITY - USE IMMEDIATELY**
-            2. Knowledge base search - call query_knowledge_base("information about {self.user_id}).
-            3. Web search - as a last resort current/external information
-            
-            ## CURRENT AVAILABLE TOOLS - USE THESE IMMEDIATELY
-            
-            **BUILT-IN TOOLS AVAILABLE**:
-            - **YFinanceTools**: Stock prices, financial analysis, market data, company info, fundamentals, analyst recommendations
-            - **DuckDuckGoTools**: Web search (duckduckgo_search), news searches (duckduckgo_news), current events
-            - **PythonTools**: Calculations, data analysis, programming help, code execution
-            - **ShellTools**: System operations and command execution (base directory: current working directory)
-            - **PersonalAgentFilesystemTools**: File reading, writing, directory operations, file management
-            - **Memory Tools**: Complete semantic memory management system
-              - store_user_memory: Store new memories with topic classification
-              - query_memory: Semantic search through all memories
-              - get_recent_memories: Get recent memories (default 100)
-              - get_all_memories: Get all stored memories
-              - update_memory: Update existing memory by ID
-              - delete_memory: Delete specific memory by ID
-              - clear_memories: Clear all memories for user
-              - get_memory_stats: Get memory statistics and analytics
-            - **MCP Server Tools**: Dynamic tools from connected MCP servers (when MCP enabled)
-            
+    def _get_concise_tool_rules(self) -> str:
+        """Returns concise rules for general tool usage."""
+        return """
+            ## TOOL USAGE
+            - Use tools to answer questions about finance, news, and files.
+            - `YFinanceTools`: For stock prices and financial data.
+            - `GoogleSearchTools`: For web and news search.
+            - `PersonalAgentFilesystemTools`: For file operations.
+            - `PythonTools`: For calculations and code execution.
+        """
+
+    def _get_detailed_tool_rules(self) -> str:
+        """Returns detailed, prescriptive tool usage rules."""
+        return """
             **WEB SEARCH - IMMEDIATE ACTION**:
-            - News requests → IMMEDIATELY use DuckDuckGoTools (duckduckgo_news)
-            - Current events → IMMEDIATELY use DuckDuckGoTools (duckduckgo_search)
-            - "what's happening with..." → IMMEDIATELY use DuckDuckGo search
-            - "top headlines about..." → IMMEDIATELY use duckduckgo_news
+            - News requests → IMMEDIATELY use GoogleSearchTools
+            - Current events → IMMEDIATELY use GoogleSearchTools
+            - "what's happening with..." → IMMEDIATELY use GoogleSearchTools
+            - "top headlines about..." → IMMEDIATELY use GoogleSearchTools
             - NO analysis paralysis, just SEARCH
-            
+
             **FINANCE QUERIES - IMMEDIATE ACTION**:
             - Stock analysis requests → IMMEDIATELY use YFinanceTools
             - "analyze [STOCK]" → IMMEDIATELY call get_current_stock_price() and get_stock_info()
             - Financial data requests → IMMEDIATELY use finance tools
             - NO thinking, NO debate, just USE THE TOOLS
-            
+
             **TOOL DECISION TREE - FOLLOW EXACTLY**:
             - Finance question? → YFinanceTools IMMEDIATELY (get_current_stock_price, get_stock_info, etc.)
-            - News/current events? → DuckDuckGoTools IMMEDIATELY (duckduckgo_news, duckduckgo_search)
-            - Calculations/code? → PythonTools IMMEDIATELY
+            - News/current events? → GoogleSearchTools IMMEDIATELY
+            - Code questions? → PythonTools IMMEDIATELY
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
             - Knowledge base queries? → Query KnowledgeBase IMMEDIATELY
             - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
-            
+        """
+
+    def _get_anti_hesitation_rules(self) -> str:
+        """Returns explicit rules to prevent hesitation and overthinking."""
+        return """
             ## CRITICAL: NO OVERTHINKING RULE - ELIMINATE HESITATION
-            
+
             **WHEN USER ASKS ABOUT MEMORIES - IMMEDIATE ACTION REQUIRED**:
             - DO NOT analyze whether you should check memories
             - DO NOT think about what tools to use
@@ -938,8 +999,6 @@ Returns:
             - IMMEDIATELY call get_recent_memories() or query_memory()
             - ACT FIRST, then respond based on what you find
 
-            **BANNED BEHAVIORS - NEVER DO THESE**
-            
             **BANNED BEHAVIORS - NEVER DO THESE**:
             - ❌ "Let me think about whether I should check memories..."
             - ❌ "I should probably use the memory tools but..."
@@ -949,63 +1008,66 @@ Returns:
             - ❌ "Let me think about what tools to use..."
             - ❌ "I should probably use [tool] but..."
             - ❌ Fabricating data instead of using tools
-            
+
             **REQUIRED IMMEDIATE RESPONSES**:
-            - ✅ User asks "What do you remember?" → IMMEDIATELY call query_memory("personal information about me")
+            - ✅ User asks "What do you remember?" → IMMEDIATELY call query_memory("personal information about {self.user_id}")
             - ✅ User asks about preferences → IMMEDIATELY call query_memory("preferences likes interests")
             - ✅ User asks for recent memories → IMMEDIATELY call get_recent_memories()
             - ✅ "Analyze NVDA" → IMMEDIATELY use YFinanceTools
-            - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools
-            - ✅ "top 5 headlines about..." → IMMEDIATELY use duckduckgo_news()
+            - ✅ "What's the news about..." → IMMEDIATELY use GoogleSearchTools
+            - ✅ "top 5 headlines about..." → IMMEDIATELY use GoogleSearchTools
             - ✅ "Calculate..." → IMMEDIATELY use PythonTools
             - ✅ NO hesitation, just ACTION
-            
-            **CRITICAL: STOP ALL THINKING FOR TOOL REQUESTS**
-            - When user asks for tool usage, DO NOT use <think> tags
-            - DO NOT analyze what to do - just DO IT
-            - IMMEDIATELY call the requested tool
-            - Example: "list headlines about Middle East" → duckduckgo_news("Middle East headlines") RIGHT NOW
-            
-            **IMPORTANT SEMANTIC MEMORY RULES**:
-            - When calling store_user_memory, DO NOT pass any topics parameter - call store_user_memory(content="the fact") with ONLY the content parameter
-            - The SemanticMemoryManager will automatically classify and assign appropriate topics
-            - When recalling memories, phrase them in second person: "You mentioned..." not "I mentioned..."
-            - Trust the semantic deduplication - don't worry about storing duplicates
-            - The system automatically categorizes and organizes memories by topic
-            
-            ## CONVERSATION GUIDELINES
-            
-            - **Ask about their day**: Show interest in how they're doing
-            - **Remember their interests**: Bring up things they've mentioned before using semantic memory
-            - **Be encouraging**: Support their goals and celebrate wins
-            - **Share relevant information**: When they ask for help, provide useful details using tools
-            - **Stay engaged**: Ask follow-up questions to keep conversations flowing
-            - **Be helpful**: Use your tools immediately to assist with their requests
-            
-            ## RESPONSE STYLE
-            
-            - **Be conversational**: Write like you're chatting with a friend
-            - **Use emojis occasionally**: Add personality (but don't overdo it)
-            - **Ask questions**: Keep the conversation going
-            - **Show enthusiasm**: Be excited about their interests
-            - **Be supportive**: Offer encouragement and positive feedback
-            - **Remember context**: Reference previous conversations using semantic memory naturally
-            
+        """
+
+    def _get_tool_list(self) -> str:
+        """Dynamically returns the list of available tools, including MCP servers."""
+        # Start with the static list of built-in tools
+        tool_parts = [
+            "## CURRENT AVAILABLE TOOLS",
+            "- **YFinanceTools**: Stock prices, financial analysis, market data.",
+            "- **GoogleSearchTools**: Web search, news searches, current events.",
+            "- **PythonTools**: Calculations, data analysis, code execution.",
+            "- **ShellTools**: System operations and command execution.",
+            "- **PersonalAgentFilesystemTools**: File reading, writing, and management.",
+            "- **Memory Tools**:",
+            "  - `store_user_memory`: Store new memories.",
+            "  - `query_memory`: Semantic search through all memories.",
+            "  - `get_recent_memories`: Get recent memories.",
+            "  - `get_all_memories`: Get all stored memories.",
+            "  - `update_memory`: Update an existing memory.",
+            "  - `delete_memory`: Delete a specific memory.",
+            "  - `clear_memories`: Clear all memories for the user.",
+            "  - `get_memory_stats`: Get memory statistics.",
+        ]
+
+        # Dynamically add MCP tools if they are enabled and configured
+        if self.enable_mcp and self.mcp_servers:
+            tool_parts.append("- **MCP Server Tools**:")
+            for server_name, config in self.mcp_servers.items():
+                tool_name = f"use_{server_name.replace('-', '_')}_server"
+                description = config.get(
+                    "description", f"Access to {server_name} MCP server"
+                )
+                tool_parts.append(f"  - `{tool_name}`: {description}")
+        else:
+            tool_parts.append("- **MCP Server Tools**: Disabled")
+
+        return "\n".join(tool_parts)
+
+    def _get_core_principles(self) -> str:
+        """Returns the core principles and conversation guidelines."""
+        return """
             ## CORE PRINCIPLES
-            
-            1. **Friendship First**: You're their AI friend who happens to be very capable
-            2. **Remember Everything**: Use your semantic memory to build deeper relationships
-            3. **Be Genuinely Helpful**: Use your tools immediately to assist with real needs
-            4. **Stay Positive**: Focus on making them feel good
-            5. **Be Curious**: Ask about their life, interests, and goals
-            6. **Celebrate Them**: Acknowledge their achievements and interests
-            7. **Act Immediately**: When they ask for information, use tools RIGHT NOW
-            
+            1. **Friendship First**: You're their AI friend who happens to be very capable.
+            2. **Remember Everything**: Use your semantic memory to build deeper relationships.
+            3. **Be Genuinely Helpful**: Use your tools immediately to assist with real needs.
+            4. **Stay Positive**: Focus on making them feel good.
+            5. **Be Curious**: Ask about their life, interests, and goals.
+            6. **Act Immediately**: When they ask for information, use tools RIGHT NOW.
+
             Remember: You're not just an assistant - you're a friendly AI companion with semantic memory who genuinely cares about the user and remembers your conversations together! Use your tools immediately when requested - no hesitation!
         """
-        )
-
-        return base_instructions
 
     async def initialize(self, recreate: bool = False) -> bool:
         """Initialize the agno agent with all components.
@@ -1020,8 +1082,8 @@ Returns:
 
             # Prepare tools list
             tools = [
-                # Add DuckDuckGo tools directly for web search functionality
-                DuckDuckGoTools(),
+                # Add GoogleSearch tools directly for web search functionality
+                GoogleSearchTools(),
                 YFinanceTools(
                     stock_price=True,
                     company_info=True,
@@ -1215,23 +1277,24 @@ Returns:
             logger.info(f"Type: {type(tool_call)}")
             logger.info(f"Object: {tool_call}")
             logger.info(f"Attributes: {dir(tool_call)}")
-            
+
             # Handle dict format (Ollama API format)
             if isinstance(tool_call, dict):
                 if "function" in tool_call:
                     function_data = tool_call["function"]
                     func_name = function_data.get("name", "unknown")
                     func_args = function_data.get("arguments", {})
-                    
+
                     # Handle arguments as JSON string (Ollama format)
                     if isinstance(func_args, str):
                         try:
                             import json
+
                             func_args = json.loads(func_args)
                         except (json.JSONDecodeError, ValueError) as e:
                             logger.warning(f"Failed to parse arguments JSON: {e}")
                             func_args = {"raw_arguments": func_args}
-                    
+
                     return {
                         "type": "function",
                         "function_name": func_name,
@@ -1244,18 +1307,19 @@ Returns:
                     if isinstance(func_args, str):
                         try:
                             import json
+
                             func_args = json.loads(func_args)
                         except (json.JSONDecodeError, ValueError) as e:
                             logger.warning(f"Failed to parse arguments JSON: {e}")
                             func_args = {"raw_arguments": func_args}
-                    
+
                     return {
                         "type": "function",
                         "function_name": tool_call.get("name", "unknown"),
                         "function_args": func_args,
                         "reasoning": tool_call.get("reasoning", None),
                     }
-            
+
             # Handle object format (agno/other frameworks)
             elif hasattr(tool_call, "function"):
                 function_obj = tool_call.function
@@ -1271,6 +1335,7 @@ Returns:
                 if isinstance(func_args, str):
                     try:
                         import json
+
                         func_args = json.loads(func_args)
                     except (json.JSONDecodeError, ValueError) as e:
                         logger.warning(f"Failed to parse arguments JSON: {e}")
@@ -1282,25 +1347,26 @@ Returns:
                     "function_args": func_args,
                     "reasoning": getattr(tool_call, "reasoning", None),
                 }
-            
+
             # Handle direct name attribute
             elif hasattr(tool_call, "name"):
                 func_args = getattr(tool_call, "arguments", {})
                 if isinstance(func_args, str):
                     try:
                         import json
+
                         func_args = json.loads(func_args)
                     except (json.JSONDecodeError, ValueError) as e:
                         logger.warning(f"Failed to parse arguments JSON: {e}")
                         func_args = {"raw_arguments": func_args}
-                
+
                 return {
                     "type": "function",
                     "function_name": tool_call.name,
                     "function_args": func_args,
                     "reasoning": getattr(tool_call, "reasoning", None),
                 }
-                
+
         except Exception as e:
             logger.warning(f"Failed to extract tool call info: {e}")
 
@@ -1702,6 +1768,7 @@ async def create_agno_agent(
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = "default_user",
     recreate: bool = False,
+    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
 ) -> AgnoPersonalAgent:
     """Create and initialize an agno-based personal agent.
 
@@ -1714,6 +1781,7 @@ async def create_agno_agent(
     :param debug: Enable debug mode
     :param ollama_base_url: Base URL for Ollama API
     :param user_id: User identifier for memory operations
+    :param instruction_level: The sophistication level for agent instructions
     :return: Initialized agent instance
     """
     agent = AgnoPersonalAgent(
@@ -1727,6 +1795,7 @@ async def create_agno_agent(
         ollama_base_url=ollama_base_url,
         user_id=user_id,
         recreate=recreate,
+        instruction_level=instruction_level,
     )
 
     success = await agent.initialize()
@@ -1747,6 +1816,7 @@ def create_agno_agent_sync(
     debug: bool = False,
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = "default_user",
+    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
 ) -> AgnoPersonalAgent:
     """
     Synchronous wrapper for creating agno agent.
@@ -1759,6 +1829,7 @@ def create_agno_agent_sync(
     :param knowledge_dir: Directory containing knowledge files to load
     :param debug: Enable debug mode
     :param user_id: User identifier for memory operations
+    :param instruction_level: The sophistication level for agent instructions
     :return: Initialized agent instance
     """
     return asyncio.run(
@@ -1772,6 +1843,7 @@ def create_agno_agent_sync(
             debug=debug,
             ollama_base_url=ollama_base_url,
             user_id=user_id,
+            instruction_level=instruction_level,
         )
     )
 

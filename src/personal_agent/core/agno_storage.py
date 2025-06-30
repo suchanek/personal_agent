@@ -49,7 +49,7 @@ from agno.vectordb.lancedb import LanceDb, SearchType
 
 # Handle imports for both module import and direct execution
 try:
-    from ..config import DATA_DIR, OLLAMA_URL
+    from ..config import DATA_DIR, LOG_LEVEL, OLLAMA_URL
     from ..utils import setup_logging
     from .semantic_memory_manager import (
         SemanticMemoryManager,
@@ -71,7 +71,7 @@ except ImportError:
     )
     from personal_agent.utils import setup_logging
 
-logger = setup_logging(__name__)
+logger = setup_logging(__name__, level=LOG_LEVEL)
 
 
 def create_agno_storage(storage_dir: str = None) -> SqliteStorage:

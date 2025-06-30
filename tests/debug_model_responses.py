@@ -6,19 +6,20 @@ This script queries specified LLMs with a set of prompts and prints their respon
 to help analyze and compare their performance and output style.
 """
 
-import subprocess
 import json
+import subprocess
 import sys
 import time
 
 # Configuration
-OLLAMA_ENDPOINT = "http://tesla.local:11434/api/generate"
-MODELS_TO_TEST = ["llama3.1:8b-instruct-q8_0", "qwen3:8b"]
+OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"
+MODELS_TO_TEST = ["llama3.1:8b-instruct-q8_0", "qwen3:1.7B"]
 PROMPTS_TO_TEST = [
     "hello",
     "summarize the top news stories in AI",
     "summarize the top news stories about the war in Ukraine",
 ]
+
 
 def get_model_response(model_name, prompt):
     """
@@ -27,7 +28,7 @@ def get_model_response(model_name, prompt):
     Args:
         model_name (str): The name of the model to query.
         prompt (str): The prompt to send to the model.
-    
+
     Returns:
         tuple: A tuple containing the response text and the elapsed time.
     """
@@ -40,14 +41,8 @@ def get_model_response(model_name, prompt):
             "prompt": prompt,
             "stream": False,  # We want the full response at once
         }
-        command = [
-            "curl",
-            "-s",
-            OLLAMA_ENDPOINT,
-            "-d",
-            json.dumps(payload)
-        ]
-        
+        command = ["curl", "-s", OLLAMA_ENDPOINT, "-d", json.dumps(payload)]
+
         # Execute the curl command
         result = subprocess.run(
             command,
@@ -56,10 +51,10 @@ def get_model_response(model_name, prompt):
             check=True,
             timeout=300,  # 5-minute timeout for potentially long responses
         )
-        
+
         # Parse the JSON response
         response_data = json.loads(result.stdout)
-        
+
         # Print the main response content
         if "response" in response_data:
             response_text = response_data["response"]
@@ -94,6 +89,7 @@ def get_model_response(model_name, prompt):
         print("\n")
         return response_text, elapsed_time
 
+
 def main():
     """
     Main function to iterate through models and prompts, get responses, and print a summary.
@@ -104,14 +100,19 @@ def main():
         for prompt in PROMPTS_TO_TEST:
             response, r_time = get_model_response(model, prompt)
             results.append({"model": model, "prompt": prompt, "time": r_time})
-    
+
     print("\n--- Analysis Summary ---")
     print(f"{'Model':<30} | {'Prompt':<50} | {'Response Time (s)':<20}")
     print("-" * 100)
     for result in results:
-        prompt_short = result['prompt'][:47] + '...' if len(result['prompt']) > 50 else result['prompt']
+        prompt_short = (
+            result["prompt"][:47] + "..."
+            if len(result["prompt"]) > 50
+            else result["prompt"]
+        )
         print(f"{result['model']:<30} | {prompt_short:<50} | {result['time']:<20.2f}")
     print("\nAnalysis complete.")
+
 
 if __name__ == "__main__":
     main()
