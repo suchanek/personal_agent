@@ -10,6 +10,7 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+backups/
 
 # Distribution / packaging
 .Python
@@ -32,7 +33,7 @@ share/python-wheels/
 MANIFEST
 
 src/agno/
-
+dickens/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -186,4 +187,3 @@ weaviate_data/
 .DS_Store
 data/
 cookbook/
-

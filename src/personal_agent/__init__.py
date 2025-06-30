@@ -3,19 +3,25 @@
 This module serves as the main entry point for the Personal AI Agent package,
 providing a comprehensive suite of AI-powered tools and capabilities including:
 
-- Multi-agent framework powered by HuggingFace smolagents
-- Model Context Protocol (MCP) integration with 6 servers
+- Multi-framework support: LangChain, smolagents, and Agno frameworks
+- Model Context Protocol (MCP) integration with multiple servers
 - Weaviate vector database for persistent memory
-- 13 integrated tools spanning memory management, file operations, and web research
-- Flask web interface for easy interaction
+- Advanced memory management with semantic deduplication
+- Comprehensive tool suite for file operations, web research, and system tasks
+- Multiple interface options: Streamlit, Flask, and CLI
 - Modular architecture with organized code structure
 
-The package supports both LangChain ReAct and smolagents frameworks, with the
-smolagents implementation being the primary interface for production use.
+The package supports three main frameworks:
+1. LangChain ReAct (legacy support)
+2. Smolagents (multi-agent coordination)
+3. Agno (modern async agent framework) - primary interface
 
 Author: Personal Agent Development Team
-Last modified: June 2, 2025
+Last modified: 2025-06-20 08:58:39
+Version: 0.7.dev
 """
+
+# pylint: disable=C0413
 
 import logging
 import os
@@ -35,6 +41,7 @@ from .tools import get_all_tools
 # Import utilities
 from .utils import cleanup, inject_dependencies, register_cleanup_handlers
 from .utils.pag_logging import (
+    configure_all_rich_logging,
     configure_master_logger,
     disable_stream_handlers_for_namespace,
     list_all_loggers,
@@ -42,6 +49,7 @@ from .utils.pag_logging import (
     set_logger_level,
     set_logger_level_for_module,
     set_logging_level_for_all_handlers,
+    setup_agno_rich_logging,
     setup_logging,
     setup_logging_filters,
     toggle_stream_handler,
@@ -50,8 +58,8 @@ from .utils.pag_logging import (
 # Import web interface
 from .web import create_app, register_routes
 
-# Package version
-__version__ = "0.3.0"
+# Package version (matches pyproject.toml)
+__version__ = "0.7.1-dev"
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -64,12 +72,14 @@ setup_logging_filters()
 
 # Package-level logger
 _logger = setup_logging()
-_logger.info("Initializing Personal AI Agent package...")
+_logger.info("Initializing Personal AI Agent package v%s...", __version__)
 
 
 # Main entry points
-from .agno_main import cli_main
-from .smol_main import run_smolagents_web
+from .agno_main import cli_main, run_agno_cli, run_agno_web
+from .langchain_main import cli_main as langchain_cli_main
+from .langchain_main import main as langchain_main
+from .smol_main import run_smolagents_cli, run_smolagents_web
 
 
 def print_configuration() -> str:
@@ -113,7 +123,12 @@ def print_configuration() -> str:
         f"  • Weaviate Enabled: {'✅' if USE_WEAVIATE else '❌'} ({USE_WEAVIATE})",
         f"  • MCP Enabled: {'✅' if USE_MCP else '❌'} ({USE_MCP})",
         "",
-        "📁 DIRECTORY CONFIGURATION:",
+        "� AVAILABLE FRAMEWORKS:",
+        "  • Agno Framework: ✅ (Primary - Modern async agent)",
+        "  • Smolagents Framework: ✅ (Multi-agent coordination)",
+        "  • LangChain Framework: ✅ (Legacy support)",
+        "",
+        "�📁 DIRECTORY CONFIGURATION:",
         f"  • Root Directory: {ROOT_DIR}",
         f"  • Home Directory: {HOME_DIR}",
         f"  • Data Directory: {DATA_DIR}",
@@ -200,8 +215,16 @@ def print_configuration() -> str:
         )
 
     config_lines.extend(storage_status)
+
+    # Entry points information
     config_lines.extend(
         [
+            "🎯 AVAILABLE ENTRY POINTS:",
+            "  • paga / personal-agent: Agno Streamlit interface (primary)",
+            "  • paga_cli / personal-agent-agno-cli: Agno CLI mode",
+            "  • pags / personal-agent-smolagent: Smolagents web interface",
+            "  • pags_cli / personal-agent-smolagent-cli: Smolagents CLI mode",
+            "  • pagl_cli / personal-agent-langchain-cli: LangChain CLI mode (legacy)",
             "",
             "=" * 80,
             "🚀 Configuration loaded successfully!",
@@ -234,6 +257,7 @@ __all__ = [
     "cleanup",
     "inject_dependencies",
     "register_cleanup_handlers",
+    "configure_all_rich_logging",
     "configure_master_logger",
     "disable_stream_handlers_for_namespace",
     "list_all_loggers",
@@ -241,17 +265,24 @@ __all__ = [
     "set_logger_level",
     "set_logger_level_for_module",
     "set_logging_level_for_all_handlers",
+    "setup_agno_rich_logging",
     "setup_logging",
     "toggle_stream_handler",
     "setup_logging_filters",
     # Web interface
     "create_app",
     "register_routes",
-    # Main entry points
-    "main",
-    "create_web_app",
-    "initialize_system",
+    # Main entry points - Agno (primary)
+    "cli_main",
+    "run_agno_cli",
+    "run_agno_web",
+    # Main entry points - LangChain (legacy)
+    "langchain_main",
+    "langchain_cli_main",
+    # Main entry points - Smolagents
     "run_smolagents_web",
+    "run_smolagents_cli",
+    # Utility functions
     "print_configuration",
     # Package info
     "__version__",

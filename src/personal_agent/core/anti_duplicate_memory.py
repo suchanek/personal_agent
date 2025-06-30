@@ -445,10 +445,9 @@ class AntiDuplicateMemory(Memory):
                 print(f"🚫 REJECTED: {reason}")
                 print(f"   Memory: '{memory.memory}'")
             
-            # Return a fake success ID to prevent agent confusion
-            # The memory wasn't actually stored, but from the agent's perspective,
-            # the desired state (memory exists) is achieved
-            return "duplicate-detected-fake-id"
+            # Return None to indicate rejection - this is the expected behavior
+            # for duplicate detection and what the tests expect
+            return None
 
         # Memory is unique, proceed with addition
         logger.info("Adding unique memory for user %s: '%s'", user_id, memory.memory)
@@ -487,7 +486,7 @@ class AntiDuplicateMemory(Memory):
         if message is not None:
             memory_obj = UserMemory(memory=str(message), topics=["general"])
             memory_id = self.add_user_memory(memory=memory_obj, user_id=user_id)
-            if memory_id:
+            if memory_id is not None:
                 memory_obj.memory_id = memory_id
                 created_memories.append(memory_obj)
 
@@ -505,7 +504,7 @@ class AntiDuplicateMemory(Memory):
                 # Create memory and add with deduplication
                 memory_obj = UserMemory(memory=content, topics=["general"])
                 memory_id = self.add_user_memory(memory=memory_obj, user_id=user_id)
-                if memory_id:
+                if memory_id is not None:
                     memory_obj.memory_id = memory_id
                     created_memories.append(memory_obj)
 

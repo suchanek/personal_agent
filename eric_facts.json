@@ -1,0 +1,246 @@
+{
+  "personal_info": {
+    "name": "Eric G. Suchanek",
+    "title": "Ph.D.",
+    "location": "4264 Meadow Creek CT Liberty TWP, OH 45011",
+    "phone": "513-593-4522",
+    "email": "suchanek@mac.com",
+    "github": "https://github.com/suchanek/",
+    "current_project": "proteusPy: https://github.com/suchanek/proteusPy/"
+  },
+  "professional_summary": {
+    "description": "Highly-skilled scientist seeking rewarding employment in computational chemistry, computational biology or Artificial Intelligence",
+    "unique_value": "Broad experience in life science, computer systems, troubleshooting and customer service provides unique and valuable toolbox of skills",
+    "management_experience": "Management experience in a Fortune 50 company with practical perspective on technology application",
+    "current_work": "Currently working in structural biophysics, building proteusPy"
+  },
+  "education": {
+    "high_school": {
+      "school": "Lakota High School, West Chester, Ohio",
+      "graduation": "June 1978",
+      "achievement": "Valedictorian: 1/550"
+    },
+    "undergraduate": {
+      "degree": "BS",
+      "school": "Washington University, St Louis",
+      "graduation": "June 1982",
+      "achievements": ["Top 10% in class", "graduated cum honore", "Elected to Phi Beta Kappa"]
+    },
+    "graduate": {
+      "degree": "Ph.D",
+      "school": "Johns Hopkins Medical School, Baltimore MD",
+      "graduation": "June 1987",
+      "program": "combined program for Biochemistry, Cellular and Molecular Biology",
+      "achievement": "Top of class",
+      "dissertation": "Applications of Artificial Intelligence to Problems in Protein Engineering",
+      "notable": "PhD advisors received the Nobel Prize for the discovery of EcoR1, establishing the Biotechnology field"
+    }
+  },
+  "technical_skills": {
+    "programming_languages": ["C", "C++", "Python", "Fortran", "Lisp", "shell programming", "SQL"],
+    "development_tools": ["git", "VisualStudio Code", "Jira"],
+    "machine_learning": ["Python", "Tensorflow", "torch", "numpy", "scikit-learn", "scipy", "pandas"],
+    "systems": ["Unix", "OSX", "Linux system management and administration"],
+    "specialized_software": ["Pixinsight", "Microsoft Office"],
+    "certifications": ["Apple-certified hardware and software technician"],
+    "other": ["3D modeling/CAD/CAM", "Image analysis", "Analytics and statistics", "numerical analysis", "visualization"]
+  },
+  "scientific_expertise": {
+    "primary_fields": [
+      "Computer science",
+      "Computational chemistry", 
+      "Bioinformatics",
+      "Computational biology",
+      "Molecular dynamics",
+      "Machine learning",
+      "Statistical analysis",
+      "Scientific visualization",
+      "Structural Biophysics"
+    ],
+    "specialized_skills": [
+      "Virtual screening technologies to develop statistical models of drug efficacy",
+      "Systems administration",
+      "Agile team experience"
+    ]
+  },
+  "major_achievements": {
+    "software_development": [
+      "Developed one of the first real-time molecular visualization programs deployed on a personal computer (Commodore Amiga)",
+      "Developed the first computer-based rapid screening algorithm for disulfide bond stabilization in proteins of known structure",
+      "Invented structure-based heuristics with considerable state-space optimizations",
+      "Developed algorithms for rapid creation of photo-realistic lenticular and holographic images with emphasis on scientific visualization"
+    ],
+    "scientific_modeling": [
+      "Built high-resolution model of Parathyroid Hormone 1-34 from ab-initio modeling, subsequently verified with solution NMR",
+      "Built first model of 7 trans-membrane G-protein Coupled Receptors within P&G",
+      "Developed several high-potency small molecular candidates from the kinase family, used in osteoporosis therapy",
+      "Implemented bone turnover simulation based on John Reeves' work to establish initial dosing regimens for Actonel"
+    ],
+    "infrastructure_management": [
+      "Architected, deployed and managed a high-performance multi-processor supercomputer center for P&G Pharmaceuticals",
+      "Managed diverse, multi-national modeling and simulation community of practice within P&G R&D division",
+      "Led Research Computing and Informatics group at P&G Pharmaceuticals"
+    ],
+    "database_development": [
+      "Built the first database of all disulfide bonds in the RCSB protein databank (https://rcsb.org)",
+      "Dataset contains over 292,000 disulfide bonds, currently being analyzed with proteusPy Python package"
+    ]
+  },
+  "work_experience": {
+    "current_positions": [
+      {
+        "title": "GeekSquad Agent",
+        "company": "BestBuy",
+        "duration": "2019 – Present",
+        "responsibilities": [
+          "Front-line technical support of customers",
+          "Troubleshoot/diagnose/recommend strategy to meet customer needs",
+          "Acts as the 'point of the spear' for customer technical support"
+        ]
+      },
+      {
+        "title": "Astronomer",
+        "company": "Monterey Institute for Research in Astronomy",
+        "duration": "2018 – Present",
+        "responsibilities": [
+          "Developed new computer algorithms and programs for astrophysical and astrometric analysis of proper motion in stars (Python, Plotly, Dash)",
+          "Configured and installed hardware and software to control generators via Arduino and C++",
+          "Configured hardware/software to control high-precision motors for instrument alignment, spectrograph configuration",
+          "Software development across many areas primarily in Python/Astropy"
+        ]
+      }
+    ],
+    "previous_positions": [
+      {
+        "title": "Support Desk Analyst II",
+        "company": "Miami University, Oxford OH",
+        "duration": "2013 – 2017",
+        "responsibilities": [
+          "Front-line help desk support for IT-related technical issues",
+          "Knowledge management across multiple end-user and internal services",
+          "Mac computer repair for Macbook Pro, iMac and Macbook computers",
+          "Remote troubleshooting, conflict resolution and problem analysis/resolution"
+        ]
+      },
+      {
+        "title": "Genius",
+        "company": "Apple Computer, Kenwood OH",
+        "duration": "2010 – 2013",
+        "achievements": [
+          "Provided 'Genius Bar' one-on-one troubleshooting for over 11,000 customer sessions",
+          "Consistently achieved top customer feedback scores",
+          "Recognized for excellent problem solving skills and management of difficult customer interactions"
+        ]
+      },
+      {
+        "title": "Director",
+        "company": "Procter & Gamble",
+        "duration": "2007-2010",
+        "role": "Led the Global Modeling Community within P&G Corporate Functions R&D"
+      },
+      {
+        "title": "Director, Research Computing and Informatics",
+        "company": "Procter & Gamble Pharmaceuticals",
+        "duration": "2000-2007",
+        "major_responsibilities": [
+          "Designed, implemented and supported Silicon Graphics supercomputing center",
+          "Maintained greater than 99% uptime while running scientific computing network",
+          "Deployed over 90 SGI workstations for divisional chemists",
+          "Lead molecular modeler within Discovery division",
+          "Managed Research Computing and Informatics Section"
+        ]
+      },
+      {
+        "title": "Senior Scientist",
+        "company": "Procter & Gamble",
+        "duration": "1992-2000",
+        "focus": "Application of computational chemistry and bioinformatics to business problems"
+      },
+      {
+        "title": "Scientist/Senior Scientist",
+        "company": "Procter & Gamble",
+        "duration": "1987-1992",
+        "division": "Management Systems Division (MSD)",
+        "notable_projects": [
+          "The Builder Advisor - coupled Fortran-based physical chemistry calculations to Windows interface",
+          "The Genotoxicity Advisor - rule-based approach to predict genotoxicity",
+          "The Phase Advisor - predicted phase behaviors of complex systems"
+        ]
+      }
+    ]
+  },
+  "publications": [
+    {
+      "title": "Theoretical and Practical Considerations in Virtual Screening: A Beaten Field?",
+      "authors": "Maria Kontoyianni, Prakash Madhav, Eric Suchanek and William Seibel",
+      "journal": "Current Med Chem",
+      "details": "15:107-116 2008"
+    },
+    {
+      "title": "Design and Synthesis of 13,14-Dihydro Prostaglandin F1α Analogues as Potent and Selective Ligands for the Human FP Receptor",
+      "authors": "Yili Wang, John A. Wos, Michelle J. Dirr, David L. Soper, Mitchell A. deLong, Glen E. Mieling, Biswanath De, Jack S. Amburgey, Eric G. Suchanek, and Cynthia J. Taylor",
+      "journal": "J. Med Chem",
+      "details": "43 (5), pp 945–952, 2000"
+    },
+    {
+      "title": "An engineered intersubunit disulfide enhances the stability and DNA binding of the N-terminal domain of lambda repressor",
+      "authors": "R. T. Sauer, K. Hehir, R. S. Stearman, M. A. Weiss, A. Jeitler-Nilsson, E. G. Suchanek, C. O. Pabo",
+      "journal": "Biochemistry",
+      "details": "25 (20), pp 5992–599, 1986"
+    },
+    {
+      "title": "Computer-aided model-building strategies for protein design",
+      "authors": "C.O. Pabo and Eric G. Suchanek",
+      "journal": "Biochemistry",
+      "details": "25 (20), pp 5987–599 1986"
+    },
+    {
+      "title": "Introduction of Intersubunit Disulfide Bonds In the Membrane-Distal Region of the Influenza Hemagglutinin Abolishes Membrane Fusion Activity",
+      "authors": "Godley, L., Pfeifer, J., Steinhauer, D., Ely, B., Shaw, G., Kaufmann, R., Suchanek, E., Pabo, C., Skehel, J.J., Wiley, D.C. & Wharton, S.",
+      "journal": "Cell",
+      "details": "68:635-645 1992"
+    }
+  ],
+  "key_projects": {
+    "proteusPy": {
+      "description": "Current project in structural biophysics",
+      "url": "https://github.com/suchanek/proteusPy/",
+      "purpose": "Re-written version of Proteus program for disulfide bond analysis"
+    },
+    "disulfide_database": {
+      "description": "First database of all disulfide bonds in the RCSB protein databank",
+      "size": "over 292,000 disulfide bonds",
+      "current_status": "being analyzed with proteusPy Python package"
+    }
+  },
+  "management_experience": {
+    "leadership_roles": [
+      "Section Leader of Research Computing and Informatics group within P&G Pharmaceuticals",
+      "Director of Global Modeling Community within P&G Corporate Functions R&D"
+    ],
+    "responsibilities": [
+      "Managed group of scientists and coordinated project work",
+      "Managed careers, salaries, ratings",
+      "Budget approval and management for hardware and software installations",
+      "Communication with senior management",
+      "Building diverse teams",
+      "Mentoring staff",
+      "Planning and delegating work"
+    ]
+  },
+  "customer_service_experience": {
+    "apple_genius": {
+      "sessions": "over 11,000 customer sessions",
+      "recognition": "top customer feedback scores",
+      "skills": "excellent problem solving and difficult customer interaction management"
+    },
+    "current_role": "front-line technical support at GeekSquad"
+  },
+  "notable_characteristics": [
+    "Veteran P&G employee with understanding of high-performing corporate culture",
+    "Ability to rapidly integrate into new work situations",
+    "Effective communication skills across broad spectrum of users/customers",
+    "Patient and effective teaching abilities",
+    "Technical background enabling work across multiple disciplines: astrophysics to computational chemistry to machine learning"
+  ]
+}
