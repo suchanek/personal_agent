@@ -15,8 +15,25 @@ import warnings
 from rich.logging import RichHandler
 
 # Use logging.WARNING as default to avoid circular import
-DEFAULT_LOG_LEVEL = logging.WARNING
-LOG_LEVEL = logging.INFO  # Default fallback for LOG_LEVEL
+# Handle imports for both module import and direct execution
+try:
+    from ..config.settings import LOG_LEVEL
+except ImportError:
+    # When running directly, use absolute imports
+    import os
+    import sys
+
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
+    from personal_agent.config.settings import LOG_LEVEL
+
+# Use a default LOG_LEVEL if import fails
+try:
+    LOG_LEVEL
+except NameError:
+    LOG_LEVEL = logging.INFO
 
 
 def set_logging_level_for_all_handlers(log_level: int):
