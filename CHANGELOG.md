@@ -1,5 +1,52 @@
 # Personal AI Agent - Technical Changelog
 
+## 🚀 **v0.7.9-dev: CLI Knowledge Base Recreation Control** (July 1, 2025)
+
+### ✅ **MAJOR ENHANCEMENT: On-Demand Knowledge Base Recreation for CLI**
+
+**🎯 Mission Accomplished**: Successfully implemented a `--recreate` flag for the `paga_cli` command-line interface, enabling on-demand knowledge base recreation and improving the development workflow.
+
+#### 🔍 **Problem Analysis - Development Workflow Limitations**
+
+**CRITICAL NEEDS IDENTIFIED:**
+
+1. **No CLI Control for Knowledge Base**: The `paga_cli` tool lacked a mechanism to force the recreation of the knowledge base. It always defaulted to `recreate=False`, making it difficult to refresh the knowledge base from the command line during development without manual intervention.
+
+#### 🛠️ **Comprehensive Solution Implementation**
+
+**SOLUTION: Added `--recreate` Flag to CLI**
+
+The `paga_cli` entry point in `src/personal_agent/agno_main.py` was enhanced to accept a `--recreate` flag. This boolean value is now propagated through the entire initialization chain, giving developers direct control over the knowledge base state at startup.
+
+```python
+# In src/personal_agent/agno_main.py
+def cli_main():
+    # ...
+    parser.add_argument(
+        "--recreate", action="store_true", help="Recreate the knowledge base"
+    )
+    args = parser.parse_args()
+    # ...
+    # Pass the recreate flag to the async runner
+    asyncio.run(run_agno_cli(use_remote_ollama=args.remote, recreate=args.recreate))
+```
+
+#### 📁 **Files Modified**
+
+- `src/personal_agent/agno_main.py`: **ENHANCED** - Added the `--recreate` command-line argument and propagated it through the `run_agno_cli` and `initialize_agno_system` functions to the agent constructor.
+
+#### 🏆 **Achievement Summary**
+
+**Technical Innovation**: Implemented a command-line flag for on-demand knowledge base recreation.
+
+**Key Achievements**:
+
+1. ✅ **CLI Control**: Developers can now use `paga_cli --recreate` to easily refresh the knowledge base.
+
+**User Benefits**:
+
+- **Improved Developer Workflow**: Simplified knowledge base management directly from the command line.
+
 ## 🔧 **v0.7.9-dev: Critical LightRAG Timeout Fix & Configuration Debugging** (June 30, 2025)
 
 ### ✅ **CRITICAL FIX: Resolved LightRAG Document Ingestion Timeout**

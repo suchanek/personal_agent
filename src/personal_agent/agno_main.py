@@ -42,7 +42,7 @@ agno_agent: Optional[AgnoPersonalAgent] = None
 logger: Optional[logging.Logger] = setup_logging()
 
 
-async def initialize_agno_system(use_remote_ollama: bool = False):
+async def initialize_agno_system(use_remote_ollama: bool = False, recreate: bool = False):
     """
     Initialize all system components for agno framework.
 
@@ -79,6 +79,7 @@ async def initialize_agno_system(use_remote_ollama: bool = False):
         debug=True,
         user_id=USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
+        recreate=recreate,
     )
 
     agent_info = agno_agent.get_agent_info()
@@ -181,7 +182,7 @@ def run_agno_web(use_remote_ollama: bool = False):
     app.run(host=host, port=5002, debug=False)
 
 
-async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
+async def run_agno_cli(query: str = None, use_remote_ollama: bool = False, recreate: bool = False):
     """
     Run agno agent in CLI mode with streaming and reasoning.
 
@@ -198,7 +199,7 @@ async def run_agno_cli(query: str = None, use_remote_ollama: bool = False):
 
     # Initialize system
     agent, query_kb, store_int, clear_kb = await initialize_agno_system(
-        use_remote_ollama
+        use_remote_ollama, recreate=recreate
     )
 
     # Print formatted agent info
@@ -259,6 +260,9 @@ def cli_main():
     parser.add_argument(
         "--remote", action="store_true", help="Use remote Ollama server"
     )
+    parser.add_argument(
+        "--recreate", action="store_true", help="Recreate the knowledge base"
+    )
     args = parser.parse_args()
 
     # Check if this function is being called from the paga_cli script
@@ -270,7 +274,7 @@ def cli_main():
     logger.info("Starting Personal AI Agent in CLI mode")
 
     # Run in CLI mode
-    asyncio.run(run_agno_cli(use_remote_ollama=args.remote))
+    asyncio.run(run_agno_cli(use_remote_ollama=args.remote, recreate=args.recreate))
 
 
 if __name__ == "__main__":

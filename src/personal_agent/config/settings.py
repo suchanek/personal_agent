@@ -76,6 +76,9 @@ LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7B")
 # User configuration
 USER_ID = get_env_var("USER_ID", "default_user")  # Default user ID for agent
 
+# Display configuration
+SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
+
 if __name__ == "__main__":
     print("Loaded environment variables from .env:")
     for key, value in _env_vars.items():
@@ -97,3 +100,5 @@ if __name__ == "__main__":
     print(f"LOG_LEVEL: {LOG_LEVEL_STR}")
     print(f"LLM_MODEL: {LLM_MODEL}")
     print(f"USER_ID: {USER_ID}")
+
+    # end of file
