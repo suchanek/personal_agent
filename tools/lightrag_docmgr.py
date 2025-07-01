@@ -28,23 +28,18 @@ import requests
 # Add the src directory to the Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-try:
-    from personal_agent.config import settings
-except ImportError:
-    print(
-        "❌ Could not import configuration. Make sure you're running from the project root."
-    )
-    print("   Usage: python lightrag_docmgr.py --status")
-    sys.exit(1)
+from personal_agent.config import settings
 
 
 class EnhancedLightRAGDocumentManager:
+    """Class that managers documents in the LightRAG server"""
+
     def __init__(
         self, base_url: Optional[str] = None, storage_path: Optional[str] = None
     ):
         # Load configuration from settings
         try:
-            self.base_url = (base_url or "http://localhost:9621").rstrip("/")
+            self.base_url = (base_url or settings.LIGHTRAG_SERVER).rstrip("/")
 
             # Build storage path from configuration
             if storage_path:
@@ -444,7 +439,7 @@ class EnhancedLightRAGDocumentManager:
             }
 
         # Show documents to be deleted
-        print(f"\nDocuments to be deleted:")
+        print("\nDocuments to be deleted:")
         print("-" * 60)
         for doc in docs:
             doc_id = doc.get("id", "Unknown ID")
@@ -546,7 +541,7 @@ def main():
         # Server status
         server_running = manager.check_server_status()
         print(
-            f"LightRAG Server: {'🟢 Running' if server_running else '🔴 Not responding'}"
+            f"LightRAG Server: {'🟢 Running on {LIGHTRAG_SERVER}' if server_running else '🔴 Not responding'}"
         )
 
         # Docker status
