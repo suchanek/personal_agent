@@ -1835,7 +1835,7 @@ def create_agno_agent_sync(
     debug: bool = False,
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = "default_user",
-    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+    instruction_level: InstructionLevel = InstructionLevel.EXPLICIT,
 ) -> AgnoPersonalAgent:
     """
     Synchronous wrapper for creating agno agent.
