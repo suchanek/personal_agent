@@ -227,19 +227,24 @@ def create_combined_knowledge_base(
 
     # Create PDF knowledge base if PDF files exist
     if pdf_files:
-        pdf_vector_db = LanceDb(
-            uri=str(storage_path / "lancedb"),
-            table_name="pdf_knowledge",
-            search_type=SearchType.hybrid,
-            embedder=embedder,
-        )
+        try:
+            pdf_vector_db = LanceDb(
+                uri=str(storage_path / "lancedb"),
+                table_name="pdf_knowledge",
+                search_type=SearchType.hybrid,
+                embedder=embedder,
+            )
 
-        pdf_kb = PDFKnowledgeBase(
-            path=knowledge_path,
-            vector_db=pdf_vector_db,
-        )
-        knowledge_sources.append(pdf_kb)
-        logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
+            pdf_kb = PDFKnowledgeBase(
+                path=knowledge_path,
+                vector_db=pdf_vector_db,
+            )
+            knowledge_sources.append(pdf_kb)
+            logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
+        except Exception as e:
+            logger.warning("Failed to create PDFKnowledgeBase due to corrupted PDF files: %s", e)
+            logger.warning("Skipping PDF knowledge base. Check for corrupted PDF files in %s", knowledge_path)
+            logger.warning("Consider removing or repairing corrupted PDF files like 'allosteric.pdf'")
 
     # Create a knowledge base with the ArXiv documents
     arxiv_vector_db = LanceDb(
@@ -287,13 +292,19 @@ async def load_combined_knowledge_base(
     :param knowledge_base: CombinedKnowledgeBase instance to load
     :param recreate: Whether to recreate the knowledge base from scratch
     """
-    logger.info("Loading combined knowledge base content...")
+    if recreate:
+        logger.info("🔄 RECREATING knowledge base from scratch (recreate=True)")
+    else:
+        logger.info("Loading combined knowledge base content...")
 
     # Use synchronous load in an async context - this matches agno framework patterns
     # The synchronous load method is more stable than aload which can return async generators
     knowledge_base.load(recreate=recreate)
 
-    logger.info("Combined knowledge base loaded successfully")
+    if recreate:
+        logger.info("✅ Knowledge base RECREATED successfully")
+    else:
+        logger.info("Combined knowledge base loaded successfully")
 
 
 async def load_lightrag_knowledge_base(base_url: str = "http://localhost:9621") -> dict:

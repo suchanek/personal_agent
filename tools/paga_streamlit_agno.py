@@ -82,7 +82,9 @@ def get_ollama_models(ollama_url):
         return []
 
 
-async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
+async def initialize_agent_async(
+    model_name, ollama_url, existing_agent=None, recreate=False
+):
     """Initialize AgnoPersonalAgent with proper async handling."""
     if existing_agent and isinstance(existing_agent, AgnoPersonalAgent):
         # Update existing agent's configuration
@@ -103,12 +105,15 @@ async def initialize_agent_async(model_name, ollama_url, existing_agent=None):
             enable_mcp=True,
             storage_dir=AGNO_STORAGE_DIR,
             knowledge_dir=AGNO_KNOWLEDGE_DIR,
+            recreate=recreate,
         )
 
 
-def initialize_agent(model_name, ollama_url, existing_agent=None):
+def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=True):
     """Sync wrapper for agent initialization."""
-    return asyncio.run(initialize_agent_async(model_name, ollama_url, existing_agent))
+    return asyncio.run(
+        initialize_agent_async(model_name, ollama_url, existing_agent, recreate)
+    )
 
 
 def apply_custom_theme():
@@ -762,26 +767,36 @@ def render_sidebar():
             st.subheader("🔧 Recent Tool Calls")
             if st.session_state[SESSION_KEY_DEBUG_METRICS]:
                 # Filter entries that have tool calls
-                tool_call_entries = [entry for entry in st.session_state[SESSION_KEY_DEBUG_METRICS] if entry.get('tool_calls', 0) > 0]
-                
+                tool_call_entries = [
+                    entry
+                    for entry in st.session_state[SESSION_KEY_DEBUG_METRICS]
+                    if entry.get("tool_calls", 0) > 0
+                ]
+
                 if tool_call_entries:
-                    for entry in reversed(tool_call_entries[-5:]):  # Show last 5 tool call entries
-                        tool_call_details = entry.get('tool_call_details', [])
+                    for entry in reversed(
+                        tool_call_entries[-5:]
+                    ):  # Show last 5 tool call entries
+                        tool_call_details = entry.get("tool_call_details", [])
                         with st.expander(
                             f"🔧 {entry['timestamp']} - {entry['tool_calls']} tool(s) - {entry['response_time']}s"
                         ):
                             st.write(f"**Prompt:** {entry['prompt']}")
                             st.write(f"**Response Time:** {entry['response_time']}s")
                             st.write(f"**Tool Calls Made:** {entry['tool_calls']}")
-                            
+
                             if tool_call_details:
                                 st.write("**Tool Call Details:**")
                                 for i, tool_call in enumerate(tool_call_details, 1):
-                                    st.write(f"**Tool {i}:** {tool_call.get('function_name', 'Unknown')}")
+                                    st.write(
+                                        f"**Tool {i}:** {tool_call.get('function_name', 'Unknown')}"
+                                    )
                                     if tool_call.get("function_args"):
                                         st.json(tool_call["function_args"])
                                     if tool_call.get("reasoning"):
-                                        st.write(f"**Reasoning:** {tool_call['reasoning']}")
+                                        st.write(
+                                            f"**Reasoning:** {tool_call['reasoning']}"
+                                        )
                 else:
                     st.info("No tool calls made yet.")
             else:
@@ -800,8 +815,10 @@ def render_sidebar():
                         st.write(f"**Total Tokens:** {entry['total_tokens']}")
                         st.write(f"**Tool Calls:** {entry['tool_calls']}")
                         st.write(f"**Response Type:** {entry['response_type']}")
-                        if not entry['success']:
-                            st.write(f"**Error:** {entry.get('error', 'Unknown error')}")
+                        if not entry["success"]:
+                            st.write(
+                                f"**Error:** {entry.get('error', 'Unknown error')}"
+                            )
             else:
                 st.info("No debug metrics available yet.")
 

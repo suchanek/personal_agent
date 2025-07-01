@@ -7,6 +7,7 @@ including native MCP support, async operations, and advanced agent features.
 """
 
 import asyncio
+import importlib.metadata
 import os
 from enum import Enum, auto
 from textwrap import dedent
@@ -40,7 +41,14 @@ from mcp.client.stdio import stdio_client
 from rich.console import Console
 from rich.table import Table
 
-from ..config import LLM_MODEL, LOG_LEVEL, OLLAMA_URL, USE_MCP, get_mcp_servers
+from ..config import (
+    LLM_MODEL,
+    LOG_LEVEL,
+    OLLAMA_URL,
+    SHOW_SPLASH_SCREEN,
+    USE_MCP,
+    get_mcp_servers,
+)
 from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
@@ -48,6 +56,7 @@ from ..tools.personal_agent_tools import (
 )
 from ..tools.working_yfinance_tools import WorkingYFinanceTools
 from ..utils import setup_logging
+from ..utils.splash_screen import display_splash_screen
 from .agno_storage import (
     create_agno_memory,
     create_agno_storage,
@@ -1075,6 +1084,9 @@ Returns:
         :param recreate: Whether to recreate the agent knowledge bases
         :return: True if initialization successful, False otherwise
         """
+        logger.info(
+            "🚀 AgnoPersonalAgent.initialize() called with recreate=%s", recreate
+        )
         try:
             # Create model
             model = self._create_model()
@@ -1232,6 +1244,13 @@ Returns:
                 mcp_tool_count,
                 memory_tool_count,
             )
+
+            # Display splash screen if enabled
+            if SHOW_SPLASH_SCREEN:
+                agent_info = self.get_agent_info()
+                agent_version = importlib.metadata.version("personal-agent")
+                display_splash_screen(agent_info, agent_version)
+
             return True
 
         except Exception as e:
@@ -1798,7 +1817,7 @@ async def create_agno_agent(
         instruction_level=instruction_level,
     )
 
-    success = await agent.initialize()
+    success = await agent.initialize(recreate=recreate)
     if not success:
         raise RuntimeError("Failed to initialize agno agent")
 
