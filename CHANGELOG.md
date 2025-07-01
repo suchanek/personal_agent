@@ -1,6 +1,52 @@
 # Personal AI Agent - Technical Changelog
 
-## 🚀 **v0.7.9-dev: Revolutionary Instruction-Level Performance Optimization & Advanced Agent Architecture** (June 30, 2025)
+## 🔧 **v0.7.9-dev: Critical LightRAG Timeout Fix & Configuration Debugging** (June 30, 2025)
+
+### ✅ **CRITICAL FIX: Resolved LightRAG Document Ingestion Timeout**
+
+**🎯 Mission Accomplished**: Successfully diagnosed and resolved a critical `httpx.ReadTimeout` error that occurred during the ingestion of large documents into the LightRAG server. The fix involved identifying the correct configuration file and increasing the timeout value to ensure robust processing of complex files.
+
+#### 🔍 **Problem Analysis - Document Ingestion Timeout Crisis**
+
+**CRITICAL ISSUE: `httpx.ReadTimeout` During Document Processing**
+
+- **Symptom**: When ingesting large or complex documents, the LightRAG server would fail with an `httpx.ReadTimeout` error.
+- **Initial Hypothesis**: The timeout was originating from the client-side application code calling the LightRAG server.
+- **Root Cause Analysis**:
+    1. **Incorrect Initial Diagnosis**: Investigation of client-side scripts like `tools/lightrag_docmgr.py` and `src/personal_agent/core/agno_storage_new.py` revealed they were not the source of the `httpx` call.
+    2. **Configuration Maze**: A deep dive into the environment configuration showed that while `.env` contained extensive timeout settings (e.g., `HTTPX_READ_TIMEOUT=7200`), they were not being applied.
+    3. **Root Cause Identified**: The `lightrag` service, running in Docker, was using a separate `config.ini` file that took precedence over the `.env` variables. This file contained a much lower timeout (`timeout = 600`) for the embedding service, which was the true source of the error.
+
+#### 🛠️ **Comprehensive Solution Implementation**
+
+**SOLUTION #1: Systematic Debugging to Pinpoint Configuration Override**
+
+The resolution followed a systematic process of elimination:
+
+1. **Analyzed Traceback**: Confirmed the error was `httpx.ReadTimeout`, indicating a client was waiting too long for a server response.
+2. **Inspected Client Code**: Ruled out `tools/lightrag_docmgr.py` as it used `requests`, not `httpx`.
+3. **Searched for `httpx`**: A project-wide search for `httpx` usage did not reveal the source of the timeout, suggesting it was within a dependency (LightRAG).
+4. **Examined Docker Configuration**: Inspection of `docker-compose.yml` revealed that both `.env` and `config.ini` were being mounted into the `lightrag` container.
+5. **Discovered Configuration Conflict**: While `.env` had high timeout values, the `config.ini` file had a much lower `timeout = 600` for the embedding service, which was the setting being used by the server.
+
+**SOLUTION #2: Corrected the Timeout in the Correct Configuration File**
+
+The fix was applied directly to `config.ini/config.ini`:
+
+```ini
+# In config.ini/config.ini
+
+[llm]
+...
+# Increased from 1800 to 7200 for large document processing
+timeout = 7200
+
+[embedding]
+...
+# Increased from 600 to 7200 to fix the httpx.ReadTimeout error
+timeout = 7200
+
+## 🚀 **v0.7.9-dev: Instruction-Level Performance Optimization & Advanced Agent Architecture** (June 30, 2025)
 
 ### ✅ **MAJOR BREAKTHROUGH: Comprehensive Instruction-Level Performance Analysis & Agent Architecture Modernization**
 
@@ -249,11 +295,13 @@ agent = AgnoPersonalAgent(
 #### 📁 **Files Created & Modified**
 
 **NEW: Performance Analysis Infrastructure**:
+
 - `docs/INSTRUCTION_LEVEL_PERFORMANCE_ANALYSIS_qwen.md` - **222-line comprehensive analysis** with scientific methodology and detailed findings
 - `tests/test_instruction_level_performance.py` - **504-line testing framework** with Rich console output and statistical analysis
 - `tests/debug_instruction_levels.py` - **60-line debug utility** for instruction level testing
 
 **ENHANCED: Core Agent Architecture**:
+
 - `src/personal_agent/core/agno_agent.py` - **MAJOR ENHANCEMENT**: 364-line refactor with:
   - Four-tier instruction level system (MINIMAL, CONCISE, STANDARD, EXPLICIT)
   - Dynamic instruction generation based on sophistication level
@@ -262,12 +310,14 @@ agent = AgnoPersonalAgent(
   - Improved agent configuration and tool management
 
 **ENHANCED: Infrastructure & Utilities**:
+
 - `src/personal_agent/utils/pag_logging.py` - **21-line enhancement** with configurable log levels
 - `src/personal_agent/utils/cleanup.py` - **5-line improvement** for better resource management
 - `src/personal_agent/core/agno_storage.py` - **4-line update** for improved integration
 - `tests/debug_model_responses.py` - **33-line enhancement** for better model response debugging
 
 **ENHANCED: Dependencies & Configuration**:
+
 - `pyproject.toml` - Added `googlesearch-python` and `pycountry` dependencies
 - `poetry.lock` - **32-line update** with new dependency resolutions
 
@@ -559,16 +609,19 @@ PROMPTS_TO_TEST = [
 #### 📁 **Files Created & Modified**
 
 **NEW: Structured Response System**:
+
 - `src/personal_agent/core/structured_response.py` - Complete JSON response handling framework (400+ lines)
 - `tests/test_structured_response.py` - Comprehensive test suite with real Ollama model testing (600+ lines)
 - `docs/STRUCTURED_JSON_RESPONSE_IMPLEMENTATION.md` - Complete implementation documentation
 
 **NEW: Advanced Tools & Testing**:
+
 - `tools/agno_assist.py` - Advanced Agno framework assistant with multi-modal capabilities
 - `tests/debug_model_responses.py` - Multi-model response analysis and comparison tool
 - `docs/TOOL_ARCHITECTURE_MODERNIZATION.md` - Complete tool architecture documentation
 
 **ENHANCED: Core Agent System**:
+
 - `src/personal_agent/core/agno_agent.py` - Enhanced with structured response parsing and improved tool call detection
 - `tools/paga_streamlit_agno.py` - Rich metadata display and enhanced debugging information
 
@@ -719,6 +772,7 @@ async def query_knowledge_base(
 #### 📁 **Files Created & Modified**
 
 **ENHANCED: Core Agent & UI**:
+
 - `src/personal_agent/core/agno_agent.py`: Updated `query_knowledge_base` to return raw responses and improved error handling.
 - `tools/paga_streamlit_agno.py`: Added `StreamlitKnowledgeHelper` class, a new "Knowledge Base" tab, and RAG search functionality.
 
@@ -1010,6 +1064,7 @@ pypdf2 = "^3.0.1"  # Advanced PDF processing capabilities
 #### 📁 **Files Created & Modified**
 
 **NEW: LightRAG Integration**:
+
 - `lightrag_docmgr.py` - Comprehensive LightRAG document management system (545 lines)
 - `examples/lightrag_ollama_demo_fixed.py` - Enhanced LightRAG demo with Ollama integration
 - `examples/lightrag_ollama_demo_pdf_fixed.py` - PDF-specific LightRAG processing demo
@@ -1018,12 +1073,14 @@ pypdf2 = "^3.0.1"  # Advanced PDF processing capabilities
 - `docs/README_LightRAG_Document_Management.md` - Complete LightRAG documentation
 
 **NEW: Server Management Tools**:
+
 - `switch-ollama.sh` - Intelligent Ollama server switching (223 lines)
 - `debug-ollama-connection.sh` - Comprehensive connection diagnostics (103 lines)
 - `restart-lightrag.sh` - LightRAG service restart utility (55 lines)
 - `docs/README-ollama-scripts.md` - Complete server management documentation
 
 **NEW: Environment Management**:
+
 - `scripts/auto_backup_env.sh` - Automated environment backup (50 lines)
 - `scripts/backup_env.sh` - Manual environment backup utility (74 lines)
 - `scripts/restore_env.sh` - Interactive environment restoration (125 lines)
@@ -1031,12 +1088,14 @@ pypdf2 = "^3.0.1"  # Advanced PDF processing capabilities
 - `scripts/README_ENV_BACKUP.md` - Environment management documentation (161 lines)
 
 **ENHANCED: Project Organization**:
+
 - `config.ini/config.ini` - Enhanced configuration with model specifications
 - `pyproject.toml` - Added PyPDF2 dependency for PDF processing
 - `docs/PYDANTIC_FIX_SUMMARY.md` - Moved from root to docs directory
 - `docs/MEMORY_SEARCH_FIX_SUMMARY.md.pdf` - Moved from root to docs directory
 
 **REORGANIZED: Test Structure**:
+
 - Moved 9 test files from root to `tests/` directory for better organization
 - Enhanced test organization and discoverability
 
@@ -1114,6 +1173,7 @@ with tab2:
 Implemented comprehensive memory management capabilities:
 
 **📝 Direct Fact Storage**:
+
 ```python
 # Category-based fact storage with immediate feedback
 categories = ["Personal Info", "Work", "Hobbies", "Health", "Technology", "Finance", "Education", "Family", "Goals", "Preferences"]
@@ -1132,6 +1192,7 @@ if fact_input := st.chat_input("Enter a fact to store"):
 ```
 
 **🔍 Advanced Memory Search**:
+
 ```python
 # Configurable semantic search with similarity controls
 col1, col2 = st.columns(2)
@@ -1157,6 +1218,7 @@ if search_query := st.chat_input("Enter keywords to search your memories"):
 ```
 
 **📚 Memory Browser & Management**:
+
 ```python
 # Browse all memories with management capabilities
 if st.button("📋 Load All Memories"):
@@ -1176,6 +1238,7 @@ if st.button("📋 Load All Memories"):
 ```
 
 **📊 Memory Statistics & Analytics**:
+
 ```python
 # Comprehensive memory analytics dashboard
 if st.button("📈 Show Statistics"):
@@ -1200,6 +1263,7 @@ if st.button("📈 Show Statistics"):
 ```
 
 **⚙️ Memory Settings & Configuration**:
+
 ```python
 # Memory system configuration and bulk operations
 if st.button("🗑️ Reset All Memories"):
@@ -1227,6 +1291,7 @@ if st.session_state.show_memory_confirmation:
 Completely overhauled the light/dark theme system with comprehensive CSS styling:
 
 **🎨 Improved Light Theme**:
+
 ```python
 # Comprehensive light theme CSS with proper Streamlit defaults
 st.markdown("""
@@ -1292,6 +1357,7 @@ st.markdown("""
 ```
 
 **🌙 Enhanced Dark Theme**:
+
 ```python
 # Comprehensive dark theme with modern styling
 st.markdown("""
@@ -1376,12 +1442,14 @@ README_personal_facts.md → docs/README_personal_facts.md
 #### 🎯 **Memory Manager Feature Set**
 
 **📝 Storage Features**:
+
 - Category-based fact storage with 10 predefined categories
 - Immediate success feedback with memory ID display
 - Automatic topic classification and organization
 - Real-time storage validation and error handling
 
 **🔍 Search Features**:
+
 - Semantic similarity search with configurable thresholds
 - Adjustable result limits (1-50 memories)
 - Color-coded similarity scores (🟢🟡🔴)
@@ -1389,6 +1457,7 @@ README_personal_facts.md → docs/README_personal_facts.md
 - Individual delete buttons for search results
 
 **📚 Management Features**:
+
 - Complete memory browser with pagination
 - Individual memory details (ID, content, timestamps, topics)
 - Per-memory delete functionality with immediate updates
@@ -1396,6 +1465,7 @@ README_personal_facts.md → docs/README_personal_facts.md
 - Memory system configuration display
 
 **📊 Analytics Features**:
+
 - Total memory count and recent activity metrics
 - Average memory length calculations
 - Topic distribution analysis with counts
@@ -1403,6 +1473,7 @@ README_personal_facts.md → docs/README_personal_facts.md
 - Memory system health indicators
 
 **⚙️ Configuration Features**:
+
 - Memory system settings display
 - Bulk reset operations with confirmation dialogs
 - Safety warnings and user education
@@ -1438,6 +1509,7 @@ README_personal_facts.md → docs/README_personal_facts.md
 #### 📁 **Files Created & Modified**
 
 **ENHANCED: Core UI System**:
+
 - `tools/paga_streamlit_agno.py` - **MAJOR ENHANCEMENT**: Added comprehensive Memory Manager tab
   - New tab-based interface with chat and memory management
   - Advanced memory search with configurable parameters
@@ -1447,17 +1519,20 @@ README_personal_facts.md → docs/README_personal_facts.md
   - Safety mechanisms and confirmation dialogs
 
 **ENHANCED: Code Organization**:
+
 - `send_facts_helper.py` - Updated fact categories for better organization
 - `src/personal_agent/core/agno_storage.py` - Minor path and configuration improvements
 - `src/personal_agent/core/topic_classifier.py` - Fixed import paths for better module loading
 
 **REORGANIZED: Documentation Structure**:
+
 - `docs/README_FACT_RECALL_TESTS.md` - Moved from root directory
 - `docs/README_TEAM_APPROACH.md` - Moved from root directory  
 - `docs/README_VALIDATION_TEST.md` - Moved from root directory
 - `docs/README_personal_facts.md` - Moved from root directory
 
 **CLEANUP: Removed Unused Files**:
+
 - `compute_pi.py` - Removed unused computation file
 
 #### 🏆 **Revolutionary Achievement Summary**
@@ -1529,14 +1604,17 @@ README_personal_facts.md → docs/README_personal_facts.md
 #### 📁 **Files Created & Modified**
 
 **NEW: ArXiv Knowledge Base Integration**:
+
 - `src/personal_agent/core/agno_storage.py` - Added `ArxivKnowledgeBase` integration
 - `pyproject.toml` - Added `arxiv` dependency
 
 **ENHANCED: Knowledge Base Architecture**:
+
 - `src/personal_agent/core/agno_storage.py` - Improved `create_combined_knowledge_base()`
 - `src/personal_agent/core/semantic_memory_manager.py` - Fixed `topics.yaml` path issue
 
 **Bug Fixes and Improvements**:
+
 - `src/personal_agent/core/semantic_memory_manager.py` - Corrected method names
 
 #### 🏆 **Achievement Summary**
@@ -1746,16 +1824,19 @@ result = classifier.classify("I have a dog", return_list=True)
 #### 🏗️ **Technical Architecture Improvements**
 
 **Robust Import Structure**:
+
 - ✅ **Fixed Dependencies**: All required imports properly included
 - ✅ **Error Prevention**: No more import-related crashes
 - ✅ **Module Compatibility**: Works seamlessly with other components
 
 **Enhanced Configuration**:
+
 - ✅ **YAML-Based**: Easy to modify and extend categories
 - ✅ **Hierarchical Structure**: Categories and phrases logically organized
 - ✅ **Scalable Design**: Simple to add new categories and keywords
 
 **Production Integration**:
+
 - ✅ **Flexible Output**: Supports both development and production needs
 - ✅ **Performance Optimized**: Efficient classification with minimal overhead
 - ✅ **Documentation**: Complete usage examples and API documentation
@@ -1763,10 +1844,12 @@ result = classifier.classify("I have a dog", return_list=True)
 #### 📁 **Files Created & Modified**
 
 **ENHANCED: Core Classification System**:
+
 - `src/personal_agent/core/topic_classifier.py` - Fixed import, added dual output modes, enhanced test examples
 - `src/personal_agent/core/topics.yaml` - Expanded from 6 to 13 categories, 200+ keywords, 50+ phrases
 
 **Key Improvements**:
+
 - **Import Fix**: Added missing `yaml` import (1 line fix, critical impact)
 - **Category Expansion**: 7 new categories for comprehensive personal information coverage
 - **Production Features**: Dual output modes for development and production use
@@ -2161,6 +2244,7 @@ Response: "You mentioned that you are working as a GeekSquad Agent at BestBuy!"
 **MASSIVE SIMPLIFICATION: Eliminated 150+ Lines of Complex Wrapper Logic**
 
 **BEFORE (Complex Wrapper Pattern)**:
+
 ```python
 async def store_user_memory(content: str, topics: Union[List[str], str, None] = None) -> str:
     # 50+ lines of complex wrapper logic with multiple fallback methods
@@ -2173,6 +2257,7 @@ async def store_user_memory(content: str, topics: Union[List[str], str, None] = 
 ```
 
 **AFTER (Direct Method Calls)**:
+
 ```python
 async def store_user_memory(content: str, topics: Union[List[str], str, None] = None) -> str:
     # Direct call to SemanticMemoryManager - Clean and simple!
@@ -2194,6 +2279,7 @@ async def store_user_memory(content: str, topics: Union[List[str], str, None] = 
 **EXPANDED CAPABILITIES: 4 New Memory Management Tools Added**
 
 **Original 4 Tools**:
+
 1. `store_user_memory` - Store new memories
 2. `query_memory` - Search memories semantically  
 3. `get_recent_memories` - Get recent memories
@@ -2206,6 +2292,7 @@ async def store_user_memory(content: str, topics: Union[List[str], str, None] = 
 8. **`get_memory_stats`** - Get comprehensive memory statistics and analytics
 
 **Direct SemanticMemoryManager Integration**:
+
 ```python
 # Get direct access to memory manager and database
 memory_manager, db = self._get_direct_memory_access()
@@ -2239,6 +2326,7 @@ async def get_memory_stats() -> str:
 **CREATED: Complete Test Suite Validating All 8 Memory Tools**
 
 **Test Suite Files Created**:
+
 - `tests/test_memory_capabilities_standalone.py` ⭐ **MAIN TEST SUITE** (400+ lines)
 - `tests/test_direct_semantic_memory_capabilities.py` - Modular test suite
 - `tests/run_memory_capability_tests.py` - Test runner with banner
@@ -2291,6 +2379,7 @@ Semantic Search:
 **SYSTEMATIC TESTING: 30 Comprehensive Personal Facts Across 6 Categories**
 
 **Test Data Categories**:
+
 1. **Personal Information** (5 facts): Name, location, work, education, background
 2. **Hobbies & Interests** (5 facts): Hiking, music, photography, cooking, yoga
 3. **Food Preferences** (5 facts): Vegetarian, Mediterranean, coffee, allergies, beer
@@ -2299,6 +2388,7 @@ Semantic Search:
 6. **Technology & Skills** (5 facts): Programming languages, tools, learning, preferences
 
 **Advanced Test Scenarios**:
+
 - **Bulk Storage Testing**: 30 memories with timing analysis
 - **Semantic Search Testing**: 12 different query types (direct, semantic, complex)
 - **Memory Management Testing**: Update, delete, clear operations
@@ -2310,12 +2400,14 @@ Semantic Search:
 **SIMPLIFIED CODEBASE: 50+ Lines Reduced While Adding 4 New Features**
 
 **Code Reduction Analysis**:
+
 - **Removed**: 150+ lines of complex wrapper functions
 - **Added**: 100+ lines of clean, direct method calls
 - **Net Result**: 50+ line reduction while adding 4 new tools
 - **Complexity**: Dramatically reduced - direct calls vs complex wrappers
 
 **Enhanced Error Handling**:
+
 ```python
 # Direct access to SemanticMemoryManager's native error responses
 success, message, memory_id = memory_manager.add_memory(...)
@@ -2331,6 +2423,7 @@ else:
 ```
 
 **Performance Optimizations**:
+
 - **Eliminated Wrapper Overhead**: Direct method calls are faster
 - **Better Memory Access**: Direct database access through `memory_manager` and `db`
 - **Cleaner Error Paths**: Native error responses from SemanticMemoryManager
@@ -2348,6 +2441,7 @@ else:
 4. **Complex Searches**: "outdoor activities hiking", "machine learning AI", "vegetarian Mediterranean"
 
 **Search Results Analysis**:
+
 - ✅ **Exact Matches**: "San Francisco" found with 1.00 similarity
 - ✅ **Programming Languages**: Found with 1.00 similarity  
 - ✅ **Complex Queries**: "machine learning AI" found 4 relevant memories
@@ -2359,6 +2453,7 @@ else:
 **NEW CRUD CAPABILITIES: Complete Memory Lifecycle Management**
 
 **Memory Update Operations**:
+
 ```python
 # Test memory update with new content and topics
 updated_content = "This is an UPDATED test memory for management operations"
@@ -2367,6 +2462,7 @@ update_result = await update_tool(memory_id, updated_content, ["test", "manageme
 ```
 
 **Memory Deletion Operations**:
+
 ```python
 # Test memory deletion by ID
 delete_result = await delete_tool(memory_id)
@@ -2374,6 +2470,7 @@ delete_result = await delete_tool(memory_id)
 ```
 
 **Memory Statistics**:
+
 ```python
 # Comprehensive memory analytics
 📊 Memory Statistics:
@@ -2392,6 +2489,7 @@ Topic distribution:
 #### 🎯 **Revolutionary User Experience Improvements**
 
 **BEFORE (Complex Wrapper System)**:
+
 - ❌ 4 memory tools only
 - ❌ Complex error handling with multiple fallback methods
 - ❌ 150+ lines of wrapper logic
@@ -2399,6 +2497,7 @@ Topic distribution:
 - ❌ Limited memory management capabilities
 
 **AFTER (Direct SemanticMemoryManager Integration)**:
+
 - ✅ 8 comprehensive memory tools
 - ✅ Clean, direct error responses from SemanticMemoryManager
 - ✅ 50+ lines reduced while adding 4 new features
@@ -2408,12 +2507,14 @@ Topic distribution:
 #### 📁 **Files Created & Modified**
 
 **NEW: Comprehensive Test Suite**:
+
 - `tests/test_memory_capabilities_standalone.py` - **MAIN TEST SUITE** (400+ lines, self-contained)
 - `tests/test_direct_semantic_memory_capabilities.py` - Modular test suite with class structure
 - `tests/run_memory_capability_tests.py` - Test runner with professional banner
 - `tests/README_memory_capability_tests.md` - Complete documentation and usage guide
 
 **ENHANCED: Core Agent Architecture**:
+
 - `src/personal_agent/core/agno_agent.py` - **MAJOR REFACTOR**: Direct SemanticMemoryManager integration
   - Replaced `_get_memory_tools()` with direct method calls
   - Added 4 new memory tools (update, delete, clear, stats)
