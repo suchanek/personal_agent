@@ -82,7 +82,7 @@ async def main():
     
     try:
         # Import and run the test
-        test_file = Path(__file__).parent / "tests" / "test_pydantic_validation_fix.py"
+        test_file = Path(__file__).parent / "test_pydantic_validation_fix.py"
         
         if not test_file.exists():
             print(f"❌ Test file not found: {test_file}")
