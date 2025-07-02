@@ -18,7 +18,7 @@ def main():
     print("It will test tool call argument parsing and display.\n")
     
     # Path to the test script
-    test_script = Path(__file__).parent / "tests" / "test_tool_call_debug_output.py"
+    test_script = Path(__file__).parent / "test_tool_call_debug_output.py"
     
     if not test_script.exists():
         print(f"❌ Test script not found: {test_script}")

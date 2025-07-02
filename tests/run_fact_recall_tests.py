@@ -63,11 +63,11 @@ def main():
     
     # Map choices to test scripts
     test_scripts = {
-        "1": ("tests/test_quick_fact_recall.py", "Quick Fact Recall Test"),
-        "2": ("tests/test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test"),
-        "quick": ("tests/test_quick_fact_recall.py", "Quick Fact Recall Test"),
-        "comprehensive": ("tests/test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test"),
-        "comp": ("tests/test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test"),
+        "1": ("test_quick_fact_recall.py", "Quick Fact Recall Test"),
+        "2": ("test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test"),
+        "quick": ("test_quick_fact_recall.py", "Quick Fact Recall Test"),
+        "comprehensive": ("test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test"),
+        "comp": ("test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test"),
     }
     
     if choice == "3" or choice == "both":
@@ -79,7 +79,7 @@ def main():
         
         if quick_success:
             print("\n⏳ Quick test passed, proceeding to comprehensive test...")
-            comp_success = run_test("tests/test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test")
+            comp_success = run_test("test_fact_recall_comprehensive.py", "Comprehensive Fact Recall Test")
             
             print("\n" + "=" * 60)
             print("📋 FINAL RESULTS")
