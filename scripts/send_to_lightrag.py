@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import requests
+import json
 
 # Add the src directory to the Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -29,8 +30,11 @@ def send_file_to_lightrag(file_path: str):
             response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
 
         print(f"Successfully sent '{file_path}' to LightRAG server.")
-        print("Server response:")
-        print(response.json())
+        print("\n" + "=" * 40)
+        print("  LightRAG Server Response")
+        print("=" * 40)
+        print(json.dumps(response.json(), indent=2))
+        print("=" * 40 + "\n")
 
     except requests.exceptions.RequestException as e:
         print(f"Error sending file to LightRAG server: {e}")
