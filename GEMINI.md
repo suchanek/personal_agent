@@ -178,6 +178,11 @@ The project uses a custom testing setup.
 *   **Python Execution**: Mathematical calculations and data analysis
 *   **Shell Commands**: System operations with security restrictions
 
+### Utility Scripts
+
+*   **Send File to LightRAG**: `python3 scripts/send_to_lightrag.py <file_path>`
+    This script sends a specified file to the LightRAG server's `/documents/file` endpoint for processing.
+
 ## Memory System
 
 The agent uses an advanced semantic memory system that:
