@@ -72,7 +72,7 @@ class EnhancedLightRAGDocumentManager:
     def check_server_status(self) -> bool:
         """Check if LightRAG server is running"""
         try:
-            response = requests.get(f"{self.base_url}/documents", timeout=5)
+            response = requests.get(f"{self.base_url}/health", timeout=5)
             return response.status_code == 200
         except requests.exceptions.RequestException:
             return False
