@@ -2,15 +2,61 @@
 """
 LightRAG Document Manager
 
-This script provides comprehensive document management capabilities:
-- API-based deletion (temporary, in-memory only)
-- Persistent storage deletion (permanent, survives restarts)
-- Docker service management (stop/start for safe operations)
-- Verification and backup functionality
+This script provides comprehensive document management capabilities for the LightRAG server,
+including API-based deletion, persistent storage management, Docker service control,
+and verification of document states. It allows for granular control over document lifecycle
+within the LightRAG knowledge base.
 
-Usage from project root:
-    python lightrag_docmgr.py --status
-    python lightrag_docmgr.py --delete-processing --persistent --restart-server --verify
+Usage:
+  From the project root directory, run:
+  `python tools/lightrag_docmgr.py [OPTIONS] [ACTIONS]`
+
+Options:
+  --url <URL>                 LightRAG server URL (default: from config or http://localhost:9621)
+  --storage-path <PATH>       Path to LightRAG storage directory (default: from config)
+  --persistent                Delete from persistent storage (permanent, requires --restart-server for immediate effect)
+  --restart-server            Restart Docker services (required for persistent deletion to take effect)
+  --verify                    Verify deletion after completion by checking server status
+  --no-confirm                Skip confirmation prompts for deletion actions
+  --delete-source             Delete the original source file from the inputs directory
+
+Actions:
+  --status                    Show LightRAG server and Docker service status
+  --list                      List all documents with detailed view (ID, file path, status, etc.)
+  --list-names                List all document names (file paths only)
+  --delete-processing         Delete all documents currently in 'processing' status
+  --delete-failed             Delete all documents currently in 'failed' status
+  --delete-status <STATUS>    Delete all documents with a specific custom status
+  --delete-ids <ID1> [ID2...] Delete specific documents by their unique IDs
+  --delete-name <PATTERN>     Delete documents whose file paths match a glob-style pattern (e.g., '*.pdf', 'my_doc.txt')
+  --nuke                      Perform a comprehensive deletion. This implicitly sets:
+                              --persistent, --restart-server, --verify, --delete-source, and --no-confirm.
+                              Must be used with a deletion action (e.g., --delete-processing, --delete-name).
+
+Examples:
+  # Check server status
+  python tools/lightrag_docmgr.py --status
+
+  # List all documents (detailed)
+  python tools/lightrag_docmgr.py --list
+
+  # List only document names
+  python tools/lightrag_docmgr.py --list-names
+
+  # Delete all 'processing' documents (API only, temporary)
+  python tools/lightrag_docmgr.py --delete-processing
+
+  # Delete all 'failed' documents persistently, restart server, and verify
+  python tools/lightrag_docmgr.py --delete-failed --persistent --restart-server --verify
+
+  # Delete a specific document by ID persistently, restart server, and delete source file
+  python tools/lightrag_docmgr.py --delete-ids doc-12345 --persistent --restart-server --delete-source
+
+  # Delete all documents matching a name pattern (e.g., all '.md' files) comprehensively
+  python tools/lightrag_docmgr.py --nuke --delete-name '*.md'
+
+  # Delete a specific document by name comprehensively
+  python tools/lightrag_docmgr.py --nuke --delete-name 'my_important_document.pdf'
 """
 
 import json
@@ -18,6 +64,7 @@ import os
 import shutil
 import subprocess
 import sys
+import fnmatch
 import time
 from datetime import datetime
 from pathlib import Path
@@ -68,6 +115,9 @@ class EnhancedLightRAGDocumentManager:
         self.text_chunks_file = os.path.join(
             self.storage_path, "kv_store_text_chunks.json"
         )
+        self.llm_cache_file = os.path.join(
+            self.storage_path, "kv_store_llm_response_cache.json"
+        )
 
     def check_server_status(self) -> bool:
         """Check if LightRAG server is running"""
@@ -81,7 +131,7 @@ class EnhancedLightRAGDocumentManager:
         """Check Docker service status"""
         try:
             # Change to project root directory for docker-compose commands
-            project_root = Path(__file__).parent
+            project_root = Path(__file__).parent.parent
             result = subprocess.run(
                 ["docker-compose", "ps", "--format", "json"],
                 capture_output=True,
@@ -116,7 +166,7 @@ class EnhancedLightRAGDocumentManager:
         """Stop Docker services"""
         print("🛑 Stopping Docker services...")
         try:
-            project_root = Path(__file__).parent
+            project_root = Path(__file__).parent.parent
             result = subprocess.run(
                 ["docker-compose", "down"],
                 capture_output=True,
@@ -134,7 +184,7 @@ class EnhancedLightRAGDocumentManager:
         """Start Docker services"""
         print("🚀 Starting Docker services...")
         try:
-            project_root = Path(__file__).parent
+            project_root = Path(__file__).parent.parent
             result = subprocess.run(
                 ["docker-compose", "up", "-d"],
                 capture_output=True,
@@ -221,11 +271,15 @@ class EnhancedLightRAGDocumentManager:
     def get_documents_by_status_from_storage(self, status: str) -> List[Dict[str, Any]]:
         """Get documents by status from storage files"""
         doc_status_data = self.load_json_file(self.doc_status_file)
+        full_docs_data = self.load_json_file(self.full_docs_file) # Load full docs data
 
         documents = []
         for doc_id, doc_info in doc_status_data.items():
             if doc_info.get("status") == status:
                 doc_info["id"] = doc_id
+                # Add file_path from full_docs_data if available
+                if doc_id in full_docs_data:
+                    doc_info["file_path"] = full_docs_data[doc_id].get("metadata", {}).get("file_path")
                 documents.append(doc_info)
 
         return documents
@@ -302,20 +356,43 @@ class EnhancedLightRAGDocumentManager:
 
         return success
 
+    def get_source_file_path(self, doc_id: str) -> Optional[str]:
+        """Get the source file path from the document metadata"""
+        full_docs_data = self.load_json_file(self.full_docs_file)
+        doc_info = full_docs_data.get(doc_id)
+        if doc_info:
+            return doc_info.get("metadata", {}).get("file_path")
+        return None
+
+    def list_document_names(self) -> List[str]:
+        """List all document names (file paths) from the LightRAG server"""
+        documents = self.get_documents()
+        names = []
+        if isinstance(documents, dict) and "statuses" in documents:
+            for status_docs in documents["statuses"].values():
+                for doc in status_docs:
+                    file_path = doc.get("file_path")
+                    if file_path:
+                        names.append(file_path)
+        return sorted(list(set(names))) # Return unique and sorted names
+
     def delete_documents_comprehensive(
         self,
-        doc_ids: List[str],
+        docs_to_delete: List[Dict[str, Any]],  # Now accepts list of dicts with doc_id and file_path
         use_persistent: bool = False,
         restart_server: bool = False,
         verify: bool = False,
+        delete_source: bool = False,
     ) -> Dict[str, Any]:
         """
         Comprehensive document deletion with multiple strategies
         """
+        doc_ids = [doc["id"] for doc in docs_to_delete]
         results = {
             "total_requested": len(doc_ids),
             "api_deleted": 0,
             "storage_deleted": 0,
+            "source_files_deleted": 0,
             "verified_deleted": 0,
             "errors": [],
             "backup_path": None,
@@ -329,11 +406,41 @@ class EnhancedLightRAGDocumentManager:
         print(f"   Persistent storage: {'Yes' if use_persistent else 'No'}")
         print(f"   Server restart: {'Yes' if restart_server else 'No'}")
         print(f"   Verification: {'Yes' if verify else 'No'}")
+        print(f"   Delete source file: {'Yes' if delete_source else 'No'}")
         print()
 
-        # Phase 1: API deletion (if server is running)
+        # Phase 1: Delete source files first if requested
+        if delete_source:
+            print("🗑️ Phase 1: Deleting source files")
+            for doc_info in docs_to_delete:
+                doc_id = doc_info["id"]
+                source_file_path = doc_info.get("file_path") # Use file_path directly from doc_info
+                if source_file_path:
+                    try:
+                        if os.path.exists(source_file_path):
+                            os.remove(source_file_path)
+                            print(f"✅ Deleted source file: {source_file_path}")
+                            results["source_files_deleted"] += 1
+                        else:
+                            print(
+                                f"⚠️  Source file not found, cannot delete: {source_file_path}"
+                            )
+                    except Exception as e:
+                        error_msg = (
+                            f"Failed to delete source file {source_file_path}: {e}"
+                        )
+                        print(f"❌ {error_msg}")
+                        results["errors"].append(error_msg)
+                else:
+                    print(f"⚠️  Could not find source file path for doc_id: {doc_id}")
+            print(
+                f"✅ Source file deletion complete: {results['source_files_deleted']}/{len(doc_ids)}"
+            )
+            print()
+
+        # Phase 2: API deletion (if server is running)
         if self.check_server_status():
-            print("📡 Phase 1: API-based deletion")
+            print("📡 Phase 2: API-based deletion")
             for doc_id in doc_ids:
                 if self.delete_document_api(doc_id):
                     results["api_deleted"] += 1
@@ -343,9 +450,9 @@ class EnhancedLightRAGDocumentManager:
             print("⚠️  Server not running, skipping API deletion")
             print()
 
-        # Phase 2: Persistent storage deletion
+        # Phase 3: Persistent storage deletion
         if use_persistent:
-            print("💾 Phase 2: Persistent storage deletion")
+            print("💾 Phase 3: Persistent storage deletion")
 
             # Stop server if restart is requested
             if restart_server:
@@ -363,6 +470,11 @@ class EnhancedLightRAGDocumentManager:
                     self.start_docker_services()  # Try to restart anyway
                 return results
 
+            # Delete the LLM cache file
+            if os.path.exists(self.llm_cache_file):
+                os.remove(self.llm_cache_file)
+                print("✅ Deleted LLM cache file")
+
             # Delete from storage
             for doc_id in doc_ids:
                 if self.delete_document_from_storage(doc_id):
@@ -379,9 +491,9 @@ class EnhancedLightRAGDocumentManager:
                     results["errors"].append("Failed to restart Docker services")
                     return results
 
-        # Phase 3: Verification
+        # Phase 4: Verification
         if verify:
-            print("🔍 Phase 3: Verification")
+            print("🔍 Phase 4: Verification")
             time.sleep(2)  # Give server time to stabilize
 
             if self.check_server_status():
@@ -416,6 +528,7 @@ class EnhancedLightRAGDocumentManager:
         use_persistent: bool = False,
         restart_server: bool = False,
         verify: bool = False,
+        delete_source: bool = False,
         confirm: bool = True,
     ) -> Dict[str, Any]:
         """Delete all documents with a specific status using comprehensive approach"""
@@ -433,6 +546,7 @@ class EnhancedLightRAGDocumentManager:
                 "total_requested": 0,
                 "api_deleted": 0,
                 "storage_deleted": 0,
+                "source_files_deleted": 0,
                 "verified_deleted": 0,
                 "errors": [],
                 "backup_path": None,
@@ -461,15 +575,20 @@ class EnhancedLightRAGDocumentManager:
                     "total_requested": 0,
                     "api_deleted": 0,
                     "storage_deleted": 0,
+                    "source_files_deleted": 0,
                     "verified_deleted": 0,
                     "errors": ["User cancelled"],
                     "backup_path": None,
                 }
 
         # Extract document IDs and perform deletion
-        doc_ids = [doc.get("id") for doc in docs if doc.get("id")]
+        docs_to_delete_info = [
+            {"id": doc.get("id"), "file_path": doc.get("file_path")}
+            for doc in docs
+            if doc.get("id")
+        ]
         return self.delete_documents_comprehensive(
-            doc_ids, use_persistent, restart_server, verify
+            docs_to_delete_info, use_persistent, restart_server, verify, delete_source
         )
 
 
@@ -489,7 +608,8 @@ def main():
     )
 
     # Actions
-    parser.add_argument("--list", action="store_true", help="List all documents")
+    parser.add_argument("--list", action="store_true", help="List all documents (detailed view)")
+    parser.add_argument("--list-names", action="store_true", help="List all document names (file paths only)")
     parser.add_argument(
         "--status", action="store_true", help="Show server and Docker status"
     )
@@ -506,6 +626,16 @@ def main():
     )
     parser.add_argument(
         "--delete-ids", nargs="+", help="Delete specific documents by ID"
+    )
+    parser.add_argument(
+        "--delete-name", type=str, help="Delete documents matching a name pattern (e.g., 'my_doc.pdf' or '*.txt')"
+    )
+
+    # Comprehensive Nuke Option
+    parser.add_argument(
+        "--nuke",
+        action="store_true",
+        help="Perform a comprehensive deletion: persistent, restart server, verify, delete source, and no confirmation.",
     )
 
     # Options
@@ -525,6 +655,11 @@ def main():
     parser.add_argument(
         "--no-confirm", action="store_true", help="Skip confirmation prompts"
     )
+    parser.add_argument(
+        "--delete-source",
+        action="store_true",
+        help="Delete the original source file from the inputs directory",
+    )
 
     args = parser.parse_args()
 
@@ -541,7 +676,7 @@ def main():
         # Server status
         server_running = manager.check_server_status()
         print(
-            f"LightRAG Server: {'🟢 Running on {LIGHTRAG_SERVER}' if server_running else '🔴 Not responding'}"
+            f"LightRAG Server: {'🟢 Running on ' + manager.base_url if server_running else '🔴 Not responding'}"
         )
 
         # Docker status
@@ -579,11 +714,34 @@ def main():
             print("❌ Cannot list documents - server not responding")
         return 0
 
+    elif args.list_names:
+        if manager.check_server_status():
+            names = manager.list_document_names()
+            if names:
+                print("Document Names:")
+                print("-" * 40)
+                for name in names:
+                    print(f"  - {name}")
+            else:
+                print("No document names found.")
+        else:
+            print("❌ Cannot list document names - server not responding")
+        return 0
+
     # Deletion operations
     use_persistent = args.persistent
     restart_server = args.restart_server
     verify = args.verify
+    delete_source = args.delete_source
     confirm = not args.no_confirm
+
+    if args.nuke:
+        print("☢️  --nuke option activated: Performing comprehensive deletion.")
+        use_persistent = True
+        restart_server = True
+        verify = True
+        delete_source = True
+        confirm = False  # No confirmation for nuke
 
     # Validate options
     if use_persistent and not restart_server:
@@ -595,17 +753,34 @@ def main():
 
     results = None
 
+    deletion_action_specified = (
+        args.delete_processing
+        or args.delete_failed
+        or args.delete_status
+        or args.delete_ids
+        or args.delete_name
+    )
+
+    if args.nuke and not deletion_action_specified:
+        print("❌ Error: --nuke option requires a deletion action (e.g., --delete-processing, --delete-ids, --delete-name).")
+        return 1
+
     if args.delete_processing:
         results = manager.delete_documents_by_status_comprehensive(
-            "processing", use_persistent, restart_server, verify, confirm
+            "processing", use_persistent, restart_server, verify, delete_source, confirm
         )
     elif args.delete_failed:
         results = manager.delete_documents_by_status_comprehensive(
-            "failed", use_persistent, restart_server, verify, confirm
+            "failed", use_persistent, restart_server, verify, delete_source, confirm
         )
     elif args.delete_status:
         results = manager.delete_documents_by_status_comprehensive(
-            args.delete_status, use_persistent, restart_server, verify, confirm
+            args.delete_status,
+            use_persistent,
+            restart_server,
+            verify,
+            delete_source,
+            confirm,
         )
     elif args.delete_ids:
         if confirm:
@@ -618,14 +793,51 @@ def main():
                 return 0
 
         results = manager.delete_documents_comprehensive(
-            args.delete_ids, use_persistent, restart_server, verify
+            args.delete_ids, use_persistent, restart_server, verify, delete_source
+        )
+    elif args.delete_name:
+        import fnmatch # Import fnmatch here to avoid circular dependency issues
+
+        if not manager.check_server_status():
+            print("❌ Cannot delete by name - server not responding")
+            return 1
+
+        all_docs = manager.get_documents()
+        matching_docs = []
+        name_pattern = args.delete_name
+
+        if isinstance(all_docs, dict) and "statuses" in all_docs:
+            for status_docs in all_docs["statuses"].values():
+                for doc in status_docs:
+                    file_path = doc.get("file_path")
+                    if file_path and fnmatch.fnmatch(file_path, name_pattern):
+                        matching_docs.append({"id": doc.get("id"), "file_path": file_path})
+        
+        if not matching_docs:
+            print(f"No documents found matching name pattern: '{name_pattern}'")
+            return 0
+
+        print(f"Found {len(matching_docs)} documents matching '{name_pattern}':")
+        for doc in matching_docs:
+            print(f"  - {doc.get("file_path")} (ID: {doc.get("id")})")
+
+        if confirm:
+            response = input(f"Delete these {len(matching_docs)} documents? (y/N): ")
+            if response.lower() not in ["y", "yes"]:
+                print("❌ Deletion cancelled")
+                return 0
+
+        results = manager.delete_documents_comprehensive(
+            matching_docs, use_persistent, restart_server, verify, delete_source
         )
     else:
         print("❌ No action specified. Use --help for available options.")
         print("\nQuick examples:")
         print("  python lightrag_docmgr.py --status")
         print("  python lightrag_docmgr.py --list")
+        print("  python lightrag_docmgr.py --list-names")
         print("  python lightrag_docmgr.py --delete-processing")
+        print("  python lightrag_docmgr.py --delete-name '*.txt'")
         print(
             "  python lightrag_docmgr.py --delete-processing --persistent --restart-server --verify"
         )
@@ -639,6 +851,7 @@ def main():
         print(f"Total requested: {results['total_requested']}")
         print(f"API deleted: {results['api_deleted']}")
         print(f"Storage deleted: {results['storage_deleted']}")
+        print(f"Source files deleted: {results['source_files_deleted']}")
         if verify:
             print(f"Verified deleted: {results['verified_deleted']}")
         if results["backup_path"]:
