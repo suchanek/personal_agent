@@ -13,7 +13,7 @@ BACKUP_DIR="backups"
 LOCAL_URL="http://localhost:11434"
 LOCAL_DOCKER_URL="http://host.docker.internal:11434"
 REMOTE_URL="http://tesla.local:11434"
-REMOTE_DOCKER_URL="http://tesla.local:11434"
+REMOTE_DOCKER_URL="http://192.168.1.126:11434"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
@@ -53,11 +53,11 @@ show_status() {
     echo "  OLLAMA_URL=$current_url"
     
     if [[ "$current_url" == "$LOCAL_URL" ]]; then
-        echo -e "  Mode: ${GREEN}LOCAL${NC} (host.docker.internal)"
+        echo -e "  RAG Mode: ${GREEN}LOCAL${NC} (host.docker.internal)"
     elif [[ "$current_url" == "$REMOTE_URL" ]]; then
-        echo -e "  Mode: ${GREEN}REMOTE${NC} (tesla.local)"
+        echo -e "  RAG Mode: ${GREEN}REMOTE${NC} (tesla.local)"
     else
-        echo -e "  Mode: ${YELLOW}CUSTOM${NC}"
+        echo -e "  RAG Mode: ${YELLOW}CUSTOM${NC}"
     fi
 }
 
