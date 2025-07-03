@@ -286,3 +286,80 @@ personal_agent/
 ├── old/                    # Legacy or deprecated files
 └── tests/                  # Test scripts and test files
 ```
+
+## LightRAG API Endpoints
+
+Here's a summary of the LightRAG API endpoints for reference:
+
+### documents
+
+*   `POST /documents/scan` - Scan For New Documents
+*   `POST /documents/upload` - Upload To Input Dir
+*   `POST /documents/text` - Insert Text
+*   `POST /documents/texts` - Insert Texts
+*   `POST /documents/file` - Insert File
+*   `POST /documents/file_batch` - Insert Batch
+*   `DELETE /documents` - Clear Documents
+*   `GET /documents` - Documents
+*   `GET /documents/pipeline_status` - Get Pipeline Status
+*   `DELETE /documents/delete_document` - Delete a document and all its associated data by its ID.
+*   `POST /documents/clear_cache` - Clear Cache
+*   `DELETE /documents/delete_entity` - Delete Entity
+*   `DELETE /documents/delete_relation` - Delete Relation
+
+### query
+
+*   `POST /query` - Query Text
+*   `POST /query/stream` - Query Text Stream
+
+### graph
+
+*   `GET /graph/label/list` - Get Graph Labels
+*   `GET /graphs` - Get Knowledge Graph
+*   `GET /graph/entity/exists` - Check Entity Exists
+*   `POST /graph/entity/edit` - Update Entity
+*   `POST /graph/relation/edit` - Update Relation
+
+### ollama
+
+*   `GET /api/version` - Get Version
+*   `GET /api/tags` - Get Tags
+*   `GET /api/ps` - Get Running Models
+*   `POST /api/generate` - Generate
+*   `POST /api/chat` - Chat
+
+### default
+
+*   `GET /` - Redirect To Webui
+*   `GET /auth-status` - Get Auth Status
+*   `POST /login` - Login
+*   `GET /health` - Get Status
+
+### Schemas
+
+*   `Body_insert_batch_documents_file_batch_post`
+*   `Body_insert_file_documents_file_post`
+*   `Body_login_login_post`
+*   `Body_upload_to_input_dir_documents_upload_post`
+*   `ClearCacheRequest`
+*   `ClearCacheResponse`
+*   `ClearDocumentsResponse`
+*   `DeleteDocByIdResponse`
+*   `DeleteDocRequest`
+*   `DeleteEntityRequest`
+*   `DeleteRelationRequest`
+*   `DeletionResult`
+*   `DocStatus`
+*   `DocStatusResponse`
+*   `DocsStatusesResponse`
+*   `EntityUpdateRequest`
+*   `HTTPValidationError`
+*   `InsertResponse`
+*   `InsertTextRequest`
+*   `InsertTextsRequest`
+*   `PipelineStatusResponse`
+*   `QueryRequest`
+*   `QueryResponse`
+*   `RelationUpdateRequest`
+*   `ScanResponse`
+*   `ValidationError`
