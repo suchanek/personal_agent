@@ -140,7 +140,7 @@ The project uses a custom testing setup.
 *   **Test memory system**: `python memory_tests/test_comprehensive_memory_search.py`
 *   **Test tool call detection**: `python tests/test_tool_call_detection.py`
 
-## Key Technologies
+"""## Key Technologies
 
 *   **agno**: Core framework for building the agent.
 *   **Ollama**: For running local language models.
@@ -149,6 +149,21 @@ The project uses a custom testing setup.
 *   **Poetry**: For dependency management.
 *   **Streamlit**: For the agent's user interface.
 *   **MCP (Model Context Protocol)**: For integrated servers and tools.
+
+## LightRAG Integration
+
+The project has been updated to integrate with the LightRAG server, a powerful tool for building RAG applications. This integration enhances the agent's knowledge capabilities by providing a robust and scalable solution for managing and querying large document collections.
+
+### Key Changes:
+
+*   **`GEMINI.md`**: This file has been significantly updated to reflect the integration with `LightRAG`. It now includes:
+    *   A detailed overview of `LightRAG`'s features.
+    *   Installation and usage instructions for the `lightrag` package.
+    *   A new section documenting the LightRAG Server API, including its endpoints and key characteristics like authentication and versioning.
+*   **`pyproject.toml`**: The `lightrag-hku` package has been added as a dependency. This is a crucial change that ensures the `LightRAG` library is installed alongside other project dependencies, making its functionality available to the application.
+*   **Docker Configuration (`docker-compose.yml`)**: The Docker configuration has been substantially modified to:
+    *   **Tailor the image for the personal agent:** The `docker-compose.yml` has been updated to create a specialized Docker image that includes all the necessary dependencies and configurations for the personal agent project.
+    *   **Integrate `LightRAG`:** The Docker build process now correctly installs the `lightrag` library, ensuring it's available within the containerized environment.""
 
 ## Tools & Capabilities
 
