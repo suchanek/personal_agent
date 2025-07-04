@@ -1,0 +1,26 @@
+services:
+  lightrag:
+    container_name: lightrag_pagent
+    image: ghcr.io/suchanek/lightrag_pagent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - ghcr.io/suchanek/lightrag_pagent:latest
+    ports:
+      - "${PORT:-9621}:9621"
+    volumes:
+      - /Users/Shared/personal_agent_data/agno/rag_storage:/app/data/rag_storage
+      - /Users/Shared/personal_agent_data/rag_storage/inputs:/app/data/inputs
+      - ./config.ini:/app/config.ini
+      - ./.env:/app/.env
+    env_file:
+      - .env
+    environment:
+      # These variables are now sourced from the .env file via `env_file`.
+      # This makes .env the single source of truth and avoids hardcoding.
+      - LLM_BINDING_HOST=${OLLAMA_DOCKER_URL:-http://host.docker.internal:11434}
+      - EMBEDDING_BINDING_HOST=${OLLAMA_DOCKER_URL:-http://host.docker.internal:11434}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

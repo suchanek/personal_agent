@@ -1,5 +1,71 @@
 # Personal AI Agent - Technical Changelog
 
+## 🚀 **v0.8.1-dev: Decoupled LightRAG Service Architecture** (July 4, 2025)
+
+### ✅ **MAJOR ENHANCEMENT: Standalone LightRAG Service for Enhanced Modularity**
+
+**🎯 Mission Accomplished**: Successfully decoupled the LightRAG service from the main application's `docker-compose.yml`, transforming it into a standalone, independently managed container for improved modularity, scalability, and deployment flexibility.
+
+#### 🔍 **Problem Analysis - Monolithic Architecture Limitations**
+
+**CRITICAL NEEDS IDENTIFIED:**
+
+1.  **Inflexible Deployment**: The tightly coupled `docker-compose` setup made it difficult to run the LightRAG service on a separate host or manage it independently from the main application.
+2.  **Configuration Complexity**: Hardcoded URLs and mixed configurations complicated the management of different environments (local vs. remote).
+3.  **Scalability Constraints**: A monolithic architecture limited the ability to scale the knowledge base service independently of the agent application.
+
+#### 🛠️ **Comprehensive Solution Implementation**
+
+**SOLUTION #1: Centralized Configuration via `LIGHTRAG_URL`**
+
+Introduced a `LIGHTRAG_URL` environment variable in [`src/personal_agent/config/settings.py`](src/personal_agent/config/settings.py:43) as the single source of truth for the LightRAG server's address. All application components were updated to use this variable, including:
+- [`src/personal_agent/core/agno_agent.py`](src/personal_agent/core/agno_agent.py:329) for knowledge base queries.
+- [`tools/paga_streamlit_agno.py`](tools/paga_streamlit_agno.py:558) for live health checks in the UI.
+
+**SOLUTION #2: Standalone LightRAG Server**
+
+Created a dedicated directory, [`lightrag_server/`](lightrag_server/), with its own:
+- [`docker-compose.yml`](lightrag_server/docker-compose.yml:1): To manage the LightRAG container independently.
+- [`config.ini`](lightrag_server/config.ini/config.ini:1): For clean, isolated server configuration.
+
+**SOLUTION #3: Enhanced Tooling and Scripts**
+
+- **`switch-ollama.sh`**: Upgraded the script to seamlessly switch the `LIGHTRAG_URL` between local and remote environments along with the Ollama URL, ensuring a smooth developer experience.
+- **`scripts/restart-container.sh`**: Added a new, generic script to restart any Docker container by name, improving container management.
+
+#### 📁 **Files Created & Modified**
+
+**NEW: Standalone LightRAG Infrastructure**:
+- `docs/LIGHTRAG_DECOUPLING_DESIGN.md`: Comprehensive design document for the new architecture.
+- `lightrag_server/docker-compose.yml`: Independent Docker configuration for the LightRAG service.
+- `lightrag_server/config.ini/config.ini`: Dedicated configuration for the LightRAG server.
+- `scripts/restart-container.sh`: Generic container restart utility.
+
+**ENHANCED: Core Application & Scripts**:
+- `src/personal_agent/config/settings.py`: Added `LIGHTRAG_URL` for centralized configuration.
+- `src/personal_agent/core/agno_agent.py`: Updated to use the new `LIGHTRAG_URL`.
+- `switch-ollama.sh`: Enhanced to manage `LIGHTRAG_URL` switching.
+- `tools/paga_streamlit_agno.py`: Added a UI health check for the LightRAG service.
+- `pyproject.toml`: Version bumped to `0.8.1rag`.
+
+#### 🏆 **Achievement Summary**
+
+**Technical Innovation**: Architecturally decoupled the LightRAG service, transforming it into a standalone component for superior flexibility and scalability.
+
+**Key Achievements**:
+
+1.  ✅ **Modularity**: LightRAG now runs as an independent service, simplifying maintenance and scaling.
+2.  ✅ **Flexibility**: The application can connect to a LightRAG instance on any host, not just `localhost`.
+3.  ✅ **Improved DX**: The `switch-ollama.sh` script now provides a one-command solution for environment switching.
+4.  ✅ **Robustness**: The Streamlit UI now displays the live status of the LightRAG service.
+
+**Business Impact**:
+
+- **Scalability**: Enables the knowledge base and application to be scaled independently.
+- **Maintainability**: Simplifies the development and deployment workflows.
+- **Future-Proofing**: Lays the groundwork for more complex, distributed deployments.
+
+---
 ## 🚀 **v0.7.10-dev: LightRAG Document Manager V2 & Multi-User Architecture Foundation** (July 3, 2025)
 
 ### ✅ **MAJOR ENHANCEMENT: LightRAG Document Manager V2 - Core Library Integration**

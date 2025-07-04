@@ -48,6 +48,7 @@ from ..config import (
     SHOW_SPLASH_SCREEN,
     USE_MCP,
     get_mcp_servers,
+    LIGHTRAG_URL,
 )
 from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import (
@@ -322,17 +323,16 @@ class AgnoPersonalAgent:
                 return f"❌ Error storing memory: {str(e)}"
 
         async def query_knowledge_base(
-            query: str, base_url: str = "http://localhost:9621", mode: str = "naive"
+            query: str, mode: str = "naive"
         ) -> dict:
             """
             Query the LightRAG knowledge base.
 
             :param query: The query string to search in the knowledge base
-            :param base_url: Base URL for the LightRAG server
             :param mode: Query mode (default: "naive")
             :return: Dictionary with query results
             """
-            url = f"{base_url}/query"
+            url = f"{LIGHTRAG_URL}/query"
             payload = {"query": query, "mode": mode}
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=120) as resp:
@@ -1512,18 +1512,17 @@ Returns:
             logger.error("Error during agno agent cleanup: %s", e)
 
     async def query_knowledge_base(
-        self, query: str, base_url: str = "http://localhost:9621", mode: str = "hybrid"
+        self, query: str, mode: str = "hybrid"
     ) -> str:
         """
         Query the LightRAG knowledge base - return raw response exactly as received.
 
         :param query: The query string to search in the knowledge base
-        :param base_url: Base URL for the LightRAG server
         :param mode: Query mode (default: "hybrid")
         :return: String with query results exactly as LightRAG returns them
         """
         try:
-            url = f"{base_url}/query"
+            url = f"{LIGHTRAG_URL}/query"
             payload = {"query": query, "mode": mode}
 
             logger.info(f"Querying LightRAG: {url} with query: '{query}', mode: {mode}")
@@ -1559,7 +1558,7 @@ Returns:
                     return response_content
 
         except aiohttp.ClientConnectorError as e:
-            error_msg = f"Cannot connect to LightRAG server at {base_url}. Is the server running? Error: {str(e)}"
+            error_msg = f"Cannot connect to LightRAG server at {LIGHTRAG_URL}. Is the server running? Error: {str(e)}"
             logger.error(error_msg)
             return error_msg
         except asyncio.TimeoutError as e:

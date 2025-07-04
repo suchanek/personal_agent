@@ -14,6 +14,8 @@ LOCAL_URL="http://localhost:11434"
 LOCAL_DOCKER_URL="http://host.docker.internal:11434"
 REMOTE_URL="http://tesla.local:11434"
 REMOTE_DOCKER_URL="http://192.168.1.126:11434"
+LOCAL_LIGHTRAG_URL="http://localhost:9621"
+REMOTE_LIGHTRAG_URL="http://tesla.local:9621"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
@@ -80,25 +82,28 @@ test_ollama_connection() {
 }
 
 # Function to update both OLLAMA_URL and OLLAMA_DOCKER_URL in .env file
-update_ollama_urls() {
-    local new_url=$1
-    local new_docker_url=$2
+update_urls() {
+    local new_ollama_url=$1
+    local new_ollama_docker_url=$2
+    local new_lightrag_url=$3
     local temp_file=$(mktemp)
     
-    # Update both OLLAMA_URL and OLLAMA_DOCKER_URL lines
-    sed -e "s|^OLLAMA_URL=.*|OLLAMA_URL=$new_url|" \
-        -e "s|^OLLAMA_DOCKER_URL=.*|OLLAMA_DOCKER_URL=$new_docker_url|" \
+    sed -e "s|^OLLAMA_URL=.*|OLLAMA_URL=$new_ollama_url|" \
+        -e "s|^OLLAMA_DOCKER_URL=.*|OLLAMA_DOCKER_URL=$new_ollama_docker_url|" \
+        -e "s|^LIGHTRAG_URL=.*|LIGHTRAG_URL=$new_lightrag_url|" \
         "$ENV_FILE" > "$temp_file"
     
-    # Check if both replacements were successful
-    if grep -q "^OLLAMA_URL=$new_url" "$temp_file" && grep -q "^OLLAMA_DOCKER_URL=$new_docker_url" "$temp_file"; then
+    if grep -q "^OLLAMA_URL=$new_ollama_url" "$temp_file" && \
+       grep -q "^OLLAMA_DOCKER_URL=$new_ollama_docker_url" "$temp_file" && \
+       grep -q "^LIGHTRAG_URL=$new_lightrag_url" "$temp_file"; then
         mv "$temp_file" "$ENV_FILE"
-        echo -e "${GREEN}✓${NC} Updated OLLAMA_URL to: $new_url"
-        echo -e "${GREEN}✓${NC} Updated OLLAMA_DOCKER_URL to: $new_docker_url"
+        echo "✓ Updated OLLAMA_URL to: $new_ollama_url"
+        echo "✓ Updated OLLAMA_DOCKER_URL to: $new_ollama_docker_url"
+        echo "✓ Updated LIGHTRAG_URL to: $new_lightrag_url"
         return 0
     else
         rm "$temp_file"
-        echo -e "${RED}✗${NC} Failed to update Ollama URLs"
+        echo "✗ Failed to update URLs"
         return 1
     fi
 }
@@ -153,7 +158,7 @@ case "$1" in
         backup_env
         
         # Update configuration
-        if update_ollama_urls "$LOCAL_URL" "$LOCAL_DOCKER_URL"; then
+        if update_urls "$LOCAL_URL" "$LOCAL_DOCKER_URL" "$LOCAL_LIGHTRAG_URL"; then
             # Test connection (optional, don't fail if unreachable)
             test_ollama_connection "$LOCAL_URL"
             
@@ -186,7 +191,7 @@ case "$1" in
         backup_env
         
         # Update configuration
-        if update_ollama_urls "$REMOTE_URL" "$REMOTE_DOCKER_URL"; then
+        if update_urls "$REMOTE_URL" "$REMOTE_DOCKER_URL" "$REMOTE_LIGHTRAG_URL"; then
             # Test connection (optional, don't fail if unreachable)
             test_ollama_connection "$REMOTE_URL"
             
