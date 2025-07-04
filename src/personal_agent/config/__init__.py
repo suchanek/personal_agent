@@ -7,6 +7,7 @@ from .settings import (
     DATA_DIR,
     HOME_DIR,
     LIGHTRAG_SERVER,
+    LIGHTRAG_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
@@ -48,6 +49,7 @@ def get_settings():
         "AGNO_KNOWLEDGE_DIR": AGNO_KNOWLEDGE_DIR,
         "STORAGE_BACKEND": STORAGE_BACKEND,
         "LIGHTRAG_SERVER": LIGHTRAG_SERVER,
+        "LIGHTRAG_URL": LIGHTRAG_URL,
     }
 
 
@@ -57,6 +59,7 @@ __all__ = [
     "DATA_DIR",
     "HOME_DIR",
     "LIGHTRAG_SERVER",
+    "LIGHTRAG_URL",
     "LLM_MODEL",
     "LOG_LEVEL",
     "MCP_SERVERS",

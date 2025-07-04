@@ -13,7 +13,7 @@ from enum import Enum, auto
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
 
-# pylint: disable=C0413
+# pylint: disable=C0413, C0415, C0301
 import aiohttp
 
 # Set logging levels for better telemetry
@@ -42,20 +42,23 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import (
+    LIGHTRAG_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
     SHOW_SPLASH_SCREEN,
     USE_MCP,
     get_mcp_servers,
-    LIGHTRAG_URL,
 )
 from ..config.model_contexts import get_model_context_size_sync
-from ..tools.personal_agent_tools import (
-    PersonalAgentFilesystemTools,
-    PersonalAgentWebTools,
+from ..config.settings import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    DATA_DIR,
+    STORAGE_BACKEND,
+    USER_ID,
 )
-from ..tools.working_yfinance_tools import WorkingYFinanceTools
+from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agno_storage import (
@@ -93,11 +96,11 @@ class AgnoPersonalAgent:
         model_name: str = LLM_MODEL,
         enable_memory: bool = True,
         enable_mcp: bool = True,
-        storage_dir: str = "./data/agno",
-        knowledge_dir: str = "./data/knowledge",
+        storage_dir: str = AGNO_STORAGE_DIR,
+        knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
-        user_id: str = "default_user",
+        user_id: str = USER_ID,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
         seed: int = None,
@@ -119,8 +122,18 @@ class AgnoPersonalAgent:
         self.model_name = model_name
         self.enable_memory = enable_memory
         self.enable_mcp = enable_mcp and USE_MCP
-        self.storage_dir = storage_dir
-        self.knowledge_dir = knowledge_dir
+
+        # If user_id differs from default, create user-specific paths
+        if user_id != USER_ID:
+            # Replace the default user ID in the paths with the custom user ID
+            self.storage_dir = os.path.expandvars(
+                f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}"
+            )
+            self.knowledge_dir = os.path.expandvars(f"{DATA_DIR}/knowledge/{user_id}")
+        else:
+            self.storage_dir = storage_dir
+            self.knowledge_dir = knowledge_dir
+
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
@@ -322,9 +335,7 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_knowledge_base(
-            query: str, mode: str = "naive"
-        ) -> dict:
+        async def query_knowledge_base(query: str, mode: str = "naive") -> dict:
             """
             Query the LightRAG knowledge base.
 
@@ -1292,7 +1303,7 @@ Returns:
     def _extract_tool_call_info(self, tool_call) -> Optional[Dict[str, Any]]:
         """Extract tool call information from various tool call formats."""
         try:
-            logger.info(f"--- Inspecting tool_call object ---")
+            logger.info("--- Inspecting tool_call object ---")
             logger.info(f"Type: {type(tool_call)}")
             logger.info(f"Object: {tool_call}")
             logger.info(f"Attributes: {dir(tool_call)}")
@@ -1511,9 +1522,7 @@ Returns:
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
 
-    async def query_knowledge_base(
-        self, query: str, mode: str = "hybrid"
-    ) -> str:
+    async def query_knowledge_base(self, query: str, mode: str = "hybrid") -> str:
         """
         Query the LightRAG knowledge base - return raw response exactly as received.
 
@@ -1534,7 +1543,7 @@ Returns:
                     if resp.status != 200:
                         error_text = await resp.text()
                         logger.error(
-                            f"LightRAG server error {resp.status}: {error_text}"
+                            "LightRAG server error {resp.status}: {error_text}"
                         )
                         return f"LightRAG server error {resp.status}: {error_text}"
 
@@ -1562,9 +1571,7 @@ Returns:
             logger.error(error_msg)
             return error_msg
         except asyncio.TimeoutError as e:
-            error_msg = (
-                f"Timeout connecting to LightRAG server at {base_url}. Error: {str(e)}"
-            )
+            error_msg = f"Timeout connecting to LightRAG server at {LIGHTRAG_URL}. Error: {str(e)}"
             logger.error(error_msg)
             return error_msg
         except Exception as e:
@@ -1808,7 +1815,7 @@ async def create_agno_agent(
         enable_memory=enable_memory,
         enable_mcp=enable_mcp,
         storage_dir=storage_dir,
-        knowledge_dir=knowledge_dir,
+        knowledge_dir=knowledge_dir,  # Pass the user-specific path
         debug=debug,
         ollama_base_url=ollama_base_url,
         user_id=user_id,
