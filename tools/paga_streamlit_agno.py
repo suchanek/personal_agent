@@ -21,6 +21,7 @@ from personal_agent.config import (
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
     USER_ID,
+    LIGHTRAG_URL,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent, create_agno_agent
 from tools.streamlit_helpers import StreamlitKnowledgeHelper, StreamlitMemoryHelper
@@ -550,7 +551,14 @@ def render_knowledge_status(knowledge_helper):
             st.markdown("**RAG**")
             agent = st.session_state.get(SESSION_KEY_AGENT)
             if agent and hasattr(agent, "lightrag_knowledge"):
-                st.success("✅ Ready")
+                try:
+                    response = requests.get(f"{LIGHTRAG_URL}/health", timeout=2)
+                    if response.status_code == 200:
+                        st.success("✅ Ready")
+                    else:
+                        st.warning("⚠️ Offline")
+                except requests.exceptions.RequestException:
+                    st.warning("⚠️ Offline")
             else:
                 st.warning("⚠️ Offline")
 

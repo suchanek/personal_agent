@@ -312,8 +312,6 @@ Here's a summary of the LightRAG API endpoints for reference:
 *   `POST /documents/upload` - Upload To Input Dir
 *   `POST /documents/text` - Insert Text
 *   `POST /documents/texts` - Insert Texts
-*   `POST /documents/file` - Insert File
-*   `POST /documents/file_batch` - Insert Batch
 *   `DELETE /documents` - Clear Documents
 *   `GET /documents` - Documents
 *   `GET /documents/pipeline_status` - Get Pipeline Status
@@ -352,8 +350,6 @@ Here's a summary of the LightRAG API endpoints for reference:
 
 ### Schemas
 
-*   `Body_insert_batch_documents_file_batch_post`
-*   `Body_insert_file_documents_file_post`
 *   `Body_login_login_post`
 *   `Body_upload_to_input_dir_documents_upload_post`
 *   `ClearCacheRequest`

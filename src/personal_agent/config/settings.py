@@ -39,7 +39,8 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
 
 
 # LighRAG server
-LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")
+LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEPRECATED
+LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
 
 # Configuration constants - All configurable via environment variables
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
