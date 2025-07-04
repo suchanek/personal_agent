@@ -181,12 +181,9 @@ def create_combined_knowledge_base(
     storage_path.mkdir(parents=True, exist_ok=True)
 
     knowledge_path = Path(knowledge_dir)
-    if not knowledge_path.exists():
-        logger.info(
-            "No knowledge directory found at %s, skipping knowledge loading",
-            knowledge_path,
-        )
-        return None
+    # Ensure the knowledge directory exists, creating it if necessary.
+    knowledge_path.mkdir(parents=True, exist_ok=True)
+    logger.info("Knowledge directory is ready at %s", knowledge_path)
 
     # Check for available knowledge files
     text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md"))
