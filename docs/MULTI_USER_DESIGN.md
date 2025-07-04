@@ -1,169 +1,97 @@
-# Multi-User Support Design
+# Plan for Multi-User Knowledge Base Implementation
 
-This document outlines the design for implementing multi-user support in the Personal Agent application. The goal is to allow multiple users to use the system with their own isolated data and configurations.
+### **1. Goal:**
+The primary objective is to create a multi-user architecture where each user has a dedicated, isolated knowledge base. This will be achieved by modifying how the knowledge base path is constructed to include a user-specific identifier, ensuring data isolation between users.
 
-## 1. Strategy
+### **2. Core Strategy:**
+We will leverage the existing `USER_ID` configuration setting to create user-specific subdirectories within the main knowledge base directory. This approach maintains the existing structure while extending it to support multiple users seamlessly.
 
-The core of the multi-user design is to make all user-specific data paths dependent on a `user_id`. This `user_id` will be used to create a unique directory for each user, containing their data, knowledge base, and other settings.
+The current directory structure is:
+`/Users/Shared/personal_agent_data/knowledge`
 
-The `user_id` will be determined in the following order of precedence:
+The new, multi-user structure will be:
+`/Users/Shared/personal_agent_data/knowledge/<USER_ID>/`
 
-1.  `--user-id` command-line argument.
-2.  `USER_ID` environment variable.
-3.  A default value of `default_user` if neither is provided.
+This design ensures that existing setups (e.g., using a `default_user`) continue to function without modification, while providing a clear path for scaling to multiple users.
 
-## 2. Implementation Steps
+### **3. Implementation Steps:**
 
-### Step 1: Modify `src/personal_agent/config/settings.py`
+**Step 1: Modify `settings.py` to Create User-Specific Paths**
 
-The `settings.py` file will be updated to incorporate the `user_id` into the path definitions.
+We will update `src/personal_agent/config/settings.py` to dynamically construct the `AGNO_KNOWLEDGE_DIR` and `AGNO_STORAGE_DIR` paths using the `USER_ID`.
 
-```python
-# src/personal_agent/config/settings.py
-
-import logging
-import os
-from pathlib import Path
-import argparse
-
-import dotenv
-from dotenv import load_dotenv
-
-# Define the project's base directory.
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-dotenv_path = BASE_DIR / ".env"
-
-# Load environment variables from .env file
-dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
-
-# --- User ID Configuration ---
-def get_user_id():
-    """
-    Get user ID from command-line arguments first, then environment variables.
-    """
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--user-id", type=str, help="User ID for the agent")
-    args, _ = parser.parse_known_args()
-
-    if args.user_id:
-        return args.user_id
-    return os.getenv("USER_ID", "eric")
-
-USER_ID = get_user_id()
-
-# Store loaded environment variables if dotenv succeeded
-_env_vars = {}
-if dotenv_loaded:
-    _env_vars = dotenv.dotenv_values(dotenv_path=dotenv_path)
-
-def get_env_var(key: str, fallback: str = "") -> str:
-    """Get environment variable from dotenv cache first, then os.environ as fallback."""
-    if dotenv_loaded and key in _env_vars:
-        return _env_vars[key] or fallback
-    else:
-        return os.getenv(key, fallback)
-
-# ... (rest of the get_env_var and get_env_bool functions)
-
-# Directory configurations
-DATA_DIR = get_env_var("DATA_DIR", f"./data/{USER_ID}")
-REPO_DIR = get_env_var("REPO_DIR", f"./repos/{USER_ID}")
-
-# Storage backend configuration
-STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")
-
-# Agno Storage Configuration
-AGNO_STORAGE_DIR = os.path.expandvars(
-    get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/storage/{STORAGE_BACKEND}")
-)
-AGNO_KNOWLEDGE_DIR = os.path.expandvars(
-    get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/knowledge")
-)
-
-# Create user-specific directories if they don't exist
-Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
-Path(REPO_DIR).mkdir(parents=True, exist_ok=True)
-Path(AGNO_STORAGE_DIR).mkdir(parents=True, exist_ok=True)
-Path(AGNO_KNOWLEDGE_DIR).mkdir(parents=True, exist_ok=True)
-
-# ... (rest of the settings.py file)
-```
-
-### Step 2: Modify `src/personal_agent/agno_main.py`
-
-The `agno_main.py` file will be updated to properly handle the `--user-id` argument.
-
-```python
-# src/personal_agent/agno_main.py
-
-import argparse
-# ... (other imports)
-
-from .config.settings import (
-    AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    OLLAMA_URL,
-    REMOTE_OLLAMA_URL,
-    USER_ID,  # USER_ID is now correctly set
-)
-
-# ... (rest of the file)
-
-def cli_main():
-    """
-    Main entry point for CLI mode (used by poetry scripts).
-    """
-    from .utils import configure_all_rich_logging, setup_logging
-
-    configure_all_rich_logging()
-    logger = setup_logging()
-
-    parser = argparse.ArgumentParser(
-        description="Run the Personal AI Agent with Agno Framework"
+*   **Current `AGNO_KNOWLEDGE_DIR` definition:**
+    ```python
+    AGNO_KNOWLEDGE_DIR = os.path.expandvars(
+        get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/knowledge")
     )
-    parser.add_argument("--cli", action="store_true", help="Run in CLI mode")
-    parser.add_argument(
-        "--remote", action="store_true", help="Use remote Ollama server"
+    ```
+
+*   **Proposed Change:**
+    We will modify this definition to append the `USER_ID` to the path. A similar change will be applied to `AGNO_STORAGE_DIR` to ensure all user-specific data is stored in a dedicated directory.
+
+    ```python
+    # In src/personal_agent/config/settings.py
+
+    # ... (USER_ID definition)
+    USER_ID = get_env_var("USER_ID", "default_user")
+
+    # ...
+
+    # Modify AGNO_STORAGE_DIR and AGNO_KNOWLEDGE_DIR to be user-specific
+    AGNO_STORAGE_DIR = os.path.expandvars(
+        get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}")
     )
-    parser.add_argument(
-        "--recreate", action="store_true", help="Recreate the knowledge base"
+    AGNO_KNOWLEDGE_DIR = os.path.expandvars(
+        get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/knowledge/{USER_ID}")
     )
-    # The --user-id argument is now parsed in settings.py, but we keep it here for help text
-    parser.add_argument("--user-id", type=str, help="User ID for the agent (overrides USER_ID env var)")
+    ```
+    This centralized change will propagate throughout the application, as all modules import these settings.
 
-    args = parser.parse_args()
+**Step 2: Ensure Automatic Directory Creation**
 
-    logger.info(f"Starting Personal AI Agent for user: {USER_ID}")
+The application must automatically create the new user-specific directories when a new user is introduced. We will investigate the storage initialization code (likely in `src/personal_agent/core/memory.py` or `src/personal_agent/core/agno_storage.py`) to confirm that directories are created using a method like `os.makedirs(..., exist_ok=True)`. If this is not the case, we will add the necessary logic to prevent errors.
 
-    # Run in CLI mode
-    asyncio.run(run_agno_cli(use_remote_ollama=args.remote, recreate=args.recreate))
+**Step 3: Update Documentation (`.env.example`)**
 
+To ensure clarity for future developers and users, we will update the `env.example` file with comments that explain the new directory structure and the role of the `USER_ID` variable.
 
-if __name__ == "__main__":
-    cli_main()
-```
+*   **Proposed addition to `.env.example`:**
+    ```
+    # USER CONFIGURATION
+    # The USER_ID is used to create a separate knowledge base for each user.
+    # The knowledge base will be located at ${DATA_DIR}/knowledge/${USER_ID}
+    # and the storage at ${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}
+    USER_ID="default_user"
+    ```
 
-## 3. Mermaid Diagram
+### **4. Visualization of the Architectural Change:**
 
-Here is a diagram illustrating the new workflow:
+The following diagram illustrates the transition from the current single-user structure to the proposed multi-user architecture.
 
 ```mermaid
 graph TD
-    A[Start Application] --> B{Get user_id};
-    B -- --user-id arg --> C[Use arg value];
-    B -- USER_ID env var --> D[Use env var value];
-    B -- a default value --> E[Use 'eric'];
-    C --> F[USER_ID is set];
-    D --> F;
-    E --> F;
-    F --> G{Construct Paths};
-    G -- ./data/{USER_ID} --> H[DATA_DIR];
-    G -- ./repos/{USER_ID} --> I[REPO_DIR];
-    G -- {DATA_DIR}/storage/agno --> J[AGNO_STORAGE_DIR];
-    G -- {DATA_DIR}/knowledge --> K[AGNO_KNOWLEDGE_DIR];
-    H & I & J & K --> L[Initialize Agent];
+    subgraph Current Single-User Structure
+        A["/Users/Shared/personal_agent_data"] --> B["knowledge"];
+        A --> C["agno (storage)"];
+    end
+
+    subgraph Proposed Multi-User Structure
+        D["/Users/Shared/personal_agent_data"] --> E["knowledge"];
+        D --> F["agno (storage)"];
+        E --> G["user_1"];
+        E --> H["user_2"];
+        E --> I["..."];
+        F --> J["user_1"];
+        F --> K["user_2"];
+        F --> L["..."];
+    end
+
 ```
 
-## 4. Conclusion
+### **5. Validation and Testing Strategy:**
 
-This design provides a robust and scalable way to handle multiple users. By isolating user data, we ensure privacy and prevent data corruption. The use of a command-line argument provides flexibility for launching the agent for different users.
+After implementing these changes, a thorough validation process will be required:
+*   **New User:** Confirm that when the application is run with a new `USER_ID`, the corresponding user-specific directories are created automatically.
+*   **Data Isolation:** Verify that knowledge and data created by one user are not accessible to another.
+*   **Backwards Compatibility:** Ensure that existing data for a `default_user` remains accessible when the `USER_ID` is set accordingly.
