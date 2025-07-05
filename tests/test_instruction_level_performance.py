@@ -5,7 +5,7 @@ Test script to compare response performance across different instruction sophist
 This script creates AgnoPersonalAgent instances with different InstructionLevel settings,
 asks the same question to each, times the responses, and prints a comparison.
 """
-
+# pylint: disable=C0413,C0301
 import asyncio
 import logging
 import sys
@@ -96,7 +96,7 @@ async def test_agent_with_level(
 
         # Warmup the model with a simple question (don't time this)
         if console:
-            console.print(f"[dim]Running warmup question...[/dim]")
+            console.print("[dim]Running warmup question...[/dim]")
         await agent.run(WARMUP_QUESTION)
 
         # Now ask the actual question and time it
@@ -142,7 +142,7 @@ async def run_instruction_level_comparison():
 
     # Test standard questions (no memory)
     console.print(f"\n[bold red]{'='*80}[/bold red]")
-    console.print(f"[bold red]STANDARD TESTS (Memory Disabled)[/bold red]")
+    console.print("[bold red]STANDARD TESTS (Memory Disabled)[/bold red]")
     console.print(f"[bold red]{'='*80}[/bold red]")
 
     for question_idx, question in enumerate(TEST_QUESTIONS, 1):
@@ -206,7 +206,7 @@ async def run_instruction_level_comparison():
 
     # Test memory questions (memory enabled)
     console.print(f"\n[bold purple]{'='*80}[/bold purple]")
-    console.print(f"[bold purple]MEMORY TESTS (Memory Enabled)[/bold purple]")
+    console.print("[bold purple]MEMORY TESTS (Memory Enabled)[/bold purple]")
     console.print(f"[bold purple]{'='*80}[/bold purple]")
 
     for question_idx, question in enumerate(MEMORY_TEST_QUESTIONS, 1):
@@ -270,11 +270,11 @@ async def run_instruction_level_comparison():
 
     # Print overall summary
     console.print(f"\n[bold magenta]{'='*80}[/bold magenta]")
-    console.print(f"[bold magenta]OVERALL PERFORMANCE SUMMARY[/bold magenta]")
+    console.print("[bold magenta]OVERALL PERFORMANCE SUMMARY[/bold magenta]")
     console.print(f"[bold magenta]{'='*80}[/bold magenta]")
 
     # Group results by question type and question for comparison
-    console.print(f"\n[bold cyan]STANDARD QUESTIONS SUMMARY[/bold cyan]")
+    console.print("\n[bold cyan]STANDARD QUESTIONS SUMMARY[/bold cyan]")
     for question_idx in range(1, len(TEST_QUESTIONS) + 1):
         question_results = [
             r
@@ -288,7 +288,7 @@ async def run_instruction_level_comparison():
             )
             print_question_summary(console, question_results)
 
-    console.print(f"\n[bold purple]MEMORY QUESTIONS SUMMARY[/bold purple]")
+    console.print("\n[bold purple]MEMORY QUESTIONS SUMMARY[/bold purple]")
     for question_idx in range(
         len(TEST_QUESTIONS) + 1, len(TEST_QUESTIONS) + len(MEMORY_TEST_QUESTIONS) + 1
     ):
@@ -307,11 +307,11 @@ async def run_instruction_level_comparison():
 
     # Print detailed responses for all questions
     console.print(f"\n[bold yellow]{'='*80}[/bold yellow]")
-    console.print(f"[bold yellow]DETAILED RESPONSES[/bold yellow]")
+    console.print("[bold yellow]DETAILED RESPONSES[/bold yellow]")
     console.print(f"[bold yellow]{'='*80}[/bold yellow]")
 
     # Standard questions detailed responses
-    console.print(f"\n[bold cyan]STANDARD QUESTIONS DETAILED RESPONSES[/bold cyan]")
+    console.print("\n[bold cyan]STANDARD QUESTIONS DETAILED RESPONSES[/bold cyan]")
     for question_idx in range(1, len(TEST_QUESTIONS) + 1):
         question_results = [
             r
@@ -336,7 +336,7 @@ async def run_instruction_level_comparison():
                     console.print("-" * 80)
 
     # Memory questions detailed responses
-    console.print(f"\n[bold purple]MEMORY QUESTIONS DETAILED RESPONSES[/bold purple]")
+    console.print("\n[bold purple]MEMORY QUESTIONS DETAILED RESPONSES[/bold purple]")
     for question_idx in range(
         len(TEST_QUESTIONS) + 1, len(TEST_QUESTIONS) + len(MEMORY_TEST_QUESTIONS) + 1
     ):

@@ -50,7 +50,6 @@ from ..config import (
     USE_MCP,
     get_mcp_servers,
 )
-from ..config.model_contexts import get_model_context_size_sync
 from ..config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
@@ -58,6 +57,8 @@ from ..config.settings import (
     STORAGE_BACKEND,
     USER_ID,
 )
+
+from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
@@ -307,9 +308,6 @@ class AgnoPersonalAgent:
                     topics = ["general"]
 
                 # Direct call to SemanticMemoryManager.add_memory()
-                #                success, message, memory_id = self.agno_memory.memory_manager.add_memory(
-                #                    memory_text=content, db=self.agno_memory.db, user_id=self.user_id, topics=topics
-                #                )
                 success, message, memory_id = (
                     self.agno_memory.memory_manager.add_memory(
                         memory_text=content,
@@ -335,9 +333,9 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_knowledge_base(query: str, mode: str = "naive") -> dict:
+        async def query_lightrag_knowledge(query: str, mode: str = "naive") -> dict:
             """
-            Query the LightRAG knowledge base.
+            Query the LightRAG knowledge base for general knowledge.
 
             :param query: The query string to search in the knowledge base
             :param mode: Query mode (default: "naive")
@@ -663,6 +661,33 @@ class AgnoPersonalAgent:
             # This is just an alias for query_memory to maintain compatibility
             return await query_memory(query, limit)
 
+        async def query_semantic_knowledge(query: str, limit: int = 5) -> str:
+            """
+            Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents.
+
+            Args:
+                query: The query to search for in the semantic knowledge base.
+                limit: The maximum number of results to return.
+
+            Returns:
+                A formatted string of search results or a message if no results are found.
+            """
+            if not self.agno_knowledge:
+                return "Semantic knowledge base is not available."
+            try:
+                results = self.agno_knowledge.search(query=query, num_documents=limit)
+                if not results:
+                    return f"No results found in the semantic knowledge base for '{query}'."
+
+                formatted_results = [
+                    f"Result {i+1}: (ID: {r.id}, Source: {r.source})\n{r.content}"
+                    for i, r in enumerate(results)
+                ]
+                return "\n\n".join(formatted_results)
+            except Exception as e:
+                logger.error(f"Error searching semantic knowledge base: {e}")
+                return f"An error occurred while searching the semantic knowledge base: {e}"
+
         # Set proper function names for tool identification
         store_user_memory.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
@@ -673,6 +698,8 @@ class AgnoPersonalAgent:
         get_recent_memories.__name__ = "get_recent_memories"
         get_all_memories.__name__ = "get_all_memories"
         get_memory_stats.__name__ = "get_memory_stats"
+        query_lightrag_knowledge.__name__ = "query_lightrag_knowledge"
+        query_semantic_knowledge.__name__ = "query_semantic_knowledge"
 
         # Add tools to the list
         tools.extend(
@@ -686,6 +713,8 @@ class AgnoPersonalAgent:
                 get_recent_memories,
                 get_all_memories,
                 get_memory_stats,
+                query_lightrag_knowledge,
+                query_semantic_knowledge,
             ]
         )
 
@@ -907,6 +936,8 @@ Returns:
             ## CRITICAL IDENTITY RULES - ABSOLUTELY MANDATORY
             **YOU ARE AN AI ASSISTANT who is a MEMORY EXPERT**: You are NOT the user. You are a friendly AI that helps and remembers things about the user.
 
+            **GREET THE USER BY NAME**: When the user greets you, greet them back by their name, which is '{self.user_id}'. For example, if they say 'hello', you should say 'Hello {self.user_id}!'
+
             **NEVER PRETEND TO BE THE USER**:
             - You are NOT the user, you are an AI assistant that knows information ABOUT the user
             - NEVER say "I'm {self.user_id}" or introduce yourself as the user - this is COMPLETELY WRONG
@@ -1003,7 +1034,8 @@ Returns:
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
-            - Knowledge base queries? → Query KnowledgeBase IMMEDIATELY
+            - General knowledge questions? → query_lightrag_knowledge IMMEDIATELY
+            - Specific document/fact search? → query_semantic_knowledge IMMEDIATELY
             - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
         """
 
@@ -1059,6 +1091,9 @@ Returns:
             "  - `delete_memory`: Delete a specific memory.",
             "  - `clear_memories`: Clear all memories for the user.",
             "  - `get_memory_stats`: Get memory statistics.",
+            "- **Knowledge Base Tools**:",
+            "  - `query_lightrag_knowledge`: Query the LightRAG server for general, up-to-date knowledge.",
+            "  - `query_semantic_knowledge`: Search the local SQLite/LanceDB for specific documents or facts.",
         ]
 
         # Dynamically add MCP tools if they are enabled and configured
@@ -1522,13 +1557,14 @@ Returns:
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
 
-    async def query_knowledge_base(self, query: str, mode: str = "hybrid") -> str:
+    async def query_lightrag_knowledge_direct(self, query: str, mode: str = "hybrid") -> str:
         """
-        Query the LightRAG knowledge base - return raw response exactly as received.
+        Directly query the LightRAG knowledge base and return the raw response.
+        This method is intended for direct calls (e.g., from Streamlit) and is not an agent tool.
 
-        :param query: The query string to search in the knowledge base
-        :param mode: Query mode (default: "hybrid")
-        :return: String with query results exactly as LightRAG returns them
+        :param query: The query string to search in the knowledge base.
+        :param mode: Query mode (default: "hybrid").
+        :return: String with query results exactly as LightRAG returns them.
         """
         try:
             url = f"{LIGHTRAG_URL}/query"
@@ -1543,12 +1579,12 @@ Returns:
                     if resp.status != 200:
                         error_text = await resp.text()
                         logger.error(
-                            "LightRAG server error {resp.status}: {error_text}"
+                            f"LightRAG server error {resp.status}: {error_text}"
                         )
                         return f"LightRAG server error {resp.status}: {error_text}"
 
                     result = await resp.json()
-                    logger.info(f"LightRAG response received, returning raw content...")
+                    logger.info("LightRAG response received, returning raw content...")
 
                     # Extract response content - simple and direct, NO FILTERING
                     if isinstance(result, dict) and "response" in result:
