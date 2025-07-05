@@ -43,6 +43,7 @@ from rich.table import Table
 
 from ..config import (
     LIGHTRAG_URL,
+    LIGHTRAG_MEMORY_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
@@ -50,6 +51,7 @@ from ..config import (
     USE_MCP,
     get_mcp_servers,
 )
+from ..config.model_contexts import get_model_context_size_sync
 from ..config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
@@ -57,8 +59,6 @@ from ..config.settings import (
     STORAGE_BACKEND,
     USER_ID,
 )
-
-from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
@@ -130,7 +130,9 @@ class AgnoPersonalAgent:
             self.storage_dir = os.path.expandvars(
                 f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}"
             )
-            self.knowledge_dir = os.path.expandvars(f"{DATA_DIR}/knowledge/{user_id}")
+            self.knowledge_dir = os.path.expandvars(
+                f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}/knowledge"
+            )
         else:
             self.storage_dir = storage_dir
             self.knowledge_dir = knowledge_dir
@@ -333,16 +335,28 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
-        async def query_lightrag_knowledge(query: str, mode: str = "naive") -> dict:
+        async def query_lightrag_knowledge(
+            query: str,
+            mode: str = "naive",
+            top_k: int = 5,
+            response_type: str = "Multiple Paragraphs",
+        ) -> dict:
             """
             Query the LightRAG knowledge base for general knowledge.
 
-            :param query: The query string to search in the knowledge base
-            :param mode: Query mode (default: "naive")
-            :return: Dictionary with query results
+            :param query: The query string to search in the knowledge base.
+            :param mode: Query mode (default: "hybrid"). Options: "local", "global", "hybrid", "naive", "mix", "bypass".
+            :param top_k: The number of top items to retrieve.
+            :param response_type: The desired format for the response.
+            :return: Dictionary with query results.
             """
             url = f"{LIGHTRAG_URL}/query"
-            payload = {"query": query, "mode": mode}
+            payload = {
+                "query": query,
+                "mode": mode,
+                "top_k": top_k,
+                "response_type": response_type,
+            }
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=120) as resp:
                     resp.raise_for_status()
@@ -688,6 +702,83 @@ class AgnoPersonalAgent:
                 logger.error(f"Error searching semantic knowledge base: {e}")
                 return f"An error occurred while searching the semantic knowledge base: {e}"
 
+        async def store_graph_memory(
+            content: str, topics: Union[List[str], str, None] = None
+        ) -> str:
+            """
+            Store a memory in the LightRAG graph database to capture relationships.
+    
+            :param content: The information to store as a memory.
+            :param topics: Optional list of topics for the memory.
+            :return: Success or error message.
+            """
+            if not content or not content.strip():
+                return "❌ Error: Content is required to store a graph memory."
+            try:
+                url = f"{LIGHTRAG_MEMORY_URL}/documents/text"
+                payload = {"text": content, "document_id": content}  # Use content as ID for simplicity
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload, timeout=60) as resp:
+                        resp.raise_for_status()
+                        result = await resp.json()
+                        logger.info(
+                            "Stored graph memory: %s... (Response: %s)",
+                            content[:50],
+                            result,
+                        )
+                        return f"✅ Successfully stored graph memory: {content[:50]}..."
+            except Exception as e:
+                logger.error("Error storing graph memory: %s", e)
+                return f"❌ Error storing graph memory: {str(e)}"
+    
+        async def query_graph_memory(
+            query: str, 
+            mode: str = "mix", 
+            top_k: int = 5,
+            response_type: str = "Multiple Paragraphs"
+        ) -> dict:
+            """
+            Query the LightRAG memory graph to explore relationships between memories.
+    
+            :param query: The query to search for.
+            :param mode: Query mode (default: "mix"). Options: "local", "global", "hybrid", "naive", "mix", "bypass".
+            :param top_k: The number of top items to retrieve.
+            :param response_type: The desired format for the response.
+            :return: Dictionary with query results (consistent with query_lightrag_knowledge).
+            """
+            try:
+                url = f"{LIGHTRAG_MEMORY_URL}/query"
+                payload = {
+                    "query": query, 
+                    "mode": mode, 
+                    "top_k": top_k,
+                    "response_type": response_type
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload, timeout=120) as resp:
+                        resp.raise_for_status()
+                        return await resp.json()
+            except Exception as e:
+                logger.error("Error querying graph memory: %s", e)
+                return {"error": f"Error querying graph memory: {str(e)}"}
+    
+        async def get_memory_graph_labels() -> str:
+            """
+            Get the list of all entity and relation labels from the memory graph.
+    
+            :return: A formatted string of graph labels.
+            """
+            try:
+                url = f"{LIGHTRAG_MEMORY_URL}/graph/label/list"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=60) as resp:
+                        resp.raise_for_status()
+                        result = await resp.json()
+                        return f"📊 Graph Labels: {result}"
+            except Exception as e:
+                logger.error("Error getting graph labels: %s", e)
+                return f"❌ Error getting graph labels: {str(e)}"
+    
         # Set proper function names for tool identification
         store_user_memory.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
@@ -700,7 +791,10 @@ class AgnoPersonalAgent:
         get_memory_stats.__name__ = "get_memory_stats"
         query_lightrag_knowledge.__name__ = "query_lightrag_knowledge"
         query_semantic_knowledge.__name__ = "query_semantic_knowledge"
-
+        store_graph_memory.__name__ = "store_graph_memory"
+        query_graph_memory.__name__ = "query_graph_memory"
+        get_memory_graph_labels.__name__ = "get_memory_graph_labels"
+    
         # Add tools to the list
         tools.extend(
             [
@@ -715,6 +809,9 @@ class AgnoPersonalAgent:
                 get_memory_stats,
                 query_lightrag_knowledge,
                 query_semantic_knowledge,
+                store_graph_memory,
+                query_graph_memory,
+                get_memory_graph_labels,
             ]
         )
 
@@ -1082,17 +1179,21 @@ Returns:
             "- **PythonTools**: Calculations, data analysis, code execution.",
             "- **ShellTools**: System operations and command execution.",
             "- **PersonalAgentFilesystemTools**: File reading, writing, and management.",
-            "- **Memory Tools**:",
-            "  - `store_user_memory`: Store new memories.",
-            "  - `query_memory`: Semantic search through all memories.",
-            "  - `get_recent_memories`: Get recent memories.",
+            "- **Local Memory Tools (SQLite)**:",
+            "  - `store_user_memory`: Store a simple fact in your local semantic memory.",
+            "  - `query_memory`: Quickly search your local semantic memory for a specific fact.",
+            "  - `get_recent_memories`: Get recent memories from local storage.",
             "  - `get_all_memories`: Get all stored memories.",
             "  - `update_memory`: Update an existing memory.",
-            "  - `delete_memory`: Delete a specific memory.",
-            "  - `clear_memories`: Clear all memories for the user.",
-            "  - `get_memory_stats`: Get memory statistics.",
+            "  - `delete_memory`: Delete a specific memory from local storage.",
+            "  - `clear_memories`: Clear all memories for the user from local storage.",
+            "  - `get_memory_stats`: Get statistics for the local memory.",
+            "- **Graph Memory Tools (LightRAG)**:",
+            "  - `store_graph_memory`: Store a complex memory in your knowledge graph to capture relationships.",
+            "  - `query_graph_memory`: Explore your knowledge graph to answer complex questions about relationships.",
+            "  - `get_memory_graph_labels`: Get all entity and relation labels from the memory graph.",
             "- **Knowledge Base Tools**:",
-            "  - `query_lightrag_knowledge`: Query the LightRAG server for general, up-to-date knowledge.",
+            "  - `query_lightrag_knowledge`: Query the General Knowledge LightRAG server for general, up-to-date knowledge.",
             "  - `query_semantic_knowledge`: Search the local SQLite/LanceDB for specific documents or facts.",
         ]
 
@@ -1557,20 +1658,25 @@ Returns:
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
 
-    async def query_lightrag_knowledge_direct(self, query: str, mode: str = "hybrid") -> str:
+    async def query_lightrag_knowledge_direct(
+        self, query: str, params: dict
+    ) -> str:
         """
         Directly query the LightRAG knowledge base and return the raw response.
         This method is intended for direct calls (e.g., from Streamlit) and is not an agent tool.
 
         :param query: The query string to search in the knowledge base.
-        :param mode: Query mode (default: "hybrid").
+        :param params: A dictionary of query parameters based on the QueryParam class.
         :return: String with query results exactly as LightRAG returns them.
         """
         try:
             url = f"{LIGHTRAG_URL}/query"
-            payload = {"query": query, "mode": mode}
+            # Start with the mandatory query parameter
+            payload = {"query": query}
+            # Add optional parameters from the params dict
+            payload.update(params)
 
-            logger.info(f"Querying LightRAG: {url} with query: '{query}', mode: {mode}")
+            logger.info(f"Querying LightRAG: {url} with payload: {payload}")
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=120) as resp:

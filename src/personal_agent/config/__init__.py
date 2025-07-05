@@ -8,6 +8,7 @@ from .settings import (
     HOME_DIR,
     LIGHTRAG_SERVER,
     LIGHTRAG_URL,
+    LIGHTRAG_MEMORY_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
@@ -50,6 +51,7 @@ def get_settings():
         "STORAGE_BACKEND": STORAGE_BACKEND,
         "LIGHTRAG_SERVER": LIGHTRAG_SERVER,
         "LIGHTRAG_URL": LIGHTRAG_URL,
+        "LIGHTRAG_MEMORY_URL": LIGHTRAG_MEMORY_URL,
     }
 
 
@@ -60,6 +62,7 @@ __all__ = [
     "HOME_DIR",
     "LIGHTRAG_SERVER",
     "LIGHTRAG_URL",
+    "LIGHTRAG_MEMORY_URL",
     "LLM_MODEL",
     "LOG_LEVEL",
     "MCP_SERVERS",
