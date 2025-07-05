@@ -61,9 +61,9 @@ async def initialize_agno_system(use_remote_ollama: bool = False, recreate: bool
     if use_remote_ollama:
         ollama_url = REMOTE_OLLAMA_URL
         os.environ["OLLAMA_URL"] = ollama_url
-        logger.info(f"Using remote Ollama server at: {ollama_url}")
+        logger.info("Using remote Ollama server at: %s", ollama_url)
     else:
-        logger.info(f"Using local Ollama server at: {ollama_url}")
+        logger.info("Using local Ollama server at: %s", ollama_url)
 
     # Create agno agent with native storage
     logger.info("Creating agno agent with native storage...")

@@ -115,7 +115,7 @@ class StreamlitKnowledgeHelper:
         if not self.agent or not (hasattr(self.agent, "lightrag_knowledge")):
             return None
         try:
-            return asyncio.run(self.agent.query_knowledge_base(query, mode=search_type))
+            return asyncio.run(self.agent.query_lightrag_knowledge_direct(query, mode=search_type))
         except Exception as e:
             st.error(f"Error querying knowledge base: {e}")
             return None
