@@ -617,23 +617,60 @@ def render_knowledge_tab():
     # RAG Knowledge Search Section
     st.markdown("---")
     st.subheader("🤖 RAG Knowledge Search")
-    st.markdown("*Search through knowledge using direct RAG query*")
-    search_type = st.selectbox(
+    st.markdown("*Search through knowledge using direct RAG query with advanced options*")
+
+    # Create a dictionary to hold the query parameters
+    query_params = {}
+
+    # Query mode
+    query_params['mode'] = st.selectbox(
         "Select RAG Search Type:",
-        ("naive", "local", "global", "hybrid", "mix"),
+        ("naive", "hybrid", "local", "global", "mix", "bypass"),
         key="rag_search_type",
     )
+
+    # Response type
+    query_params['response_type'] = st.text_input(
+        "Response Format:",
+        "Multiple Paragraphs",
+        key="rag_response_type",
+        help="Examples: 'Single Paragraph', 'Bullet Points', 'JSON'"
+    )
+
+    # Top K
+    query_params['top_k'] = st.slider(
+        "Top K:",
+        min_value=1,
+        max_value=100,
+        value=10,
+        key="rag_top_k",
+        help="Number of items to retrieve"
+    )
+
+    # Other boolean flags
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        query_params['only_need_context'] = st.checkbox("Context Only", key="rag_context_only")
+    with col2:
+        query_params['only_need_prompt'] = st.checkbox("Prompt Only", key="rag_prompt_only")
+    with col3:
+        query_params['stream'] = st.checkbox("Stream", key="rag_stream")
+
     if rag_search_query := st.chat_input(
         "Enter keywords to search the RAG knowledge base"
     ):
+        # Pass the entire dictionary of parameters to the helper
         search_results = knowledge_helper.search_rag(
-            query=rag_search_query, search_type=search_type
+            query=rag_search_query, params=query_params
         )
-        if search_results:
+        # Check if we have actual content (not just empty string or None)
+        if search_results is not None and str(search_results).strip():
             st.subheader(
-                f"🤖 RAG Knowledge Search Results for: '{rag_search_query}' (Type: {search_type})"
+                f"🤖 RAG Knowledge Search Results for: '{rag_search_query}'"
             )
             st.markdown(search_results)
+        elif search_results is not None:
+            st.warning(f"Query returned empty response. Raw result: '{search_results}'")
         else:
             st.info("No matching knowledge found.")
 
