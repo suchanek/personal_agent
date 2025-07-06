@@ -1,4 +1,17 @@
-## 🚀 **v0.8.3-dev: Revolutionary Knowledge Graph Memory System & Unified Knowledge Architecture** (January 5, 2025)
+## 🚀 **v0.8.3-dev: Revolutionary Knowledge Graph Memory System & Unified Knowledge Architecture** (July5, 2025)
+
+### ✨ Features
+
+- **Streamlit UI**: Added a dropdown menu in the Knowledge Base tab to dynamically switch the RAG server location between `localhost` and a remote server (`tesla.local`). The UI now provides more detailed status updates for the RAG server, indicating if it's processing, has items queued, or is ready.
+
+### 🚀 Improvements
+
+- **Topic Classification**: The topic classifier has been enhanced for greater accuracy. It now performs whole-word matching to prevent partial matches (e.g., "ai" in "train") and has an expanded dictionary of keywords and phrases in `topics.yaml` to better understand user input.
+- **Docker Restart Script**: The `switch-ollama.sh` script's `restart_docker_services` function has been improved with more detailed output, better error handling, and a clearer status report of the services being restarted.
+
+### 🏗️ Refactoring
+
+- **Technical Documentation**: Updated the Mermaid diagram in the `COMPREHENSIVE_MEMORY_SYSTEM_TECHNICAL_SUMMARY.md` to reflect the current system architecture.
 
 ### ✅ **MAJOR BREAKTHROUGH: LightRAG Knowledge Graph Memory System Integration**
 
@@ -51,6 +64,7 @@ services:
 ```
 
 **Key Infrastructure Features**:
+
 - **Dedicated Memory Server**: Separate from main LightRAG for memory-specific operations
 - **User Isolation**: Complete data separation per user ID
 - **Docker Integration**: Containerized deployment with volume persistence
@@ -116,6 +130,7 @@ Created comprehensive memory client system with multiple implementations:
 - **`lightrag_memory_client_file_upload.py`**: File-based memory storage with metadata
 
 **File Upload Innovation**:
+
 ```python
 # Meaningful file naming with metadata preservation
 filename = f"graph_memory_{content_words}_{hash}.txt"
@@ -133,6 +148,7 @@ content = f"""# Topics: {', '.join(topics)}
 ✅ **100% Success Rate** (6/6 tests passed)
 
 **Test Cases Validated**:
+
 1. **Simple fact + explicit local mode**: "What is Python?" → Local Semantic (9,184 chars)
 2. **Relationship + explicit hybrid mode**: "How does ML relate to AI?" → LightRAG (2,471 chars)
 3. **Definition + auto-detection**: "Define recursion" → Local Semantic (7,707 chars)
@@ -141,6 +157,7 @@ content = f"""# Topics: {', '.join(topics)}
 6. **Comparison + mix mode**: "Compare Python and JavaScript" → LightRAG (5,586 chars)
 
 **Routing Statistics**:
+
 - **Total Queries**: 8
 - **Local Semantic**: 2 queries
 - **LightRAG**: 4 queries
@@ -159,6 +176,7 @@ content = f"""# Topics: {', '.join(topics)}
 #### 📊 **Technical Architecture Innovations**
 
 **1. Intelligent Query Routing**:
+
 ```python
 def _determine_routing(self, query: str, mode: str) -> Tuple[str, str]:
     """Determine which knowledge system to use based on mode and query analysis."""
@@ -172,6 +190,7 @@ def _determine_routing(self, query: str, mode: str) -> Tuple[str, str]:
 ```
 
 **2. Advanced Fallback Mechanisms**:
+
 - Local search failure → Automatic LightRAG fallback
 - LightRAG failure → Automatic local search fallback
 - Comprehensive error handling and logging
@@ -181,6 +200,7 @@ def _determine_routing(self, query: str, mode: str) -> Tuple[str, str]:
 **Problem**: LightRAG server's `POST /documents/text` endpoint created documents with `"file_path": null`, causing validation errors.
 
 **Solution**: File upload approach using `POST /documents/upload`:
+
 ```python
 # Create temporary file with meaningful name
 filename = f"graph_memory_{content_words}_{hash}.txt"
@@ -191,6 +211,7 @@ data.add_field('file', file_handle, filename=filename, content_type='text/plain'
 ```
 
 **Benefits**:
+
 - ✅ Eliminates null file_path issues
 - ✅ Meaningful file organization
 - ✅ Metadata preservation in file headers
@@ -199,6 +220,7 @@ data.add_field('file', file_handle, filename=filename, content_type='text/plain'
 #### 🎯 **Revolutionary Memory Capabilities**
 
 **Enhanced Memory Storage**:
+
 ```python
 # Unified memory storage with dual persistence
 await store_user_memory(
@@ -209,6 +231,7 @@ await store_user_memory(
 ```
 
 **Intelligent Memory Retrieval**:
+
 ```python
 # Unified knowledge query with automatic routing
 await query_knowledge_base(
@@ -218,6 +241,7 @@ await query_knowledge_base(
 ```
 
 **Advanced Memory Management**:
+
 - **Semantic Deduplication**: Prevents duplicate memories with configurable similarity thresholds
 - **Topic Classification**: Automatic categorization with 11 predefined topics
 - **User Isolation**: Complete data separation per user ID
@@ -226,22 +250,26 @@ await query_knowledge_base(
 #### 📁 **Files Created & Modified**
 
 **NEW: Knowledge Coordinator Infrastructure**:
+
 - `src/personal_agent/core/knowledge_coordinator.py` - **Core coordinator implementation** (400+ lines)
 - `test_knowledge_coordinator.py` - **Comprehensive test suite** with 100% success rate
 - `KNOWLEDGE_COORDINATOR_IMPLEMENTATION_SUMMARY.md` - **Detailed implementation documentation**
 
 **NEW: LightRAG Memory Server**:
+
 - `lightrag_memory_server/docker-compose.yml` - **Dedicated memory server configuration**
 - `lightrag_memory_server/config.ini` - **Memory-specific server settings**
 - `lightrag_memory_server/env.memory.example` - **Environment template**
 - `restart-lightrag-memory.sh` - **Memory server management script**
 
 **NEW: Memory Client Architecture**:
+
 - `lightrag_memory_client.py` - **Core memory client with HTTP API**
 - `lightrag_memory_client_fixed.py` - **Enhanced error handling implementation**
 - `lightrag_memory_client_file_upload.py` - **File-based memory storage with metadata**
 
 **NEW: Testing & Validation**:
+
 - `test_lightrag_memory_features.py` - **Memory system feature testing**
 - `test_lightrag_memory_fixed.py` - **Fixed implementation validation**
 - `test_simple_lightrag.py` - **Basic functionality testing**
@@ -249,6 +277,7 @@ await query_knowledge_base(
 - `README_test_lightrag_memory.md` - **Memory testing documentation**
 
 **ENHANCED: Core Agent Architecture**:
+
 - `src/personal_agent/core/agno_agent.py` - **MAJOR ENHANCEMENT**:
   - Knowledge coordinator initialization
   - New unified `query_knowledge_base()` tool
@@ -256,11 +285,13 @@ await query_knowledge_base(
   - Backward compatibility for existing tools
 
 **ENHANCED: Configuration & Infrastructure**:
+
 - `pyproject.toml` - **Version bump to 0.8.3-dev**
 - `src/personal_agent/config/settings.py` - **Memory server URL configuration**
 - `docs/knowledge_architecture.md` - **Updated architecture documentation**
 
 **ENHANCED: Documentation**:
+
 - `COMPREHENSIVE_MEMORY_SYSTEM_TECHNICAL_SUMMARY.md` - **Complete technical overview**
 - `LIGHTRAG_MEMORY_SERVER_FIX_SUMMARY.md` - **Server implementation details**
 
@@ -457,6 +488,7 @@ else:
 **Result**: Transformed the multi-user implementation from broken hardcoded paths to a clean, working system that properly isolates user data while maintaining simplicity and avoiding over-engineering! 🚀
 
 ---
+
 ## 🚀 **v0.8.1-dev: Multi-User Implementation Fix & Simplified Path Management** (July 4, 2025)
 
 ### ✅ **CRITICAL FIX: Multi-User Path Configuration & Simplified Architecture**
@@ -603,6 +635,7 @@ else:
 **Result**: Transformed the multi-user implementation from broken hardcoded paths to a clean, working system that properly isolates user data while maintaining simplicity and avoiding over-engineering! 🚀
 
 ---
+
 ## 🚀 **v0.8.1-dev: Multi-User Implementation Fix & Simplified Path Management** (July 4, 2025)
 
 ### ✅ **CRITICAL FIX: Multi-User Path Configuration & Simplified Architecture**
@@ -749,6 +782,7 @@ else:
 **Result**: Transformed the multi-user implementation from broken hardcoded paths to a clean, working system that properly isolates user data while maintaining simplicity and avoiding over-engineering! 🚀
 
 ---
+
 # Personal AI Agent - Technical Changelog
 
 ## 🚀 **v0.8.1-dev: Decoupled LightRAG Service Architecture** (July 4, 2025)

@@ -40,7 +40,13 @@ import re
 
 
 class TopicClassifier:
-    def __init__(self, config_path="src/personal_agent/core/topics.yaml"):
+    def __init__(self, config_path=None):
+        import os
+        if config_path is None:
+            # Default to topics.yaml in the same directory as this file
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            config_path = os.path.join(current_dir, "topics.yaml")
+
         self.load_config(config_path)
         self.stopwords = set(
             [
@@ -145,7 +151,9 @@ class TopicClassifier:
 
     def clean_text(self, text):
         text = text.lower()
-        text = re.sub(r"[^a-z\s]", "", text)
+        # Preserve special characters relevant to programming languages (e.g., C++, C#)
+        # and remove other non-alphanumeric characters, but keep spaces.
+        text = re.sub(r"[^a-z0-9#+\s]", "", text)
         tokens = text.split()
         tokens = [word for word in tokens if word not in self.stopwords]
         return " ".join(tokens)
@@ -163,6 +171,7 @@ class TopicClassifier:
             Union[List[str], Dict[str, float]]: Topic classification results
         """
         cleaned = self.clean_text(text)
+        cleaned_words = cleaned.split()
         raw_scores = {category: 0 for category in self.categories}
 
         # Check phrases first (higher weight)
@@ -172,10 +181,15 @@ class TopicClassifier:
                     if phrase.lower() in cleaned:
                         raw_scores[category] += self.phrase_weight
 
-        # Check individual keywords
+        # Check individual keywords with whole word matching
         for category, keywords in self.categories.items():
             for keyword in keywords:
-                if keyword.lower() in cleaned:
+                keyword_lower = keyword.lower()
+                # Use whole word matching to avoid partial matches like "ai" in "hiking"
+                if keyword_lower in cleaned_words:
+                    raw_scores[category] += self.keyword_weight
+                # Also check for exact phrase matches for multi-word keywords
+                elif " " in keyword_lower and keyword_lower in cleaned:
                     raw_scores[category] += self.keyword_weight
 
         total_score = sum(raw_scores.values())
