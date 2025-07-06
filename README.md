@@ -2,7 +2,7 @@
 
 A sophisticated personal AI assistant powered by the **Agno Framework** with native MCP integration, semantic memory management, and local Ollama AI. Built for modern AI workflows with comprehensive tool integration and persistent memory capabilities.
 
-> **🚀 Quick Start**: Run `paga_streamlit` for the Streamlit web interface or `paga_cli` for command-line interaction
+> **🚀 Quick Start**: Run `poetry run paga_streamlit` for the Streamlit web interface or `poetry run paga_cli` for command-line interaction
 
 ## 🌟 Features
 
@@ -166,15 +166,22 @@ cd personal_agent
 poetry install
 ```
 
-2. **Start LightRAG Server**
+2. **Start LightRAG Servers**
+
+Use the provided helper scripts to start and manage the LightRAG services. These will ensure the services are stopped and started correctly.
 
 ```bash
-docker-compose up -d
+# Restart the main LightRAG server
+./restart-lightrag.sh
+
+# Restart the LightRAG memory server
+./restart-lightrag-memory.sh
 ```
 
 3. **Manage MCP & Ollama Servers**
 
-Use the provided scripts to manage your MCP and Ollama servers:
+Use the provided scripts to manage your MCP and Ollama servers (the remote is hardcoded to `tesla.local`, the name of
+my Mac Mini. Adjust as needed. It must be running Ollama!):
 
 ```bash
 # Switch to local Ollama server
