@@ -10,8 +10,8 @@ services:
     ports:
       - "${PORT:-9621}:9621"
     volumes:
-      - /Users/Shared/personal_agent_data/agno/rag_storage:/app/data/rag_storage
-      - /Users/Shared/personal_agent_data/rag_storage/inputs:/app/data/inputs
+      - "${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage:/app/data/rag_storage"
+      - "${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
       - ./.env:/app/.env
     env_file:
@@ -21,6 +21,8 @@ services:
       # This makes .env the single source of truth and avoids hardcoding.
       - LLM_BINDING_HOST=${OLLAMA_DOCKER_URL:-http://host.docker.internal:11434}
       - EMBEDDING_BINDING_HOST=${OLLAMA_DOCKER_URL:-http://host.docker.internal:11434}
+      - USER_ID=${USER_ID}
+      - STORAGE_BACKEND=${STORAGE_BACKEND}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
