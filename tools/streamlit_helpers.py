@@ -40,18 +40,36 @@ class StreamlitMemoryHelper:
             return []
 
     def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
-        if not self.memory_manager or not self.db:
-            return False, "Memory system not available", None
+        """Adds a memory by calling the agent's public store_user_memory method."""
+        if not self.agent or not hasattr(self.agent, "store_user_memory"):
+            return False, "Memory storage function not available on the agent.", None, None
+
         try:
-            return self.memory_manager.add_memory(
-                memory_text=memory_text,
-                db=self.db,
-                user_id=self.agent.user_id,
-                topics=topics,
-                input_text=input_text,
+            # Call the async method from the agent
+            result_str = asyncio.run(
+                self.agent.store_user_memory(content=memory_text, topics=topics)
             )
+
+            # Parse the result string to determine success and message
+            if "❌" in result_str:
+                success = False
+                message = result_str
+                memory_id = None
+                generated_topics = []
+            else:
+                success = True
+                message = result_str
+                # Attempt to parse memory_id from the success message
+                try:
+                    memory_id = result_str.split("(ID: ")[1].split(")")[0]
+                except IndexError:
+                    memory_id = None
+                generated_topics = topics
+
+            return success, message, memory_id, generated_topics
+
         except Exception as e:
-            return False, f"Error adding memory: {e}", None
+            return False, f"Error adding memory via agent: {e}", None, None
 
     def clear_memories(self):
         if not self.memory_manager or not self.db:
