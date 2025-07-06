@@ -66,6 +66,29 @@ graph TB
     style DC fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
 ```
 
+### 📚 **Dual Knowledge Architecture**
+
+The Personal Agent's knowledge base mirrors the dual design of its memory system, providing both fast, local semantic search and a powerful, graph-based RAG system for advanced queries.
+
+```mermaid
+graph TB
+    subgraph "📚 Dual Knowledge Architecture"
+        KBC["🎯 KNOWLEDGE COORDINATOR<br/>Routes queries based on mode"]
+
+        subgraph "Query Paths"
+            LKB["🗃️ LOCAL SEMANTIC SEARCH<br/>SQLite + LanceDB<br/>────────────────<br/>⚡ Fast, local vector search<br/>📄 Ingests Txt, PDF, MD"]
+            GKB["🌐 ADVANCED RAG<br/>LightRAG Server<br/>────────────────<br/>🔗 Knowledge Graph<br/>🧩 Complex Queries<br/>e.g., hybrid, mix"]
+        end
+        
+        KBC -->|"mode=local"| LKB
+        KBC -->|"mode=global, hybrid, etc."| GKB
+    end
+
+    style LKB fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style GKB fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+    style KBC fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+```
+
 ### 🏗️ **System Architecture Breakdown**
 
 ```mermaid
@@ -79,6 +102,21 @@ graph TD
     IL --> |EXPLICIT| EXP[📝 Explicit Instructions<br/>Detailed guidance]
     
     AGENT --> TOOLS[🛠️ TOOL ECOSYSTEM]
+    
+    subgraph "🧠 DUAL MEMORY SYSTEM"
+        direction TB
+        TOOLS -- "Memory Tools" --> DSC[🎯 DUAL STORAGE<br/>COORDINATOR]
+        DSC --> LOCAL_MEM[💾 Local Memory<br/>SQLite + LanceDB]
+        DSC --> LGM[🕸️ Graph Memory<br/>LightRAG Server]
+    end
+    
+    subgraph "📚 DUAL KNOWLEDGE SYSTEM"
+        direction TB
+        TOOLS -- "Knowledge Tools" --> KBC[🎯 KNOWLEDGE<br/>COORDINATOR]
+        KBC --> LOCAL_KB[🗃️ Local Knowledge<br/>SQLite + LanceDB]
+        KBC --> GKB[🌐 Graph Knowledge<br/>LightRAG Server]
+    end
+
     TOOLS --> MCP[🔧 MCP SERVERS<br/>6 Integrated Servers]
     TOOLS --> BUILTIN[⚙️ BUILT-IN TOOLS<br/>Search, Python, Finance]
     
@@ -89,19 +127,6 @@ graph TD
     MCP --> PY[🐍 Python]
     MCP --> SEARCH[🔍 Web Search]
 
-    AGENT --> DSC[🎯 DUAL STORAGE<br/>COORDINATOR]
-    subgraph "🧠 DUAL MEMORY SYSTEM"
-        DSC --> LOCAL[💾 Local Memory<br/>SQLite + LanceDB]
-        DSC --> LGM[🕸️ Graph Memory<br/>LightRAG Server]
-    end
-
-    subgraph "📚 KNOWLEDGE BASE"
-        AGENT --> LKB[🤖 LightRAG Server<br/>Advanced Document Processing]
-    end
-
-    LOCAL --> SEMANTIC[🔍 Semantic Search<br/>Topic Classification<br/>Deduplication]
-    LGM --> RELATIONS[🔗 Relationship Mapping<br/>Entity Extraction<br/>Knowledge Synthesis]
-    
     AGENT --> OLLAMA[⚡ OLLAMA LLM<br/>Local AI Processing]
     OLLAMA --> MODELS[🧠 MODEL SELECTION<br/>qwen2.5, llama3.1, etc.]
     
@@ -111,11 +136,13 @@ graph TD
     
     style UI fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     style AGENT fill:#fff3e0,stroke:#f57c00,stroke-width:3px
-    style DSC fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    style LOCAL fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style LGM fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style LKB fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
     style TOOLS fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style DSC fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    style KBC fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    style LOCAL_MEM fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style LGM fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style LOCAL_KB fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style GKB fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
     style OLLAMA fill:#fce4ec,stroke:#c2185b,stroke-width:2px
 ```
 
