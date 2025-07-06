@@ -69,6 +69,7 @@ from .agno_storage import (
     load_combined_knowledge_base,
     load_lightrag_knowledge_base,
 )
+from .knowledge_coordinator import create_knowledge_coordinator
 
 # Configure logging
 logger = setup_logging(__name__, level=LOG_LEVEL)
@@ -149,6 +150,7 @@ class AgnoPersonalAgent:
         self.agno_knowledge = None
         self.lightrag_knowledge = None
         self.agno_memory = None
+        self.knowledge_coordinator = None
 
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
@@ -350,6 +352,45 @@ class AgnoPersonalAgent:
                 logger.error("Error storing user memory: %s", e)
                 return f"❌ Error storing memory: {str(e)}"
 
+        async def query_knowledge_base(
+            query: str,
+            mode: str = "auto",
+            limit: int = 5,
+            response_type: str = "Multiple Paragraphs"
+        ) -> str:
+            """
+            Unified knowledge base query with intelligent routing.
+            
+            This tool automatically routes queries between local semantic search and LightRAG
+            based on the mode parameter and query characteristics.
+            
+            Args:
+                query: The search query
+                mode: Routing mode:
+                      - "local": Force local semantic search
+                      - "global", "hybrid", "mix", "naive", "bypass": Use LightRAG
+                      - "auto": Intelligent auto-detection (default)
+                limit: Maximum results for local search / top_k for LightRAG
+                response_type: Format for LightRAG responses
+                
+            Returns:
+                Formatted search results from the appropriate knowledge system
+            """
+            if not self.knowledge_coordinator:
+                return "❌ Knowledge coordinator not available."
+                
+            try:
+                result = await self.knowledge_coordinator.query_knowledge_base(
+                    query=query,
+                    mode=mode,
+                    limit=limit,
+                    response_type=response_type
+                )
+                return result
+            except Exception as e:
+                logger.error("Error in unified knowledge query: %s", e)
+                return f"❌ Error querying knowledge base: {str(e)}"
+
         async def query_lightrag_knowledge(
             query: str,
             mode: str = "naive",
@@ -357,7 +398,8 @@ class AgnoPersonalAgent:
             response_type: str = "Multiple Paragraphs",
         ) -> dict:
             """
-            Query the LightRAG knowledge base for general knowledge.
+            DEPRECATED: Use query_knowledge_base instead.
+            Direct query to LightRAG knowledge base for backward compatibility.
 
             :param query: The query string to search in the knowledge base.
             :param mode: Query mode (default: "hybrid"). Options: "local", "global", "hybrid", "naive", "mix", "bypass".
@@ -838,6 +880,7 @@ class AgnoPersonalAgent:
         get_recent_memories.__name__ = "get_recent_memories"
         get_all_memories.__name__ = "get_all_memories"
         get_memory_stats.__name__ = "get_memory_stats"
+        query_knowledge_base.__name__ = "query_knowledge_base"
         query_lightrag_knowledge.__name__ = "query_lightrag_knowledge"
         query_semantic_knowledge.__name__ = "query_semantic_knowledge"
         store_graph_memory.__name__ = "store_graph_memory"
@@ -856,8 +899,9 @@ class AgnoPersonalAgent:
                 get_recent_memories,
                 get_all_memories,
                 get_memory_stats,
-                query_lightrag_knowledge,
-                query_semantic_knowledge,
+                query_knowledge_base,  # NEW: Unified knowledge coordinator tool
+                query_lightrag_knowledge,  # DEPRECATED: Kept for backward compatibility
+                query_semantic_knowledge,  # DEPRECATED: Kept for backward compatibility
                 store_graph_memory,
                 query_graph_memory,
                 get_memory_graph_labels,
@@ -1242,8 +1286,9 @@ Returns:
             "  - `query_graph_memory`: Explore your knowledge graph to answer complex questions about relationships.",
             "  - `get_memory_graph_labels`: Get all entity and relation labels from the memory graph.",
             "- **Knowledge Base Tools**:",
-            "  - `query_lightrag_knowledge`: Query the General Knowledge LightRAG server for general, up-to-date knowledge.",
-            "  - `query_semantic_knowledge`: Search the local SQLite/LanceDB for specific documents or facts.",
+            "  - `query_knowledge_base`: 🆕 UNIFIED knowledge coordinator with intelligent routing (mode=auto/local/global/hybrid/mix)",
+            "  - `query_lightrag_knowledge`: DEPRECATED - Use query_knowledge_base instead",
+            "  - `query_semantic_knowledge`: DEPRECATED - Use query_knowledge_base instead",
         ]
 
         # Dynamically add MCP tools if they are enabled and configured
@@ -1366,6 +1411,14 @@ Returns:
                     )
                 else:
                     logger.error("Failed to create memory system")
+
+                # Create Knowledge Coordinator
+                self.knowledge_coordinator = create_knowledge_coordinator(
+                    agno_knowledge=self.agno_knowledge,
+                    lightrag_url=LIGHTRAG_URL,
+                    debug=self.debug
+                )
+                logger.info("Created Knowledge Coordinator for unified knowledge queries")
 
                 logger.info("Initialized Agno storage and knowledge backend")
             else:
