@@ -244,7 +244,7 @@ class AgnoPersonalAgent:
         async def store_user_memory(
             content: str = "", topics: Union[List[str], str, None] = None
         ) -> str:
-            """Store information as a user memory using direct SemanticMemoryManager calls.
+            """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
 
             Args:
                 content: The information to store as a memory
@@ -309,7 +309,10 @@ class AgnoPersonalAgent:
                 if not topics:
                     topics = ["general"]
 
-                # Direct call to SemanticMemoryManager.add_memory()
+                # DUAL STORAGE: Store in BOTH local SQLite memory AND LightRAG graph memory
+                results = []
+                
+                # 1. Store in local SQLite memory system
                 success, message, memory_id = (
                     self.agno_memory.memory_manager.add_memory(
                         memory_text=content,
@@ -321,15 +324,27 @@ class AgnoPersonalAgent:
 
                 if success:
                     logger.info(
-                        "Stored user memory: %s... (ID: %s)", content[:50], memory_id
+                        "Stored in local memory: %s... (ID: %s)", content[:50], memory_id
                     )
-                    return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
+                    results.append(f"✅ Local memory: {content[:50]}... (ID: {memory_id})")
                 else:
-                    logger.info("Memory rejected: %s", message)
+                    logger.info("Local memory rejected: %s", message)
                     if "duplicate" in message.lower():
-                        return f"✅ Memory already exists: {content[:50]}..."
+                        results.append(f"✅ Local memory: Already exists")
                     else:
-                        return f"❌ Error storing memory: {message}"
+                        results.append(f"❌ Local memory error: {message}")
+
+                # 2. Store in LightRAG graph memory system
+                try:
+                    graph_result = await store_graph_memory(content, topics)
+                    logger.info("Graph memory result: %s", graph_result)
+                    results.append(f"Graph memory: {graph_result}")
+                except Exception as e:
+                    logger.error("Error storing in graph memory: %s", e)
+                    results.append(f"❌ Graph memory error: {str(e)}")
+
+                # Return combined results
+                return " | ".join(results)
 
             except Exception as e:
                 logger.error("Error storing user memory: %s", e)
@@ -707,6 +722,7 @@ class AgnoPersonalAgent:
         ) -> str:
             """
             Store a memory in the LightRAG graph database to capture relationships.
+            Uses file upload approach to avoid null file_path issues.
     
             :param content: The information to store as a memory.
             :param topics: Optional list of topics for the memory.
@@ -715,18 +731,51 @@ class AgnoPersonalAgent:
             if not content or not content.strip():
                 return "❌ Error: Content is required to store a graph memory."
             try:
-                url = f"{LIGHTRAG_MEMORY_URL}/documents/text"
-                payload = {"text": content, "document_id": content}  # Use content as ID for simplicity
+                import tempfile
+                import hashlib
+                import os
+                
+                # Create a meaningful filename based on content
+                content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
+                words = content.split()[:3]
+                filename_base = "_".join(word.lower().replace(" ", "") for word in words if word.isalnum())
+                filename = f"graph_memory_{filename_base}_{content_hash}.txt"
+                
+                # Create temporary file
+                temp_dir = "/tmp/lightrag_graph_memories"
+                os.makedirs(temp_dir, exist_ok=True)
+                filepath = os.path.join(temp_dir, filename)
+                
+                # Write content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    if topics:
+                        if isinstance(topics, str):
+                            topics = [topics]
+                        f.write(f"# Topics: {', '.join(topics)}\n\n")
+                    f.write(content)
+                
+                # Upload file using the file upload endpoint
+                url = f"{LIGHTRAG_MEMORY_URL}/documents/upload"
                 async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=payload, timeout=60) as resp:
-                        resp.raise_for_status()
-                        result = await resp.json()
-                        logger.info(
-                            "Stored graph memory: %s... (Response: %s)",
-                            content[:50],
-                            result,
-                        )
-                        return f"✅ Successfully stored graph memory: {content[:50]}..."
+                    with open(filepath, 'rb') as f:
+                        data = aiohttp.FormData()
+                        data.add_field('file', f, filename=filename, content_type='text/plain')
+                        async with session.post(url, data=data, timeout=60) as resp:
+                            resp.raise_for_status()
+                            result = await resp.json()
+                
+                # Clean up temporary file
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                
+                logger.info(
+                    "Stored graph memory via file upload: %s... (Response: %s)",
+                    content[:50],
+                    result,
+                )
+                return f"✅ Successfully stored graph memory: {content[:50]}..."
             except Exception as e:
                 logger.error("Error storing graph memory: %s", e)
                 return f"❌ Error storing graph memory: {str(e)}"
