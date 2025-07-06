@@ -958,7 +958,7 @@ class SemanticMemoryManager:
             memorable_statements = self._extract_memorable_statements(input_text)
 
             for statement in memorable_statements:
-                success, message, memory_id = self.add_memory(
+                success, message, memory_id, topics = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,
@@ -972,11 +972,7 @@ class SemanticMemoryManager:
                         {
                             "memory_id": memory_id,
                             "memory": statement,
-                            "topics": (
-                                self.topic_classifier.classify(statement)
-                                if self.config.enable_topic_classification
-                                else []
-                            ),
+                            "topics": topics,
                         }
                     )
                 else:
@@ -1083,7 +1079,7 @@ class SemanticMemoryManager:
                 continue
 
             # Add the memory
-            success, message, memory_id = self.add_memory(
+            success, message, memory_id, _ = self.add_memory(
                 memory_text=statement,
                 db=db,
                 user_id=user_id,
@@ -1218,7 +1214,7 @@ class SemanticMemoryManager:
                     continue
 
                 # Add the memory
-                success, message, memory_id = self.add_memory(
+                success, message, memory_id, _ = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,

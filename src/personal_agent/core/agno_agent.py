@@ -243,118 +243,11 @@ class AgnoPersonalAgent:
 
         tools = []
 
-        async def store_user_memory(
+        async def store_user_memory_tool(
             content: str = "", topics: Union[List[str], str, None] = None
         ) -> str:
-            """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
-
-            Args:
-                content: The information to store as a memory
-                topics: Optional list of topics/categories for the memory
-
-            Returns:
-                str: Success or error message
-            """
-            # Validate that content is provided
-            if not content or not content.strip():
-                return "❌ Error: Content is required to store a memory. Please provide the information you want me to remember."
-            try:
-                import json
-
-                if topics is None:
-                    topics = ["general"]
-
-                # CRITICAL FIX: Ensure topics are ALWAYS stored as a list
-                if isinstance(topics, str):
-                    # Check if it's a JSON string representation of a list
-                    if topics.startswith("[") and topics.endswith("]"):
-                        try:
-                            topics = json.loads(topics)
-                            logger.debug(
-                                "Converted topics from JSON string to list: %s", topics
-                            )
-                        except (json.JSONDecodeError, ValueError):
-                            # If JSON parsing fails, treat as comma-separated string
-                            topics = [
-                                t.strip().strip("'\"")
-                                for t in topics.strip("[]").split(",")
-                            ]
-                            logger.debug(
-                                "Parsed topics from malformed JSON as list: %s", topics
-                            )
-                    elif "," in topics:
-                        # Handle comma-separated topics like "education, personal"
-                        topics = [t.strip().strip("'\"") for t in topics.split(",")]
-                        logger.debug(
-                            "Split comma-separated topics into list: %s", topics
-                        )
-                    else:
-                        # Single topic string
-                        topics = [topics.strip().strip("'\"")]
-                        logger.debug(
-                            "Converted single topic string to list: %s", topics
-                        )
-
-                # Final validation: Ensure topics is ALWAYS a list
-                if not isinstance(topics, list):
-                    topics = [str(topics).strip("'\"")]
-                    logger.warning(
-                        "Force-converted non-list topics to list: %s", topics
-                    )
-
-                # Clean up topics: remove empty strings, strip whitespace AND quotes
-                topics = [
-                    t.strip().strip("'\"") for t in topics if t and str(t).strip()
-                ]
-
-                # Ensure we have at least one topic
-                if not topics:
-                    topics = ["general"]
-
-                # DUAL STORAGE: Store in BOTH local SQLite memory AND LightRAG graph memory
-                results = []
-
-                # 1. Store in local SQLite memory system
-                success, message, memory_id, generated_topics = (
-                    self.agno_memory.memory_manager.add_memory(
-                        memory_text=content,
-                        db=self.agno_memory.db,
-                        user_id=self.user_id,
-                        topics=topics,
-                    )
-                )
-
-                if success:
-                    logger.info(
-                        "Stored in local memory: %s... (ID: %s)",
-                        content[:50],
-                        memory_id,
-                    )
-                    results.append(
-                        f"✅ Local memory: {content[:50]}... (ID: {memory_id})"
-                    )
-                else:
-                    logger.info("Local memory rejected: %s", message)
-                    if "duplicate" in message.lower():
-                        results.append(f"✅ Local memory: Already exists")
-                    else:
-                        results.append(f"❌ Local memory error: {message}")
-
-                # 2. Store in LightRAG graph memory system
-                try:
-                    graph_result = await store_graph_memory(content, generated_topics)
-                    logger.info("Graph memory result: %s", graph_result)
-                    results.append(f"Graph memory: {graph_result}")
-                except Exception as e:
-                    logger.error("Error storing in graph memory: %s", e)
-                    results.append(f"❌ Graph memory error: {str(e)}")
-
-                # Return combined results
-                return " | ".join(results)
-
-            except Exception as e:
-                logger.error("Error storing user memory: %s", e)
-                return f"❌ Error storing memory: {str(e)}"
+            """A tool that wraps the public store_user_memory method."""
+            return await self.store_user_memory(content=content, topics=topics)
 
         async def query_knowledge_base(
             query: str,
@@ -920,7 +813,7 @@ class AgnoPersonalAgent:
                 return f"❌ Error getting graph labels: {str(e)}"
 
         # Set proper function names for tool identification
-        store_user_memory.__name__ = "store_user_memory"
+        store_user_memory_tool.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
         search_memory.__name__ = "search_memory"
         update_memory.__name__ = "update_memory"
@@ -940,7 +833,7 @@ class AgnoPersonalAgent:
         # Add tools to the list
         tools.extend(
             [
-                store_user_memory,
+                store_user_memory_tool,
                 query_memory,
                 search_memory,
                 update_memory,
@@ -1799,6 +1692,129 @@ Returns:
             "response_type": response_type,
             "metadata": metadata,
         }
+
+    async def store_user_memory(
+        self, content: str = "", topics: Union[List[str], str, None] = None
+    ) -> str:
+        """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
+
+        This is a public method that can be called directly.
+
+        Args:
+            content: The information to store as a memory
+            topics: Optional list of topics/categories for the memory
+
+        Returns:
+            str: Success or error message
+        """
+        # Validate that content is provided
+        if not content or not content.strip():
+            return "❌ Error: Content is required to store a memory. Please provide the information you want me to remember."
+        try:
+            import json
+
+            if topics is None:
+                topics = ["general"]
+
+            # CRITICAL FIX: Ensure topics are ALWAYS stored as a list
+            if isinstance(topics, str):
+                # Check if it's a JSON string representation of a list
+                if topics.startswith("[") and topics.endswith("]"):
+                    try:
+                        topics = json.loads(topics)
+                        logger.debug(
+                            "Converted topics from JSON string to list: %s", topics
+                        )
+                    except (json.JSONDecodeError, ValueError):
+                        # If JSON parsing fails, treat as comma-separated string
+                        topics = [
+                            t.strip().strip("'\"")
+                            for t in topics.strip("[]").split(",")
+                        ]
+                        logger.debug(
+                            "Parsed topics from malformed JSON as list: %s", topics
+                        )
+                elif "," in topics:
+                    # Handle comma-separated topics like "education, personal"
+                    topics = [t.strip().strip("'\"") for t in topics.split(",")]
+                    logger.debug(
+                        "Split comma-separated topics into list: %s", topics
+                    )
+                else:
+                    # Single topic string
+                    topics = [topics.strip().strip("'\"")]
+                    logger.debug("Converted single topic string to list: %s", topics)
+
+            # Final validation: Ensure topics is ALWAYS a list
+            if not isinstance(topics, list):
+                topics = [str(topics).strip("'\"")]
+                logger.warning("Force-converted non-list topics to list: %s", topics)
+
+            # Clean up topics: remove empty strings, strip whitespace AND quotes
+            topics = [t.strip().strip("'\"") for t in topics if t and str(t).strip()]
+
+            # Ensure we have at least one topic
+            if not topics:
+                topics = ["general"]
+
+            # DUAL STORAGE: Store in BOTH local SQLite memory AND LightRAG graph memory
+            results = []
+
+            # 1. Store in local SQLite memory system
+            (
+                success,
+                message,
+                memory_id,
+                generated_topics,
+            ) = self.agno_memory.memory_manager.add_memory(
+                memory_text=content,
+                db=self.agno_memory.db,
+                user_id=self.user_id,
+                topics=topics,
+            )
+
+            if success:
+                logger.info(
+                    "Stored in local memory: %s... (ID: %s)",
+                    content[:50],
+                    memory_id,
+                )
+                results.append(f"✅ Local memory: {content[:50]}... (ID: {memory_id})")
+            else:
+                logger.info("Local memory rejected: %s", message)
+                if "duplicate" in message.lower():
+                    results.append(f"✅ Local memory: Already exists")
+                else:
+                    results.append(f"❌ Local memory error: {message}")
+
+            # 2. Store in LightRAG graph memory system
+            try:
+                # Find the store_graph_memory tool/method to call it
+                store_graph_memory_func = None
+                if self.agent and hasattr(self.agent, "tools"):
+                    for tool in self.agent.tools:
+                        if getattr(tool, "__name__", "") == "store_graph_memory":
+                            store_graph_memory_func = tool
+                            break
+                if store_graph_memory_func:
+                    graph_result = await store_graph_memory_func(
+                        content, generated_topics
+                    )
+                    logger.info("Graph memory result: %s", graph_result)
+                    results.append(f"Graph memory: {graph_result}")
+                else:
+                    logger.error("Could not find store_graph_memory tool to call.")
+                    results.append("❌ Graph memory error: Tool not found")
+            except Exception as e:
+                logger.error("Error storing in graph memory: %s", e)
+                results.append(f"❌ Graph memory error: {str(e)}")
+
+            # Return combined results
+            return " | ".join(results)
+
+        except Exception as e:
+            logger.error("Error storing user memory: %s", e)
+            return f"❌ Error storing memory: {str(e)}"
 
     async def cleanup(self) -> None:
         """Clean up resources.

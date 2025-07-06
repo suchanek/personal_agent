@@ -397,7 +397,7 @@ def render_memory_tab():
             topic_list = (
                 None if selected_category == "automatic" else [selected_category]
             )
-            success, message, memory_id = memory_helper.add_memory(
+            success, message, memory_id, _ = memory_helper.add_memory(
                 memory_text=fact_input.strip(),
                 topics=topic_list,
                 input_text="Direct fact storage",

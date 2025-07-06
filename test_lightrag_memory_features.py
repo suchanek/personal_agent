@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import time
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -78,6 +79,8 @@ class LightRAGMemoryTester:
             self.storage_dir = AGNO_STORAGE_DIR
             self.knowledge_dir = os.path.join(AGNO_STORAGE_DIR, "knowledge")
             self.console.print(f"🗄️  Using production storage: {self.storage_dir}")
+        
+        self.knowledge_file = Path(__file__).parent / "tests/knowledge.json"
 
         # Agent instance
         self.agent: Optional[AgnoPersonalAgent] = None
@@ -143,6 +146,32 @@ class LightRAGMemoryTester:
                 self.console.print(traceback.format_exc())
             self.test_results[test_name] = {"status": "ERROR", "error": str(e)}
             return False
+
+    async def _populate_knowledge_base(self):
+        """Populate the knowledge base from the JSON file."""
+        if not self.agent or not self.agent.agno_knowledge:
+            self.console.print("⚠️  Knowledge base not available, skipping population")
+            return
+
+        if not self.knowledge_file.exists():
+            self.console.print(f"⚠️  Knowledge file not found at {self.knowledge_file}, skipping population")
+            return
+
+        try:
+            with open(self.knowledge_file, "r") as f:
+                knowledge_data = json.load(f)
+
+            self.console.print(f"📚 Populating knowledge base with {len(knowledge_data)} documents...")
+            for doc in knowledge_data:
+                await self.agent.agno_knowledge.add(
+                    document_id=doc["document_id"],
+                    content=doc["content"],
+                    metadata=doc.get("metadata", {}),
+                )
+            self.console.print("✅ Knowledge base populated successfully")
+
+        except Exception as e:
+            self.console.print(f"❌ Error populating knowledge base: {e}")
 
     async def test_lightrag_servers_connectivity(self) -> bool:
         """Test connectivity to both LightRAG servers."""
@@ -212,6 +241,9 @@ class LightRAGMemoryTester:
             
             if success and self.agent.agent:
                 self.console.print("✅ Agent initialized successfully")
+
+                # Populate knowledge base
+                await self._populate_knowledge_base()
                 
                 # Check memory components
                 if self.agent.agno_memory:
@@ -263,6 +295,12 @@ class LightRAGMemoryTester:
             return False
 
         try:
+            # Clean up previous test data for this user
+            self.console.print("🧹 Clearing previous memories for test user...")
+            self.agent.agno_memory.memory_manager.clear_memories(
+                db=self.agent.agno_memory.db, user_id=self.user_id
+            )
+
             test_memories = [
                 ("I love programming in Python and building AI applications", ["programming", "personal"]),
                 ("My favorite food is sushi, especially salmon rolls", ["food", "preferences"]),
@@ -277,7 +315,7 @@ class LightRAGMemoryTester:
             for memory_text, topics in test_memories:
                 try:
                     # Use the agent's memory manager directly
-                    success, message, memory_id = self.agent.agno_memory.memory_manager.add_memory(
+                    success, message, memory_id, _ = self.agent.agno_memory.memory_manager.add_memory(
                         memory_text=memory_text,
                         db=self.agent.agno_memory.db,
                         user_id=self.user_id,
@@ -545,11 +583,18 @@ class LightRAGMemoryTester:
         """Test knowledge base integration and search capabilities."""
         if not self.agent or not self.agent.agno_knowledge:
             self.console.print("⚠️  Knowledge base not available, skipping test")
-            return True
+            return False
 
         try:
             self.console.print("📚 Testing knowledge base integration...")
-            
+
+            # Check if the knowledge base has documents
+            num_docs = await self.agent.agno_knowledge.count()
+            if num_docs == 0:
+                self.console.print("❌ Knowledge base is empty after population step.")
+                return False
+            self.console.print(f"   ✅ Knowledge base contains {num_docs} documents.")
+
             # Test knowledge base search
             test_queries = [
                 "artificial intelligence",
@@ -562,7 +607,7 @@ class LightRAGMemoryTester:
             
             for query in test_queries:
                 try:
-                    results = self.agent.agno_knowledge.search(query=query, num_documents=3)
+                    results = await self.agent.agno_knowledge.search(query=query, num_documents=3)
                     
                     if results and len(results) > 0:
                         successful_searches += 1
@@ -579,6 +624,7 @@ class LightRAGMemoryTester:
                     self.console.print(f"   ❌ Error searching for '{query}': {e}")
 
             # Test through agent (should use knowledge tools automatically)
+            agent_query_success = False
             try:
                 self.console.print("\n   🤖 Testing knowledge search through agent...")
                 knowledge_query = "What do you know about machine learning algorithms?"
@@ -586,6 +632,7 @@ class LightRAGMemoryTester:
                 
                 if response and len(response.strip()) > 50:
                     self.console.print("   ✅ Agent knowledge query successful")
+                    agent_query_success = True
                     if self.debug:
                         self.console.print(f"      Response preview: {response[:100]}...")
                 else:
@@ -594,13 +641,13 @@ class LightRAGMemoryTester:
             except Exception as e:
                 self.console.print(f"   ❌ Error in agent knowledge query: {e}")
 
-            # Success criteria: some searches should work
-            success = successful_searches > 0
+            # Success criteria: all searches should work and agent query should succeed
+            success = successful_searches == len(test_queries) and agent_query_success
             
             if success:
-                self.console.print(f"✅ Knowledge base integration passed: {successful_searches}/{len(test_queries)} searches successful")
+                self.console.print(f"✅ Knowledge base integration passed: {successful_searches}/{len(test_queries)} searches successful and agent query OK")
             else:
-                self.console.print(f"❌ Knowledge base integration failed: {successful_searches}/{len(test_queries)} searches successful")
+                self.console.print(f"❌ Knowledge base integration failed: {successful_searches}/{len(test_queries)} searches successful, agent query OK: {agent_query_success}")
                 
             return success
 
@@ -624,7 +671,7 @@ class LightRAGMemoryTester:
             local_stored = False
             if self.agent.agno_memory:
                 try:
-                    success, message, memory_id = self.agent.agno_memory.memory_manager.add_memory(
+                    success, message, memory_id, _ = self.agent.agno_memory.memory_manager.add_memory(
                         memory_text=test_info,
                         db=self.agent.agno_memory.db,
                         user_id=self.user_id,
