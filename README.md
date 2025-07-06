@@ -88,17 +88,19 @@ graph TD
     MCP --> FIN[💰 Finance]
     MCP --> PY[🐍 Python]
     MCP --> SEARCH[🔍 Web Search]
-    
-    AGENT --> MEMORY[🧠 DUAL MEMORY SYSTEM]
-    MEMORY --> LOCAL[💾 Local Memory<br/>SQLite + LanceDB]
-    MEMORY --> GRAPH[🕸️ Graph Memory<br/>LightRAG Server]
-    
+
+    AGENT --> DSC[🎯 DUAL STORAGE<br/>COORDINATOR]
+    subgraph "🧠 DUAL MEMORY SYSTEM"
+        DSC --> LOCAL[💾 Local Memory<br/>SQLite + LanceDB]
+        DSC --> LGM[🕸️ Graph Memory<br/>LightRAG Server]
+    end
+
+    subgraph "📚 KNOWLEDGE BASE"
+        AGENT --> LKB[🤖 LightRAG Server<br/>Advanced Document Processing]
+    end
+
     LOCAL --> SEMANTIC[🔍 Semantic Search<br/>Topic Classification<br/>Deduplication]
-    GRAPH --> RELATIONS[🔗 Relationship Mapping<br/>Entity Extraction<br/>Knowledge Synthesis]
-    
-    AGENT --> KNOWLEDGE[📚 KNOWLEDGE BASE]
-    KNOWLEDGE --> RAG[🤖 LightRAG Server<br/>Advanced Document Processing]
-    KNOWLEDGE --> SQLITE[🗃️ SQLite/LanceDB<br/>Fast Local Search]
+    LGM --> RELATIONS[🔗 Relationship Mapping<br/>Entity Extraction<br/>Knowledge Synthesis]
     
     AGENT --> OLLAMA[⚡ OLLAMA LLM<br/>Local AI Processing]
     OLLAMA --> MODELS[🧠 MODEL SELECTION<br/>qwen2.5, llama3.1, etc.]
@@ -109,9 +111,11 @@ graph TD
     
     style UI fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     style AGENT fill:#fff3e0,stroke:#f57c00,stroke-width:3px
-    style MEMORY fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style DSC fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    style LOCAL fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style LGM fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style LKB fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
     style TOOLS fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    style KNOWLEDGE fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
     style OLLAMA fill:#fce4ec,stroke:#c2185b,stroke-width:2px
 ```
 
