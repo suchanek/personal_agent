@@ -117,13 +117,6 @@ class StreamlitKnowledgeHelper:
             return None
         try:
             result = asyncio.run(self.agent.query_lightrag_knowledge_direct(query, params=params))
-            # Debug logging to see what we're getting
-            st.write(f"**Debug:** Raw result type: {type(result)}")
-            st.write(f"**Debug:** Raw result length: {len(str(result)) if result else 0}")
-            st.write(f"**Debug:** Raw result preview: {str(result)[:200] if result else 'None/Empty'}")
-            st.write(f"**Debug:** Result is None: {result is None}")
-            st.write(f"**Debug:** Result is empty string: {result == ''}")
-            st.write(f"**Debug:** Result stripped: '{str(result).strip()[:100] if result else 'None/Empty'}'")
             return result
         except Exception as e:
             st.error(f"Error querying knowledge base: {e}")

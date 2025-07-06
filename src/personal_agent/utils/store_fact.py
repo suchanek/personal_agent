@@ -203,7 +203,6 @@ def verify_fact_storage(fact: str, limit: int = 3) -> bool:
         results = vector_store.similarity_search(search_query, k=limit)
 
         if results:
-            print(f"\n🔍 Verification search found {len(results)} related items:")
             for i, doc in enumerate(results, 1):
                 metadata = doc.metadata if hasattr(doc, "metadata") else {}
                 topic = metadata.get("topic", "general")
