@@ -39,6 +39,7 @@ SESSION_KEY_PERFORMANCE_STATS = "performance_stats"
 SESSION_KEY_SHOW_DEBUG = "show_debug"
 SESSION_KEY_MEMORY_HELPER = "memory_helper"
 SESSION_KEY_KNOWLEDGE_HELPER = "knowledge_helper"
+SESSION_KEY_RAG_SERVER_LOCATION = "rag_server_location"
 
 # Optional imports
 try:
@@ -173,6 +174,9 @@ def initialize_session_state():
             "tool_calls_count": 0,
             "memory_operations": 0,
         }
+
+    if SESSION_KEY_RAG_SERVER_LOCATION not in st.session_state:
+        st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = "localhost"
 
 
 def render_chat_tab():
@@ -543,24 +547,98 @@ def render_knowledge_status(knowledge_helper):
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**SQLite/LanceDB**")
+
+            # Show the knowledge directory path
+            st.caption(f"**Path:** {AGNO_KNOWLEDGE_DIR}")
+
             if knowledge_helper.knowledge_manager:
                 st.success("✅ Ready")
             else:
                 st.warning("⚠️ Offline")
         with col2:
             st.markdown("**RAG**")
-            agent = st.session_state.get(SESSION_KEY_AGENT)
-            if agent and hasattr(agent, "lightrag_knowledge"):
-                try:
-                    response = requests.get(f"{LIGHTRAG_URL}/health", timeout=2)
-                    if response.status_code == 200:
+
+            # RAG Server Location Dropdown
+            rag_location = st.selectbox(
+                "RAG Server:",
+                ["localhost", "tesla.local"],
+                index=0 if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost" else 1,
+                key="rag_server_dropdown"
+            )
+
+            # Check if location changed and show apply button
+            location_changed = rag_location != st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]
+            
+            if location_changed:
+                if st.button("🔄 Apply & Rescan", key="apply_rag_server", type="primary"):
+                    # Update session state
+                    st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = rag_location
+                    
+                    # Determine the new RAG URL
+                    if rag_location == "localhost":
+                        new_rag_url = "http://localhost:9621"
+                    else:  # tesla.local
+                        new_rag_url = "http://tesla.local:9621"
+                    
+                    # Trigger rescan on the new server
+                    with st.spinner(f"Switching to {rag_location} and triggering rescan..."):
+                        try:
+                            rescan_response = requests.post(f"{new_rag_url}/documents/scan", timeout=10)
+                            if rescan_response.status_code == 200:
+                                st.success(f"✅ Switched to {rag_location} and rescan initiated!")
+                            else:
+                                st.warning(f"⚠️ Switched to {rag_location} but rescan failed (status: {rescan_response.status_code})")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"❌ Failed to connect to {rag_location}: {str(e)}")
+                    
+                    # Force a rerun to update the status display
+                    st.rerun()
+            
+            # Determine the RAG URL based on current session state
+            if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost":
+                rag_url = "http://localhost:9621"
+            else:  # tesla.local
+                rag_url = "http://tesla.local:9621"
+            
+            # Check RAG server status with detailed pipeline information
+            try:
+                # First check basic health
+                health_response = requests.get(f"{rag_url}/health", timeout=3)
+                if health_response.status_code == 200:
+                    # Get pipeline status for more detailed information
+                    try:
+                        pipeline_response = requests.get(f"{rag_url}/documents/pipeline_status", timeout=3)
+                        if pipeline_response.status_code == 200:
+                            pipeline_data = pipeline_response.json()
+                            
+                            # Check if pipeline is processing
+                            if pipeline_data.get("is_processing", False):
+                                st.warning("🔄 Processing")
+                                if pipeline_data.get("current_task"):
+                                    st.caption(f"Task: {pipeline_data['current_task']}")
+                            elif pipeline_data.get("queue_size", 0) > 0:
+                                st.info(f"📋 Queued ({pipeline_data['queue_size']} items)")
+                            else:
+                                st.success("✅ Ready")
+                                
+                            # Show additional pipeline info if available
+                            if pipeline_data.get("last_processed"):
+                                st.caption(f"Last: {pipeline_data['last_processed']}")
+                        else:
+                            # Fallback to basic ready status if pipeline endpoint fails
+                            st.success("✅ Ready")
+                    except requests.exceptions.RequestException:
+                        # Pipeline status failed, but health passed
                         st.success("✅ Ready")
-                    else:
-                        st.warning("⚠️ Offline")
-                except requests.exceptions.RequestException:
-                    st.warning("⚠️ Offline")
-            else:
+                else:
+                    st.error(f"❌ Error ({health_response.status_code})")
+            except requests.exceptions.RequestException as e:
                 st.warning("⚠️ Offline")
+                st.caption(f"({st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]})")
+            
+            # Show current server info
+            if not location_changed:
+                st.caption(f"Current: {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
 
 
 def render_knowledge_tab():
@@ -874,22 +952,10 @@ def main():
     apply_custom_theme()
 
     # Streamlit UI
-    is_dark = st.session_state.get(SESSION_KEY_DARK_THEME, False)
-    theme_icon = "🌙" if is_dark else "☀️"
-    theme_text = "Dark" if is_dark else "Light"
-
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.title("🤖 Personal AI Friend with Memory")
-        st.markdown(
-            "*A friendly AI agent that remembers your conversations and learns about you*"
-        )
-    with col2:
-        if st.button(f"{theme_icon} {theme_text} Mode", key="theme_toggle"):
-            st.session_state[SESSION_KEY_DARK_THEME] = not st.session_state[
-                SESSION_KEY_DARK_THEME
-            ]
-            st.rerun()
+    st.title("🤖 Personal AI Friend with Memory")
+    st.markdown(
+        "*A friendly AI agent that remembers your conversations and learns about you*"
+    )
 
     tab1, tab2, tab3 = st.tabs(["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"])
 

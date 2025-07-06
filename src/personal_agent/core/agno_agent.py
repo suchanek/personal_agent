@@ -42,8 +42,8 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import (
-    LIGHTRAG_URL,
     LIGHTRAG_MEMORY_URL,
+    LIGHTRAG_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
@@ -313,9 +313,9 @@ class AgnoPersonalAgent:
 
                 # DUAL STORAGE: Store in BOTH local SQLite memory AND LightRAG graph memory
                 results = []
-                
+
                 # 1. Store in local SQLite memory system
-                success, message, memory_id = (
+                success, message, memory_id, generated_topics = (
                     self.agno_memory.memory_manager.add_memory(
                         memory_text=content,
                         db=self.agno_memory.db,
@@ -326,9 +326,13 @@ class AgnoPersonalAgent:
 
                 if success:
                     logger.info(
-                        "Stored in local memory: %s... (ID: %s)", content[:50], memory_id
+                        "Stored in local memory: %s... (ID: %s)",
+                        content[:50],
+                        memory_id,
                     )
-                    results.append(f"✅ Local memory: {content[:50]}... (ID: {memory_id})")
+                    results.append(
+                        f"✅ Local memory: {content[:50]}... (ID: {memory_id})"
+                    )
                 else:
                     logger.info("Local memory rejected: %s", message)
                     if "duplicate" in message.lower():
@@ -338,7 +342,7 @@ class AgnoPersonalAgent:
 
                 # 2. Store in LightRAG graph memory system
                 try:
-                    graph_result = await store_graph_memory(content, topics)
+                    graph_result = await store_graph_memory(content, generated_topics)
                     logger.info("Graph memory result: %s", graph_result)
                     results.append(f"Graph memory: {graph_result}")
                 except Exception as e:
@@ -356,14 +360,14 @@ class AgnoPersonalAgent:
             query: str,
             mode: str = "auto",
             limit: int = 5,
-            response_type: str = "Multiple Paragraphs"
+            response_type: str = "Multiple Paragraphs",
         ) -> str:
             """
             Unified knowledge base query with intelligent routing.
-            
+
             This tool automatically routes queries between local semantic search and LightRAG
             based on the mode parameter and query characteristics.
-            
+
             Args:
                 query: The search query
                 mode: Routing mode:
@@ -372,19 +376,16 @@ class AgnoPersonalAgent:
                       - "auto": Intelligent auto-detection (default)
                 limit: Maximum results for local search / top_k for LightRAG
                 response_type: Format for LightRAG responses
-                
+
             Returns:
                 Formatted search results from the appropriate knowledge system
             """
             if not self.knowledge_coordinator:
                 return "❌ Knowledge coordinator not available."
-                
+
             try:
                 result = await self.knowledge_coordinator.query_knowledge_base(
-                    query=query,
-                    mode=mode,
-                    limit=limit,
-                    response_type=response_type
+                    query=query, mode=mode, limit=limit, response_type=response_type
                 )
                 return result
             except Exception as e:
@@ -442,7 +443,7 @@ class AgnoPersonalAgent:
                     query=query.strip(),
                     db=self.agno_memory.db,
                     user_id=self.user_id,
-                    limit=limit or 20,
+                    limit=limit,
                     similarity_threshold=0.3,
                     search_topics=True,
                     topic_boost=0.5,
@@ -608,7 +609,7 @@ class AgnoPersonalAgent:
                 logger.error("Error clearing memories: %s", e)
                 return f"❌ Error clearing memories: {str(e)}"
 
-        async def get_recent_memories(limit: int = 100) -> str:
+        async def get_recent_memories(limit: int = 10) -> str:
             """Get recent memories by searching all memories and sorting by date.
 
             Args:
@@ -658,7 +659,7 @@ class AgnoPersonalAgent:
                     query="",  # Empty query to get all memories
                     db=self.agno_memory.db,
                     user_id=self.user_id,
-                    limit=1000,  # High limit to get all
+                    limit=None,  # High limit to get all
                     similarity_threshold=0.0,  # Very low threshold to get all
                     search_topics=False,
                 )
@@ -732,6 +733,50 @@ class AgnoPersonalAgent:
             # This is just an alias for query_memory to maintain compatibility
             return await query_memory(query, limit)
 
+        async def get_memories_by_topic(
+            topics: Union[List[str], str, None] = None,
+            limit: Union[int, None] = None,
+        ) -> str:
+            """Get memories by topic without similarity search.
+
+            Args:
+                topics: A list of topics to filter by. If None, returns all memories.
+                limit: Maximum number of memories to return.
+
+            Returns:
+                str: Found memories or a message if none are found.
+            """
+            try:
+                # Ensure topics are in the correct list format
+                if isinstance(topics, str):
+                    topics = [t.strip() for t in topics.split(",")]
+                
+                results = self.agno_memory.memory_manager.get_memories_by_topic(
+                    db=self.agno_memory.db,
+                    user_id=self.user_id,
+                    topics=topics,
+                    limit=limit,
+                )
+
+                if not results:
+                    topic_str = f" for topics {topics}" if topics else ""
+                    return f"📝 No memories found{topic_str}."
+
+                # Format memories for display
+                result_str = f"📝 Found {len(results)} memories:\n\n"
+                for i, memory in enumerate(results, 1):
+                    result_str += f"{i}. {memory.memory}\n"
+                    if memory.topics:
+                        result_str += f"   Topics: {', '.join(memory.topics)}\n"
+                    result_str += "\n"
+
+                logger.info("Retrieved %d memories by topic", len(results))
+                return result_str
+
+            except Exception as e:
+                logger.error("Error getting memories by topic: %s", e)
+                return f"❌ Error getting memories by topic: {str(e)}"
+
         async def query_semantic_knowledge(query: str, limit: int = 5) -> str:
             """
             Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents.
@@ -765,7 +810,7 @@ class AgnoPersonalAgent:
             """
             Store a memory in the LightRAG graph database to capture relationships.
             Uses file upload approach to avoid null file_path issues.
-    
+
             :param content: The information to store as a memory.
             :param topics: Optional list of topics for the memory.
             :return: Success or error message.
@@ -773,45 +818,49 @@ class AgnoPersonalAgent:
             if not content or not content.strip():
                 return "❌ Error: Content is required to store a graph memory."
             try:
-                import tempfile
                 import hashlib
                 import os
-                
+                import tempfile
+
                 # Create a meaningful filename based on content
                 content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
                 words = content.split()[:3]
-                filename_base = "_".join(word.lower().replace(" ", "") for word in words if word.isalnum())
+                filename_base = "_".join(
+                    word.lower().replace(" ", "") for word in words if word.isalnum()
+                )
                 filename = f"graph_memory_{filename_base}_{content_hash}.txt"
-                
+
                 # Create temporary file
                 temp_dir = "/tmp/lightrag_graph_memories"
                 os.makedirs(temp_dir, exist_ok=True)
                 filepath = os.path.join(temp_dir, filename)
-                
+
                 # Write content to file
-                with open(filepath, 'w', encoding='utf-8') as f:
+                with open(filepath, "w", encoding="utf-8") as f:
                     if topics:
                         if isinstance(topics, str):
                             topics = [topics]
                         f.write(f"# Topics: {', '.join(topics)}\n\n")
                     f.write(content)
-                
+
                 # Upload file using the file upload endpoint
                 url = f"{LIGHTRAG_MEMORY_URL}/documents/upload"
                 async with aiohttp.ClientSession() as session:
-                    with open(filepath, 'rb') as f:
+                    with open(filepath, "rb") as f:
                         data = aiohttp.FormData()
-                        data.add_field('file', f, filename=filename, content_type='text/plain')
+                        data.add_field(
+                            "file", f, filename=filename, content_type="text/plain"
+                        )
                         async with session.post(url, data=data, timeout=60) as resp:
                             resp.raise_for_status()
                             result = await resp.json()
-                
+
                 # Clean up temporary file
                 try:
                     os.remove(filepath)
                 except:
                     pass
-                
+
                 logger.info(
                     "Stored graph memory via file upload: %s... (Response: %s)",
                     content[:50],
@@ -821,16 +870,16 @@ class AgnoPersonalAgent:
             except Exception as e:
                 logger.error("Error storing graph memory: %s", e)
                 return f"❌ Error storing graph memory: {str(e)}"
-    
+
         async def query_graph_memory(
-            query: str, 
-            mode: str = "mix", 
+            query: str,
+            mode: str = "mix",
             top_k: int = 5,
-            response_type: str = "Multiple Paragraphs"
+            response_type: str = "Multiple Paragraphs",
         ) -> dict:
             """
             Query the LightRAG memory graph to explore relationships between memories.
-    
+
             :param query: The query to search for.
             :param mode: Query mode (default: "mix"). Options: "local", "global", "hybrid", "naive", "mix", "bypass".
             :param top_k: The number of top items to retrieve.
@@ -840,10 +889,10 @@ class AgnoPersonalAgent:
             try:
                 url = f"{LIGHTRAG_MEMORY_URL}/query"
                 payload = {
-                    "query": query, 
-                    "mode": mode, 
+                    "query": query,
+                    "mode": mode,
                     "top_k": top_k,
-                    "response_type": response_type
+                    "response_type": response_type,
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url, json=payload, timeout=120) as resp:
@@ -852,11 +901,11 @@ class AgnoPersonalAgent:
             except Exception as e:
                 logger.error("Error querying graph memory: %s", e)
                 return {"error": f"Error querying graph memory: {str(e)}"}
-    
+
         async def get_memory_graph_labels() -> str:
             """
             Get the list of all entity and relation labels from the memory graph.
-    
+
             :return: A formatted string of graph labels.
             """
             try:
@@ -869,7 +918,7 @@ class AgnoPersonalAgent:
             except Exception as e:
                 logger.error("Error getting graph labels: %s", e)
                 return f"❌ Error getting graph labels: {str(e)}"
-    
+
         # Set proper function names for tool identification
         store_user_memory.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
@@ -880,13 +929,14 @@ class AgnoPersonalAgent:
         get_recent_memories.__name__ = "get_recent_memories"
         get_all_memories.__name__ = "get_all_memories"
         get_memory_stats.__name__ = "get_memory_stats"
+        get_memories_by_topic.__name__ = "get_memories_by_topic"
         query_knowledge_base.__name__ = "query_knowledge_base"
         query_lightrag_knowledge.__name__ = "query_lightrag_knowledge"
         query_semantic_knowledge.__name__ = "query_semantic_knowledge"
         store_graph_memory.__name__ = "store_graph_memory"
         query_graph_memory.__name__ = "query_graph_memory"
         get_memory_graph_labels.__name__ = "get_memory_graph_labels"
-    
+
         # Add tools to the list
         tools.extend(
             [
@@ -899,6 +949,7 @@ class AgnoPersonalAgent:
                 get_recent_memories,
                 get_all_memories,
                 get_memory_stats,
+                get_memories_by_topic,
                 query_knowledge_base,  # NEW: Unified knowledge coordinator tool
                 query_lightrag_knowledge,  # DEPRECATED: Kept for backward compatibility
                 query_semantic_knowledge,  # DEPRECATED: Kept for backward compatibility
@@ -1277,6 +1328,7 @@ Returns:
             "  - `query_memory`: Quickly search your local semantic memory for a specific fact.",
             "  - `get_recent_memories`: Get recent memories from local storage.",
             "  - `get_all_memories`: Get all stored memories.",
+            "  - `get_memories_by_topic`: Get memories filtered by topic, without similarity search.",
             "  - `update_memory`: Update an existing memory.",
             "  - `delete_memory`: Delete a specific memory from local storage.",
             "  - `clear_memories`: Clear all memories for the user from local storage.",
@@ -1416,9 +1468,11 @@ Returns:
                 self.knowledge_coordinator = create_knowledge_coordinator(
                     agno_knowledge=self.agno_knowledge,
                     lightrag_url=LIGHTRAG_URL,
-                    debug=self.debug
+                    debug=self.debug,
                 )
-                logger.info("Created Knowledge Coordinator for unified knowledge queries")
+                logger.info(
+                    "Created Knowledge Coordinator for unified knowledge queries"
+                )
 
                 logger.info("Initialized Agno storage and knowledge backend")
             else:
@@ -1760,9 +1814,7 @@ Returns:
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
 
-    async def query_lightrag_knowledge_direct(
-        self, query: str, params: dict
-    ) -> str:
+    async def query_lightrag_knowledge_direct(self, query: str, params: dict) -> str:
         """
         Directly query the LightRAG knowledge base and return the raw response.
         This method is intended for direct calls (e.g., from Streamlit) and is not an agent tool.

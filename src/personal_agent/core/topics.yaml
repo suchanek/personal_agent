@@ -261,6 +261,62 @@ categories:
     - rescue
     - adoption
     - shelter
+  skills:
+    - python
+    - java
+    - c++
+    - c#
+    - javascript
+    - typescript
+    - go
+    - rust
+    - sql
+    - nosql
+    - react
+    - angular
+    - vue
+    - docker
+    - kubernetes
+    - aws
+    - azure
+    - gcp
+    - proficient
+    - skilled
+    - expert
+    - programming
+    - developer
+    - engineer
+    - software engineer
+    - web developer
+    - coding
+    - development
+  learning:
+    - learning
+    - learn
+    - studying
+    - study
+    - language
+    - speak
+    - spanish
+    - french
+    - german
+    - italian
+    - chinese
+    - japanese
+    - korean
+    - portuguese
+    - russian
+    - arabic
+    - hindi
+    - course
+    - class
+    - lesson
+    - tutorial
+    - training
+    - skill
+    - practice
+    - improve
+    - master
 
 phrases:
   academic:
@@ -341,3 +397,27 @@ phrases:
     - pet care
     - love animals
     - animal lover
+  skills:
+    - proficient in
+    - skilled in
+    - expert in
+    - programming languages
+    - software engineer
+    - web developer
+    - am proficient
+    - know python
+    - know java
+    - programming skills
+    - technical skills
+    - coding experience
+  learning:
+    - learning to
+    - learning spanish
+    - learning french
+    - speak spanish
+    - speak french
+    - taking classes
+    - studying language
+    - language learning
+    - im learning
+    - currently learning
