@@ -582,6 +582,63 @@ class SemanticMemoryManager:
             logger.error(error_msg)
             return False, error_msg
 
+    def delete_memories_by_topic(
+        self, topics: List[str], db: MemoryDb, user_id: str = USER_ID
+    ) -> Tuple[bool, str]:
+        """
+        Delete all memories associated with a specific topic or list of topics.
+
+        :param topics: A list of topics to delete memories for.
+        :param db: Memory database instance.
+        :param user_id: User ID for the memories.
+        :return: Tuple of (success, message).
+        """
+        if not topics:
+            return False, "No topics provided for deletion."
+
+        try:
+            # Get all memories for the specified topics
+            memories_to_delete = self.get_memories_by_topic(
+                db=db, user_id=user_id, topics=topics
+            )
+
+            if not memories_to_delete:
+                return (
+                    True,
+                    f"No memories found for topics: {', '.join(topics)}.",
+                )
+
+            deleted_count = 0
+            for memory in memories_to_delete:
+                success, _ = self.delete_memory(
+                    memory_id=memory.memory_id, db=db, user_id=user_id
+                )
+                if success:
+                    deleted_count += 1
+
+            self.memories_updated = True
+
+            logger.info(
+                "Deleted %d memories for topics '%s' for user %s",
+                deleted_count,
+                ", ".join(topics),
+                user_id,
+            )
+            if self.config.debug_mode:
+                print(
+                    f"🗑️ DELETED BY TOPIC: {deleted_count} memories for topics: {', '.join(topics)}"
+                )
+
+            return (
+                True,
+                f"Successfully deleted {deleted_count} memories for topics: {', '.join(topics)}.",
+            )
+
+        except Exception as e:
+            error_msg = f"Error deleting memories by topic: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
     def clear_memories(self, db: MemoryDb, user_id: str = USER_ID) -> Tuple[bool, str]:
         """
         Clear all memories for a user.

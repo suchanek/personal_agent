@@ -1,4 +1,38 @@
 categories:
+  weather:
+    - weather
+    - temperature
+    - rain
+    - snow
+    - sunny
+    - cloudy
+    - storm
+    - forecast
+    - climate
+    - humidity
+    - wind
+    - precipitation
+    - hot
+    - cold
+    - warm
+    - cool
+    - degrees
+    - fahrenheit
+    - celsius
+    - meteorology
+    - barometric pressure
+    - tornado
+    - hurricane
+    - thunderstorm
+    - blizzard
+    - drought
+    - flood
+    - hail
+    - fog
+    - mist
+    - overcast
+    - partly cloudy
+    - clear skies
   academic:
     - phd
     - doctorate
@@ -144,6 +178,9 @@ categories:
     - husband
     - grandma
     - grandpa
+    - cousin
+    - niece
+    - nephew
     - woman
     - man
   hobbies:
@@ -158,6 +195,7 @@ categories:
     - music
     - sport
     - game
+    - fishing
     - travel
     - piano
     - guitar
@@ -202,6 +240,11 @@ categories:
     - soccer
     - baseball
     - volleyball
+    - rc airplanes
+    - remote control
+    - model aircraft
+    - flying
+    - aviation
   preferences:
     - prefer
     - favorite
@@ -372,6 +415,10 @@ phrases:
     - enjoy playing
     - like to travel
     - play piano
+    - i used to fly rc airplanes
+    - used to fly
+    - remote control airplanes
+    - model airplanes
   preferences:
     - prefer coffee
     - like better

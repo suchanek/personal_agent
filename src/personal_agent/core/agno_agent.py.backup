@@ -41,20 +41,22 @@ from mcp.client.stdio import stdio_client
 from rich.console import Console
 from rich.table import Table
 
-from ..config import get_mcp_servers
-from ..config.model_contexts import get_model_context_size_sync
-from ..config.settings import (
-    AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    DATA_DIR,
+from ..config import (
     LIGHTRAG_MEMORY_URL,
     LIGHTRAG_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
     SHOW_SPLASH_SCREEN,
-    STORAGE_BACKEND,
     USE_MCP,
+    get_mcp_servers,
+)
+from ..config.model_contexts import get_model_context_size_sync
+from ..config.settings import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    DATA_DIR,
+    STORAGE_BACKEND,
     USER_ID,
 )
 from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
@@ -147,7 +149,6 @@ class AgnoPersonalAgent:
         self.agno_storage = None
         self.agno_knowledge = None
         self.lightrag_knowledge = None
-        self.lightrag_knowledge_enabled = False
         self.agno_memory = None
         self.knowledge_coordinator = None
 
@@ -323,29 +324,6 @@ class AgnoPersonalAgent:
                 str: Found memories or message if none found
             """
             try:
-                stripped_query = query.strip().lower()
-
-                # List of phrases that should trigger get_all_memories instead of search
-                get_all_phrases = [
-                    "all",
-                    "all memories",
-                    "everything",
-                    "summarize all memories",
-                    "what do you know about me",
-                    "what have i told you",
-                    "list all memories",
-                    "show all memories",
-                    "tell me everything",
-                    "list everything you know",
-                ]
-
-                if stripped_query in get_all_phrases:
-                    logger.info(
-                        "Generic query '%s' detected. Delegating to get_all_memories.",
-                        query,
-                    )
-                    return await get_all_memories()
-
                 # Validate query parameter
                 if not query or not query.strip():
                     logger.warning("Empty query provided to query_memory")
@@ -523,45 +501,6 @@ class AgnoPersonalAgent:
             except Exception as e:
                 logger.error("Error clearing memories: %s", e)
                 return f"❌ Error clearing memories: {str(e)}"
-
-        async def delete_memories_by_topic(topics: Union[List[str], str]) -> str:
-            """Delete all memories associated with a specific topic or list of topics.
-
-            Args:
-                topics: A single topic or a list of topics to delete memories for.
-
-            Returns:
-                str: Success or error message.
-            """
-            try:
-                if isinstance(topics, str):
-                    topics = [t.strip() for t in topics.split(",")]
-
-                (
-                    success,
-                    message,
-                ) = self.agno_memory.memory_manager.delete_memories_by_topic(
-                    topics=topics, db=self.agno_memory.db, user_id=self.user_id
-                )
-
-                if success:
-                    logger.info(
-                        "Deleted memories for topics '%s' for user %s",
-                        ", ".join(topics),
-                        self.user_id,
-                    )
-                    return f"✅ {message}"
-                else:
-                    logger.error(
-                        "Failed to delete memories for topics %s: %s",
-                        ", ".join(topics),
-                        message,
-                    )
-                    return f"❌ Error deleting memories by topic: {message}"
-
-            except Exception as e:
-                logger.error("Error deleting memories by topic: %s", e)
-                return f"❌ Error deleting memories by topic: {str(e)}"
 
         async def get_recent_memories(limit: int = 10) -> str:
             """Get recent memories by searching all memories and sorting by date.
@@ -904,7 +843,6 @@ class AgnoPersonalAgent:
         search_memory.__name__ = "search_memory"
         update_memory.__name__ = "update_memory"
         delete_memory.__name__ = "delete_memory"
-        delete_memories_by_topic.__name__ = "delete_memories_by_topic"
         clear_memories.__name__ = "clear_memories"
         get_recent_memories.__name__ = "get_recent_memories"
         get_all_memories.__name__ = "get_all_memories"
@@ -925,7 +863,6 @@ class AgnoPersonalAgent:
                 query_memory,
                 update_memory,
                 delete_memory,
-                delete_memories_by_topic,
                 clear_memories,
                 get_recent_memories,
                 get_all_memories,
@@ -1199,10 +1136,6 @@ Returns:
 
             Your primary function is to remember information about the user. You must use your memory tools immediately and correctly.
 
-            **SPECIAL COMMANDS**:
-            - **`!`**: When the user starts with `!`, **IMMEDIATELY** call `store_user_memory` with the rest of the input.
-            - **`?`**: When the user starts with `?`, **IMMEDIATELY** call `get_memories_by_topic`. If no topic is provided, call `get_all_memories`.
-
             **IMPERATIVE: ACTION OVER CONVERSATION**
             - **DO NOT** explain how to use tools. **DO NOT** provide code examples for tool usage.
             - When the user asks you to do something that requires a tool, **CALL THE TOOL IMMEDIATELY**.
@@ -1214,11 +1147,9 @@ Returns:
             - When the user provides a new piece of information about themselves (e.g., "I work at...", "My pet's name is..."), or tells you to remember something, **IMMEDIATELY** call `store_user_memory(content="the fact to remember")`.
             - If the user wants to update a fact, find the existing memory with `query_memory` to get its ID, then call `update_memory(memory_id="...", content="...")`. If you cannot find an existing memory, use `store_user_memory`.
 
-            **MEMORY RETRIEVAL - CRITICAL RULES**:
-            1.  **For a complete list of ALL memories**: If the user asks "list everything you know", "what do you know about me", "summarize all memories", or any other broad question asking for everything, you **MUST** call `get_all_memories()`.
-                - **WRONG**: `query_memory("all")` or `query_memory("everything")`. This will perform a semantic search for the word "all", which is incorrect.
-                - **CORRECT**: `get_all_memories()`
-            2.  **For SPECIFIC questions about the user**: Use `query_memory("specific keywords")`. For example, for "what is my favorite color?", use `query_memory("favorite color")`.
+            **MEMORY RETRIEVAL - SIMPLE RULES**:
+            1.  **For a complete list of memories**: If the user asks "list everything you know", "what have I told you", or similar broad questions, call `get_all_memories()`.
+            2.  **For all other questions about the user**: Use `query_memory("specific keywords")`.
 
             **HOW TO RESPOND - CRITICAL IDENTITY RULES**:
             - You are an AI assistant, NOT the user.
@@ -1317,8 +1248,7 @@ Returns:
             "  - `get_memories_by_topic`: Get memories filtered by topic, without similarity search.",
             "  - `list_memories`: List all memories in a simple, user-friendly format.",
             "  - `update_memory`: Update an existing memory.",
-            "  - `delete_memory`: Delete a specific memory by its ID.",
-            "  - `delete_memories_by_topic`: Delete all memories for a given topic.",
+            "  - `delete_memory`: Delete a specific memory from local storage.",
             "  - `clear_memories`: Clear all memories for the user from local storage.",
             "  - `get_memory_stats`: Get statistics for the local memory.",
             "- **Graph Memory Tools (LightRAG)**:",
@@ -1432,16 +1362,12 @@ Returns:
                             self.lightrag_knowledge = (
                                 await load_lightrag_knowledge_base()
                             )
-                            self.lightrag_knowledge_enabled = (
-                                self.lightrag_knowledge is not None
-                            )
                             logger.info("Loaded Lightrag knowledge base metadata")
                         except Exception as e:
                             logger.warning(
                                 "Failed to load Lightrag knowledge base: %s", e
                             )
                             self.lightrag_knowledge = None
-                            self.lightrag_knowledge_enabled = False
 
                 # Create memory with SemanticMemoryManager (debug mode passed through)
                 self.agno_memory = create_agno_memory(
@@ -2043,15 +1969,12 @@ Returns:
             "model_name": self.model_name,
             "memory_enabled": self.enable_memory,
             "knowledge_enabled": self.agno_knowledge is not None,
-            "lightrag_knowledge_enabled": self.lightrag_knowledge_enabled,
             "mcp_enabled": self.enable_mcp,
             "debug_mode": self.debug,
             "user_id": self.user_id,
             "initialized": self.agent is not None,
             "storage_dir": self.storage_dir,
             "knowledge_dir": self.knowledge_dir,
-            "lightrag_url": LIGHTRAG_URL,
-            "lightrag_memory_url": LIGHTRAG_MEMORY_URL,
             "tool_counts": {
                 "total": len(built_in_tools) + len(mcp_tools),
                 "built_in": len(built_in_tools),
@@ -2095,12 +2018,6 @@ Returns:
         main_table.add_row("Initialized", "✅" if info["initialized"] else "❌")
         main_table.add_row("Storage Directory", info["storage_dir"])
         main_table.add_row("Knowledge Directory", info["knowledge_dir"])
-        main_table.add_row(
-            "LightRAG Knowledge",
-            "✅" if info["lightrag_knowledge_enabled"] else "❌",
-        )
-        main_table.add_row("LightRAG URL", info["lightrag_url"])
-        main_table.add_row("LightRAG Memory URL", info["lightrag_memory_url"])
 
         console.print(main_table)
         console.print()
