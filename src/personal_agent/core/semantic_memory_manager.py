@@ -10,6 +10,7 @@ statement/memory is a duplicate.
 
 import difflib
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,9 +23,8 @@ from agno.models.base import Model
 from pydantic import BaseModel, Field
 
 from personal_agent.config import USER_ID
-from personal_agent.utils import setup_logging
 from personal_agent.core.topic_classifier import TopicClassifier
-import os
+from personal_agent.utils import setup_logging
 
 logger = setup_logging(__name__)
 
@@ -304,11 +304,11 @@ class SemanticMemoryManager:
 
         self.model = model  # Required by Agno Memory class
         self.config = config
-        
+
         # Get the correct path to topics.yaml
         current_dir = os.path.dirname(os.path.abspath(__file__))
         topics_yaml_path = os.path.join(current_dir, "topics.yaml")
-        
+
         self.topic_classifier = TopicClassifier(config_path=topics_yaml_path)
         self.duplicate_detector = SemanticDuplicateDetector(
             similarity_threshold=config.similarity_threshold
@@ -419,7 +419,7 @@ class SemanticMemoryManager:
         user_id: str = USER_ID,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[str]]:
+    ) -> Tuple[bool, str, Optional[str], Optional[List[str]]]:
         """
         Add a memory with duplicate detection and topic classification.
 
@@ -428,7 +428,7 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memory
         :param topics: Optional list of topics (will be auto-classified if not provided)
         :param input_text: Optional input text that generated this memory
-        :return: Tuple of (success, message, memory_id)
+        :return: Tuple of (success, message, memory_id, topics)
         """
         # Get recent memories for duplicate checking
         existing_memories = self._get_recent_memories(db, user_id)
@@ -448,7 +448,7 @@ class SemanticMemoryManager:
             if self.config.debug_mode:
                 print(f"🚫 REJECTED: {reason}")
                 print(f"   Memory: '{memory_text}'")
-            return False, reason, None
+            return False, reason, None, None
 
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
@@ -489,12 +489,12 @@ class SemanticMemoryManager:
             if self.config.debug_mode:
                 print(f"✅ ACCEPTED: '{memory_text}' (topics: {topics})")
 
-            return True, "Memory added successfully", memory_id
+            return True, "Memory added successfully", memory_id, topics
 
         except Exception as e:
             error_msg = f"Error adding memory: {e}"
             logger.error(error_msg)
-            return False, error_msg, None
+            return False, error_msg, None, None
 
     def update_memory(
         self,
@@ -582,6 +582,63 @@ class SemanticMemoryManager:
             logger.error(error_msg)
             return False, error_msg
 
+    def delete_memories_by_topic(
+        self, topics: List[str], db: MemoryDb, user_id: str = USER_ID
+    ) -> Tuple[bool, str]:
+        """
+        Delete all memories associated with a specific topic or list of topics.
+
+        :param topics: A list of topics to delete memories for.
+        :param db: Memory database instance.
+        :param user_id: User ID for the memories.
+        :return: Tuple of (success, message).
+        """
+        if not topics:
+            return False, "No topics provided for deletion."
+
+        try:
+            # Get all memories for the specified topics
+            memories_to_delete = self.get_memories_by_topic(
+                db=db, user_id=user_id, topics=topics
+            )
+
+            if not memories_to_delete:
+                return (
+                    True,
+                    f"No memories found for topics: {', '.join(topics)}.",
+                )
+
+            deleted_count = 0
+            for memory in memories_to_delete:
+                success, _ = self.delete_memory(
+                    memory_id=memory.memory_id, db=db, user_id=user_id
+                )
+                if success:
+                    deleted_count += 1
+
+            self.memories_updated = True
+
+            logger.info(
+                "Deleted %d memories for topics '%s' for user %s",
+                deleted_count,
+                ", ".join(topics),
+                user_id,
+            )
+            if self.config.debug_mode:
+                print(
+                    f"🗑️ DELETED BY TOPIC: {deleted_count} memories for topics: {', '.join(topics)}"
+                )
+
+            return (
+                True,
+                f"Successfully deleted {deleted_count} memories for topics: {', '.join(topics)}.",
+            )
+
+        except Exception as e:
+            error_msg = f"Error deleting memories by topic: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
     def clear_memories(self, db: MemoryDb, user_id: str = USER_ID) -> Tuple[bool, str]:
         """
         Clear all memories for a user.
@@ -617,7 +674,7 @@ class SemanticMemoryManager:
         query: str,
         db: MemoryDb,
         user_id: str = USER_ID,
-        limit: int = 10,
+        limit: int = None,
         similarity_threshold: float = 0.3,
         search_topics: bool = True,
         topic_boost: float = 0.5,
@@ -637,7 +694,7 @@ class SemanticMemoryManager:
         try:
             # Enhanced query expansion for better semantic matching
             expanded_queries = self._expand_query(query)
-            
+
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id)
 
@@ -659,7 +716,7 @@ class SemanticMemoryManager:
             for memory in user_memories:
                 max_similarity = 0.0
                 best_query = query
-                
+
                 # Test original query and all expanded queries
                 for test_query in expanded_queries:
                     content_similarity = (
@@ -680,7 +737,10 @@ class SemanticMemoryManager:
                         # Check original query and expanded queries against topics
                         for test_query in expanded_queries:
                             test_query_lower = test_query.lower()
-                            if test_query_lower in topic.lower() or topic.lower() in test_query_lower:
+                            if (
+                                test_query_lower in topic.lower()
+                                or topic.lower() in test_query_lower
+                            ):
                                 if test_query_lower == topic.lower():
                                     topic_score = 1.0  # Exact topic match
                                     topic_matches.append(topic)
@@ -692,15 +752,25 @@ class SemanticMemoryManager:
                                     topic_matches.append(topic)
 
                 # Enhanced keyword matching for work-related queries
-                keyword_score = self._calculate_keyword_score(expanded_queries, memory.memory)
-                
+                keyword_score = self._calculate_keyword_score(
+                    expanded_queries, memory.memory
+                )
+
                 # Combined scoring: use the best of content similarity, topic match, or keyword match
-                final_score = max(max_similarity, topic_score * topic_boost, keyword_score)
-                
-                if final_score >= similarity_threshold or topic_score > 0 or keyword_score > 0.4:
+                final_score = max(
+                    max_similarity, topic_score * topic_boost, keyword_score
+                )
+
+                if (
+                    final_score >= similarity_threshold
+                    or topic_score > 0
+                    or keyword_score > 0.4
+                ):
                     results.append((memory, final_score))
 
-                    if self.config.debug_mode and (topic_matches or keyword_score > 0.4):
+                    if self.config.debug_mode and (
+                        topic_matches or keyword_score > 0.4
+                    ):
                         logger.debug(
                             "Enhanced match for query '%s': memory='%s', topics=%s, final_score=%.3f (content=%.3f, topic=%.3f, keyword=%.3f)",
                             query,
@@ -720,25 +790,85 @@ class SemanticMemoryManager:
             logger.error("Error searching memories: %s", e)
             return []
 
+    def get_memories_by_topic(
+        self,
+        db: MemoryDb,
+        user_id: str = USER_ID,
+        topics: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+    ) -> List[UserMemory]:
+        """
+        Get memories filtered by a list of topics, without similarity search.
+
+        :param db: Memory database instance
+        :param user_id: User ID to search within
+        :param topics: Optional list of topics to filter by. If None, returns all memories.
+        :param limit: Maximum number of results to return
+        :return: List of UserMemory objects matching the topics.
+        """
+        try:
+            # Get all memories for the user
+            memory_rows = db.read_memories(user_id=user_id, sort="desc")
+
+            user_memories = []
+            for row in memory_rows:
+                if row.user_id == user_id and row.memory:
+                    try:
+                        user_memory = UserMemory.from_dict(row.memory)
+                        user_memories.append(user_memory)
+                    except (ValueError, KeyError, TypeError) as e:
+                        logger.warning(
+                            "Failed to convert memory row to UserMemory: %s", e
+                        )
+
+            if not topics:
+                # If no topics are specified, return all memories up to the limit
+                return user_memories[:limit]
+
+            # Filter memories by the given topics
+            filtered_memories = []
+            topic_set = {t.lower() for t in topics}
+            for memory in user_memories:
+                if memory.topics and any(
+                    t.lower() in topic_set for t in memory.topics
+                ):
+                    filtered_memories.append(memory)
+
+            # Sort by date (already sorted by read_memories) and limit
+            return filtered_memories[:limit]
+
+        except Exception as e:
+            logger.error("Error getting memories by topic: %s", e)
+            return []
+
     def _expand_query(self, query: str) -> List[str]:
         """
         Expand query with synonyms and related terms for better semantic matching.
-        
+
         :param query: Original search query
         :return: List of expanded queries including the original
         """
         query_lower = query.lower().strip()
         expanded = [query]  # Always include original query
-        
+
         # Work-related expansions
         work_synonyms = {
-            "work": ["job", "employment", "career", "occupation", "position", "company", "employer", "workplace"],
+            "work": [
+                "job",
+                "employment",
+                "career",
+                "occupation",
+                "position",
+                "company",
+                "employer",
+                "workplace",
+            ],
             "workplace": ["work", "job", "office", "company", "employer", "business"],
             "job": ["work", "employment", "career", "position", "occupation", "role"],
             "company": ["employer", "business", "organization", "workplace", "firm"],
             "career": ["job", "work", "profession", "occupation", "employment"],
         }
-        
+
         # Education-related expansions
         education_synonyms = {
             "school": ["university", "college", "education", "academic", "institution"],
@@ -746,7 +876,7 @@ class SemanticMemoryManager:
             "degree": ["education", "qualification", "diploma", "certification"],
             "study": ["education", "learning", "academic", "school", "university"],
         }
-        
+
         # Personal-related expansions
         personal_synonyms = {
             "hobby": ["interest", "activity", "pastime", "recreation", "leisure"],
@@ -754,10 +884,10 @@ class SemanticMemoryManager:
             "like": ["enjoy", "prefer", "love", "interest", "hobby"],
             "preference": ["like", "prefer", "choice", "favorite"],
         }
-        
+
         # Combine all synonym dictionaries
         all_synonyms = {**work_synonyms, **education_synonyms, **personal_synonyms}
-        
+
         # Add synonyms for words in the query
         query_words = query_lower.split()
         for word in query_words:
@@ -767,38 +897,40 @@ class SemanticMemoryManager:
                     expanded_query = query_lower.replace(word, synonym)
                     if expanded_query not in expanded:
                         expanded.append(expanded_query)
-                    
+
                     # Also add just the synonym
                     if synonym not in expanded:
                         expanded.append(synonym)
-        
+
         return expanded
 
     def _calculate_keyword_score(self, queries: List[str], memory_text: str) -> float:
         """
         Calculate keyword-based similarity score for enhanced matching.
-        
+
         :param queries: List of query variations to test
         :param memory_text: Memory text to search in
         :return: Keyword similarity score (0.0 to 1.0)
         """
         memory_lower = memory_text.lower()
         max_score = 0.0
-        
+
         for query in queries:
             query_words = query.lower().split()
             if not query_words:
                 continue
-                
+
             matches = 0
             for word in query_words:
-                if len(word) > 2 and word in memory_lower:  # Only count words longer than 2 chars
+                if (
+                    len(word) > 2 and word in memory_lower
+                ):  # Only count words longer than 2 chars
                     matches += 1
-            
+
             if query_words:
                 score = matches / len(query_words)
                 max_score = max(max_score, score)
-        
+
         return max_score
 
     def get_memory_stats(self, db: MemoryDb, user_id: str = USER_ID) -> Dict[str, Any]:
@@ -883,7 +1015,7 @@ class SemanticMemoryManager:
             memorable_statements = self._extract_memorable_statements(input_text)
 
             for statement in memorable_statements:
-                success, message, memory_id = self.add_memory(
+                success, message, memory_id, topics = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,
@@ -897,11 +1029,7 @@ class SemanticMemoryManager:
                         {
                             "memory_id": memory_id,
                             "memory": statement,
-                            "topics": (
-                                self.topic_classifier.classify(statement)
-                                if self.config.enable_topic_classification
-                                else []
-                            ),
+                            "topics": topics,
                         }
                     )
                 else:
@@ -1008,7 +1136,7 @@ class SemanticMemoryManager:
                 continue
 
             # Add the memory
-            success, message, memory_id = self.add_memory(
+            success, message, memory_id, _ = self.add_memory(
                 memory_text=statement,
                 db=db,
                 user_id=user_id,
@@ -1143,7 +1271,7 @@ class SemanticMemoryManager:
                     continue
 
                 # Add the memory
-                success, message, memory_id = self.add_memory(
+                success, message, memory_id, _ = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,

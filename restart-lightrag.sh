@@ -9,6 +9,20 @@ NC='\033[0m' # No Color
 
 echo -e "${BLUE}Restarting LightRAG Docker Services...${NC}"
 
+# Change to lightrag_server directory
+LIGHTRAG_DIR="lightrag_server"
+if [ ! -d "$LIGHTRAG_DIR" ]; then
+    echo -e "${RED}✗${NC} Directory $LIGHTRAG_DIR not found"
+    exit 1
+fi
+
+cd "$LIGHTRAG_DIR" || {
+    echo -e "${RED}✗${NC} Failed to change to $LIGHTRAG_DIR directory"
+    exit 1
+}
+
+echo -e "${BLUE}Working from directory: $(pwd)${NC}"
+
 # Stop services
 echo -e "${YELLOW}Stopping services...${NC}"
 if docker-compose down; then

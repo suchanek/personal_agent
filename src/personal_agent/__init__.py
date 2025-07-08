@@ -23,6 +23,8 @@ Version: 0.7.dev
 
 # pylint: disable=C0413
 
+__version__ = "0.8.5"
+
 import logging
 import os
 
@@ -59,7 +61,7 @@ from .utils.pag_logging import (
 from .web import create_app, register_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.7.1-dev"
+__version__ = "0.8.3-dev"
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -72,11 +74,16 @@ setup_logging_filters()
 
 # Package-level logger
 _logger = setup_logging()
-_logger.info("Initializing Personal AI Agent package v%s...", __version__)
+
+# Only log initialization message if log level allows it AND root logger allows it
+# This prevents spam when scripts want to suppress logging
+root_logger = logging.getLogger()
+if _logger.isEnabledFor(logging.INFO) and root_logger.isEnabledFor(logging.INFO):
+    _logger.info("Initializing Personal AI Agent package v%s...", __version__)
 
 
 # Main entry points
-from .agno_main import cli_main, run_agno_cli, run_agno_web
+from .agno_main import cli_main, run_agno_cli
 from .langchain_main import cli_main as langchain_cli_main
 from .langchain_main import main as langchain_main
 from .smol_main import run_smolagents_cli, run_smolagents_web
@@ -275,7 +282,6 @@ __all__ = [
     # Main entry points - Agno (primary)
     "cli_main",
     "run_agno_cli",
-    "run_agno_web",
     # Main entry points - LangChain (legacy)
     "langchain_main",
     "langchain_cli_main",
