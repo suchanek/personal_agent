@@ -23,6 +23,8 @@ Version: 0.7.dev
 
 # pylint: disable=C0413
 
+__version__ = "0.8.4.dev"
+
 import logging
 import os
 

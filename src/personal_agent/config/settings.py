@@ -21,6 +21,8 @@ _env_vars = {}
 if dotenv_loaded:
     # Load all variables from .env file into a cache
     _env_vars = dotenv.dotenv_values(dotenv_path=dotenv_path)
+else:
+    print("Unable to load .env!")
 
 
 def get_env_var(key: str, fallback: str = "") -> str:
@@ -86,26 +88,112 @@ LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
 # Display configuration
 SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
 
-if __name__ == "__main__":
-    print("Loaded environment variables from .env:")
-    for key, value in _env_vars.items():
-        print(f"{key}={value}")
 
-    print("\n--- Configuration Constants ---")
-    print(f"WEAVIATE_URL: {WEAVIATE_URL}")
-    print(f"OLLAMA_URL: {OLLAMA_URL}")
-    print(f"REMOTE_OLLAMA_URL: {REMOTE_OLLAMA_URL}")
-    print(f"USE_WEAVIATE: {USE_WEAVIATE}")
-    print(f"USE_MCP: {USE_MCP}")
-    print(f"ROOT_DIR: {ROOT_DIR}")
-    print(f"HOME_DIR: {HOME_DIR}")
-    print(f"DATA_DIR: {DATA_DIR}")
-    print(f"REPO_DIR: {REPO_DIR}")
-    print(f"STORAGE_BACKEND: {STORAGE_BACKEND}")
-    print(f"AGNO_STORAGE_DIR: {AGNO_STORAGE_DIR}")
-    print(f"AGNO_KNOWLEDGE_DIR: {AGNO_KNOWLEDGE_DIR}")
-    print(f"LOG_LEVEL: {LOG_LEVEL_STR}")
-    print(f"LLM_MODEL: {LLM_MODEL}")
-    print(f"USER_ID: {USER_ID}")
+def get_package_version():
+    """Get package version from the package __init__.py."""
+    try:
+        # Import the version from the package
+        from personal_agent import __version__
+        return __version__
+    except ImportError:
+        return 'unknown'
+
+
+def print_config():
+    """Pretty print configuration and environment variables."""
+    # ANSI color codes
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    
+    # Get version for header
+    version = get_package_version()
+    
+    # Header
+    print(f"{BOLD}{HEADER}{'='*60}{ENDC}")
+    print(f"{BOLD}{HEADER}  Personal Agent Configuration Status{ENDC}")
+    print(f"{BOLD}{HEADER}  Version: {version}{ENDC}")
+    print(f"{BOLD}{HEADER}{'='*60}{ENDC}")
+    
+    # Environment file status
+    print(f"\n{BOLD}{BLUE}📁 Environment File Status:{ENDC}")
+    if dotenv_loaded:
+        print(f"  {GREEN}✓ Successfully loaded .env from: {dotenv_path}{ENDC}")
+    else:
+        print(f"  {RED}✗ Failed to load .env file{ENDC}")
+    
+    # Environment variables section
+    if _env_vars:
+        print(f"\n{BOLD}{CYAN}🔧 Environment Variables:{ENDC}")
+        print(f"  {UNDERLINE}Variable{' '*20}Value{ENDC}")
+        for key, value in sorted(_env_vars.items()):
+            # Mask sensitive values
+            display_value = value
+            if any(sensitive in key.lower() for sensitive in ['password', 'secret', 'key', 'token']):
+                display_value = '*' * len(value) if value else ''
+            print(f"  {YELLOW}{key:<28}{ENDC} {display_value}")
+    
+    # Configuration sections
+    sections = [
+        {
+            'title': '🌐 Server Configuration',
+            'items': [
+                ('LightRAG URL', LIGHTRAG_URL),
+                ('LightRAG Memory URL', LIGHTRAG_MEMORY_URL),
+                ('Weaviate URL', WEAVIATE_URL),
+                ('Ollama URL', OLLAMA_URL),
+                ('Remote Ollama URL', REMOTE_OLLAMA_URL),
+            ]
+        },
+        {
+            'title': '⚙️  Feature Flags',
+            'items': [
+                ('Use Weaviate', f"{GREEN}✓{ENDC}" if USE_WEAVIATE else f"{RED}✗{ENDC}"),
+                ('Use MCP', f"{GREEN}✓{ENDC}" if USE_MCP else f"{RED}✗{ENDC}"),
+                ('Show Splash Screen', f"{GREEN}✓{ENDC}" if SHOW_SPLASH_SCREEN else f"{RED}✗{ENDC}"),
+            ]
+        },
+        {
+            'title': '📂 Directory Configuration',
+            'items': [
+                ('Root Directory', ROOT_DIR),
+                ('Home Directory', HOME_DIR),
+                ('Data Directory', DATA_DIR),
+                ('Repository Directory', REPO_DIR),
+                ('Agno Storage Directory', AGNO_STORAGE_DIR),
+                ('Agno Knowledge Directory', AGNO_KNOWLEDGE_DIR),
+            ]
+        },
+        {
+            'title': '🤖 AI & Storage Configuration',
+            'items': [
+                ('Storage Backend', STORAGE_BACKEND),
+                ('LLM Model', LLM_MODEL),
+                ('User ID', USER_ID),
+                ('Log Level', LOG_LEVEL_STR),
+            ]
+        }
+    ]
+    
+    for section in sections:
+        print(f"\n{BOLD}{BLUE}{section['title']}:{ENDC}")
+        print(f"  {UNDERLINE}Setting{' '*22}Value{ENDC}")
+        for name, value in section['items']:
+            print(f"  {CYAN}{name:<30}{ENDC} {value}")
+    
+    # Footer
+    print(f"\n{BOLD}{HEADER}{'='*60}{ENDC}")
+    print(f"{BOLD}{GREEN}Configuration loaded successfully!{ENDC}")
+    print(f"{BOLD}{HEADER}{'='*60}{ENDC}")
+
+
+if __name__ == "__main__":
+    print_config()
 
     # end of file
