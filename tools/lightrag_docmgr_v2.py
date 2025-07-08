@@ -2,29 +2,29 @@
 """
 LightRAG Document Manager V2
 
-A modernized document management tool for LightRAG that uses the core LightRAG
-library for stable and reliable operations. This version replaces direct API calls
-and manual file manipulation with the official `LightRAG` class methods.
+A modernized document management tool for LightRAG that uses the LightRAG server
+API for stable and reliable operations. This version uses HTTP API calls to the
+LightRAG server instead of direct library usage.
 
 Key Improvements from V1:
-- Uses `lightrag.lightrag.LightRAG` for all operations, ensuring stability.
-- Deletion is now handled by the canonical `adelete_by_doc_id` method.
+- Uses LightRAG server API endpoints for all operations, ensuring stability.
+- Deletion is now handled by the `/documents/delete_document` API endpoint.
 - No longer requires server restarts (`--restart-server` is removed).
 - Deletion is always persistent (`--persistent` is removed).
-- More robust, as it can operate directly on storage without a running server.
+- More robust, as it uses the official API interface.
 
 Usage:
   From the project root directory, run:
   `python tools/lightrag_docmgr_v2.py [OPTIONS] [ACTIONS]`
 
 Options:
-  --working-dir <PATH>        Path to LightRAG working directory (default: from config)
-  --verify                    Verify deletion after completion by checking storage
+  --server-url <URL>          LightRAG server URL (default: from config)
+  --verify                    Verify deletion after completion by checking server
   --no-confirm                Skip confirmation prompts for deletion actions
   --delete-source             Delete the original source file from the inputs directory
 
 Actions:
-  --status                    Show LightRAG storage and document status
+  --status                    Show LightRAG server and document status
   --list                      List all documents with detailed view (ID, file path, status, etc.)
   --list-names                List all document names (file paths only)
   --delete-processing         Delete all documents currently in 'processing' status
@@ -37,7 +37,7 @@ Actions:
                               Must be used with a deletion action.
 
 Examples:
-  # Check storage status
+  # Check server status
   python tools/lightrag_docmgr_v2.py --status
 
   # List all documents
@@ -59,105 +59,76 @@ import fnmatch
 import os
 import sys
 from typing import Any, Dict, List, Optional
-
-from lightrag.base import DeletionResult, DocStatus
-from lightrag.lightrag import LightRAG
-from lightrag.llm.ollama import ollama_embed, ollama_model_complete
-from lightrag.utils import EmbeddingFunc
+import aiohttp
+import json
 
 from personal_agent.config import settings
 
 
 class LightRAGDocumentManagerV2:
-    """Manages documents in LightRAG using the core library."""
+    """Manages documents in LightRAG using the server API."""
 
-    def __init__(self, working_dir: Optional[str] = None):
-        self.working_dir = working_dir or os.path.join(
-            settings.AGNO_STORAGE_DIR, "rag_storage"
-        )
-        print(f"📁 Using LightRAG working directory: {self.working_dir}")
-        self.rag: Optional[LightRAG] = None
+    def __init__(self, server_url: Optional[str] = None):
+        self.server_url = server_url or settings.LIGHTRAG_URL
+        print(f"🌐 Using LightRAG server URL: {self.server_url}")
 
-        # Cache files that need to be cleared during deletion
-        self.llm_cache_file = os.path.join(
-            self.working_dir, "kv_store_llm_response_cache.json"
-        )
+    async def check_server_status(self) -> bool:
+        """Check if LightRAG server is running."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.server_url}/health", timeout=10) as resp:
+                    return resp.status == 200
+        except Exception as e:
+            print(f"❌ Cannot connect to LightRAG server: {e}")
+            return False
 
     async def initialize(self) -> bool:
-        """Initializes the LightRAG instance."""
-        if not os.path.exists(self.working_dir):
-            print(f"❌ Working directory not found: {self.working_dir}")
-            print("   Please ensure LightRAG has been run at least once to create it.")
+        """Check server connectivity."""
+        if not await self.check_server_status():
+            print(f"❌ LightRAG server not accessible at: {self.server_url}")
+            print("   Please ensure the LightRAG server is running.")
             return False
-        try:
-            # Use the function-based approach like the working examples
-            embedding_func = EmbeddingFunc(
-                embedding_dim=768,  # Match existing storage dimension
-                max_token_size=8192,
-                func=lambda texts: ollama_embed(
-                    texts,
-                    embed_model="nomic-embed-text",  # Using nomic-embed-text model
-                    host=settings.OLLAMA_URL,
-                ),
-            )
-
-            self.rag = LightRAG(
-                working_dir=self.working_dir,
-                llm_model_func=ollama_model_complete,
-                llm_model_name=settings.LLM_MODEL,
-                llm_model_max_token_size=8192,
-                llm_model_kwargs={
-                    "host": settings.OLLAMA_URL,
-                    "options": {"num_ctx": 8192},
-                    "timeout": 300,
-                },
-                embedding_func=embedding_func,
-            )
-            # Ensure storages are properly initialized
-            await self.rag.initialize_storages()
-            print("✅ LightRAG instance initialized successfully.")
-            return True
-        except Exception as e:
-            print(f"❌ Failed to initialize LightRAG: {e}")
-            return False
+        
+        print("✅ LightRAG server is accessible.")
+        return True
 
     async def get_all_docs(self) -> List[Dict[str, Any]]:
-        """Fetches all document statuses directly from storage."""
-        if not self.rag:
+        """Fetches all documents from the LightRAG server."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.server_url}/documents", timeout=30) as resp:
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        print(f"❌ Server error {resp.status}: {error_text}")
+                        return []
+                    
+                    data = await resp.json()
+                    all_docs = []
+                    
+                    # The API returns documents grouped by status in a "statuses" dict
+                    if isinstance(data, dict) and "statuses" in data:
+                        statuses = data["statuses"]
+                        # Iterate through all status categories (processed, failed, etc.)
+                        for status_name, docs_list in statuses.items():
+                            if isinstance(docs_list, list):
+                                all_docs.extend(docs_list)
+                        return all_docs
+                    elif isinstance(data, dict) and "documents" in data:
+                        return data["documents"]
+                    elif isinstance(data, list):
+                        return data
+                    else:
+                        print(f"⚠️ Unexpected response format: {type(data)}")
+                        print(f"Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                        return []
+        except Exception as e:
+            print(f"❌ Error fetching documents: {e}")
             return []
-
-        all_docs = []
-        for status in list(DocStatus):
-            try:
-                docs = await self.rag.get_docs_by_status(status)
-                for doc_id, doc_info in docs.items():
-                    # Convert DocProcessingStatus to dict and add the ID
-                    doc_dict = {
-                        "id": doc_id,
-                        "status": doc_info.status,
-                        "content": doc_info.content,
-                        "content_summary": doc_info.content_summary,
-                        "content_length": doc_info.content_length,
-                        "file_path": doc_info.file_path,
-                        "created_at": doc_info.created_at,
-                        "updated_at": doc_info.updated_at,
-                        "chunks_count": getattr(doc_info, "chunks_count", None),
-                        "chunks_list": getattr(doc_info, "chunks_list", []),
-                        "error": doc_info.error,
-                        "metadata": doc_info.metadata,
-                    }
-                    all_docs.append(doc_dict)
-            except Exception as e:
-                print(f"⚠️ Could not retrieve docs with status {status}: {e}")
-        return all_docs
 
     async def delete_documents(
         self, docs_to_delete: List[Dict[str, Any]], delete_source: bool = False
     ) -> Dict[str, Any]:
-        """Deletes a list of documents using adelete_by_doc_id."""
-        if not self.rag:
-            return {"errors": ["LightRAG not initialized."]}
-
+        """Deletes a list of documents using the server API."""
         results = {
             "total_requested": len(docs_to_delete),
             "deleted_successfully": 0,
@@ -184,54 +155,86 @@ class LightRAGDocumentManagerV2:
                     print(f"⚠️ Source file not found, skipping: {source_path}")
             print(f"✅ Source file deletion complete.")
 
-        # Phase 2: Delete documents from LightRAG storage
-        print("\n💾 Phase 2: Deleting documents from LightRAG storage")
-        for doc_info in docs_to_delete:
-            doc_id = doc_info["id"]
-            print(f"   - Deleting {doc_id}...")
-            try:
-                result = await self.rag.adelete_by_doc_id(doc_id)
-                if result.status == "success":
-                    print(f"   ✅ Success: {result.message}")
-                    results["deleted_successfully"] += 1
-                elif result.status == "not_found":
-                    print(f"   ⚠️ Not Found: {result.message}")
-                    results["not_found"] += 1
-                else:
-                    print(f"   ❌ Failure: {result.message}")
-                    results["errors"].append(result.message)
-            except Exception as e:
-                msg = f"An exception occurred while deleting {doc_id}: {e}"
-                print(f"   ❌ {msg}")
-                results["errors"].append(msg)
+        # Phase 2: Delete documents from LightRAG server
+        print("\n💾 Phase 2: Deleting documents from LightRAG server")
+        if docs_to_delete:
+            # Collect all document IDs for batch deletion
+            doc_ids = [doc_info["id"] for doc_info in docs_to_delete]
+            print(f"   - Deleting {len(doc_ids)} documents in batch...")
+            
+            async with aiohttp.ClientSession() as session:
+                try:
+                    # Use the DELETE /documents/delete_document endpoint with proper format
+                    payload = {
+                        "doc_ids": doc_ids,
+                        "delete_file": delete_source
+                    }
+                    async with session.delete(
+                        f"{self.server_url}/documents/delete_document",
+                        json=payload,
+                        timeout=60  # Longer timeout for batch operations
+                    ) as resp:
+                        if resp.status == 200:
+                            result_data = await resp.json()
+                            status = result_data.get("status", "unknown")
+                            message = result_data.get("message", "No message")
+                            
+                            if status == "deletion_started":
+                                print(f"   ✅ Success: {message}")
+                                results["deleted_successfully"] = len(doc_ids)
+                            elif status == "busy":
+                                print(f"   ⚠️ Server Busy: {message}")
+                                results["errors"].append(f"Server busy: {message}")
+                            elif status == "not_allowed":
+                                print(f"   ❌ Not Allowed: {message}")
+                                results["errors"].append(f"Not allowed: {message}")
+                            else:
+                                print(f"   ⚠️ Unknown Status '{status}': {message}")
+                                results["errors"].append(f"Unknown status: {message}")
+                        else:
+                            error_text = await resp.text()
+                            msg = f"Server error {resp.status}: {error_text}"
+                            print(f"   ❌ {msg}")
+                            results["errors"].append(msg)
+                except Exception as e:
+                    msg = f"An exception occurred during batch deletion: {e}"
+                    print(f"   ❌ {msg}")
+                    results["errors"].append(msg)
 
-        # Phase 3: Clear LLM cache to prevent cached responses
-        print("\n🧹 Phase 3: Clearing LLM cache")
-        if os.path.exists(self.llm_cache_file):
-            try:
-                os.remove(self.llm_cache_file)
-                print("✅ Deleted LLM cache file to prevent stale cached responses")
-            except OSError as e:
-                msg = f"Failed to delete LLM cache file: {e}"
-                print(f"❌ {msg}")
-                results["errors"].append(msg)
-        else:
-            print("⚠️ LLM cache file not found, skipping cache clear")
+        # Phase 3: Clear cache using the server API
+        print("\n🧹 Phase 3: Clearing server cache")
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Clear all cache modes
+                payload = {"modes": None}  # None clears all cache
+                async with session.post(
+                    f"{self.server_url}/documents/clear_cache", 
+                    json=payload,
+                    timeout=30
+                ) as resp:
+                    if resp.status == 200:
+                        print("✅ Server cache cleared successfully")
+                    else:
+                        error_text = await resp.text()
+                        msg = f"Failed to clear server cache: {resp.status} - {error_text}"
+                        print(f"❌ {msg}")
+                        results["errors"].append(msg)
+        except Exception as e:
+            msg = f"Failed to clear server cache: {e}"
+            print(f"❌ {msg}")
+            results["errors"].append(msg)
 
-        print("✅ LightRAG deletion complete.")
-
+        print("✅ LightRAG server deletion complete.")
         return results
 
     async def finalize(self):
-        """Properly close the LightRAG instance."""
-        if self.rag:
-            await self.rag.finalize_storages()
-            print("\n✅ LightRAG instance finalized.")
+        """No cleanup needed for API-based approach."""
+        print("\n✅ Document manager finalized.")
 
 
 async def main():
     parser = argparse.ArgumentParser(description="LightRAG Document Manager V2")
-    parser.add_argument("--working-dir", help="Path to LightRAG working directory")
+    parser.add_argument("--server-url", help="LightRAG server URL")
     # Actions
     parser.add_argument(
         "--status", action="store_true", help="Show storage and document status"
@@ -269,7 +272,7 @@ async def main():
 
     args = parser.parse_args()
 
-    manager = LightRAGDocumentManagerV2(args.working_dir)
+    manager = LightRAGDocumentManagerV2(args.server_url)
     if not await manager.initialize():
         return 1
 
@@ -279,10 +282,9 @@ async def main():
     if args.status:
         print("\n🔍 System Status Check")
         print("-" * 40)
-        print(
-            f"Storage Path: {'🟢 Exists' if os.path.exists(manager.working_dir) else '🔴 Missing'}"
-        )
-        print(f"  Path: {manager.working_dir}")
+        server_status = await manager.check_server_status()
+        print(f"Server Status: {'🟢 Online' if server_status else '🔴 Offline'}")
+        print(f"  URL: {manager.server_url}")
         print(f"Documents Found: {len(all_docs)}")
         # Count by status
         status_counts = {}
@@ -327,12 +329,12 @@ async def main():
         verify = True
 
     if args.delete_processing:
-        docs_to_delete = [d for d in all_docs if d.get("status") == "PROCESSING"]
+        docs_to_delete = [d for d in all_docs if d.get("status") == "processing"]
     elif args.delete_failed:
-        docs_to_delete = [d for d in all_docs if d.get("status") == "FAILED"]
+        docs_to_delete = [d for d in all_docs if d.get("status") == "failed"]
     elif args.delete_status:
         docs_to_delete = [
-            d for d in all_docs if d.get("status") == args.delete_status.upper()
+            d for d in all_docs if d.get("status") == args.delete_status.lower()
         ]
     elif args.delete_ids:
         docs_to_delete = [
