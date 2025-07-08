@@ -69,7 +69,9 @@ AGNO_STORAGE_DIR = os.path.expandvars(
     get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}")
 )
 AGNO_KNOWLEDGE_DIR = os.path.expandvars(
-    get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/knowledge/{USER_ID}")
+    get_env_var(
+        "AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}/knowledge"
+    )
 )
 
 
@@ -78,7 +80,7 @@ LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7B")
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
 
 
 # Display configuration
