@@ -73,7 +73,7 @@ class LightRAGDocumentManagerV2:
 
     def __init__(self, working_dir: Optional[str] = None):
         self.working_dir = working_dir or os.path.join(
-            settings.DATA_DIR, settings.STORAGE_BACKEND, "rag_storage"
+            settings.AGNO_STORAGE_DIR, "rag_storage"
         )
         print(f"📁 Using LightRAG working directory: {self.working_dir}")
         self.rag: Optional[LightRAG] = None
