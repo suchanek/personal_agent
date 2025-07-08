@@ -405,55 +405,25 @@ class AgnoPersonalAgent:
                 str: Success or error message
             """
             try:
-                import json
-
-                # CRITICAL FIX: Ensure topics are ALWAYS stored as a list (same logic as store_user_memory)
-                if isinstance(topics, str):
-                    # Check if it's a JSON string representation of a list
-                    if topics.startswith("[") and topics.endswith("]"):
-                        try:
-                            topics = json.loads(topics)
-                            logger.debug(
-                                "Converted topics from JSON string to list: %s", topics
-                            )
-                        except (json.JSONDecodeError, ValueError):
-                            # If JSON parsing fails, treat as comma-separated string
-                            topics = [
-                                t.strip().strip("'\"")
-                                for t in topics.strip("[]").split(",")
-                            ]
-                            logger.debug(
-                                "Parsed topics from malformed JSON as list: %s", topics
-                            )
-                    elif "," in topics:
-                        # Handle comma-separated topics like "education, personal"
-                        topics = [t.strip().strip("'\"") for t in topics.split(",")]
-                        logger.debug(
-                            "Split comma-separated topics into list: %s", topics
-                        )
+                # SIMPLIFIED TOPIC HANDLING: Handle the common cases simply
+                if topics is None:
+                    # Leave as None - let memory manager auto-classify
+                    pass
+                elif isinstance(topics, str):
+                    # Convert string to list, handle comma-separated values
+                    if "," in topics:
+                        topics = [t.strip() for t in topics.split(",") if t.strip()]
                     else:
-                        # Single topic string
-                        topics = [topics.strip().strip("'\"")]
-                        logger.debug(
-                            "Converted single topic string to list: %s", topics
-                        )
-
-                # Final validation: Ensure topics is ALWAYS a list
-                if topics and not isinstance(topics, list):
-                    topics = [str(topics).strip("'\"")]
-                    logger.warning(
-                        "Force-converted non-list topics to list: %s", topics
-                    )
-
-                # Clean up topics: remove empty strings, strip whitespace AND quotes
-                if topics:
-                    topics = [
-                        t.strip().strip("'\"") for t in topics if t and str(t).strip()
-                    ]
-
-                    # Ensure we have at least one topic if topics were provided
+                        topics = [topics.strip()] if topics.strip() else None
+                elif isinstance(topics, list):
+                    # Clean up list - remove empty entries
+                    topics = [str(t).strip() for t in topics if str(t).strip()]
                     if not topics:
-                        topics = ["general"]
+                        topics = None
+                else:
+                    # Convert anything else to string and put in list
+                    topic_str = str(topics).strip()
+                    topics = [topic_str] if topic_str and topic_str != "None" else None
 
                 # Direct call to SemanticMemoryManager.update_memory()
                 success, message = self.agno_memory.memory_manager.update_memory(
@@ -1802,7 +1772,7 @@ Returns:
 
         Args:
             content: The information to store as a memory
-            topics: Optional list of topics/categories for the memory
+            topics: Optional list of topics/categories for the memory (None = auto-classify)
 
         Returns:
             str: Success or error message
@@ -1813,47 +1783,33 @@ Returns:
         try:
             import json
 
+            # DON'T set topics to ["general"] here - let the memory manager handle auto-classification
+            # if topics is None:
+            #     topics = ["general"]
+
+            # SIMPLIFIED TOPIC HANDLING: Handle the common cases simply
             if topics is None:
-                topics = ["general"]
-
-            # CRITICAL FIX: Ensure topics are ALWAYS stored as a list
-            if isinstance(topics, str):
-                # Check if it's a JSON string representation of a list
-                if topics.startswith("[") and topics.endswith("]"):
-                    try:
-                        topics = json.loads(topics)
-                        logger.debug(
-                            "Converted topics from JSON string to list: %s", topics
-                        )
-                    except (json.JSONDecodeError, ValueError):
-                        # If JSON parsing fails, treat as comma-separated string
-                        topics = [
-                            t.strip().strip("'\"")
-                            for t in topics.strip("[]").split(",")
-                        ]
-                        logger.debug(
-                            "Parsed topics from malformed JSON as list: %s", topics
-                        )
-                elif "," in topics:
-                    # Handle comma-separated topics like "education, personal"
-                    topics = [t.strip().strip("'\"") for t in topics.split(",")]
-                    logger.debug("Split comma-separated topics into list: %s", topics)
+                # Leave as None - let memory manager auto-classify
+                pass
+            elif isinstance(topics, str):
+                # Convert string to list, handle comma-separated values
+                if "," in topics:
+                    topics = [t.strip() for t in topics.split(",") if t.strip()]
                 else:
-                    # Single topic string
-                    topics = [topics.strip().strip("'\"")]
-                    logger.debug("Converted single topic string to list: %s", topics)
+                    topics = [topics.strip()] if topics.strip() else None
+            elif isinstance(topics, list):
+                # Clean up list - remove empty entries
+                topics = [str(t).strip() for t in topics if str(t).strip()]
+                if not topics:
+                    topics = None
+            else:
+                # Convert anything else to string and put in list
+                topic_str = str(topics).strip()
+                topics = [topic_str] if topic_str and topic_str != "None" else None
 
-            # Final validation: Ensure topics is ALWAYS a list
-            if not isinstance(topics, list):
-                topics = [str(topics).strip("'\"")]
-                logger.warning("Force-converted non-list topics to list: %s", topics)
-
-            # Clean up topics: remove empty strings, strip whitespace AND quotes
-            topics = [t.strip().strip("'\"") for t in topics if t and str(t).strip()]
-
-            # Ensure we have at least one topic
-            if not topics:
-                topics = ["general"]
+            # Don't set a default - let the memory manager handle auto-classification
+            # if topics is None:
+            #     topics = ["general"]
 
             # DUAL STORAGE: Store in BOTH local SQLite memory AND LightRAG graph memory
             results = []
