@@ -11,14 +11,6 @@ services:
       - ./.env:/app/.env
     env_file:
       - .env
-    environment:
-      # These variables are now sourced from the .env file via `env_file`.
-      # This makes .env the single source of truth and avoids hardcoding.
-      - LLM_BINDING_HOST=${OLLAMA_DOCKER_URL:-http://host.docker.internal:11434}
-      - EMBEDDING_BINDING_HOST=${OLLAMA_DOCKER_URL:-http://host.docker.internal:11434}
-      - USER_ID=${USER_ID}
-      - STORAGE_BACKEND=${STORAGE_BACKEND}
-
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

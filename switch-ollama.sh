@@ -13,9 +13,11 @@ BACKUP_DIR="backups"
 LOCAL_URL="http://localhost:11434"
 LOCAL_DOCKER_URL="http://host.docker.internal:11434"
 REMOTE_URL="http://tesla.local:11434"
-REMOTE_DOCKER_URL="tesla.local:11434"
+REMOTE_DOCKER_URL="http://tesla.local:11434"
 LOCAL_LIGHTRAG_URL="http://localhost:9621"
 REMOTE_LIGHTRAG_URL="http://tesla.local:9621"
+LOCAL_EMBEDDING_BINDING_HOST="http://host.docker.internal:11434"
+REMOTE_EMBEDDING_BINDING_HOST="http://tesla.local:11434"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
@@ -86,24 +88,25 @@ update_urls() {
     local new_ollama_url=$1
     local new_ollama_docker_url=$2
     local new_lightrag_url=$3
+    local new_embedding_host=$4
     local temp_file=$(mktemp)
     
     # We also need to update the EMBEDDING_BINDING_HOST
     sed -e "s|^OLLAMA_URL=.*|OLLAMA_URL=$new_ollama_url|" \
         -e "s|^OLLAMA_DOCKER_URL=.*|OLLAMA_DOCKER_URL=$new_ollama_docker_url|" \
         -e "s|^LIGHTRAG_URL=.*|LIGHTRAG_URL=$new_lightrag_url|" \
-        -e "s|^EMBEDDING_BINDING_HOST=.*|EMBEDDING_BINDING_HOST=$new_ollama_docker_url|" \
+        -e "s|^EMBEDDING_BINDING_HOST=.*|EMBEDDING_BINDING_HOST=$new_embedding_host|" \
         "$ENV_FILE" > "$temp_file"
     
     if grep -q "^OLLAMA_URL=$new_ollama_url" "$temp_file" && \
        grep -q "^OLLAMA_DOCKER_URL=$new_ollama_docker_url" "$temp_file" && \
        grep -q "^LIGHTRAG_URL=$new_lightrag_url" "$temp_file" && \
-       grep -q "^EMBEDDING_BINDING_HOST=$new_ollama_docker_url" "$temp_file"; then
+       grep -q "^EMBEDDING_BINDING_HOST=$new_embedding_host" "$temp_file"; then
         mv "$temp_file" "$ENV_FILE"
         echo "✓ Updated OLLAMA_URL to: $new_ollama_url"
         echo "✓ Updated OLLAMA_DOCKER_URL to: $new_ollama_docker_url"
         echo "✓ Updated LIGHTRAG_URL to: $new_lightrag_url"
-        echo "✓ Updated EMBEDDING_BINDING_HOST to: $new_ollama_docker_url"
+        echo "✓ Updated EMBEDDING_BINDING_HOST to: $new_embedding_host"
         return 0
     else
         rm "$temp_file"
@@ -226,7 +229,7 @@ case "$1" in
         backup_env
         
         # Update configuration for main .env
-        if update_urls "$LOCAL_URL" "$LOCAL_DOCKER_URL" "$LOCAL_LIGHTRAG_URL"; then
+        if update_urls "$LOCAL_URL" "$LOCAL_DOCKER_URL" "$LOCAL_LIGHTRAG_URL" "$LOCAL_EMBEDDING_BINDING_HOST"; then
             test_ollama_connection "$LOCAL_URL"
             
             # Restart lightrag_server and switch+restart lightrag_memory_server
@@ -256,7 +259,7 @@ case "$1" in
         backup_env
         
         # Update configuration
-        if update_urls "$REMOTE_URL" "$REMOTE_DOCKER_URL" "$REMOTE_LIGHTRAG_URL"; then
+        if update_urls "$REMOTE_URL" "$REMOTE_DOCKER_URL" "$REMOTE_LIGHTRAG_URL" "$REMOTE_EMBEDDING_BINDING_HOST"; then
             test_ollama_connection "$REMOTE_URL"
             
             # Restart lightrag_server and switch+restart lightrag_memory_server
