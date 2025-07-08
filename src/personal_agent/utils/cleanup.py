@@ -15,6 +15,7 @@ import time
 from weaviate import WeaviateClient
 
 from ..core.mcp_client import SimpleMCPClient
+from ..config.settings import LOG_LEVEL
 from ..utils.pag_logging import setup_logging
 
 # Use logging.INFO as default to avoid circular import
@@ -24,9 +25,7 @@ DEFAULT_LOG_LEVEL = logging.INFO
 weaviate_client: "WeaviateClient" = None
 vector_store = None
 mcp_client: "SimpleMCPClient" = None
-logger: logging.Logger = setup_logging(
-    name="__name__",  # Use a placeholder name
-)
+logger: logging.Logger = setup_logging(name="__name__", level=LOG_LEVEL)
 
 
 def inject_dependencies(weaviate_cli, vec_store, mcp_cli, log):

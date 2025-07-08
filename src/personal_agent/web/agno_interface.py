@@ -166,7 +166,6 @@ async def create_agno_agent_with_params(model_name, ollama_url):
         debug=True,
         user_id=USER_ID,
         ollama_base_url=ollama_url,
-        complexity_level=4,
     )
     return agent
 
@@ -354,7 +353,6 @@ def main():
                         debug=True,
                         user_id=USER_ID,
                         ollama_base_url=st.session_state.current_ollama_url,
-                        complexity_level=4,
                     )
                     return agent
 

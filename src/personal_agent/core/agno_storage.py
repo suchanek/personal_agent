@@ -49,7 +49,7 @@ from agno.vectordb.lancedb import LanceDb, SearchType
 
 # Handle imports for both module import and direct execution
 try:
-    from ..config import DATA_DIR, OLLAMA_URL
+    from ..config import DATA_DIR, LOG_LEVEL, OLLAMA_URL
     from ..utils import setup_logging
     from .semantic_memory_manager import (
         SemanticMemoryManager,
@@ -71,7 +71,7 @@ except ImportError:
     )
     from personal_agent.utils import setup_logging
 
-logger = setup_logging(__name__)
+logger = setup_logging(__name__, level=LOG_LEVEL)
 
 
 def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
@@ -181,12 +181,9 @@ def create_combined_knowledge_base(
     storage_path.mkdir(parents=True, exist_ok=True)
 
     knowledge_path = Path(knowledge_dir)
-    if not knowledge_path.exists():
-        logger.info(
-            "No knowledge directory found at %s, skipping knowledge loading",
-            knowledge_path,
-        )
-        return None
+    # Ensure the knowledge directory exists, creating it if necessary.
+    knowledge_path.mkdir(parents=True, exist_ok=True)
+    logger.info("Knowledge directory is ready at %s", knowledge_path)
 
     # Check for available knowledge files
     text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md"))
@@ -227,19 +224,24 @@ def create_combined_knowledge_base(
 
     # Create PDF knowledge base if PDF files exist
     if pdf_files:
-        pdf_vector_db = LanceDb(
-            uri=str(storage_path / "lancedb"),
-            table_name="pdf_knowledge",
-            search_type=SearchType.hybrid,
-            embedder=embedder,
-        )
+        try:
+            pdf_vector_db = LanceDb(
+                uri=str(storage_path / "lancedb"),
+                table_name="pdf_knowledge",
+                search_type=SearchType.hybrid,
+                embedder=embedder,
+            )
 
-        pdf_kb = PDFKnowledgeBase(
-            path=knowledge_path,
-            vector_db=pdf_vector_db,
-        )
-        knowledge_sources.append(pdf_kb)
-        logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
+            pdf_kb = PDFKnowledgeBase(
+                path=knowledge_path,
+                vector_db=pdf_vector_db,
+            )
+            knowledge_sources.append(pdf_kb)
+            logger.info("Created PDFKnowledgeBase with %d files", len(pdf_files))
+        except Exception as e:
+            logger.warning("Failed to create PDFKnowledgeBase due to corrupted PDF files: %s", e)
+            logger.warning("Skipping PDF knowledge base. Check for corrupted PDF files in %s", knowledge_path)
+            logger.warning("Consider removing or repairing corrupted PDF files like 'allosteric.pdf'")
 
     # Create a knowledge base with the ArXiv documents
     arxiv_vector_db = LanceDb(
@@ -287,13 +289,19 @@ async def load_combined_knowledge_base(
     :param knowledge_base: CombinedKnowledgeBase instance to load
     :param recreate: Whether to recreate the knowledge base from scratch
     """
-    logger.info("Loading combined knowledge base content...")
+    if recreate:
+        logger.info("🔄 RECREATING knowledge base from scratch (recreate=True)")
+    else:
+        logger.info("Loading combined knowledge base content...")
 
     # Use synchronous load in an async context - this matches agno framework patterns
     # The synchronous load method is more stable than aload which can return async generators
     knowledge_base.load(recreate=recreate)
 
-    logger.info("Combined knowledge base loaded successfully")
+    if recreate:
+        logger.info("✅ Knowledge base RECREATED successfully")
+    else:
+        logger.info("Combined knowledge base loaded successfully")
 
 
 async def load_lightrag_knowledge_base(base_url: str = "http://localhost:9621") -> dict:

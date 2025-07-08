@@ -1,0 +1,31 @@
+services:
+  lightrag:
+    container_name: lightrag_memory
+    image: ghcr.io/suchanek/lightrag_pagent:latest
+    ports:
+      - "${PORT:-9622}:9621"
+    volumes:
+      - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
+      - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
+      - ./config.ini:/app/config.ini
+      - ./.env:/app/.env
+    env_file:
+      - .env
+    environment:
+      # Explicit timeout settings for the container
+      - HTTPX_TIMEOUT=7200
+      - HTTPX_CONNECT_TIMEOUT=600
+      - HTTPX_READ_TIMEOUT=7200
+      - HTTPX_WRITE_TIMEOUT=600
+      - HTTPX_POOL_TIMEOUT=600
+      - OLLAMA_TIMEOUT=7200
+      - OLLAMA_KEEP_ALIVE=3600
+      - OLLAMA_NUM_PREDICT=16384
+      - OLLAMA_TEMPERATURE=0.1
+      - PDF_CHUNK_SIZE=1024
+      - LLM_TIMEOUT=7200
+      - EMBEDDING_TIMEOUT=3600
+
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

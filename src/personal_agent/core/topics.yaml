@@ -1,4 +1,38 @@
 categories:
+  weather:
+    - weather
+    - temperature
+    - rain
+    - snow
+    - sunny
+    - cloudy
+    - storm
+    - forecast
+    - climate
+    - humidity
+    - wind
+    - precipitation
+    - hot
+    - cold
+    - warm
+    - cool
+    - degrees
+    - fahrenheit
+    - celsius
+    - meteorology
+    - barometric pressure
+    - tornado
+    - hurricane
+    - thunderstorm
+    - blizzard
+    - drought
+    - flood
+    - hail
+    - fog
+    - mist
+    - overcast
+    - partly cloudy
+    - clear skies
   academic:
     - phd
     - doctorate
@@ -18,6 +52,8 @@ categories:
     - education
     - school
     - biology
+    - medical school
+    - johns hopkins
   health:
     - hospital
     - patient
@@ -101,6 +137,8 @@ categories:
     - truck
     - motorcycle
     - driving
+    - drive
+    - drove
   personal_info:
     - name
     - age
@@ -126,6 +164,7 @@ categories:
     - business
     - profession
     - occupation
+    - genius
   family:
     - family
     - parent
@@ -138,19 +177,20 @@ categories:
     - sister
     - child
     - kids
+    - children
     - married
     - spouse
     - wife
     - husband
     - grandma
     - grandpa
+    - cousin
+    - niece
+    - nephew
     - woman
     - man
   hobbies:
     - hobby
-    - enjoy
-    - love
-    - like
     - play
     - watch
     - read
@@ -158,6 +198,7 @@ categories:
     - music
     - sport
     - game
+    - fishing
     - travel
     - piano
     - guitar
@@ -202,6 +243,12 @@ categories:
     - soccer
     - baseball
     - volleyball
+    - rc airplanes
+    - remote control
+    - model aircraft
+    - flying
+    - fly
+    - aviation
   preferences:
     - prefer
     - favorite
@@ -216,6 +263,8 @@ categories:
     - drink
     - taste
     - opinion
+    - love
+    - like
   goals:
     - goal
     - plan
@@ -261,6 +310,75 @@ categories:
     - rescue
     - adoption
     - shelter
+  skills:
+    - python
+    - java
+    - c++
+    - c#
+    - javascript
+    - typescript
+    - go
+    - rust
+    - sql
+    - nosql
+    - react
+    - angular
+    - vue
+    - docker
+    - kubernetes
+    - aws
+    - azure
+    - gcp
+    - proficient
+    - skilled
+    - expert
+    - programming
+    - developer
+    - engineer
+    - software engineer
+    - web developer
+    - coding
+    - development
+  learning:
+    - learning
+    - learn
+    - studying
+    - study
+    - language
+    - speak
+    - spanish
+    - french
+    - german
+    - italian
+    - chinese
+    - japanese
+    - korean
+    - portuguese
+    - russian
+    - arabic
+    - hindi
+    - course
+    - class
+    - lesson
+    - tutorial
+    - training
+    - skill
+    - practice
+    - improve
+    - master
+  feelings:
+    - happy
+    - sad
+    - angry
+    - excited
+    - anxious
+    - stressed
+    - relaxed
+    - content
+    - frustrated
+    - disappointed
+    - feel
+    - feeling
 
 phrases:
   academic:
@@ -288,6 +406,7 @@ phrases:
     - machine learning pipeline
     - work at google
     - software company
+    - apple store
   astronomy:
     - observing the night sky
     - galactic cluster
@@ -308,7 +427,6 @@ phrases:
     - employed at
   family:
     - my family
-    - married to
     - have kids
     - wonderful woman
   hobbies:
@@ -316,6 +434,10 @@ phrases:
     - enjoy playing
     - like to travel
     - play piano
+    - fly rc airplanes
+    - used to fly
+    - remote control airplanes
+    - model airplanes
   preferences:
     - prefer coffee
     - like better
@@ -341,3 +463,34 @@ phrases:
     - pet care
     - love animals
     - animal lover
+  skills:
+    - proficient in
+    - skilled in
+    - expert in
+    - programming languages
+    - software engineer
+    - web developer
+    - am proficient
+    - know python
+    - know java
+    - programming skills
+    - technical skills
+    - coding experience
+  learning:
+    - learning to
+    - learning spanish
+    - learning french
+    - speak spanish
+    - speak french
+    - taking classes
+    - studying language
+    - language learning
+    - im learning
+    - currently learning
+  feelings:
+    - i feel
+    - feeling happy
+    - feeling sad
+    - am excited
+    - am anxious
+    - am stressed

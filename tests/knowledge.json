@@ -1,0 +1,34 @@
+[
+    {
+        "document_id": "kb-doc-1",
+        "content": "Artificial intelligence (AI) is intelligence demonstrated by machines, in contrast to the natural intelligence displayed by humans and animals.",
+        "metadata": {
+            "source": "Wikipedia",
+            "category": "Science"
+        }
+    },
+    {
+        "document_id": "kb-doc-2",
+        "content": "Machine learning (ML) is a field of inquiry devoted to understanding and building methods that 'learn' – that is, methods that leverage data to improve performance on some set of tasks.",
+        "metadata": {
+            "source": "Wikipedia",
+            "category": "Science"
+        }
+    },
+    {
+        "document_id": "kb-doc-3",
+        "content": "Python is an interpreted, high-level and general-purpose programming language. Python's design philosophy emphasizes code readability with its notable use of significant whitespace.",
+        "metadata": {
+            "source": "Wikipedia",
+            "category": "Technology"
+        }
+    },
+    {
+        "document_id": "kb-doc-4",
+        "content": "Data science is an inter-disciplinary field that uses scientific methods, processes, algorithms and systems to extract knowledge and insights from many structural and unstructured data.",
+        "metadata": {
+            "source": "Wikipedia",
+            "category": "Technology"
+        }
+    }
+]

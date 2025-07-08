@@ -128,17 +128,6 @@ logger.setLevel(logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-# Configuration
-WEAVIATE_URL = "http://localhost:8080"
-OLLAMA_URL = "http://localhost:11434"
-USE_WEAVIATE = True  # Set to False to bypass Weaviate for testing
-USE_MCP = True  # Set to False to bypass MCP for testing
-
-ROOT_DIR = get_env_var("ROOT_DIR", ".")  # Root directory for MCP filesystem server
-DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
-
-LLM_MODEL = "qwen2.5:7b-instruct"  # Ollama model to use for LLM
-
 # MCP Server configurations
 MCP_SERVERS = {
     "filesystem-home": {
