@@ -12,7 +12,7 @@ services:
     volumes:
       - "${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage:/app/data/rag_storage"
       - "${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs:/app/data/inputs"
-      - ./Nconfig.ini:/app/config.ini
+      - ./config.ini:/app/config.ini
       - ./env.server:/app/.env
     env_file:
       - env.server
