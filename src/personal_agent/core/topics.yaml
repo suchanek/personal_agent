@@ -52,6 +52,8 @@ categories:
     - education
     - school
     - biology
+    - medical school
+    - johns hopkins
   health:
     - hospital
     - patient
@@ -135,6 +137,8 @@ categories:
     - truck
     - motorcycle
     - driving
+    - drive
+    - drove
   personal_info:
     - name
     - age
@@ -160,6 +164,7 @@ categories:
     - business
     - profession
     - occupation
+    - genius
   family:
     - family
     - parent
@@ -172,6 +177,7 @@ categories:
     - sister
     - child
     - kids
+    - children
     - married
     - spouse
     - wife
@@ -185,9 +191,6 @@ categories:
     - man
   hobbies:
     - hobby
-    - enjoy
-    - love
-    - like
     - play
     - watch
     - read
@@ -244,6 +247,7 @@ categories:
     - remote control
     - model aircraft
     - flying
+    - fly
     - aviation
   preferences:
     - prefer
@@ -259,6 +263,8 @@ categories:
     - drink
     - taste
     - opinion
+    - love
+    - like
   goals:
     - goal
     - plan
@@ -360,6 +366,19 @@ categories:
     - practice
     - improve
     - master
+  feelings:
+    - happy
+    - sad
+    - angry
+    - excited
+    - anxious
+    - stressed
+    - relaxed
+    - content
+    - frustrated
+    - disappointed
+    - feel
+    - feeling
 
 phrases:
   academic:
@@ -387,6 +406,7 @@ phrases:
     - machine learning pipeline
     - work at google
     - software company
+    - apple store
   astronomy:
     - observing the night sky
     - galactic cluster
@@ -407,7 +427,6 @@ phrases:
     - employed at
   family:
     - my family
-    - married to
     - have kids
     - wonderful woman
   hobbies:
@@ -415,7 +434,7 @@ phrases:
     - enjoy playing
     - like to travel
     - play piano
-    - i used to fly rc airplanes
+    - fly rc airplanes
     - used to fly
     - remote control airplanes
     - model airplanes
@@ -468,3 +487,10 @@ phrases:
     - language learning
     - im learning
     - currently learning
+  feelings:
+    - i feel
+    - feeling happy
+    - feeling sad
+    - am excited
+    - am anxious
+    - am stressed

@@ -151,6 +151,30 @@ class TopicClassifier:
 
     def clean_text(self, text):
         text = text.lower()
+        # Expand common contractions
+        text = re.sub(r"i'm", "i am", text)
+        text = re.sub(r"you're", "you are", text)
+        text = re.sub(r"he's", "he is", text)
+        text = re.sub(r"she's", "she is", text)
+        text = re.sub(r"it's", "it is", text)
+        text = re.sub(r"we're", "we are", text)
+        text = re.sub(r"they're", "they are", text)
+        text = re.sub(r"can't", "cannot", text)
+        text = re.sub(r"won't", "will not", text)
+        text = re.sub(r"don't", "do not", text)
+        text = re.sub(r"doesn't", "does not", text)
+        text = re.sub(r"didn't", "did not", text)
+        text = re.sub(r"isn't", "is not", text)
+        text = re.sub(r"aren't", "are not", text)
+        text = re.sub(r"wasn't", "was not", text)
+        text = re.sub(r"weren't", "were not", text)
+        text = re.sub(r"haven't", "have not", text)
+        text = re.sub(r"hasn't", "has not", text)
+        text = re.sub(r"hadn't", "had not", text)
+        text = re.sub(r"wouldn't", "would not", text)
+        text = re.sub(r"shouldn't", "should not", text)
+        text = re.sub(r"couldn't", "could not", text)
+
         # Preserve special characters relevant to programming languages (e.g., C++, C#)
         # and remove other non-alphanumeric characters, but keep spaces.
         text = re.sub(r"[^a-z0-9#+\s]", "", text)
@@ -227,6 +251,14 @@ if __name__ == "__main__":
         "I have a peanut allergy.",
         "I have a dog named Max and love animals.",
         "I enjoy hiking and playing tennis on weekends.",
+        "I love to drive my car.",
+        "I have four children.",
+        "I was a Genius at the Apple Store!",
+        "I used to fly RC airplanes",
+        "I attended Johns Hopkins Medical School for my PhD.",
+        "I love tea",
+        "I hate hot weather",
+        "I'm feeling a bit stressed today.",
         "Completely unrelated sentence.",
     ]
 

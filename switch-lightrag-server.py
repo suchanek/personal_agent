@@ -17,8 +17,8 @@ class Colors:
 
 # --- Path and URL Constants ---
 # The script assumes it is run from the root of the personal_agent repository.
-LIGHTRAG_MEMORY_DIR = Path("lightrag_memory_server")
-ENV_FILE = LIGHTRAG_MEMORY_DIR / ".env"
+LIGHTRAG_DIR = Path("lightrag_server")
+ENV_FILE = LIGHTRAG_DIR / ".env"
 
 # Define the URLs for local and remote configurations
 # You can adjust the remote IP if needed
@@ -95,7 +95,7 @@ def restart_service():
     """Restarts the lightrag_memory_server using docker-compose."""
     print(f"\n{Colors.BLUE}Restarting the LightRAG Memory service...{Colors.NC}")
 
-    if not LIGHTRAG_MEMORY_DIR.exists():
+    if not LIGHTRAG_DIR.exists():
         print(f"{Colors.RED}✗ Directory not found: {LIGHTRAG_MEMORY_DIR}{Colors.NC}")
         return False
 
@@ -104,7 +104,7 @@ def restart_service():
         print(f"{Colors.YELLOW}Stopping services...{Colors.NC}")
         subprocess.run(
             ["docker-compose", "down"],
-            cwd=LIGHTRAG_MEMORY_DIR,
+            cwd=LIGHTRAG_DIR,
             check=True,
             capture_output=True,
             text=True,
@@ -115,7 +115,7 @@ def restart_service():
         print(f"{Colors.YELLOW}Starting services...{Colors.NC}")
         subprocess.run(
             ["docker-compose", "up", "-d"],
-            cwd=LIGHTRAG_MEMORY_DIR,
+            cwd=LIGHTRAG_DIR,
             check=True,
             capture_output=True,
             text=True,
@@ -149,7 +149,7 @@ def restart_service():
 
 def show_status():
     """Displays the current configuration and Docker service status."""
-    print(f"{Colors.BLUE}--- LightRAG Memory Server Status ---{Colors.NC}")
+    print(f"{Colors.BLUE}--- LightRAG Server Status ---{Colors.NC}")
 
     # Check .env file status
     current_config = get_current_config()
@@ -181,7 +181,7 @@ def show_status():
     # Check Docker status
     print("\nDocker Service Status:")
     try:
-        subprocess.run(["docker-compose", "ps"], cwd=LIGHTRAG_MEMORY_DIR, check=True)
+        subprocess.run(["docker-compose", "ps"], cwd=LIGHTRAG_DIR, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"{Colors.RED}✗ Could not get Docker status. {e}{Colors.NC}")
     print(f"{Colors.BLUE}------------------------------------{Colors.NC}")
