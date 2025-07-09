@@ -22,6 +22,7 @@ Options:
   --verify                    Verify deletion after completion by checking server
   --no-confirm                Skip confirmation prompts for deletion actions
   --delete-source             Delete the original source file from the inputs directory
+  --retry <ID1> [ID2...]      Retry specific failed documents by their unique IDs
 
 Actions:
   --status                    Show LightRAG server and document status
@@ -51,6 +52,9 @@ Examples:
 
   # Delete all '.md' files comprehensively
   python tools/lightrag_docmgr_v2.py --nuke --delete-name '*.md'
+
+  # Retry a failed document
+  python tools/lightrag_docmgr_v2.py --retry doc-failed-123
 """
 
 import argparse
@@ -61,6 +65,7 @@ import sys
 from typing import Any, Dict, List, Optional
 import aiohttp
 import json
+from pathlib import Path
 
 from personal_agent.config import settings
 
@@ -70,7 +75,10 @@ class LightRAGDocumentManagerV2:
 
     def __init__(self, server_url: Optional[str] = None):
         self.server_url = server_url or settings.LIGHTRAG_URL
+        self.storage_dir = Path(settings.AGNO_STORAGE_DIR)
+        self.status_file_path = self.storage_dir / "rag_storage" / "kv_store_doc_status.json"
         print(f"🌐 Using LightRAG server URL: {self.server_url}")
+        print(f"🗄️ Using storage path: {self.storage_dir}")
 
     async def check_server_status(self) -> bool:
         """Check if LightRAG server is running."""
@@ -227,6 +235,51 @@ class LightRAGDocumentManagerV2:
         print("✅ LightRAG server deletion complete.")
         return results
 
+    async def retry_documents(self, doc_ids: List[str]) -> Dict[str, Any]:
+        """Retries failed documents by updating their status to 'pending' in the status file."""
+        results = {
+            "total_requested": len(doc_ids),
+            "retried_successfully": 0,
+            "not_found": 0,
+            "not_failed": 0,
+            "errors": [],
+        }
+
+        if not self.status_file_path.exists():
+            msg = f"Status file not found at {self.status_file_path}"
+            print(f"❌ {msg}")
+            results["errors"].append(msg)
+            return results
+
+        try:
+            with open(self.status_file_path, "r+") as f:
+                doc_statuses = json.load(f)
+
+                for doc_id in doc_ids:
+                    if doc_id in doc_statuses:
+                        if doc_statuses[doc_id].get("status") == "failed":
+                            doc_statuses[doc_id]["status"] = "pending"
+                            print(f"✅ Re-queued document '{doc_id}' for processing.")
+                            results["retried_successfully"] += 1
+                        else:
+                            print(f"⚠️ Document '{doc_id}' is not in 'failed' state. Skipping.")
+                            results["not_failed"] += 1
+                    else:
+                        print(f"⚠️ Document '{doc_id}' not found in status file. Skipping.")
+                        results["not_found"] += 1
+                
+                # Write the changes back to the file
+                f.seek(0)
+                json.dump(doc_statuses, f, indent=2)
+                f.truncate()
+
+        except (IOError, json.JSONDecodeError) as e:
+            msg = f"Error accessing status file: {e}"
+            print(f"❌ {msg}")
+            results["errors"].append(msg)
+
+        return results
+
     async def finalize(self):
         """No cleanup needed for API-based approach."""
         print("\n✅ Document manager finalized.")
@@ -256,6 +309,7 @@ async def main():
     parser.add_argument(
         "--delete-name", help="Delete documents matching a name pattern"
     )
+    parser.add_argument("--retry", nargs="+", help="Retry documents by ID")
     # Options
     parser.add_argument(
         "--nuke", action="store_true", help="Comprehensive deletion mode"
@@ -346,9 +400,23 @@ async def main():
             for d in all_docs
             if d.get("file_path") and fnmatch.fnmatch(d["file_path"], args.delete_name)
         ]
-    else:
-        print("❌ No deletion action specified. Use --help for options.")
-        return 1
+
+    if args.retry:
+        print(f"\n🔄 Retrying {len(args.retry)} documents...")
+        results = await manager.retry_documents(args.retry)
+        print("\n" + "=" * 60)
+        print("🔄 RETRY SUMMARY")
+        print("=" * 60)
+        print(f"Total documents targeted: {results['total_requested']}")
+        print(f"Re-queued successfully: {results['retried_successfully']}")
+        print(f"Not found: {results['not_found']}")
+        print(f"Not in 'failed' state: {results['not_failed']}")
+        if results["errors"]:
+            print(f"Errors ({len(results['errors'])}):")
+            for error in results["errors"]:
+                print(f"  ❌ {error}")
+        await manager.finalize()
+        return 0
 
     if not docs_to_delete:
         print("\n✅ No documents found matching the criteria. Nothing to do.")
