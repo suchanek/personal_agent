@@ -23,6 +23,7 @@ Options:
   --no-confirm                Skip confirmation prompts for deletion actions
   --delete-source             Delete the original source file from the inputs directory
   --retry <ID1> [ID2...]      Retry specific failed documents by their unique IDs
+  --retry-all                 Retry all documents currently in 'failed' status
 
 Actions:
   --status                    Show LightRAG server and document status
@@ -55,6 +56,9 @@ Examples:
 
   # Retry a failed document
   python tools/lightrag_docmgr_v2.py --retry doc-failed-123
+
+  # Retry all failed documents
+  python tools/lightrag_docmgr_v2.py --retry-all
 """
 
 import argparse
@@ -286,30 +290,40 @@ class LightRAGDocumentManagerV2:
             print("\nNo valid documents to retry.")
             return results
 
-        # Phase 2: Delete the failed document entries from LightRAG
-        print("\n🗑️ Phase 2: Deleting failed document entries from LightRAG")
-        failed_doc_ids = [doc["id"] for doc in docs_to_retry]
-        delete_payload = {"doc_ids": failed_doc_ids}
-        async with aiohttp.ClientSession() as session:
+        # Phase 2: Delete the failed document entries from LightRAG, one by one.
+        print("\n🗑️ Phase 2: Deleting failed document entries from LightRAG (one by one)")
+        deleted_count = 0
+        for doc_info in docs_to_retry:
+            doc_id = doc_info["id"]
+            print(f"   - Deleting document: {doc_id} ({doc_info.get('file_path', 'N/A')})")
+            delete_payload = {"doc_ids": [doc_id]}
             try:
-                async with session.delete(
-                    f"{self.server_url}/documents/delete_document",
-                    json=delete_payload,
-                    timeout=60
-                ) as resp:
-                    if resp.status == 200:
-                        print(f"   ✅ Successfully deleted {len(failed_doc_ids)} failed document entries.")
-                    else:
-                        error_text = await resp.text()
-                        msg = f"Server error during deletion: {resp.status} - {error_text}"
-                        print(f"   ❌ {msg}")
-                        results["errors"].append(msg)
-                        return results
+                async with aiohttp.ClientSession() as session:
+                    async with session.delete(
+                        f"{self.server_url}/documents/delete_document",
+                        json=delete_payload,
+                        timeout=60
+                    ) as resp:
+                        if resp.status == 200:
+                            print(f"     ✅ Successfully deleted.")
+                            deleted_count += 1
+                            print("     ⏱️ Waiting 1 second...")
+                            await asyncio.sleep(1)  # Delay after each deletion
+                        else:
+                            error_text = await resp.text()
+                            msg = f"Server error during deletion of {doc_id}: {resp.status} - {error_text}"
+                            print(f"     ❌ {msg}")
+                            results["errors"].append(msg)
             except Exception as e:
-                msg = f"An exception occurred during deletion: {e}"
+                msg = f"An exception occurred during deletion of {doc_id}: {e}"
                 print(f"   ❌ {msg}")
                 results["errors"].append(msg)
-                return results
+        
+        print(f"\n   ✅ Deletion phase complete. Successfully deleted {deleted_count}/{len(docs_to_retry)} documents.")
+
+        # Add a delay to give the server time to process the deletions before scanning.
+        print("\n⏱️ Waiting 5 seconds for server to process deletions...")
+        await asyncio.sleep(5)
 
         # Phase 3: Trigger a server-side scan to re-discover and process the files
         print("\n🔄 Phase 3: Triggering server scan to re-process files")
@@ -362,6 +376,7 @@ async def main():
         "--delete-name", help="Delete documents matching a name pattern"
     )
     parser.add_argument("--retry", nargs="+", help="Retry documents by ID")
+    parser.add_argument("--retry-all", action="store_true", help="Retry all failed documents")
     # Options
     parser.add_argument(
         "--nuke", action="store_true", help="Comprehensive deletion mode"
@@ -377,6 +392,10 @@ async def main():
     )
 
     args = parser.parse_args()
+
+    if args.retry and args.retry_all:
+        print("❌ Please use either --retry <IDs> or --retry-all, not both.")
+        return 1
 
     manager = LightRAGDocumentManagerV2(args.server_url)
     if not await manager.initialize():
@@ -422,6 +441,58 @@ async def main():
             print(f"  - {name}")
         return 0
 
+    # --- Retry Logic ---
+    if args.retry:
+        print(f"\n🔄 Retrying {len(args.retry)} documents...")
+        results = await manager.retry_documents(args.retry, all_docs)
+        print("\n" + "=" * 60)
+        print("🔄 RETRY SUMMARY")
+        print("=" * 60)
+        print(f"Total documents targeted: {results['total_requested']}")
+        print(f"Retried successfully (re-queued via scan): {results['retried_successfully']}")
+        print(f"Not found on server: {results['not_found']}")
+        print(f"Not in 'failed' state: {results['not_failed']}")
+        print(f"Source file missing: {results['source_file_missing']}")
+        if results["errors"]:
+            print(f"Errors ({len(results['errors'])}):")
+            for error in results["errors"]:
+                print(f"  ❌ {error}")
+        await manager.finalize()
+        return 0
+
+    if args.retry_all:
+        print("\n🔄 Finding all failed documents to retry...")
+        failed_docs = [d for d in all_docs if d.get("status") == "failed"]
+        
+        if not failed_docs:
+            print("✅ No failed documents found. Nothing to do.")
+            return 0
+            
+        failed_doc_ids = [d["id"] for d in failed_docs]
+        print(f"🎯 Found {len(failed_doc_ids)} failed documents to retry.")
+
+        if not args.no_confirm:
+            response = input(f"\nProceed with retrying all {len(failed_doc_ids)} failed documents? (y/N): ")
+            if response.lower() not in ["y", "yes"]:
+                print("❌ Retry cancelled.")
+                return 0
+
+        results = await manager.retry_documents(failed_doc_ids, all_docs)
+        print("\n" + "=" * 60)
+        print("🔄 RETRY ALL SUMMARY")
+        print("=" * 60)
+        print(f"Total documents targeted: {results['total_requested']}")
+        print(f"Retried successfully (re-queued via scan): {results['retried_successfully']}")
+        print(f"Not found on server: {results['not_found']}")
+        print(f"Not in 'failed' state: {results['not_failed']}")
+        print(f"Source file missing: {results['source_file_missing']}")
+        if results["errors"]:
+            print(f"Errors ({len(results['errors'])}):")
+            for error in results["errors"]:
+                print(f"  ❌ {error}")
+        await manager.finalize()
+        return 0
+
     # --- Deletion Logic ---
     docs_to_delete = []
     confirm = not args.no_confirm
@@ -452,24 +523,6 @@ async def main():
             for d in all_docs
             if d.get("file_path") and fnmatch.fnmatch(d["file_path"], args.delete_name)
         ]
-
-    if args.retry:
-        print(f"\n🔄 Retrying {len(args.retry)} documents...")
-        results = await manager.retry_documents(args.retry, all_docs)
-        print("\n" + "=" * 60)
-        print("🔄 RETRY SUMMARY")
-        print("=" * 60)
-        print(f"Total documents targeted: {results['total_requested']}")
-        print(f"Retried successfully (re-queued via scan): {results['retried_successfully']}")
-        print(f"Not found on server: {results['not_found']}")
-        print(f"Not in 'failed' state: {results['not_failed']}")
-        print(f"Source file missing: {results['source_file_missing']}")
-        if results["errors"]:
-            print(f"Errors ({len(results['errors'])}):")
-            for error in results["errors"]:
-                print(f"  ❌ {error}")
-        await manager.finalize()
-        return 0
 
     if not docs_to_delete:
         print("\n✅ No documents found matching the criteria. Nothing to do.")
