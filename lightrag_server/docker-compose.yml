@@ -17,6 +17,8 @@ services:
     env_file:
       - env.server
     environment:
+      - WORKERS=1
+      - MAX_PARALLEL_INSERT=1
       # Explicit timeout settings for the container
       - HTTPX_TIMEOUT=7200
       - HTTPX_CONNECT_TIMEOUT=600
