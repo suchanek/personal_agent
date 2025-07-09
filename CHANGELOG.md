@@ -2,6 +2,21 @@
 
 Eric G. Suchanek, PhD
 
+## [0.8.51-dev] - 2025-07-09
+
+#### Features
+
+- **Configuration:** Enhanced the `show-config` tool with a comprehensive, color-coded output for system configuration, including Docker environment variables, server settings, and feature flags. Added a `--json` option for programmatic access.
+- **Server Stability:** Implemented a healthcheck for the `lightrag_memory_server` to monitor its operational status.
+
+#### Fixes
+
+- **Server Timeouts:** Increased various service timeouts and added TCP keepalive settings in the `lightrag_memory_server` to improve stability and prevent connection drops during long-running operations.
+
+#### Chore
+
+- **Dependencies:** Updated Python dependencies, including `lightrag-hku`, and added `googlesearch-python`, `pycountry`, and `pyyaml`.
+
 ## [Unreleased] - 2025-01-07
 
 ### Added
