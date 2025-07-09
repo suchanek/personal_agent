@@ -45,6 +45,11 @@ LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEP
 LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
 LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9622")
 
+# Docker port configurations
+PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server
+LIGHTRAG_PORT = get_env_var("LIGHTRAG_PORT", "9621")  # Explicit port for lightrag_server
+LIGHTRAG_MEMORY_PORT = get_env_var("LIGHTRAG_MEMORY_PORT", "9622")  # Explicit port for lightrag_memory_server
+
 # Configuration constants - All configurable via environment variables
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
@@ -84,6 +89,24 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 # LLM Model configuration
 LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
 
+# Docker environment variables for LightRAG containers
+# HTTP timeout configurations
+HTTPX_TIMEOUT = get_env_var("HTTPX_TIMEOUT", "7200")
+HTTPX_CONNECT_TIMEOUT = get_env_var("HTTPX_CONNECT_TIMEOUT", "600")
+HTTPX_READ_TIMEOUT = get_env_var("HTTPX_READ_TIMEOUT", "7200")
+HTTPX_WRITE_TIMEOUT = get_env_var("HTTPX_WRITE_TIMEOUT", "600")
+HTTPX_POOL_TIMEOUT = get_env_var("HTTPX_POOL_TIMEOUT", "600")
+
+# Ollama timeout and configuration
+OLLAMA_TIMEOUT = get_env_var("OLLAMA_TIMEOUT", "7200")
+OLLAMA_KEEP_ALIVE = get_env_var("OLLAMA_KEEP_ALIVE", "3600")
+OLLAMA_NUM_PREDICT = get_env_var("OLLAMA_NUM_PREDICT", "16384")
+OLLAMA_TEMPERATURE = get_env_var("OLLAMA_TEMPERATURE", "0.1")
+
+# Processing configurations
+PDF_CHUNK_SIZE = get_env_var("PDF_CHUNK_SIZE", "1024")
+LLM_TIMEOUT = get_env_var("LLM_TIMEOUT", "7200")
+EMBEDDING_TIMEOUT = get_env_var("EMBEDDING_TIMEOUT", "3600")
 
 # Display configuration
 SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
@@ -146,6 +169,8 @@ def print_config():
             'items': [
                 ('LightRAG URL', LIGHTRAG_URL),
                 ('LightRAG Memory URL', LIGHTRAG_MEMORY_URL),
+                ('LightRAG Port', LIGHTRAG_PORT),
+                ('LightRAG Memory Port', LIGHTRAG_MEMORY_PORT),
                 ('Weaviate URL', WEAVIATE_URL),
                 ('Ollama URL', OLLAMA_URL),
                 ('Remote Ollama URL', REMOTE_OLLAMA_URL),
@@ -177,6 +202,23 @@ def print_config():
                 ('LLM Model', LLM_MODEL),
                 ('User ID', USER_ID),
                 ('Log Level', LOG_LEVEL_STR),
+            ]
+        },
+        {
+            'title': '🐳 Docker Configuration',
+            'items': [
+                ('HTTPX Timeout', f"{HTTPX_TIMEOUT}s"),
+                ('HTTPX Connect Timeout', f"{HTTPX_CONNECT_TIMEOUT}s"),
+                ('HTTPX Read Timeout', f"{HTTPX_READ_TIMEOUT}s"),
+                ('HTTPX Write Timeout', f"{HTTPX_WRITE_TIMEOUT}s"),
+                ('HTTPX Pool Timeout', f"{HTTPX_POOL_TIMEOUT}s"),
+                ('Ollama Timeout', f"{OLLAMA_TIMEOUT}s"),
+                ('Ollama Keep Alive', f"{OLLAMA_KEEP_ALIVE}s"),
+                ('Ollama Num Predict', OLLAMA_NUM_PREDICT),
+                ('Ollama Temperature', OLLAMA_TEMPERATURE),
+                ('PDF Chunk Size', PDF_CHUNK_SIZE),
+                ('LLM Timeout', f"{LLM_TIMEOUT}s"),
+                ('Embedding Timeout', f"{EMBEDDING_TIMEOUT}s"),
             ]
         }
     ]
