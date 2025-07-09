@@ -12,6 +12,8 @@ services:
     env_file:
       - .env
     environment:
+      - WORKERS=1
+      - MAX_PARALLEL_INSERT=1
       # Explicit timeout settings for the container
       - HTTPX_TIMEOUT=7200
       - HTTPX_CONNECT_TIMEOUT=600
@@ -25,7 +27,24 @@ services:
       - PDF_CHUNK_SIZE=1024
       - LLM_TIMEOUT=7200
       - EMBEDDING_TIMEOUT=3600
+      - OLLAMA_REQUEST_TIMEOUT=14400
+      - REQUESTS_TIMEOUT=14400
+      - URLLIB3_TIMEOUT=14400
+      - AIOHTTP_TIMEOUT=14400
+      - SOCKET_TIMEOUT=14400
+      - TCP_KEEPALIVE=true
+      - TCP_KEEPALIVE_IDLE=600
+      - TCP_KEEPALIVE_INTERVAL=60
+      - TCP_KEEPALIVE_COUNT=9
+
 
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9622/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
