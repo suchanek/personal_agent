@@ -235,48 +235,100 @@ class LightRAGDocumentManagerV2:
         print("✅ LightRAG server deletion complete.")
         return results
 
-    async def retry_documents(self, doc_ids: List[str]) -> Dict[str, Any]:
-        """Retries failed documents by updating their status to 'pending' in the status file."""
+    async def retry_documents(self, doc_ids: List[str], all_docs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Retries failed documents by deleting their server entry and triggering a new scan."""
         results = {
             "total_requested": len(doc_ids),
             "retried_successfully": 0,
             "not_found": 0,
             "not_failed": 0,
+            "source_file_missing": 0,
             "errors": [],
         }
 
-        if not self.status_file_path.exists():
-            msg = f"Status file not found at {self.status_file_path}"
-            print(f"❌ {msg}")
-            results["errors"].append(msg)
+        docs_to_retry = []
+        docs_by_id = {doc["id"]: doc for doc in all_docs}
+
+        print("🔍 Phase 1: Identifying documents to retry")
+        for doc_id in doc_ids:
+            if doc_id not in docs_by_id:
+                print(f"   - ⚠️ Document '{doc_id}' not found on server. Skipping.")
+                results["not_found"] += 1
+                continue
+
+            doc_info = docs_by_id[doc_id]
+            if doc_info.get("status") != "failed":
+                print(f"   - ⚠️ Document '{doc_id}' is not in 'failed' state (status: {doc_info.get('status')}). Skipping.")
+                results["not_failed"] += 1
+                continue
+            
+            source_path_relative = doc_info.get("file_path")
+            if not source_path_relative:
+                print(f"   - ❌ Source file path is missing for doc '{doc_id}'. Cannot retry.")
+                results["source_file_missing"] += 1
+                continue
+
+            # The file_path from the server is relative. We construct the full path
+            # by assuming it's within an 'inputs' directory inside the main storage path.
+            full_source_path = self.storage_dir / "inputs" / source_path_relative
+            
+            print(f"     (Checking for source file at: {full_source_path})")
+
+            if not full_source_path.exists():
+                print(f"   - ❌ Source file for doc '{doc_id}' not found.")
+                results["source_file_missing"] += 1
+                continue
+            
+            print(f"   - ✅ Document '{doc_id}' ({source_path_relative}) is eligible for retry.")
+            docs_to_retry.append(doc_info)
+
+        if not docs_to_retry:
+            print("\nNo valid documents to retry.")
             return results
 
-        try:
-            with open(self.status_file_path, "r+") as f:
-                doc_statuses = json.load(f)
-
-                for doc_id in doc_ids:
-                    if doc_id in doc_statuses:
-                        if doc_statuses[doc_id].get("status") == "failed":
-                            doc_statuses[doc_id]["status"] = "pending"
-                            print(f"✅ Re-queued document '{doc_id}' for processing.")
-                            results["retried_successfully"] += 1
-                        else:
-                            print(f"⚠️ Document '{doc_id}' is not in 'failed' state. Skipping.")
-                            results["not_failed"] += 1
+        # Phase 2: Delete the failed document entries from LightRAG
+        print("\n🗑️ Phase 2: Deleting failed document entries from LightRAG")
+        failed_doc_ids = [doc["id"] for doc in docs_to_retry]
+        delete_payload = {"doc_ids": failed_doc_ids}
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.delete(
+                    f"{self.server_url}/documents/delete_document",
+                    json=delete_payload,
+                    timeout=60
+                ) as resp:
+                    if resp.status == 200:
+                        print(f"   ✅ Successfully deleted {len(failed_doc_ids)} failed document entries.")
                     else:
-                        print(f"⚠️ Document '{doc_id}' not found in status file. Skipping.")
-                        results["not_found"] += 1
-                
-                # Write the changes back to the file
-                f.seek(0)
-                json.dump(doc_statuses, f, indent=2)
-                f.truncate()
+                        error_text = await resp.text()
+                        msg = f"Server error during deletion: {resp.status} - {error_text}"
+                        print(f"   ❌ {msg}")
+                        results["errors"].append(msg)
+                        return results
+            except Exception as e:
+                msg = f"An exception occurred during deletion: {e}"
+                print(f"   ❌ {msg}")
+                results["errors"].append(msg)
+                return results
 
-        except (IOError, json.JSONDecodeError) as e:
-            msg = f"Error accessing status file: {e}"
-            print(f"❌ {msg}")
-            results["errors"].append(msg)
+        # Phase 3: Trigger a server-side scan to re-discover and process the files
+        print("\n🔄 Phase 3: Triggering server scan to re-process files")
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(f"{self.server_url}/documents/scan", timeout=30) as resp:
+                    if resp.status == 200:
+                        print("   ✅ Server scan initiated successfully.")
+                        print("      Documents will be re-processed in the background.")
+                        results["retried_successfully"] = len(docs_to_retry)
+                    else:
+                        error_text = await resp.text()
+                        msg = f"Failed to trigger server scan: {resp.status} - {error_text}"
+                        print(f"   ❌ {msg}")
+                        results["errors"].append(msg)
+            except Exception as e:
+                msg = f"An exception occurred while triggering scan: {e}"
+                print(f"   ❌ {msg}")
+                results["errors"].append(msg)
 
         return results
 
@@ -403,14 +455,15 @@ async def main():
 
     if args.retry:
         print(f"\n🔄 Retrying {len(args.retry)} documents...")
-        results = await manager.retry_documents(args.retry)
+        results = await manager.retry_documents(args.retry, all_docs)
         print("\n" + "=" * 60)
         print("🔄 RETRY SUMMARY")
         print("=" * 60)
         print(f"Total documents targeted: {results['total_requested']}")
-        print(f"Re-queued successfully: {results['retried_successfully']}")
-        print(f"Not found: {results['not_found']}")
+        print(f"Retried successfully (re-queued via scan): {results['retried_successfully']}")
+        print(f"Not found on server: {results['not_found']}")
         print(f"Not in 'failed' state: {results['not_failed']}")
+        print(f"Source file missing: {results['source_file_missing']}")
         if results["errors"]:
             print(f"Errors ({len(results['errors'])}):")
             for error in results["errors"]:
