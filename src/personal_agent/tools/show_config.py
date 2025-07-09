@@ -6,13 +6,11 @@ This script provides a pretty-printed view of the personal agent's configuration
 including environment variables, server settings, feature flags, and directory paths.
 
 Usage:
-    ./tools/show-config [options]
+    from personal_agent.tools.show_config import show_config
+    show_config()
 
 Options:
-    -h, --help     Show this help message
-    -v, --version  Show version information
-    --no-color     Disable colored output
-    --json         Output configuration as JSON
+    show_config(no_color=False, json_output=False)
 """
 
 import sys
@@ -21,22 +19,31 @@ import argparse
 from pathlib import Path
 import yaml
 
-# Add the src directory to Python path so we can import our modules
-script_dir = Path(__file__).resolve().parent
-project_root = script_dir.parent
-src_dir = project_root / "src"
-sys.path.insert(0, str(src_dir))
-
+# Import settings from the config module
 try:
+    from ..config import settings
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    from pathlib import Path
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent.parent.parent
+    src_dir = project_root / "src"
+    sys.path.insert(0, str(src_dir))
     from personal_agent.config import settings
-except ImportError as e:
-    print(f"Error: Could not import settings module: {e}")
-    print("Make sure you're running this script from the project root directory.")
-    sys.exit(1)
+
+
+def get_project_root():
+    """Get the project root directory."""
+    # This file is at src/personal_agent/tools/show_config.py
+    # So we go up 3 levels to get to project root
+    return Path(__file__).resolve().parent.parent.parent.parent
 
 
 def output_json():
     """Output configuration as JSON."""
+    project_root = get_project_root()
+    
     config_data = {
         "version": settings.get_package_version(),
         "environment_file": {
@@ -75,7 +82,7 @@ def output_json():
         "docker_compose_summary": get_docker_compose_summary()
     }
     
-    print(json.dumps(config_data, indent=2))
+    return json.dumps(config_data, indent=2)
 
 
 def load_env_file(env_path):
@@ -98,6 +105,8 @@ def load_env_file(env_path):
 
 def get_docker_env_variables_by_server():
     """Get environment variables from Docker env files organized by server."""
+    project_root = get_project_root()
+    
     servers = {
         "lightrag_server": {
             "env_file": project_root / "lightrag_server" / "env.server",
@@ -148,6 +157,8 @@ def get_docker_env_variables():
 
 def get_docker_compose_summary():
     """Get a summary of the docker-compose configurations."""
+    project_root = get_project_root()
+    
     docker_compose_files = {
         "lightrag_server": project_root / "lightrag_server" / "docker-compose.yml",
         "lightrag_memory_server": project_root / "lightrag_memory_server" / "docker-compose.yml",
@@ -447,8 +458,34 @@ def print_config_no_color():
     print("=" * 60)
 
 
+def show_config(no_color=False, json_output=False):
+    """Main function to display configuration.
+    
+    Args:
+        no_color (bool): If True, disable colored output
+        json_output (bool): If True, output as JSON
+        
+    Returns:
+        str: JSON string if json_output=True, otherwise None
+    """
+    try:
+        if json_output:
+            return output_json()
+        elif no_color:
+            print_config_no_color()
+        else:
+            # Default to colored fancy output
+            print_config_colored()
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user.")
+        return None
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+
 def main():
-    """Main entry point."""
+    """Main entry point for command line usage."""
     parser = argparse.ArgumentParser(
         description="Display Personal Agent configuration",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -475,20 +512,9 @@ def main():
     
     args = parser.parse_args()
     
-    try:
-        if args.json:
-            output_json()
-        elif args.no_color:
-            print_config_no_color()
-        else:
-            # Default to colored fancy output
-            print_config_colored()
-    except KeyboardInterrupt:
-        print("\nOperation cancelled by user.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    result = show_config(no_color=args.no_color, json_output=args.json)
+    if args.json and result:
+        print(result)
 
 
 if __name__ == "__main__":
