@@ -10,7 +10,7 @@ services:
       - ./config.ini:/app/config.ini
       - ./env.memory_server:/app/.env
     env_file:
-      - .env
+      - env.memory_server
     environment:
       - WORKERS=1
       - MAX_PARALLEL_INSERT=1
