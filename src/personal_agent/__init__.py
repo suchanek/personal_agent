@@ -23,7 +23,7 @@ Version: 0.7.dev
 
 # pylint: disable=C0413
 
-__version__ = "0.8.51-dev"
+__version__ = "0.8.6"
 
 import logging
 import os
@@ -61,7 +61,7 @@ from .utils.pag_logging import (
 from .web import create_app, register_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.3-dev"
+__version__ = "0.8.6"
 
 # Setup package and module-level logging
 # Configure logging for the package
