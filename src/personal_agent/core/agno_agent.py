@@ -759,8 +759,8 @@ class AgnoPersonalAgent:
         ) -> str:
             """
             Store a memory in the LightRAG graph database to capture relationships.
-            Uses file upload approach to avoid null file_path issues and explicitly adds relationships.
-            Includes improved coreference resolution for pronouns.
+            Uses proper entity seeding and existence checking before creating relationships.
+            Includes improved coreference resolution and entity filtering.
 
             :param content: The information to store as a memory.
             :param topics: Optional list of topics for the memory.
@@ -821,116 +821,106 @@ class AgnoPersonalAgent:
                 
                 graph_edit_results = []
                 
-                # --- Create all entities first ---
+                # --- Step 1: Ensure all entities exist in the graph ---
                 async with aiohttp.ClientSession() as session:
-                    entity_creation_tasks = []
                     for entity in entities:
                         entity_name = entity.get("text")
                         entity_type = entity.get("label")
                         if entity_name and entity_type:
+                            # Check if entity exists
+                            exists = await self.check_entity_exists(entity_name)
+                            if not exists:
+                                # Seed the entity
+                                seeded = await self.seed_entity_in_graph(entity_name, entity_type)
+                                if seeded:
+                                    graph_edit_results.append(f"Entity seeded: {entity_name}")
+                                    # Wait a bit for processing
+                                    await asyncio.sleep(1)
+                                else:
+                                    graph_edit_results.append(f"Failed to seed entity: {entity_name}")
+                                    continue
+                            
+                            # Now enhance the existing entity with metadata
                             payload = {
                                 "entity_name": entity_name,
                                 "updated_data": {
                                     "type": entity_type,
-                                    "description": f"Entity of type {entity_type}"
+                                    "description": f"Enhanced entity of type {entity_type}",
+                                    "user_id": self.user_id,
+                                    "source": "user_memory"
                                 }
                             }
                             url = f"{LIGHTRAG_MEMORY_URL}/graph/entity/edit"
                             
-                            async def post_entity(session, url, payload):
+                            try:
                                 async with session.post(url, json=payload, timeout=10) as resp:
-                                    if resp.status not in [200, 201]:
+                                    if resp.status in [200, 201]:
+                                        result = await resp.json()
+                                        graph_edit_results.append(f"Entity enhanced: {entity_name}")
+                                    else:
                                         error_detail = await resp.text()
-                                        logger.warning(f"Failed to post entity {payload.get('entity_name')}: {error_detail}")
-                                        # Do not raise exception, just log and continue
-                                        return {"message": f"Failed: {error_detail}"}
-                                    return await resp.json()
+                                        logger.warning(f"Failed to enhance entity {entity_name}: {error_detail}")
+                                        graph_edit_results.append(f"Entity enhancement failed: {entity_name}")
+                            except Exception as e:
+                                logger.error(f"Error enhancing entity {entity_name}: {e}")
+                                graph_edit_results.append(f"Entity enhancement error: {entity_name}")
 
-                            entity_creation_tasks.append(post_entity(session, url, payload))
-
-                    if entity_creation_tasks:
-                        try:
-                            entity_results = await asyncio.gather(*entity_creation_tasks)
-                            for res in entity_results:
-                                graph_edit_results.append(f"Entity added/updated: {res.get('message', 'OK')}")
-                        except Exception as e:
-                            logger.error(f"Error during entity creation: {e}")
-                            graph_edit_results.append(f"Error creating entities: {e}")
-
-                    # --- Then, create all relationships ---
-                    relationship_creation_tasks = []
+                    # --- Step 2: Create relationships between existing entities ---
                     for sub, rel, obj in relationships:
-                        # More flexible entity validation - allow relationships even if entities aren't perfectly matched
-                        entity_names = [e.get("text") for e in entities]
+                        # Ensure both entities exist before creating relationship
+                        sub_exists = await self.check_entity_exists(sub)
+                        obj_exists = await self.check_entity_exists(obj)
                         
-                        # Check if subject and object are valid (not empty, not just pronouns)
-                        if not sub or not obj or sub.strip() == "" or obj.strip() == "":
-                            logger.warning(f"Skipping relationship {sub}-{rel}-{obj}: empty subject or object")
-                            graph_edit_results.append(f"Relation skipped: {sub}-{rel}-{obj} (empty subject/object)")
-                            continue
-                        
-                        # Skip relationships with unresolved pronouns
-                        if sub.lower() in ['he', 'she', 'it', 'they', 'him', 'her', 'them']:
-                            logger.warning(f"Skipping relationship {sub}-{rel}-{obj}: unresolved pronoun as subject")
-                            graph_edit_results.append(f"Relation skipped: {sub}-{rel}-{obj} (unresolved pronoun)")
-                            continue
-                            
-                        # Create entities for subject and object if they don't exist
-                        for entity_text in [sub, obj]:
-                            if entity_text not in entity_names:
-                                # Add missing entity
-                                entity_payload = {
-                                    "entity_name": entity_text,
-                                    "updated_data": {
-                                        "type": "MISC",  # Default type for missing entities
-                                        "description": f"Auto-created entity: {entity_text}"
-                                    }
-                                }
-                                entity_url = f"{LIGHTRAG_MEMORY_URL}/graph/entity/edit"
+                        # Seed missing entities
+                        if not sub_exists:
+                            seeded = await self.seed_entity_in_graph(sub, "MISC")
+                            if seeded:
+                                graph_edit_results.append(f"Missing subject entity seeded: {sub}")
+                                await asyncio.sleep(2)  # Increased wait time for processing
+                            else:
+                                graph_edit_results.append(f"Failed to seed subject: {sub}")
+                                continue
                                 
-                                async def post_missing_entity(session, url, payload):
-                                    async with session.post(url, json=payload, timeout=10) as resp:
-                                        if resp.status not in [200, 201]:
-                                            error_detail = await resp.text()
-                                            logger.warning(f"Failed to create missing entity {payload.get('entity_name')}: {error_detail}")
-                                            return {"message": f"Failed: {error_detail}"}
-                                        return await resp.json()
-                                
-                                try:
-                                    missing_entity_result = await post_missing_entity(session, entity_url, entity_payload)
-                                    graph_edit_results.append(f"Missing entity created: {entity_text}")
-                                    logger.info(f"Created missing entity: {entity_text}")
-                                except Exception as e:
-                                    logger.warning(f"Failed to create missing entity {entity_text}: {e}")
+                        if not obj_exists:
+                            seeded = await self.seed_entity_in_graph(obj, "MISC")
+                            if seeded:
+                                graph_edit_results.append(f"Missing object entity seeded: {obj}")
+                                await asyncio.sleep(2)  # Increased wait time for processing
+                            else:
+                                graph_edit_results.append(f"Failed to seed object: {obj}")
+                                continue
                         
+                        # Additional wait to ensure both entities are fully processed
+                        if not sub_exists or not obj_exists:
+                            await asyncio.sleep(1)  # Extra wait after seeding
+                        
+                        # Now create the relationship
                         payload = {
                             "source_id": sub,
                             "target_id": obj,
-                            "updated_data": { "type": rel.upper().replace(" ", "_") }
+                            "updated_data": {
+                                "type": rel.upper().replace(" ", "_"),
+                                "description": f"{sub} {rel} {obj}",
+                                "user_id": self.user_id,
+                                "source": "user_memory"
+                            }
                         }
                         url = f"{LIGHTRAG_MEMORY_URL}/graph/relation/edit"
 
-                        async def post_relation(session, url, payload):
-                            async with session.post(url, json=payload, timeout=10) as resp:
-                                if resp.status not in [200, 201]:
-                                    error_detail = await resp.text()
-                                    logger.warning(f"Failed to post relation {payload.get('source_id')}-{payload.get('target_id')}: {error_detail}")
-                                    # Do not raise exception, just log and continue
-                                    return {"message": f"Failed: {error_detail}"}
-                                return await resp.json()
-                        
-                        relationship_creation_tasks.append(post_relation(session, url, payload))
-
-                    if relationship_creation_tasks:
                         try:
-                            relation_results = await asyncio.gather(*relationship_creation_tasks)
-                            for res in relation_results:
-                                graph_edit_results.append(f"Relation added/updated: {res.get('message', 'OK')}")
+                            async with session.post(url, json=payload, timeout=10) as resp:
+                                if resp.status in [200, 201]:
+                                    result = await resp.json()
+                                    graph_edit_results.append(f"Relationship created: {sub} -> {rel} -> {obj}")
+                                else:
+                                    error_detail = await resp.text()
+                                    logger.warning(f"Failed to create relationship {sub}-{rel}-{obj}: {error_detail}")
+                                    graph_edit_results.append(f"Relationship failed: {sub} -> {rel} -> {obj}")
                         except Exception as e:
-                            logger.error(f"Error during relationship creation: {e}")
-                            graph_edit_results.append(f"Error creating relationships: {e}")
+                            logger.error(f"Error creating relationship {sub}-{rel}-{obj}: {e}")
+                            graph_edit_results.append(f"Relationship error: {sub} -> {rel} -> {obj}")
 
-                final_message = f"✅ Successfully stored graph memory: {restated_content[:50]}...\nGraph Edits: {'; '.join(graph_edit_results)}"
+                final_message = f"✅ Successfully stored graph memory: {restated_content[:50]}...\nGraph Operations: {'; '.join(graph_edit_results)}"
                 logger.info(final_message)
                 return final_message
             except Exception as e:
@@ -1497,6 +1487,138 @@ Returns:
             )
 
         return restated_content
+
+    async def seed_entity_in_graph(self, entity_name: str, entity_type: str) -> bool:
+        """
+        Seed an entity into the graph by creating and uploading a physical file.
+        
+        Args:
+            entity_name: Name of the entity to create
+            entity_type: Type of the entity
+            
+        Returns:
+            True if entity was successfully seeded
+        """
+        try:
+            import tempfile
+            import os
+            import hashlib
+            import time
+            
+            # Create a minimal document to seed the entity
+            seed_text = f"{entity_name} is a {entity_type.lower()}."
+            
+            # Create a unique filename for this entity seed
+            entity_hash = hashlib.md5(f"{entity_name}_{entity_type}_{time.time()}".encode()).hexdigest()[:8]
+            filename = f"entity_seed_{entity_name.replace(' ', '_').replace('/', '_')}_{entity_hash}.txt"
+            
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                temp_file.write(seed_text)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Upload the file using the /documents/upload endpoint
+                url = f"{LIGHTRAG_MEMORY_URL}/documents/upload"
+                
+                async with aiohttp.ClientSession() as session:
+                    with open(temp_file_path, 'rb') as file:
+                        # Create form data for file upload
+                        data = aiohttp.FormData()
+                        data.add_field('file', file, filename=filename, content_type='text/plain')
+                        
+                        async with session.post(url, data=data, timeout=30) as resp:
+                            if resp.status in [200, 201]:
+                                logger.info(f"Successfully seeded entity: {entity_name}")
+                                return True
+                            else:
+                                error_detail = await resp.text()
+                                logger.warning(f"Failed to seed entity {entity_name}: {error_detail}")
+                                return False
+                                
+            finally:
+                # Clean up the temporary file
+                try:
+                    os.unlink(temp_file_path)
+                except OSError:
+                    pass  # Ignore cleanup errors
+                        
+        except Exception as e:
+            logger.error(f"Error seeding entity {entity_name}: {e}")
+            return False
+
+    async def check_entity_exists(self, entity_name: str) -> bool:
+        """
+        Check if entity exists in the graph using the correct /graph/entity/exists endpoint.
+        
+        Args:
+            entity_name: Name of the entity to check
+            
+        Returns:
+            True if entity exists
+        """
+        try:
+            url = f"{LIGHTRAG_MEMORY_URL}/graph/entity/exists"
+            
+            # Try different parameter formats that LightRAG might expect
+            params_options = [
+                {"entity_name": entity_name},
+                {"name": entity_name},
+                {"entity": entity_name}
+            ]
+            
+            async with aiohttp.ClientSession() as session:
+                for params in params_options:
+                    try:
+                        async with session.get(url, params=params, timeout=10) as resp:
+                            if resp.status == 200:
+                                result = await resp.json()
+                                # Handle different response formats
+                                if isinstance(result, bool):
+                                    exists = result
+                                elif isinstance(result, dict):
+                                    exists = result.get("exists", False) or result.get("found", False)
+                                else:
+                                    exists = False
+                                
+                                logger.debug(f"Entity {entity_name} exists: {exists} (params: {params})")
+                                return exists
+                            elif resp.status == 422:
+                                # Try next parameter format
+                                continue
+                            else:
+                                logger.warning(f"Failed to check entity existence for {entity_name}: {resp.status}")
+                                break
+                    except Exception as e:
+                        logger.debug(f"Error with params {params}: {e}")
+                        continue
+                
+                # If all parameter formats fail, fall back to label list approach
+                logger.debug(f"All parameter formats failed for {entity_name}, falling back to label list")
+                url = f"{LIGHTRAG_MEMORY_URL}/graph/label/list"
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status == 200:
+                        labels_data = await resp.json()
+                        
+                        # Handle both response formats: direct array or dict with 'labels' key
+                        if isinstance(labels_data, list):
+                            all_labels = labels_data
+                        elif isinstance(labels_data, dict) and "labels" in labels_data:
+                            all_labels = labels_data["labels"]
+                        else:
+                            all_labels = []
+                        
+                        # Check if entity name exists in labels (case-insensitive)
+                        exists = any(label.lower() == entity_name.lower() for label in all_labels)
+                        logger.debug(f"Entity {entity_name} exists (via labels): {exists}")
+                        return exists
+                    else:
+                        logger.warning(f"Failed to get graph labels for entity check: {resp.status}")
+                        return False
+                        
+        except Exception as e:
+            logger.error(f"Error checking entity existence for {entity_name}: {e}")
+            return False
 
     async def initialize(self, recreate: bool = False) -> bool:
         """Initialize the agno agent with all components.

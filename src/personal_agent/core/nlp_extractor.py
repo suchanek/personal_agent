@@ -1,5 +1,6 @@
 
 import spacy
+import re
 from typing import List, Dict, Tuple, Any
 
 # Load the small English model
@@ -11,33 +12,114 @@ except OSError:
     spacy.cli.download("en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
 
+def is_meaningful_entity(entity_text: str, entity_label: str) -> bool:
+    """
+    Filter out meaningless entities like page numbers, standalone years, etc.
+    
+    Args:
+        entity_text: The text of the entity
+        entity_label: The spaCy label of the entity
+        
+    Returns:
+        True if the entity is meaningful for relationship building
+    """
+    # Skip page references (pp 123, p. 456, etc.)
+    if re.match(r'^pp?\s*\.?\s*\d+', entity_text.lower()):
+        return False
+    
+    # Skip page ranges (123-456, 5992–599, etc.)
+    if re.match(r'^\d+[-–]\d+$', entity_text):
+        return False
+    
+    # Skip standalone years (1986, 2000, etc.) unless they're part of a larger context
+    if re.match(r'^\d{4}$', entity_text) and entity_label == "DATE":
+        return False
+    
+    # Skip standalone numbers unless they're cardinal numbers in context
+    if re.match(r'^\d+$', entity_text) and entity_label not in ["PERSON", "ORG", "GPE"]:
+        return False
+    
+    # Skip very short entities (< 2 chars) unless they're important types
+    if len(entity_text) < 2 and entity_label not in ["PERSON", "ORG", "GPE"]:
+        return False
+    
+    # Skip common stop words that might be extracted as entities
+    stop_words = {"the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by"}
+    if entity_text.lower() in stop_words:
+        return False
+    
+    # Skip volume/issue references (Vol 25, Issue 20, etc.)
+    if re.match(r'^(vol|volume|issue|no)\s*\.?\s*\d+', entity_text.lower()):
+        return False
+    
+    # Keep meaningful entities
+    return True
+
 def extract_entities(text: str) -> List[Dict[str, str]]:
     """
-    Extracts named entities from text using spaCy.
+    Extracts meaningful named entities from text using spaCy with filtering.
     """
     doc = nlp(text)
     entities = []
     for ent in doc.ents:
-        entities.append({"text": ent.text, "label": ent.label_})
+        if is_meaningful_entity(ent.text, ent.label_):
+            entities.append({"text": ent.text, "label": ent.label_})
     return entities
+
+def is_meaningful_relationship(subject: str, relation: str, obj: str) -> bool:
+    """
+    Filter out meaningless relationships.
+    
+    Args:
+        subject: Subject of the relationship
+        relation: Relationship type
+        obj: Object of the relationship
+        
+    Returns:
+        True if the relationship is meaningful for knowledge graph
+    """
+    # Skip relationships with meaningless entities
+    if not subject or not obj or subject.strip() == "" or obj.strip() == "":
+        return False
+    
+    # Skip relationships with unresolved pronouns
+    pronouns = {'he', 'she', 'it', 'they', 'him', 'her', 'them', 'his', 'hers', 'its', 'their'}
+    if subject.lower() in pronouns or obj.lower() in pronouns:
+        return False
+    
+    # Skip relationships with page numbers, years, etc.
+    if not is_meaningful_entity(subject, "MISC") or not is_meaningful_entity(obj, "MISC"):
+        return False
+    
+    # Skip very generic relationships that don't add value
+    generic_relations = {'be', 'have', 'do', 'get', 'make', 'take', 'come', 'go'}
+    if relation.lower() in generic_relations and len(obj) < 3:
+        return False
+    
+    # Keep meaningful relationships
+    return True
 
 def extract_relationships(text: str) -> List[Tuple[str, str, str]]:
     """
-    Extracts simple subject-verb-object relationships from text using spaCy's dependency parser.
-    This version includes improved coreference resolution and entity linking.
+    Extracts meaningful subject-verb-object relationships from text using spaCy's dependency parser.
+    This version includes improved coreference resolution, entity linking, and relationship filtering.
     """
     doc = nlp(text)
     relationships = []
     
-    # Get entities to help with linking
-    entities = {ent.text: ent.label_ for ent in doc.ents}
-    entity_texts = list(entities.keys())
+    # Get meaningful entities to help with linking
+    meaningful_entities = {}
+    entity_texts = []
+    for ent in doc.ents:
+        if is_meaningful_entity(ent.text, ent.label_):
+            meaningful_entities[ent.text] = ent.label_
+            entity_texts.append(ent.text)
     
     # Simple coreference resolution
     last_person = None
-    for ent in doc.ents:
-        if ent.label_ == "PERSON":
-            last_person = ent.text
+    for ent_text, ent_label in meaningful_entities.items():
+        if ent_label == "PERSON":
+            last_person = ent_text
 
     for sent in doc.sents:
         for token in sent:
@@ -78,7 +160,10 @@ def extract_relationships(text: str) -> List[Tuple[str, str, str]]:
                                 break
                         
                         relation_text = token.lemma_
-                        relationships.append((subject_text, relation_text, object_text))
+                        
+                        # Only add meaningful relationships
+                        if is_meaningful_relationship(subject_text, relation_text, object_text):
+                            relationships.append((subject_text, relation_text, object_text))
                     
                     # Handle prepositional objects (e.g., "works at Google", "lives in Mountain View")
                     for prep, pobj in prep_objects:
@@ -89,10 +174,13 @@ def extract_relationships(text: str) -> List[Tuple[str, str, str]]:
                                 break
                         
                         relation_text = f"{token.lemma_} {prep}"
-                        relationships.append((subject_text, relation_text, object_text))
+                        
+                        # Only add meaningful relationships
+                        if is_meaningful_relationship(subject_text, relation_text, object_text):
+                            relationships.append((subject_text, relation_text, object_text))
                     
                     # Update last seen person for coreference
-                    if subject.text in entities and entities[subject.text] == "PERSON":
+                    if subject.text in meaningful_entities and meaningful_entities[subject.text] == "PERSON":
                         last_person = subject.text
 
     return relationships
