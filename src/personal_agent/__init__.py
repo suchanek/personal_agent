@@ -17,13 +17,11 @@ The package supports three main frameworks:
 3. Agno (modern async agent framework) - primary interface
 
 Author: Personal Agent Development Team
-Last modified: 2025-06-20 08:58:39
-Version: 0.7.dev
+Last modified: 2025-07-10 15:12:58
+Version: 0.8.7.dev
 """
 
 # pylint: disable=C0413
-
-__version__ = "0.8.6"
 
 import logging
 import os
@@ -61,7 +59,7 @@ from .utils.pag_logging import (
 from .web import create_app, register_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.6"
+__version__ = "0.8.6"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package

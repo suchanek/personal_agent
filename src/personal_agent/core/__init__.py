@@ -10,7 +10,9 @@ from .agno_storage import (
     load_lightrag_knowledge_base,
 )
 from .anti_duplicate_memory import AntiDuplicateMemory, create_anti_duplicate_memory
+from .knowledge_coordinator import KnowledgeCoordinator, create_knowledge_coordinator
 from .mcp_client import SimpleMCPClient
+from .nlp_extractor import extract_entities, extract_relationships
 from .memory import (
     is_weaviate_connected,
     reset_weaviate_if_corrupted,
@@ -26,6 +28,15 @@ from .semantic_memory_manager import (
     create_semantic_memory_manager,
 )
 from .smol_agent import create_smolagents_executor, create_smolagents_model
+from .structured_response import (
+    StructuredResponse,
+    StructuredResponseParser,
+    ToolCall,
+    ResponseMetadata,
+    ResponseError,
+    get_ollama_format_schema,
+    create_structured_instructions,
+)
 from .topic_classifier import RuleSet, TopicClassifier
 
 __all__ = [
@@ -61,6 +72,20 @@ __all__ = [
     "SemanticMemoryManagerConfig",
     "SemanticDuplicateDetector",
     "create_semantic_memory_manager",
+    # Knowledge coordinator
+    "KnowledgeCoordinator",
+    "create_knowledge_coordinator",
+    # NLP extractor
+    "extract_entities",
+    "extract_relationships",
+    # Structured response
+    "StructuredResponse",
+    "StructuredResponseParser",
+    "ToolCall",
+    "ResponseMetadata",
+    "ResponseError",
+    "get_ollama_format_schema",
+    "create_structured_instructions",
     # Topic classifier
     "TopicClassifier",
     "RuleSet",

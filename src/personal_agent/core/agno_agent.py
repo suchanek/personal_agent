@@ -759,7 +759,8 @@ class AgnoPersonalAgent:
         ) -> str:
             """
             Store a memory in the LightRAG graph database to capture relationships.
-            Uses file upload approach to avoid null file_path issues.
+            Uses file upload approach to avoid null file_path issues and explicitly adds relationships.
+            Includes improved coreference resolution for pronouns.
 
             :param content: The information to store as a memory.
             :param topics: Optional list of topics for the memory.
@@ -768,62 +769,172 @@ class AgnoPersonalAgent:
             if not content or not content.strip():
                 return "❌ Error: Content is required to store a graph memory."
             try:
-                import hashlib
-                import os
-                import tempfile
+                import asyncio
+                from personal_agent.core.nlp_extractor import extract_entities, extract_relationships
+                import spacy
+
+                # Improved Coreference Resolution
+                nlp = spacy.load("en_core_web_sm")
+                doc = nlp(content)
+                resolved_sents = []
+                last_person = None
+                
+                # First pass: collect all person entities
+                all_persons = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
+                
+                for sent in doc.sents:
+                    # Find person in the current sentence
+                    current_persons = [ent.text for ent in sent.ents if ent.label_ == "PERSON"]
+                    
+                    sent_text = sent.text
+                    
+                    # Enhanced pronoun replacement
+                    if not current_persons and last_person:
+                        # Replace various pronouns with the last known person
+                        sent_text = re.sub(r'\bhe\b', last_person, sent_text, flags=re.IGNORECASE)
+                        sent_text = re.sub(r'\bshe\b', last_person, sent_text, flags=re.IGNORECASE)
+                        sent_text = re.sub(r'\bhis\b', f"{last_person}'s", sent_text, flags=re.IGNORECASE)
+                        sent_text = re.sub(r'\bher\b', f"{last_person}'s", sent_text, flags=re.IGNORECASE)
+                        sent_text = re.sub(r'\bhim\b', last_person, sent_text, flags=re.IGNORECASE)
+                        sent_text = re.sub(r'\bhers\b', f"{last_person}'s", sent_text, flags=re.IGNORECASE)
+
+                    resolved_sents.append(sent_text)
+                    
+                    # Update last_person if a new person is mentioned
+                    if current_persons:
+                        last_person = current_persons[0]
+                
+                coref_resolved_content = " ".join(resolved_sents)
+                logger.info("Coreference resolved content: '%s'", coref_resolved_content)
 
                 # Restate the fact to be user-centric for the knowledge graph
-                restated_content = self._restate_user_fact(content)
+                restated_content = self._restate_user_fact(coref_resolved_content)
                 logger.info("Original content for graph: '%s'", content)
                 logger.info("Restated content for graph: '%s'", restated_content)
-
-                # Create a meaningful filename based on content
-                content_hash = hashlib.md5(restated_content.encode()).hexdigest()[:8]
-                words = restated_content.split()[:3]
-                filename_base = "_".join(
-                    word.lower().replace(" ", "") for word in words if word.isalnum()
-                )
-                filename = f"graph_memory_{filename_base}_{content_hash}.txt"
-
-                # Create temporary file
-                temp_dir = "/tmp/lightrag_graph_memories"
-                os.makedirs(temp_dir, exist_ok=True)
-                filepath = os.path.join(temp_dir, filename)
-
-                # Write content to file
-                with open(filepath, "w", encoding="utf-8") as f:
-                    if topics:
-                        if isinstance(topics, str):
-                            topics = [topics]
-                        f.write(f"# Topics: {', '.join(topics)}\n\n")
-                    f.write(restated_content)
-
-                # Upload file using the file upload endpoint
-                url = f"{LIGHTRAG_MEMORY_URL}/documents/upload"
+                
+                # --- Extract entities and relationships from the final content ---
+                entities = extract_entities(restated_content)
+                relationships = extract_relationships(restated_content)
+                
+                logger.info("Extracted entities: %s", entities)
+                logger.info("Extracted relationships: %s", relationships)
+                
+                graph_edit_results = []
+                
+                # --- Create all entities first ---
                 async with aiohttp.ClientSession() as session:
-                    with open(filepath, "rb") as f:
-                        data = aiohttp.FormData()
-                        data.add_field(
-                            "file", f, filename=filename, content_type="text/plain"
-                        )
-                        async with session.post(url, data=data, timeout=60) as resp:
-                            resp.raise_for_status()
-                            result = await resp.json()
+                    entity_creation_tasks = []
+                    for entity in entities:
+                        entity_name = entity.get("text")
+                        entity_type = entity.get("label")
+                        if entity_name and entity_type:
+                            payload = {
+                                "entity_name": entity_name,
+                                "updated_data": {
+                                    "type": entity_type,
+                                    "description": f"Entity of type {entity_type}"
+                                }
+                            }
+                            url = f"{LIGHTRAG_MEMORY_URL}/graph/entity/edit"
+                            
+                            async def post_entity(session, url, payload):
+                                async with session.post(url, json=payload, timeout=10) as resp:
+                                    if resp.status not in [200, 201]:
+                                        error_detail = await resp.text()
+                                        logger.warning(f"Failed to post entity {payload.get('entity_name')}: {error_detail}")
+                                        # Do not raise exception, just log and continue
+                                        return {"message": f"Failed: {error_detail}"}
+                                    return await resp.json()
 
-                # Clean up temporary file
-                try:
-                    os.remove(filepath)
-                except:
-                    pass
+                            entity_creation_tasks.append(post_entity(session, url, payload))
 
-                logger.info(
-                    "Stored graph memory via file upload: %s... (Response: %s)",
-                    restated_content[:50],
-                    result,
-                )
-                return f"✅ Successfully stored graph memory: {restated_content[:50]}..."
+                    if entity_creation_tasks:
+                        try:
+                            entity_results = await asyncio.gather(*entity_creation_tasks)
+                            for res in entity_results:
+                                graph_edit_results.append(f"Entity added/updated: {res.get('message', 'OK')}")
+                        except Exception as e:
+                            logger.error(f"Error during entity creation: {e}")
+                            graph_edit_results.append(f"Error creating entities: {e}")
+
+                    # --- Then, create all relationships ---
+                    relationship_creation_tasks = []
+                    for sub, rel, obj in relationships:
+                        # More flexible entity validation - allow relationships even if entities aren't perfectly matched
+                        entity_names = [e.get("text") for e in entities]
+                        
+                        # Check if subject and object are valid (not empty, not just pronouns)
+                        if not sub or not obj or sub.strip() == "" or obj.strip() == "":
+                            logger.warning(f"Skipping relationship {sub}-{rel}-{obj}: empty subject or object")
+                            graph_edit_results.append(f"Relation skipped: {sub}-{rel}-{obj} (empty subject/object)")
+                            continue
+                        
+                        # Skip relationships with unresolved pronouns
+                        if sub.lower() in ['he', 'she', 'it', 'they', 'him', 'her', 'them']:
+                            logger.warning(f"Skipping relationship {sub}-{rel}-{obj}: unresolved pronoun as subject")
+                            graph_edit_results.append(f"Relation skipped: {sub}-{rel}-{obj} (unresolved pronoun)")
+                            continue
+                            
+                        # Create entities for subject and object if they don't exist
+                        for entity_text in [sub, obj]:
+                            if entity_text not in entity_names:
+                                # Add missing entity
+                                entity_payload = {
+                                    "entity_name": entity_text,
+                                    "updated_data": {
+                                        "type": "MISC",  # Default type for missing entities
+                                        "description": f"Auto-created entity: {entity_text}"
+                                    }
+                                }
+                                entity_url = f"{LIGHTRAG_MEMORY_URL}/graph/entity/edit"
+                                
+                                async def post_missing_entity(session, url, payload):
+                                    async with session.post(url, json=payload, timeout=10) as resp:
+                                        if resp.status not in [200, 201]:
+                                            error_detail = await resp.text()
+                                            logger.warning(f"Failed to create missing entity {payload.get('entity_name')}: {error_detail}")
+                                            return {"message": f"Failed: {error_detail}"}
+                                        return await resp.json()
+                                
+                                try:
+                                    missing_entity_result = await post_missing_entity(session, entity_url, entity_payload)
+                                    graph_edit_results.append(f"Missing entity created: {entity_text}")
+                                    logger.info(f"Created missing entity: {entity_text}")
+                                except Exception as e:
+                                    logger.warning(f"Failed to create missing entity {entity_text}: {e}")
+                        
+                        payload = {
+                            "source_id": sub,
+                            "target_id": obj,
+                            "updated_data": { "type": rel.upper().replace(" ", "_") }
+                        }
+                        url = f"{LIGHTRAG_MEMORY_URL}/graph/relation/edit"
+
+                        async def post_relation(session, url, payload):
+                            async with session.post(url, json=payload, timeout=10) as resp:
+                                if resp.status not in [200, 201]:
+                                    error_detail = await resp.text()
+                                    logger.warning(f"Failed to post relation {payload.get('source_id')}-{payload.get('target_id')}: {error_detail}")
+                                    # Do not raise exception, just log and continue
+                                    return {"message": f"Failed: {error_detail}"}
+                                return await resp.json()
+                        
+                        relationship_creation_tasks.append(post_relation(session, url, payload))
+
+                    if relationship_creation_tasks:
+                        try:
+                            relation_results = await asyncio.gather(*relationship_creation_tasks)
+                            for res in relation_results:
+                                graph_edit_results.append(f"Relation added/updated: {res.get('message', 'OK')}")
+                        except Exception as e:
+                            logger.error(f"Error during relationship creation: {e}")
+                            graph_edit_results.append(f"Error creating relationships: {e}")
+
+                final_message = f"✅ Successfully stored graph memory: {restated_content[:50]}...\nGraph Edits: {'; '.join(graph_edit_results)}"
+                logger.info(final_message)
+                return final_message
             except Exception as e:
-                logger.error("Error storing graph memory: %s", e)
+                logger.error("Error storing graph memory: %s", e, exc_info=True)
                 return f"❌ Error storing graph memory: {str(e)}"
 
         async def query_graph_memory(
@@ -859,17 +970,33 @@ class AgnoPersonalAgent:
 
         async def get_memory_graph_labels() -> str:
             """
-            Get the list of all entity and relation labels from the memory graph.
-
-            :return: A formatted string of graph labels.
+            Get the list of all entity and relation labels from the memory graph
+            by calling the /graph/label/list endpoint.
             """
             try:
                 url = f"{LIGHTRAG_MEMORY_URL}/graph/label/list"
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, timeout=60) as resp:
-                        resp.raise_for_status()
-                        result = await resp.json()
-                        return f"📊 Graph Labels: {result}"
+                        if resp.status != 200:
+                            error_text = await resp.text()
+                            logger.error(f"Error fetching graph labels from {url}: {resp.status} {error_text}")
+                            resp.raise_for_status()
+                        
+                        labels_data = await resp.json()
+                        
+                        # Handle both response formats: direct array or dict with 'labels' key
+                        if isinstance(labels_data, list):
+                            # Direct array format: ["Eric", "Google", "Mountain View", ...]
+                            all_labels = labels_data
+                        elif isinstance(labels_data, dict) and "labels" in labels_data:
+                            # Dict format: {"labels": ["Eric", "Google", ...]}
+                            all_labels = labels_data["labels"]
+                        else:
+                            # Fallback: try to extract any list-like data
+                            all_labels = []
+                            logger.warning(f"Unexpected labels response format: {type(labels_data)}")
+                        
+                        return f"📊 Graph Labels: {sorted(all_labels)}"
             except Exception as e:
                 logger.error("Error getting graph labels: %s", e)
                 return f"❌ Error getting graph labels: {str(e)}"
