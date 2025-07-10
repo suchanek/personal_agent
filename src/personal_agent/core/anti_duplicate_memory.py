@@ -1,9 +1,32 @@
 #!/usr/bin/env python3
 """
-Anti-Duplicate Memory Manager for Ollama Models.
+Anti-Duplicate Memory Manager for Intelligent Memory Curation.
 
-This module provides a superclass that extends Agno's Memory class with
-intelligent duplicate detection and prevention capabilities.
+This module provides the `AntiDuplicateMemory` class, an advanced memory management
+system that extends Agno's base `Memory` class. It is specifically designed to
+prevent the creation of duplicate or low-quality memories by implementing a
+sophisticated, multi-layered deduplication strategy.
+
+Core Features:
+- **Exact and Semantic Deduplication:** Identifies and rejects both exact string
+  matches and semantically similar memories using `difflib`.
+- **Dynamic Similarity Thresholds:** Intelligently adjusts the similarity
+  threshold based on the content of the memory (e.g., factual statements,
+  user preferences, or structured data) to improve accuracy.
+- **Combined Fact Detection:** Prevents the storage of overly complex memories
+  that contain multiple distinct facts, encouraging atomic memories.
+- **Performance Optimizations:** Utilizes direct database queries for recent
+  memories to ensure efficient duplicate checking without loading the entire
+  memory history.
+- **Batch Processing:** Deduplicates memories within rapid-fire creation batches
+  before they are committed to the database.
+- **Memory Analysis Tools:** Includes utilities (`get_memory_stats`, `print_memory_analysis`)
+  and a runnable main script to analyze the quality of the memory store,
+  identify potential issues, and report statistics.
+
+This system ensures that the agent's memory remains clean, concise, and
+free of redundant information, which is crucial for effective long-term
+recall and reasoning.
 """
 
 import difflib
@@ -141,10 +164,10 @@ class AntiDuplicateMemory(Memory):
     def _calculate_semantic_threshold(self, memory1: str, memory2: str) -> float:
         """
         Calculate the appropriate semantic similarity threshold based on memory content.
-        
+
         This method analyzes the content of both memories to determine the most
         appropriate threshold for semantic duplicate detection.
-        
+
         :param memory1: First memory text (cleaned/lowercased)
         :param memory2: Second memory text (cleaned/lowercased)
         :return: Similarity threshold to use for these memories
@@ -153,40 +176,56 @@ class AntiDuplicateMemory(Memory):
         if self._is_structured_test_data(memory1, memory2):
             # For structured test data, use a much higher threshold to avoid false positives
             return 0.95
-        
+
         # Check for preference-related memories that might be legitimately similar
         # but represent different preferences (e.g., "prefers tea" vs "likes tea")
         preference_indicators = [
-            "prefer", "like", "enjoy", "love", "hate", "dislike",
-            "favorite", "favourite", "best", "worst"
+            "prefer",
+            "like",
+            "enjoy",
+            "love",
+            "hate",
+            "dislike",
+            "favorite",
+            "favourite",
+            "best",
+            "worst",
         ]
-        
+
         has_preferences = any(
-            indicator in memory1 or indicator in memory2 
+            indicator in memory1 or indicator in memory2
             for indicator in preference_indicators
         )
-        
+
         if has_preferences:
             # For preference-related memories, use a lower threshold to catch
             # semantic duplicates like "prefers tea" and "likes tea"
             return 0.65
-        
+
         # Check for factual statements that might have similar structure
         # but different content (e.g., "works in tech" vs "works in finance")
         factual_indicators = [
-            "works", "lives", "has", "owns", "studies", "graduated",
-            "born", "married", "single", "divorced"
+            "works",
+            "lives",
+            "has",
+            "owns",
+            "studies",
+            "graduated",
+            "born",
+            "married",
+            "single",
+            "divorced",
         ]
-        
+
         has_factual_content = any(
             indicator in memory1 or indicator in memory2
             for indicator in factual_indicators
         )
-        
+
         if has_factual_content:
             # For factual content, use a moderate threshold
             return 0.75
-        
+
         # Default threshold - use the configured similarity threshold but cap at 85%
         return min(0.85, self.similarity_threshold)
 
@@ -207,25 +246,27 @@ class AntiDuplicateMemory(Memory):
             "enjoys activity",
             "fact number",
         ]
-        
+
         # Check if both memories contain test patterns
         for pattern in test_patterns:
             if pattern in memory1 and pattern in memory2:
                 # Check if they differ by small numeric or single character differences
                 # This indicates structured test data with incremental values
                 import re
-                
+
                 # Extract numbers from both memories
-                numbers1 = re.findall(r'\d+', memory1)
-                numbers2 = re.findall(r'\d+', memory2)
-                
+                numbers1 = re.findall(r"\d+", memory1)
+                numbers2 = re.findall(r"\d+", memory2)
+
                 # If they have the same number of numeric values but different values,
                 # this is likely structured test data
-                if (len(numbers1) == len(numbers2) and 
-                    len(numbers1) > 0 and 
-                    numbers1 != numbers2):
+                if (
+                    len(numbers1) == len(numbers2)
+                    and len(numbers1) > 0
+                    and numbers1 != numbers2
+                ):
                     return True
-                    
+
         return False
 
     def _contains_multiple_facts(self, memory_text: str) -> bool:
@@ -444,7 +485,7 @@ class AntiDuplicateMemory(Memory):
             if self.debug_mode:
                 print(f"🚫 REJECTED: {reason}")
                 print(f"   Memory: '{memory.memory}'")
-            
+
             # Return None to indicate rejection - this is the expected behavior
             # for duplicate detection and what the tests expect
             return None
@@ -731,6 +772,7 @@ def main():
         enable_semantic_dedup=True,
         enable_exact_dedup=True,
         debug_mode=True,
+        enable_optimizations=False,
     )
 
     try:

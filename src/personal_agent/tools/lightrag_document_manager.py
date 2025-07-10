@@ -1,67 +1,21 @@
 #!/usr/bin/env python3
 """
-LightRAG Document Manager V2
+LightRAG Document Manager Package Module
 
 A modernized document management tool for LightRAG that uses the LightRAG server
 API for stable and reliable operations. This version uses HTTP API calls to the
 LightRAG server instead of direct library usage.
 
-Key Improvements from V1:
+Key Features:
 - Uses LightRAG server API endpoints for all operations, ensuring stability.
-- Deletion is now handled by the `/documents/delete_document` API endpoint.
-- No longer requires server restarts (`--restart-server` is removed).
-- Deletion is always persistent (`--persistent` is removed).
+- Deletion is handled by the `/documents/delete_document` API endpoint.
+- No server restarts required - all operations are API-based.
+- Deletion is always persistent.
 - More robust, as it uses the official API interface.
-
-Usage:
-  From the project root directory, run:
-  `python tools/lightrag_docmgr_v2.py [OPTIONS] [ACTIONS]`
-
-Options:
-  --server-url <URL>          LightRAG server URL (default: from config)
-  --verify                    Verify deletion after completion by checking server
-  --no-confirm                Skip confirmation prompts for deletion actions
-  --delete-source             Delete the original source file from the inputs directory
-  --retry <ID1> [ID2...]      Retry specific failed documents by their unique IDs
-  --retry-all                 Retry all documents currently in 'failed' status
-
-Actions:
-  --status                    Show LightRAG server and document status
-  --list                      List all documents with detailed view (ID, file path, status, etc.)
-  --list-names                List all document names (file paths only)
-  --delete-processing         Delete all documents currently in 'processing' status
-  --delete-failed             Delete all documents currently in 'failed' status
-  --delete-status <STATUS>    Delete all documents with a specific custom status
-  --delete-ids <ID1> [ID2...] Delete specific documents by their unique IDs
-  --delete-name <PATTERN>     Delete documents whose file paths match a glob-style pattern (e.g., '*.pdf', 'my_doc.txt')
-  --nuke                      Perform a comprehensive deletion. This implicitly sets:
-                              --verify, --delete-source, and --no-confirm.
-                              Must be used with a deletion action.
-
-Examples:
-  # Check server status
-  python tools/lightrag_docmgr_v2.py --status
-
-  # List all documents
-  python tools/lightrag_docmgr_v2.py --list
-
-  # Delete all 'failed' documents and verify
-  python tools/lightrag_docmgr_v2.py --delete-failed --verify
-
-  # Delete a specific document by ID and also delete the source file
-  python tools/lightrag_docmgr_v2.py --delete-ids doc-12345 --delete-source
-
-  # Delete all '.md' files comprehensively
-  python tools/lightrag_docmgr_v2.py --nuke --delete-name '*.md'
-
-  # Retry a failed document
-  python tools/lightrag_docmgr_v2.py --retry doc-failed-123
-
-  # Retry all failed documents
-  python tools/lightrag_docmgr_v2.py --retry-all
+- Supports retry operations for failed documents.
+- Comprehensive verification and status reporting.
 """
 
-import argparse
 import asyncio
 import fnmatch
 import os
@@ -71,10 +25,10 @@ import aiohttp
 import json
 from pathlib import Path
 
-from personal_agent.config import settings
+from ..config import settings
 
 
-class LightRAGDocumentManagerV2:
+class LightRAGDocumentManager:
     """Manages documents in LightRAG using the server API."""
 
     def __init__(self, server_url: Optional[str] = None):
@@ -350,10 +304,60 @@ class LightRAGDocumentManagerV2:
         """No cleanup needed for API-based approach."""
         print("\n✅ Document manager finalized.")
 
+    def get_status_summary(self, all_docs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Get a summary of document statuses."""
+        status_counts = {}
+        for doc in all_docs:
+            status = doc.get("status", "UNKNOWN")
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        return {
+            "total_documents": len(all_docs),
+            "status_breakdown": status_counts,
+            "server_url": self.server_url,
+            "storage_dir": str(self.storage_dir)
+        }
+
+    def filter_documents_by_status(self, all_docs: List[Dict[str, Any]], status: str) -> List[Dict[str, Any]]:
+        """Filter documents by their status."""
+        return [d for d in all_docs if d.get("status") == status.lower()]
+
+    def filter_documents_by_ids(self, all_docs: List[Dict[str, Any]], doc_ids: List[str]) -> List[Dict[str, Any]]:
+        """Filter documents by their IDs."""
+        docs_by_id = {doc["id"]: doc for doc in all_docs}
+        return [docs_by_id[doc_id] for doc_id in doc_ids if doc_id in docs_by_id]
+
+    def filter_documents_by_name_pattern(self, all_docs: List[Dict[str, Any]], pattern: str) -> List[Dict[str, Any]]:
+        """Filter documents by file name pattern (glob-style)."""
+        return [
+            d for d in all_docs
+            if d.get("file_path") and fnmatch.fnmatch(d["file_path"], pattern)
+        ]
+
+    async def verify_deletion(self, original_doc_ids: List[str]) -> Dict[str, Any]:
+        """Verify that documents have been successfully deleted."""
+        remaining_docs = await self.get_all_docs()
+        remaining_ids = {doc["id"] for doc in remaining_docs}
+        deleted_ids = set(original_doc_ids)
+
+        verified_deleted_count = len(deleted_ids - remaining_ids)
+        still_present_count = len(deleted_ids & remaining_ids)
+
+        return {
+            "total_targeted": len(original_doc_ids),
+            "verified_deleted": verified_deleted_count,
+            "still_present": still_present_count,
+            "deletion_successful": still_present_count == 0
+        }
+
 
 async def main():
-    parser = argparse.ArgumentParser(description="LightRAG Document Manager V2")
+    """Main function to handle command-line interface and execute document management operations."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="LightRAG Document Manager")
     parser.add_argument("--server-url", help="LightRAG server URL")
+    
     # Actions
     parser.add_argument(
         "--status", action="store_true", help="Show storage and document status"
@@ -377,6 +381,7 @@ async def main():
     )
     parser.add_argument("--retry", nargs="+", help="Retry documents by ID")
     parser.add_argument("--retry-all", action="store_true", help="Retry all failed documents")
+    
     # Options
     parser.add_argument(
         "--nuke", action="store_true", help="Comprehensive deletion mode"
@@ -397,29 +402,32 @@ async def main():
         print("❌ Please use either --retry <IDs> or --retry-all, not both.")
         return 1
 
-    manager = LightRAGDocumentManagerV2(args.server_url)
+    # Initialize the document manager
+    manager = LightRAGDocumentManager(args.server_url)
     if not await manager.initialize():
         return 1
 
+    # Get all documents
     all_docs = await manager.get_all_docs()
     docs_by_id = {doc["id"]: doc for doc in all_docs}
 
+    # Handle status command
     if args.status:
         print("\n🔍 System Status Check")
         print("-" * 40)
         server_status = await manager.check_server_status()
         print(f"Server Status: {'🟢 Online' if server_status else '🔴 Offline'}")
         print(f"  URL: {manager.server_url}")
-        print(f"Documents Found: {len(all_docs)}")
+        
+        status_summary = manager.get_status_summary(all_docs)
+        print(f"Documents Found: {status_summary['total_documents']}")
+        
         # Count by status
-        status_counts = {}
-        for doc in all_docs:
-            status = doc.get("status", "UNKNOWN")
-            status_counts[status] = status_counts.get(status, 0) + 1
-        for status, count in status_counts.items():
+        for status, count in status_summary['status_breakdown'].items():
             print(f"  - {status}: {count}")
         return 0
 
+    # Handle list command
     if args.list:
         print(f"\n📊 Found {len(all_docs)} total documents")
         print("-" * 60)
@@ -431,6 +439,7 @@ async def main():
             print()
         return 0
 
+    # Handle list-names command
     if args.list_names:
         names = sorted(
             list(set(d.get("file_path") for d in all_docs if d.get("file_path")))
@@ -441,7 +450,7 @@ async def main():
             print(f"  - {name}")
         return 0
 
-    # --- Retry Logic ---
+    # Handle retry logic
     if args.retry:
         print(f"\n🔄 Retrying {len(args.retry)} documents...")
         results = await manager.retry_documents(args.retry, all_docs)
@@ -462,7 +471,7 @@ async def main():
 
     if args.retry_all:
         print("\n🔄 Finding all failed documents to retry...")
-        failed_docs = [d for d in all_docs if d.get("status") == "failed"]
+        failed_docs = manager.filter_documents_by_status(all_docs, "failed")
         
         if not failed_docs:
             print("✅ No failed documents found. Nothing to do.")
@@ -493,7 +502,7 @@ async def main():
         await manager.finalize()
         return 0
 
-    # --- Deletion Logic ---
+    # Handle deletion logic
     docs_to_delete = []
     confirm = not args.no_confirm
     delete_source = args.delete_source
@@ -505,24 +514,17 @@ async def main():
         delete_source = True
         verify = True
 
+    # Determine which documents to delete based on the action
     if args.delete_processing:
-        docs_to_delete = [d for d in all_docs if d.get("status") == "processing"]
+        docs_to_delete = manager.filter_documents_by_status(all_docs, "processing")
     elif args.delete_failed:
-        docs_to_delete = [d for d in all_docs if d.get("status") == "failed"]
+        docs_to_delete = manager.filter_documents_by_status(all_docs, "failed")
     elif args.delete_status:
-        docs_to_delete = [
-            d for d in all_docs if d.get("status") == args.delete_status.lower()
-        ]
+        docs_to_delete = manager.filter_documents_by_status(all_docs, args.delete_status)
     elif args.delete_ids:
-        docs_to_delete = [
-            docs_by_id[doc_id] for doc_id in args.delete_ids if doc_id in docs_by_id
-        ]
+        docs_to_delete = manager.filter_documents_by_ids(all_docs, args.delete_ids)
     elif args.delete_name:
-        docs_to_delete = [
-            d
-            for d in all_docs
-            if d.get("file_path") and fnmatch.fnmatch(d["file_path"], args.delete_name)
-        ]
+        docs_to_delete = manager.filter_documents_by_name_pattern(all_docs, args.delete_name)
 
     if not docs_to_delete:
         print("\n✅ No documents found matching the criteria. Nothing to do.")
@@ -538,22 +540,22 @@ async def main():
             print("❌ Deletion cancelled.")
             return 0
 
+    # Store original doc IDs for verification
+    original_doc_ids = [doc["id"] for doc in docs_to_delete]
+
+    # Perform deletion
     results = await manager.delete_documents(docs_to_delete, delete_source)
 
+    # Perform verification if requested
     if verify:
         print("\n🔍 Verification Phase")
-        # Re-fetch the documents after deletion
-        remaining_docs_list = await manager.get_all_docs()
-        remaining_ids = {doc["id"] for doc in remaining_docs_list}
-        deleted_ids = {doc["id"] for doc in docs_to_delete}
-
-        verified_deleted_count = len(deleted_ids - remaining_ids)
+        verification_results = await manager.verify_deletion(original_doc_ids)
         print(
-            f"✅ Verified {verified_deleted_count}/{len(deleted_ids)} documents are deleted."
+            f"✅ Verified {verification_results['verified_deleted']}/{verification_results['total_targeted']} documents are deleted."
         )
-        results["verified_deleted"] = verified_deleted_count
+        results["verified_deleted"] = verification_results["verified_deleted"]
 
-    # --- Summary ---
+    # Print summary
     print("\n" + "=" * 60)
     print("🎯 DELETION SUMMARY")
     print("=" * 60)
@@ -578,7 +580,8 @@ if __name__ == "__main__":
     # Ensure you have the necessary dependencies:
     # poetry install
     try:
-        asyncio.run(main())
+        exit_code = asyncio.run(main())
+        sys.exit(exit_code)
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
         sys.exit(1)
