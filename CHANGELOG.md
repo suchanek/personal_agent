@@ -2,6 +2,26 @@
 
 Eric G. Suchanek, PhD
 
+## [0.8.52-dev] - 2025-07-09
+
+#### Features
+
+- **Memory Restatement System:** Implemented an intelligent memory restatement capability that automatically converts first-person user facts to third-person statements for optimal knowledge graph storage and entity mapping.
+  - Added `_restate_user_fact()` method in `AgnoPersonalAgent` that transforms user statements like "I have a PhD" to "{user_id} has a PhD"
+  - Enhanced dual memory architecture to store facts literally in local semantic memory while storing restated versions in the graph memory system
+  - Comprehensive pronoun and possessive conversion using regex patterns with word boundaries to avoid partial word replacements
+  - Supports conversions for: "I am/was/have" → "{user_id} is/was/has", "I'm/I've" → "{user_id} is/has", "my/mine/myself" → "{user_id}'s/{user_id}"
+  - Ensures proper entity recognition and relationship mapping in the LightRAG knowledge graph system
+  - Added comprehensive test suite (`tests/test_fact_restatement.py`) with 5 test scenarios validating both local and graph memory storage
+
+#### Technical Implementation
+
+- **Dual Memory Storage Strategy:** Facts are now processed differently for each memory system:
+  - **Local Semantic Memory:** Stores user facts exactly as entered (first-person) for natural user experience
+  - **Graph Memory System:** Automatically restates facts to third-person for proper entity mapping and relationship extraction
+- **Enhanced Graph Memory Integration:** Updated `store_graph_memory()` method to use restated content for file uploads and knowledge graph processing
+- **Robust Pattern Matching:** Uses case-insensitive regex with word boundaries to ensure accurate pronoun replacement without affecting partial words
+
 ## [0.8.51-dev] - 2025-07-09
 
 #### Features
