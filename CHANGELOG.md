@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2025-07-10
+
+### Added
+- **Direct Knowledge Graph Construction**: The agent now performs advanced NLP (coreference resolution, entity/relationship extraction) to build a precise knowledge graph from user statements. This replaces the previous text-upload method with direct API calls to create and link entities and relationships. See [ADR-007](./docs/adr/007-direct-knowledge-graph-construction.md) for details.
+
+### Changed
+- The `store_graph_memory` tool was completely overhauled to use the new Direct Knowledge Graph Construction pipeline, resulting in more accurate and detailed memory storage in the LightRAG knowledge graph.
+
+## [0.8.6] - 2025-07-10
+
 ### Added
 - The `docmgr` tool now supports a `--json` flag for machine-readable output.
+
+### Changed
+- Project version bumped to `0.8.6`.
 
 ## [0.8.52] - 2025-07-09
 
