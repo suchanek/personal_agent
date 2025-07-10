@@ -9,6 +9,7 @@ including native MCP support, async operations, and advanced agent features.
 import asyncio
 import importlib.metadata
 import os
+import re
 from enum import Enum, auto
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
@@ -771,9 +772,14 @@ class AgnoPersonalAgent:
                 import os
                 import tempfile
 
+                # Restate the fact to be user-centric for the knowledge graph
+                restated_content = self._restate_user_fact(content)
+                logger.info("Original content for graph: '%s'", content)
+                logger.info("Restated content for graph: '%s'", restated_content)
+
                 # Create a meaningful filename based on content
-                content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
-                words = content.split()[:3]
+                content_hash = hashlib.md5(restated_content.encode()).hexdigest()[:8]
+                words = restated_content.split()[:3]
                 filename_base = "_".join(
                     word.lower().replace(" ", "") for word in words if word.isalnum()
                 )
@@ -790,7 +796,7 @@ class AgnoPersonalAgent:
                         if isinstance(topics, str):
                             topics = [topics]
                         f.write(f"# Topics: {', '.join(topics)}\n\n")
-                    f.write(content)
+                    f.write(restated_content)
 
                 # Upload file using the file upload endpoint
                 url = f"{LIGHTRAG_MEMORY_URL}/documents/upload"
@@ -812,10 +818,10 @@ class AgnoPersonalAgent:
 
                 logger.info(
                     "Stored graph memory via file upload: %s... (Response: %s)",
-                    content[:50],
+                    restated_content[:50],
                     result,
                 )
-                return f"✅ Successfully stored graph memory: {content[:50]}..."
+                return f"✅ Successfully stored graph memory: {restated_content[:50]}..."
             except Exception as e:
                 logger.error("Error storing graph memory: %s", e)
                 return f"❌ Error storing graph memory: {str(e)}"
@@ -1328,6 +1334,42 @@ Returns:
 
             Remember: You're not just an assistant - you're a friendly AI companion with semantic memory who genuinely cares about the user and remembers your conversations together! Use your tools immediately when requested - no hesitation!
         """
+
+    def _restate_user_fact(self, content: str) -> str:
+        """
+        Restate a user fact from first-person to third-person.
+
+        This method converts statements like "I have a PhD" to "{user_id} has a PhD"
+        to ensure correct entity mapping in the knowledge graph.
+
+        :param content: The original fact from the user.
+        :return: The restated fact.
+        """
+        # Ensure user_id is a safe string for replacement
+        user_id_str = str(self.user_id)
+
+        # Define regex patterns for pronoun and verb replacement
+        # Using word boundaries (\b) to avoid replacing parts of words like "mine" in "mining"
+        patterns = [
+            (r"\bI am\b", f"{user_id_str} is"),
+            (r"\bI was\b", f"{user_id_str} was"),
+            (r"\bI have\b", f"{user_id_str} has"),
+            (r"\bI'm\b", f"{user_id_str} is"),
+            (r"\bI've\b", f"{user_id_str} has"),
+            (r"\bI\b", user_id_str),
+            (r"\bmy\b", f"{user_id_str}'s"),
+            (r"\bmine\b", f"{user_id_str}'s"),
+            (r"\bmyself\b", user_id_str),
+        ]
+
+        restated_content = content
+        for pattern, replacement in patterns:
+            # Use re.IGNORECASE to handle variations like "i" vs "I"
+            restated_content = re.sub(
+                pattern, replacement, restated_content, flags=re.IGNORECASE
+            )
+
+        return restated_content
 
     async def initialize(self, recreate: bool = False) -> bool:
         """Initialize the agno agent with all components.

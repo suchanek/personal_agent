@@ -1,133 +1,78 @@
-# LightRAG Server Timeout Fix Summary
+# LightRAG Timeout Fix Summary
 
-## Problem Analysis
+## Problem
+The LightRAG server was failing to process files longer than about 8k characters with `httpx.ReadTimeout` errors. The error occurred in the Ollama client when making HTTP requests for text processing/embedding generation on large documents.
 
-The LightRAG server was experiencing `httpx.ReadTimeout` errors when processing PDF documents, specifically during communication with the Ollama server. The errors occurred because:
+## Root Cause
+The issue was caused by default timeout settings in the httpx client library used by the Ollama Python client. Even though the LightRAG configuration had timeout settings, the underlying HTTP client was using shorter default timeouts that weren't being properly overridden.
 
-1. **Inadequate Model Performance**: Using `qwen3:1.7b` (1.7B parameters) - too small for complex PDF processing
-2. **Insufficient Timeout Configuration**: Default httpx client timeouts were too short for large document processing
-3. **Suboptimal Processing Settings**: Large chunk sizes causing memory and processing bottlenecks
+## Solution Applied
+Applied extended timeout configurations at multiple levels:
 
-## Implemented Solutions
+### 1. Environment Variables (env.server)
+- Extended all HTTP timeouts to 4 hours (14400 seconds)
+- Increased Ollama request timeout to 4 hours
+- Reduced PDF chunk size to 512 for better reliability
+- Increased retry attempts to 10
+- Added TCP keepalive settings for stable connections
 
-### 1. Model Upgrade
-- **Before**: `qwen3:1.7b` (1.7B parameters)
-- **After**: `qwen2.5:latest` (7B parameters)
-- **Benefit**: Significantly better performance for document processing and text understanding
+### 2. Docker Compose Environment
+- Added explicit timeout environment variables in docker-compose.yml
+- Configured httpx client timeouts directly
+- Set Ollama-specific timeout parameters
+- Enabled TCP keepalive for long-running connections
 
-### 2. Timeout Configuration Enhancements
-
-#### Environment Variables (`lightrag_server/env.server`)
+### 3. Key Timeout Settings
 ```bash
-# Extended timeout settings
-LLM_TIMEOUT=7200          # 2 hours for LLM processing
-EMBEDDING_TIMEOUT=3600    # 1 hour for embedding processing
-HTTPX_TIMEOUT=7200        # 2 hours for httpx client operations
-HTTPX_CONNECT_TIMEOUT=600 # 10 minutes for connection timeout
-HTTPX_READ_TIMEOUT=7200   # 2 hours for read operations
-HTTPX_WRITE_TIMEOUT=600   # 10 minutes for write operations
-HTTPX_POOL_TIMEOUT=600    # 10 minutes for connection pool timeout
+# HTTP Client Timeouts
+HTTPX_TIMEOUT=14400          # 4 hours total timeout
+HTTPX_CONNECT_TIMEOUT=1200   # 20 minutes connection timeout
+HTTPX_READ_TIMEOUT=14400     # 4 hours read timeout
+HTTPX_WRITE_TIMEOUT=1200     # 20 minutes write timeout
+HTTPX_POOL_TIMEOUT=1200      # 20 minutes pool timeout
 
-# Ollama-specific settings
-OLLAMA_TIMEOUT=7200       # 2 hours for Ollama operations
-OLLAMA_KEEP_ALIVE=3600    # Keep model loaded for 1 hour
-OLLAMA_NUM_PREDICT=16384  # Maximum tokens to generate
-OLLAMA_TEMPERATURE=0.1    # Lower temperature for consistent processing
-```
+# Ollama Client Timeouts
+OLLAMA_TIMEOUT=14400         # 4 hours for Ollama operations
+OLLAMA_REQUEST_TIMEOUT=14400 # 4 hours for individual requests
+OLLAMA_KEEP_ALIVE=7200       # Keep model loaded for 2 hours
 
-#### Configuration File (`lightrag_server/config.ini`)
-```ini
-[server]
-request_timeout = 7200
-keepalive_timeout = 600
-
-[llm]
-timeout = 7200
-temperature = 0.1
-keep_alive = 3600
-num_predict = 16384
-
-[processing]
-pdf_chunk_size = 1024      # Reduced from 10000
-max_retries = 5            # Increased from 3
-retry_delay = 60           # Increased from 30
-batch_size = 1
-enable_chunking = true
-chunk_overlap = 100
-max_concurrent_requests = 1
-backoff_factor = 2.0
-```
-
-### 3. Docker Configuration Updates
-
-#### Docker Compose (`lightrag_server/docker-compose.yml`)
-- Added explicit environment variables for timeout settings
-- Added health check for container monitoring
-- Configured proper networking with `host.docker.internal`
-
-### 4. Processing Optimizations
-- **Chunk Size**: Reduced from 10,000 to 1,024 bytes for better reliability
-- **Retry Logic**: Increased max retries from 3 to 5
-- **Retry Delay**: Increased from 30 to 60 seconds
-- **Backoff Strategy**: Added exponential backoff with factor 2.0
-- **Concurrency**: Limited to 1 concurrent request to prevent resource exhaustion
-
-## Verification Results
-
-All tests passed successfully:
-- ✅ Server health check
-- ✅ Model configuration test
-- ✅ Document upload endpoint accessibility
-
-## Key Benefits
-
-1. **Timeout Resilience**: 2-hour timeout windows prevent premature connection drops
-2. **Better Model Performance**: 7B model handles complex PDF processing more efficiently
-3. **Improved Reliability**: Enhanced retry logic with exponential backoff
-4. **Resource Optimization**: Smaller chunks prevent memory issues
-5. **Connection Stability**: Keep-alive settings maintain persistent connections
-
-## Usage Recommendations
-
-### For PDF Processing:
-1. **Start Small**: Test with smaller PDF files first (< 10MB)
-2. **Monitor Logs**: Watch container logs during processing
-3. **Be Patient**: Large documents may take significant time to process
-4. **Check Progress**: Use the document status endpoints to monitor progress
-
-### Monitoring Commands:
-```bash
-# Check container status
-cd lightrag_server && docker-compose ps
-
-# Monitor logs
-cd lightrag_server && docker-compose logs -f
-
-# Test server health
-python test_lightrag_timeout_fix.py
+# Processing Configuration
+PDF_CHUNK_SIZE=512           # Smaller chunks for better reliability
+MAX_RETRIES=10               # More retries for large documents
+RETRY_DELAY=120              # 2 minutes between retries
+BATCH_SIZE=1                 # Process one document at a time
+MAX_CONCURRENT_REQUESTS=1    # Single threaded processing
 ```
 
 ## Files Modified
+1. `lightrag_server/env.server` - Added extended timeout environment variables
+2. `lightrag_server/docker-compose.yml` - Added timeout environment variables to container
+3. `fix_lightrag_timeout.py` - Created automated fix script
 
-1. `lightrag_server/env.server` - Updated timeout and model configuration
-2. `lightrag_server/config.ini` - Enhanced processing and timeout settings
-3. `lightrag_server/docker-compose.yml` - Added environment variables and health check
-4. `test_lightrag_timeout_fix.py` - Created verification script
+## Testing
+The fix was applied and the LightRAG container was successfully restarted with the new timeout settings. The server is now running properly and should be able to handle large documents (>8k characters) without timeout errors.
 
-## Expected Behavior
+## Usage
+To apply this fix in the future, run:
+```bash
+python3 fix_lightrag_timeout.py
+```
 
-- **Before**: Frequent `httpx.ReadTimeout` errors during PDF processing
-- **After**: Robust processing with proper timeout handling and retry logic
-- **Processing Time**: Longer but more reliable processing of complex documents
-- **Error Recovery**: Automatic retries with exponential backoff on failures
+This script will:
+1. Update environment configuration with extended timeouts
+2. Update Docker Compose configuration
+3. Restart the LightRAG container with new settings
 
-## Troubleshooting
+## Expected Results
+- Large documents (>8k characters) should now process successfully
+- PDF processing should be more reliable with smaller chunk sizes
+- Increased retry attempts should handle temporary network issues
+- TCP keepalive should maintain stable connections during long processing
 
-If timeout issues persist:
-1. Check Ollama server status: `ollama list`
-2. Verify model is loaded: `ollama run qwen2.5:latest "test"`
-3. Monitor system resources during processing
-4. Consider further reducing chunk size if memory issues occur
-5. Check Docker container logs for specific error messages
+## Monitoring
+Monitor the container logs for successful processing:
+```bash
+cd lightrag_server && docker-compose logs -f
+```
 
-The implemented fixes address the root causes of the timeout issues and provide a more robust document processing pipeline.
+If timeout issues persist, the timeout values can be further increased by modifying the environment variables and restarting the container.

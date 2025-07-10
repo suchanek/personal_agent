@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.8.5"
+version = "0.8.6"
 license = "GPL-3.0-only"
 description = "Personal AI agent with MCP and Memory, powered by Agno and Ollama"
 authors = ["Eric Suchanek <suchanek@mac.com>"]
@@ -47,6 +47,7 @@ nest-asyncio = "^1.6.0"
 googlesearch-python = "^1.3.0"
 pycountry = "^24.6.1"
 lightrag-hku = "^1.3.9"
+pyyaml = "^6.0.2"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"
