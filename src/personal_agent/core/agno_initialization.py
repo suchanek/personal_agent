@@ -9,16 +9,8 @@ import logging
 import os
 from typing import Optional, Tuple
 
-from ..config.settings import (
-    AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    LLM_MODEL,
-    LOG_LEVEL,
-    OLLAMA_URL,
-    REMOTE_OLLAMA_URL,
-    USE_MCP,
-    USER_ID,
-)
+from ..config import settings
+
 from ..utils import inject_dependencies, setup_logging
 from .agno_agent import AgnoPersonalAgent, create_agno_agent
 
@@ -34,16 +26,17 @@ async def initialize_agno_system(
     :return: Tuple of (agno_agent, query_kb_func, store_int_func, clear_kb_func, ollama_url)
     """
     from ..utils.pag_logging import configure_all_rich_logging
+    from .agno_agent import create_agno_agent
 
     # Set up Rich logging for all components including agno
     configure_all_rich_logging()
-    logger = setup_logging(level=LOG_LEVEL)
+    logger = setup_logging(level=settings.LOG_LEVEL)
     logger.info("Starting Personal AI Agent with agno framework...")
 
     # Update Ollama URL if requested
-    ollama_url = OLLAMA_URL
+    ollama_url = settings.OLLAMA_URL
     if use_remote_ollama:
-        ollama_url = REMOTE_OLLAMA_URL
+        ollama_url = settings.REMOTE_OLLAMA_URL
         os.environ["OLLAMA_URL"] = ollama_url
         logger.info("Using remote Ollama server at: %s", ollama_url)
     else:
@@ -54,13 +47,13 @@ async def initialize_agno_system(
 
     agno_agent = await create_agno_agent(
         model_provider="ollama",  # Default to Ollama
-        model_name=LLM_MODEL,  # Use configured model
+        model_name=settings.LLM_MODEL,  # Use configured model
         enable_memory=True,  # Enable native Agno memory
-        enable_mcp=USE_MCP,  # Use configured MCP setting
-        storage_dir=AGNO_STORAGE_DIR,  # Pass the user-specific path
-        knowledge_dir=AGNO_KNOWLEDGE_DIR,  # Pass the user-specific path
+        enable_mcp=settings.USE_MCP,  # Use configured MCP setting
+        storage_dir=settings.AGNO_STORAGE_DIR,  # Pass the user-specific path
+        knowledge_dir=settings.AGNO_KNOWLEDGE_DIR,  # Pass the user-specific path
         debug=True,
-        user_id=USER_ID,
+        user_id=settings.USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
         recreate=recreate,
     )

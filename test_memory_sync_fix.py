@@ -24,7 +24,7 @@ async def test_memory_sync():
     """Test memory synchronization between different interfaces."""
     print("🧪 Testing Memory Sync Fix")
     print("=" * 50)
-    
+
     # 1. Create agent
     print("\n1️⃣ Creating agent...")
     try:
@@ -34,29 +34,30 @@ async def test_memory_sync():
             debug=True,
             enable_memory=True,
             enable_mcp=False,  # Disable MCP for simpler testing
-            recreate=False
+            recreate=False,
+            user_id="test_user",
         )
         print("✅ Agent created successfully")
     except Exception as e:
         print(f"❌ Failed to create agent: {e}")
         return
-    
+
     # 2. Create Streamlit helper
     print("\n2️⃣ Creating Streamlit memory helper...")
     memory_helper = StreamlitMemoryHelper(agent)
     print("✅ Memory helper created")
-    
+
     # 3. Test memory storage via agent
     print("\n3️⃣ Testing memory storage via agent...")
     test_memory = "I love testing memory synchronization systems"
     result = await agent.store_user_memory(content=test_memory, topics=["testing"])
     print(f"Storage result: {result}")
-    
+
     # 4. Test memory retrieval via Streamlit helper
     print("\n4️⃣ Testing memory retrieval via Streamlit helper...")
     streamlit_memories = memory_helper.get_all_memories()
     print(f"Streamlit interface found: {len(streamlit_memories)} memories")
-    
+
     # 5. Test memory retrieval via agent tools
     print("\n5️⃣ Testing memory retrieval via agent tools...")
     if agent.agent and hasattr(agent.agent, "tools"):
@@ -64,10 +65,11 @@ async def test_memory_sync():
             if getattr(tool, "__name__", "") == "get_all_memories":
                 agent_result = await tool()
                 # Count memories in agent result
-                agent_count = agent_result.count("📝 All ") 
+                agent_count = agent_result.count("📝 All ")
                 if "📝 All " in agent_result:
                     # Extract number from "📝 All X memories:"
                     import re
+
                     match = re.search(r"📝 All (\d+) memories:", agent_result)
                     if match:
                         agent_count = int(match.group(1))
@@ -83,7 +85,7 @@ async def test_memory_sync():
     else:
         print("❌ Agent tools not available")
         agent_count = 0
-    
+
     # 6. Test sync status
     print("\n6️⃣ Testing sync status...")
     sync_status = memory_helper.get_memory_sync_status()
@@ -93,37 +95,37 @@ async def test_memory_sync():
         print(f"Sync status: {sync_status.get('status', 'unknown')}")
     else:
         print(f"❌ Sync status error: {sync_status.get('error', 'Unknown')}")
-    
+
     # 7. Compare results
     print("\n7️⃣ Comparing results...")
     streamlit_count = len(streamlit_memories)
-    
+
     print(f"Streamlit helper: {streamlit_count} memories")
     print(f"Agent tools: {agent_count} memories")
-    
+
     if streamlit_count == agent_count:
         print("✅ SUCCESS: Both interfaces show the same memory count!")
     else:
         print("⚠️ MISMATCH: Interfaces show different memory counts")
         print("This suggests the fix may need additional work")
-    
+
     # 8. Show sample memories from both interfaces
     print("\n8️⃣ Sample memories from both interfaces...")
-    
+
     print("\nStreamlit memories (first 3):")
     for i, memory in enumerate(streamlit_memories[:3]):
         print(f"  {i+1}. {memory.memory[:60]}...")
-    
+
     print(f"\nAgent tool result preview:")
-    if 'agent_result' in locals():
-        lines = agent_result.split('\n')[:10]  # First 10 lines
+    if "agent_result" in locals():
+        lines = agent_result.split("\n")[:10]  # First 10 lines
         for line in lines:
             if line.strip():
                 print(f"  {line}")
-    
+
     print("\n" + "=" * 50)
     print("🎯 Test completed!")
-    
+
     # Cleanup
     await agent.cleanup()
 
