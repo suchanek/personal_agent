@@ -516,6 +516,50 @@ def render_memory_tab():
         else:
             st.error(f"Error getting statistics: {stats['error']}")
 
+    # Memory Sync Status Section
+    st.markdown("---")
+    st.subheader("🔄 Memory Sync Status")
+    st.markdown("*Monitor synchronization between local SQLite and LightRAG graph memories*")
+    if st.button("🔍 Check Sync Status", key="check_sync_btn"):
+        sync_status = memory_helper.get_memory_sync_status()
+        if "error" not in sync_status:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Local Memories", sync_status.get("local_memory_count", 0))
+            with col2:
+                st.metric("Graph Entities", sync_status.get("graph_entity_count", 0))
+            with col3:
+                sync_ratio = sync_status.get("sync_ratio", 0)
+                st.metric("Sync Ratio", f"{sync_ratio:.2f}")
+            
+            status = sync_status.get("status", "unknown")
+            if status == "synced":
+                st.success("✅ Memories are synchronized between local and graph systems")
+            elif status == "out_of_sync":
+                st.warning("⚠️ Memories may be out of sync between systems")
+                if st.button("🔄 Sync Missing Memories", key="sync_missing_btn"):
+                    # Sync any missing memories to graph
+                    local_memories = memory_helper.get_all_memories()
+                    synced_count = 0
+                    for memory in local_memories:
+                        try:
+                            success, result = memory_helper.sync_memory_to_graph(
+                                memory.memory, getattr(memory, 'topics', None)
+                            )
+                            if success:
+                                synced_count += 1
+                        except Exception as e:
+                            st.error(f"Error syncing memory: {e}")
+                    
+                    if synced_count > 0:
+                        st.success(f"✅ Synced {synced_count} memories to graph system")
+                    else:
+                        st.info("No memories needed syncing")
+            else:
+                st.error(f"❌ Sync status unknown: {status}")
+        else:
+            st.error(f"Error checking sync status: {sync_status.get('error', 'Unknown error')}")
+
     # Memory Settings Section
     st.markdown("---")
     st.subheader("⚙️ Memory Settings")

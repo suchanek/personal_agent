@@ -140,7 +140,7 @@ class MemoryClearingManager:
                 # Delete documents using batch deletion
                 payload = {
                     "doc_ids": doc_ids,
-                    "delete_file": False  # Don't delete source files
+                    "delete_file": True  # DELETE source files to prevent rescan
                 }
                 async with session.delete(
                     f"{self.lightrag_memory_url}/documents/delete_document",

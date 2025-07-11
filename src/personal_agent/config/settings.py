@@ -81,6 +81,20 @@ AGNO_KNOWLEDGE_DIR = os.path.expandvars(
     )
 )
 
+# LightRAG storage directories
+LIGHTRAG_STORAGE_DIR = os.path.expandvars(
+    get_env_var("LIGHTRAG_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}/rag_storage")
+)
+LIGHTRAG_INPUTS_DIR = os.path.expandvars(
+    get_env_var("LIGHTRAG_INPUTS_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}/inputs")
+)
+LIGHTRAG_MEMORY_STORAGE_DIR = os.path.expandvars(
+    get_env_var("LIGHTRAG_MEMORY_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}/memory_rag_storage")
+)
+LIGHTRAG_MEMORY_INPUTS_DIR = os.path.expandvars(
+    get_env_var("LIGHTRAG_MEMORY_INPUTS_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{USER_ID}/memory_inputs")
+)
+
 
 # Logging configuration
 LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
