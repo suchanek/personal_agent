@@ -91,6 +91,12 @@ This is a Python project managed with `Poetry`.
     OLLAMA_URL=http://localhost:11434
     OLLAMA_DOCKER_URL=http://host.docker.internal:11434
 
+    # LightRAG Storage Directories
+    LIGHTRAG_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage
+    LIGHTRAG_INPUTS_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs
+    LIGHTRAG_MEMORY_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/memory_rag_storage
+    LIGHTRAG_MEMORY_INPUTS_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/memory_inputs
+
     # Optional: API keys for enhanced functionality
     GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
     BRAVE_API_KEY=your_api_key_here
@@ -139,8 +145,9 @@ The project uses a custom testing setup.
 *   **Test MCP servers**: `poetry run test-mcp-servers`
 *   **Test memory system**: `python memory_tests/test_comprehensive_memory_search.py`
 *   **Test tool call detection**: `python tests/test_tool_call_detection.py`
+*   **Test memory synchronization**: `python test_memory_sync_fix.py`
 
-"""## Key Technologies
+## Key Technologies
 
 *   **agno**: Core framework for building the agent.
 *   **Ollama**: For running local language models.
@@ -156,27 +163,42 @@ The project has been updated to integrate with the LightRAG server, a powerful t
 
 ### Key Changes:
 
-*   **`GEMINI.md`**: This file has been significantly updated to reflect the integration with `LightRAG`. It now includes:
+*   **`GEMINI.md`**: This file has been significantly updated to reflect the integration with `LightRAG` and recent system enhancements. It now includes:
     *   A detailed overview of `LightRAG`'s features.
     *   Installation and usage instructions for the `lightrag` package.
     *   A new section documenting the LightRAG Server API, including its endpoints and key characteristics like authentication and versioning.
+    *   Updates on the **Enriched Graph Ingestion Pipeline** (ADR-007) and the **LightRAG Timeout Fix** (ADR-006).
 *   **`pyproject.toml`**: The `lightrag-hku` package has been added as a dependency. This is a crucial change that ensures the `LightRAG` library is installed alongside other project dependencies, making its functionality available to the application.
 *   **Docker Configuration (`docker-compose.yml`)**: The Docker configuration has been substantially modified to:
     *   **Tailor the image for the personal agent:** The `docker-compose.yml` has been updated to create a specialized Docker image that includes all the necessary dependencies and configurations for the personal agent project.
-    *   **Integrate `LightRAG`:** The Docker build process now correctly installs the `lightrag` library, ensuring it's available within the containerized environment.""
+    *   **Integrate `LightRAG`:** The Docker build process now correctly installs the `lightrag` library, ensuring it's available within the containerized environment.
+*   **Memory Sync Fix**: Addressed inconsistencies in memory access between the Streamlit interface and agent tools. Both now use a consistent `SemanticMemoryManager` interface. Introduced memory sync monitoring and repair functionality in the Streamlit UI.
+*   **New LightRAG Storage Configuration**: Added dedicated environment variables and settings for LightRAG storage and input directories (`LIGHTRAG_STORAGE_DIR`, `LIGHTRAG_INPUTS_DIR`, etc.) for better organization and multi-user support.
+*   **Enhanced Memory Cleaner**: Modified `memory_cleaner.py` to delete source files from LightRAG memory to prevent rescanning.
+    *   **Improved Config Display**: Updated the `show-config` tool to display the new LightRAG storage directories.
 
 ## Tools & Capabilities
 
 ### Memory Tools
 
-*   **store_user_memory**: Store personal information with topic classification
-*   **query_memory**: Search through stored memories using semantic similarity
-*   **get_recent_memories**: Retrieve recent interactions and stored information
+*   **store_user_memory**: Store personal information with topic classification, now leveraging an **Enriched Graph Ingestion Pipeline** for more accurate knowledge graph construction (see ADR-007).
+*   **query_memory**: Search user memories using semantic similarity. Args: `query` (str), `limit` (int, optional). Returns: `str` (found memories or message if none found).
+*   **get_recent_memories**: Retrieve recent memories by searching all memories and sorting by date. Args: `limit` (int, default: 10). Returns: `str` (recent memories or message if none found).
+*   **get_all_memories**: Get all user memories. Returns: `str` (all memories or message if none found).
+*   **get_memories_by_topic**: Get memories by topic without similarity search. Args: `topics` (list[str] or str, optional), `limit` (int, optional). Returns: `str` (found memories or a message if none are found).
+*   **list_memories**: List all memories in a simple, user-friendly format. Returns: `str` (all memories or message if none found).
+*   **update_memory**: Update an existing memory. Args: `memory_id` (str), `content` (str), `topics` (list[str] or str, optional). Returns: `str` (success or error message).
+*   **delete_memory**: Delete a memory. Args: `memory_id` (str). Returns: `str` (success or error message).
+*   **delete_memories_by_topic**: Delete all memories associated with a specific topic or list of topics. Args: `topics` (list[str] or str). Returns: `str` (success or error message).
+*   **clear_memories**: Clear all memories for the user. Returns: `str` (success or error message).
+*   **get_memory_stats**: Get memory statistics. Returns: `str` (memory statistics).
+*   **store_graph_memory**: Store a complex memory in your knowledge graph to capture relationships. Uses file upload approach with enhanced entity and relationship extraction. Combines reliable file upload with advanced NLP processing. Args: `content` (str), `topics` (list[str] or str, optional). Returns: `str` (success or error message).
+*   **get_memory_graph_labels**: Get the list of all entity and relation labels from the memory graph. Returns: `str` (sorted graph labels).
 
 ### Knowledge Tools
 
-*   **query_knowledge_base**: Search the RAG knowledge base with multiple modes (hybrid, local, etc.).
-*   **Semantic Search**: Search through SQLite/LanceDB knowledge sources.
+*   **query_knowledge_base**: Unified knowledge base query with intelligent routing. Automatically routes queries between local semantic search and LightRAG based on mode and query characteristics. Supports modes like "local", "global", "hybrid", "mix", "naive", and "auto" (default).
+*   **query_semantic_knowledge**: DEPRECATED. Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents. Args: `query` (str), `limit` (int, default: 5). Returns: `str` (formatted search results or message if none found).
 
 ### MCP-Powered Tools
 
@@ -197,6 +219,8 @@ The project has been updated to integrate with the LightRAG server, a powerful t
 
 *   **Send File to LightRAG**: `python3 scripts/send_to_lightrag.py <file_path>`
     This script sends a specified file to the LightRAG server's `/documents/file` endpoint for processing.
+*   **Clear Memory When Ready**: `python3 clear_memory_when_ready.py`
+    This script waits for the LightRAG pipeline to finish processing, then clears both local and graph memories.
 
 ## Memory System
 
@@ -267,13 +291,21 @@ poetry run test-mcp-servers
 
 **4. Memory System Issues**
 
-```bash
-# Clear memory database
-rm -f data/agent_memory.db
+If you encounter issues with the memory system, consider the following:
 
-# Test memory functionality
-python memory_tests/test_comprehensive_memory_search.py
-```
+*   **Clear all memories**: Use the `clear_all_memories.py` script for a unified approach to clear both local and graph memories.
+    ```bash
+    python3 scripts/clear_all_memories.py --no-confirm
+    ```
+*   **Wait for pipeline idle**: If clearing memories after ingestion, use `clear_memory_when_ready.py` to ensure the LightRAG pipeline is idle.
+    ```bash
+    python3 clear_memory_when_ready.py
+    ```
+*   **Test memory functionality**:
+    ```bash
+    python memory_tests/test_comprehensive_memory_search.py
+    ```
+*   **Check memory sync status**: In the Streamlit UI, use the "Memory Sync Status" section to check for inconsistencies between local and graph memories and sync them if needed.
 
 **5. Tool Call Visibility**
 
