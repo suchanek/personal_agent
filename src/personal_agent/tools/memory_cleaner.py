@@ -46,7 +46,7 @@ class MemoryClearingManager:
         self.memory_db = None
         self.memory_manager = None
 
-        print(f"🧠 Memory Clearing Manager initialized")
+        print("🧠 Memory Clearing Manager initialized")
         print(f"   User ID: {self.user_id}")
         print(f"   Storage Directory: {self.storage_dir}")
         print(f"   LightRAG Memory URL: {self.lightrag_memory_url}")
@@ -408,7 +408,7 @@ def print_clearing_results(results: Dict[str, Any]) -> None:
     # LightRAG Memory Results
     lightrag = results["lightrag_memory"]
     if lightrag["attempted"]:
-        print(f"\n🌐 LightRAG Graph Memory System:")
+        print("\n🌐 LightRAG Graph Memory System:")
         print(f"   Status: {'✅ Success' if lightrag['success'] else '❌ Failed'}")
         print(f"   Message: {lightrag['message']}")
 
@@ -424,7 +424,7 @@ def print_verification_results(verification: Dict[str, Any]) -> None:
 
     # Semantic Memory Verification
     semantic = verification["semantic_memory"]
-    print(f"\n📊 Semantic Memory System:")
+    print("\n📊 Semantic Memory System:")
     print(f"   Cleared: {'✅' if semantic['cleared'] else '❌'}")
     print(f"   Remaining Memories: {semantic['remaining_count']}")
 
