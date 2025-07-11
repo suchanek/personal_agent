@@ -26,7 +26,7 @@ The LightRAG server must be running for the agent to function correctly. It is m
 ./restart-lightrag.sh
 ```
 
-This script uses the `docker-compose.yml` file in the project root to bring up the necessary services.
+This script uses the `docker-compose.yml` file in the `lightrag_server` directory to bring up the necessary services.
 
 ## Installation and Dependencies
 
@@ -43,7 +43,7 @@ This is a Python project managed with `Poetry`.
 2.  **Start LightRAG Server**
 
     ```bash
-    docker-compose up -d
+    ./restart-lightrag.sh
     ```
 
 3.  **Manage MCP & Ollama Servers**

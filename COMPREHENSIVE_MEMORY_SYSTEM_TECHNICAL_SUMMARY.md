@@ -251,9 +251,86 @@ When the `recreate` flag is set to `True` during agent initialization, the syste
 
 ### 1. File Upload Solution for Pydantic Validation
 
+**Problem**: The LightRAG server's `POST /documents/text` endpoint, when used directly, created documents with a `file_path` of `null`. This caused Pydantic validation errors in the agent's data models, which expected a valid file path string.
+
+**Solution**: To resolve this, the system was updated to use the `POST /documents/upload` endpoint. This involves creating a temporary text file locally, writing the memory content to it, and then uploading the file using a multipart form data request.
+
+**Implementation Details**:
+- **Meaningful Filenames**: Files are given descriptive names for better traceability, e.g., `graph_memory_content_words_hash.txt`.
+- **Metadata in Content**: Topics are embedded as headers within the file content (e.g., `# Topics: work, personal`).
+- **Robust Upload**: The `aiohttp` library is used to construct and send the `multipart/form-data` request.
+
+```python
+# Example of file creation and upload
+import aiohttp
+import os
+import tempfile
+
+async def store_memory_in_graph(content: str, topics: list[str], upload_url: str):
+    topic_header = f"# Topics: {', '.join(topics)}\n\n"
+    file_content = topic_header + content
+    
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", prefix="graph_memory_") as tmp_file:
+        tmp_file.write(file_content)
+        tmp_file_path = tmp_file.name
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            data = aiohttp.FormData()
+            data.add_field('file',
+                           open(tmp_file_path, 'rb'),
+                           filename=os.path.basename(tmp_file_path),
+                           content_type='text/plain')
+            async with session.post(upload_url, data=data) as response:
+                response.raise_for_status()
+                return await response.json()
+    finally:
+        os.remove(tmp_file_path)
+```
+
+**Benefits**:
+- ✅ **Eliminates Pydantic Errors**: Ensures all documents in LightRAG have a valid `file_path`.
+- ✅ **Meaningful Organization**: Files in the LightRAG input directory are clearly named.
+- ✅ **Metadata Preservation**: Topics are preserved within the document content itself.
+- ✅ **Reliability**: The file upload approach is more robust for storing structured text.
+
 ### 2. Intelligent Topic Management
 
+The system features robust logic for processing the `topics` parameter, which can be provided as a JSON string, a comma-separated string, or a single string. This ensures flexibility for the user or calling tool.
+
+```python
+# Robust topic processing
+import json
+
+def process_topics(topics_input):
+    if isinstance(topics_input, list):
+        return topics_input if topics_input else ["general"]
+    if not isinstance(topics_input, str):
+        return ["general"]
+
+    topics_str = topics_input.strip()
+    if topics_str.startswith('[') and topics_str.endswith(']'):
+        try:
+            topics = json.loads(topics_str)
+            return topics if isinstance(topics, list) else [topics_str]
+        except json.JSONDecodeError:
+            # Fallback for malformed JSON string like '[topic1, topic2]'
+            return [t.strip() for t in topics_str.strip('[]').split(',')]
+    elif "," in topics_str:
+        return [t.strip() for t in topics_str.split(',')]
+    elif topics_str:
+        return [topics_str]
+    else:
+        return ["general"]
+```
+
 ### 3. Semantic Search Optimization
+
+The local memory system is optimized for fast and relevant search through:
+- **Multi-vector Embeddings**: Using multiple strategies to create rich content embeddings.
+- **Topic Boosting**: Prioritizing results that match the query's topic.
+- **Threshold Tuning**: Allowing configurable similarity thresholds to filter noise.
+- **Result Ranking**: Employing intelligent scoring algorithms to rank results.
 
 ### 4. Recreate Flag Memory Safety Fix (ADR-009)
 
@@ -269,52 +346,6 @@ When the `recreate` flag is set to `True` during agent initialization, the syste
 -   **Reliable Recreation**: The `--recreate` flag now functions correctly, providing a dependable way to reset both local SQLite and LightRAG graph memories when explicitly requested.
 -   **Improved User Experience**: Prevents unexpected data loss and provides clear control over memory management.
 -   **Consistent Behavior**: Ensures that memory clearing operations are consistently applied to both memory systems.
-
-## API Interface
-
-**Problem**: LightRAG server's `POST /documents/text` endpoint created documents with `"file_path": null`, causing Pydantic validation errors.
-
-**Solution**: File upload approach using `POST /documents/upload`:
-
-```python
-# Create temporary file with meaningful name
-filename = f"graph_memory_{content_words}_{hash}.txt"
-
-# Upload using proper multipart form data
-data = aiohttp.FormData()
-data.add_field('file', file_handle, filename=filename, content_type='text/plain')
-```
-
-**Benefits**:
-
-- ✅ Eliminates null file_path issues
-- ✅ Meaningful file organization
-- ✅ Metadata preservation in file headers
-- ✅ Automatic cleanup of temporary files
-
-### 2. Intelligent Topic Management
-
-```python
-# Robust topic processing
-if isinstance(topics, str):
-    if topics.startswith("[") and topics.endswith("]"):
-        topics = json.loads(topics)  # JSON string
-    elif "," in topics:
-        topics = [t.strip() for t in topics.split(",")]  # Comma-separated
-    else:
-        topics = [topics.strip()]  # Single topic
-
-# Ensure valid list with fallback
-if not topics:
-    topics = ["general"]
-```
-
-### 3. Semantic Search Optimization
-
-- **Multi-vector Embeddings**: Multiple embedding strategies
-- **Topic Boosting**: Enhanced relevance for categorized content
-- **Threshold Tuning**: Configurable similarity thresholds
-- **Result Ranking**: Intelligent scoring algorithms
 
 ## API Interface
 
@@ -556,25 +587,57 @@ Query Input → Query Analysis → Routing Decision
 ```python
 # SemanticMemoryManager settings
 similarity_threshold = 0.80
-embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
-vector_dimensions = 384
+embedding_model = "nomic-embed-text"
+vector_dimensions = 768
 storage_path = "data/agno/agent_memory.db"
 ```
 
 ### LightRAG Server Configuration
 
 ```yaml
-# docker-compose.yml
+# lightrag_server/docker-compose.yml
 services:
   lightrag:
+    container_name: lightrag_pagent
     image: ghcr.io/suchanek/lightrag_pagent:latest
     ports:
-      - "9622:9621"
+      - "${PORT:-9621}:9621"
     volumes:
-      - ${DATA_DIR}/agno/${USER_ID}/memory_rag_storage:/app/data/rag_storage
+      - "${AGNO_STORAGE_DIR}/rag_storage:/app/data/rag_storage"
+      - "${AGNO_STORAGE_DIR}/inputs:/app/data/inputs"
+      - ./config.ini:/app/config.ini
+      - ./env.server:/app/.env
+    env_file:
+      - env.server
     environment:
-      - LLM_BINDING_HOST=${OLLAMA_DOCKER_URL}
-      - EMBEDDING_BINDING_HOST=${OLLAMA_DOCKER_URL}
+      - WORKERS=1
+      - MAX_PARALLEL_INSERT=1
+      - HTTPX_TIMEOUT=14400
+      - OLLAMA_REQUEST_TIMEOUT=14400
+```
+
+### LightRAG Memory Server Configuration
+
+```yaml
+# lightrag_memory_server/docker-compose.yml
+services:
+  lightrag:
+    container_name: lightrag_memory
+    image: ghcr.io/suchanek/lightrag_pagent:latest
+    ports:
+      - "${PORT:-9622}:9621"
+    volumes:
+      - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
+      - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
+      - ./config.ini:/app/config.ini
+      - ./env.memory_server:/app/.env
+    env_file:
+      - env.memory_server
+    environment:
+      - WORKERS=1
+      - MAX_PARALLEL_INSERT=1
+      - HTTPX_TIMEOUT=7200
+      - OLLAMA_TIMEOUT=7200
 ```
 
 ### Environment Variables
