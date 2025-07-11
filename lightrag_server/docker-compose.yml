@@ -10,8 +10,8 @@ services:
     ports:
       - "${PORT:-9621}:9621"
     volumes:
-      - "${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage:/app/data/rag_storage"
-      - "${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs:/app/data/inputs"
+      - "${AGNO_STORAGE_DIR}/rag_storage:/app/data/rag_storage"
+      - "${AGNO_STORAGE_DIR}/inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
       - ./env.server:/app/.env
     env_file:

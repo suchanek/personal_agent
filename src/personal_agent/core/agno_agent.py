@@ -759,8 +759,8 @@ class AgnoPersonalAgent:
         ) -> str:
             """
             Store a memory in the LightRAG graph database to capture relationships.
-            Uses proper entity seeding and existence checking before creating relationships.
-            Includes improved coreference resolution and entity filtering.
+            Uses file upload approach with enhanced entity and relationship extraction.
+            Combines the reliable file upload method with advanced NLP processing.
 
             :param content: The information to store as a memory.
             :param topics: Optional list of topics for the memory.
@@ -769,6 +769,9 @@ class AgnoPersonalAgent:
             if not content or not content.strip():
                 return "❌ Error: Content is required to store a graph memory."
             try:
+                import hashlib
+                import os
+                import tempfile
                 import asyncio
                 from personal_agent.core.nlp_extractor import extract_entities, extract_relationships
                 import spacy
@@ -818,111 +821,72 @@ class AgnoPersonalAgent:
                 
                 logger.info("Extracted entities: %s", entities)
                 logger.info("Extracted relationships: %s", relationships)
-                
-                graph_edit_results = []
-                
-                # --- Step 1: Ensure all entities exist in the graph ---
+
+                # Create a meaningful filename based on content
+                content_hash = hashlib.md5(restated_content.encode()).hexdigest()[:8]
+                words = restated_content.split()[:3]
+                filename_base = "_".join(
+                    word.lower().replace(" ", "") for word in words if word.isalnum()
+                )
+                filename = f"graph_memory_{filename_base}_{content_hash}.txt"
+
+                # Create temporary file
+                temp_dir = "/tmp/lightrag_graph_memories"
+                os.makedirs(temp_dir, exist_ok=True)
+                filepath = os.path.join(temp_dir, filename)
+
+                # Write enhanced content to file with metadata
+                with open(filepath, "w", encoding="utf-8") as f:
+                    if topics:
+                        if isinstance(topics, str):
+                            topics = [topics]
+                        f.write(f"# Topics: {', '.join(topics)}\n\n")
+                    
+                    # Add extracted entities and relationships as metadata
+                    if entities:
+                        f.write("# Extracted Entities:\n")
+                        for entity in entities:
+                            f.write(f"# - {entity.get('text', 'Unknown')} ({entity.get('label', 'Unknown')})\n")
+                        f.write("\n")
+                    
+                    if relationships:
+                        f.write("# Extracted Relationships:\n")
+                        for sub, rel, obj in relationships:
+                            f.write(f"# - {sub} -> {rel} -> {obj}\n")
+                        f.write("\n")
+                    
+                    # Write the main content
+                    f.write(restated_content)
+
+                # Upload file using the file upload endpoint
+                url = f"{LIGHTRAG_MEMORY_URL}/documents/upload"
                 async with aiohttp.ClientSession() as session:
-                    for entity in entities:
-                        entity_name = entity.get("text")
-                        entity_type = entity.get("label")
-                        if entity_name and entity_type:
-                            # Check if entity exists
-                            exists = await self.check_entity_exists(entity_name)
-                            if not exists:
-                                # Seed the entity
-                                seeded = await self.seed_entity_in_graph(entity_name, entity_type)
-                                if seeded:
-                                    graph_edit_results.append(f"Entity seeded: {entity_name}")
-                                    # Wait a bit for processing
-                                    await asyncio.sleep(1)
-                                else:
-                                    graph_edit_results.append(f"Failed to seed entity: {entity_name}")
-                                    continue
-                            
-                            # Now enhance the existing entity with metadata
-                            payload = {
-                                "entity_name": entity_name,
-                                "updated_data": {
-                                    "type": entity_type,
-                                    "description": f"Enhanced entity of type {entity_type}",
-                                    "user_id": self.user_id,
-                                    "source": "user_memory"
-                                }
-                            }
-                            url = f"{LIGHTRAG_MEMORY_URL}/graph/entity/edit"
-                            
-                            try:
-                                async with session.post(url, json=payload, timeout=10) as resp:
-                                    if resp.status in [200, 201]:
-                                        result = await resp.json()
-                                        graph_edit_results.append(f"Entity enhanced: {entity_name}")
-                                    else:
-                                        error_detail = await resp.text()
-                                        logger.warning(f"Failed to enhance entity {entity_name}: {error_detail}")
-                                        graph_edit_results.append(f"Entity enhancement failed: {entity_name}")
-                            except Exception as e:
-                                logger.error(f"Error enhancing entity {entity_name}: {e}")
-                                graph_edit_results.append(f"Entity enhancement error: {entity_name}")
+                    with open(filepath, "rb") as f:
+                        data = aiohttp.FormData()
+                        data.add_field(
+                            "file", f, filename=filename, content_type="text/plain"
+                        )
+                        async with session.post(url, data=data, timeout=60) as resp:
+                            resp.raise_for_status()
+                            result = await resp.json()
 
-                    # --- Step 2: Create relationships between existing entities ---
-                    for sub, rel, obj in relationships:
-                        # Ensure both entities exist before creating relationship
-                        sub_exists = await self.check_entity_exists(sub)
-                        obj_exists = await self.check_entity_exists(obj)
-                        
-                        # Seed missing entities
-                        if not sub_exists:
-                            seeded = await self.seed_entity_in_graph(sub, "MISC")
-                            if seeded:
-                                graph_edit_results.append(f"Missing subject entity seeded: {sub}")
-                                await asyncio.sleep(2)  # Increased wait time for processing
-                            else:
-                                graph_edit_results.append(f"Failed to seed subject: {sub}")
-                                continue
-                                
-                        if not obj_exists:
-                            seeded = await self.seed_entity_in_graph(obj, "MISC")
-                            if seeded:
-                                graph_edit_results.append(f"Missing object entity seeded: {obj}")
-                                await asyncio.sleep(2)  # Increased wait time for processing
-                            else:
-                                graph_edit_results.append(f"Failed to seed object: {obj}")
-                                continue
-                        
-                        # Additional wait to ensure both entities are fully processed
-                        if not sub_exists or not obj_exists:
-                            await asyncio.sleep(1)  # Extra wait after seeding
-                        
-                        # Now create the relationship
-                        payload = {
-                            "source_id": sub,
-                            "target_id": obj,
-                            "updated_data": {
-                                "type": rel.upper().replace(" ", "_"),
-                                "description": f"{sub} {rel} {obj}",
-                                "user_id": self.user_id,
-                                "source": "user_memory"
-                            }
-                        }
-                        url = f"{LIGHTRAG_MEMORY_URL}/graph/relation/edit"
+                # Clean up temporary file
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
 
-                        try:
-                            async with session.post(url, json=payload, timeout=10) as resp:
-                                if resp.status in [200, 201]:
-                                    result = await resp.json()
-                                    graph_edit_results.append(f"Relationship created: {sub} -> {rel} -> {obj}")
-                                else:
-                                    error_detail = await resp.text()
-                                    logger.warning(f"Failed to create relationship {sub}-{rel}-{obj}: {error_detail}")
-                                    graph_edit_results.append(f"Relationship failed: {sub} -> {rel} -> {obj}")
-                        except Exception as e:
-                            logger.error(f"Error creating relationship {sub}-{rel}-{obj}: {e}")
-                            graph_edit_results.append(f"Relationship error: {sub} -> {rel} -> {obj}")
-
-                final_message = f"✅ Successfully stored graph memory: {restated_content[:50]}...\nGraph Operations: {'; '.join(graph_edit_results)}"
-                logger.info(final_message)
-                return final_message
+                # Create summary of what was processed
+                entity_summary = f"{len(entities)} entities" if entities else "no entities"
+                relationship_summary = f"{len(relationships)} relationships" if relationships else "no relationships"
+                
+                logger.info(
+                    "Stored graph memory via file upload: %s... (Extracted: %s, %s)",
+                    restated_content[:50],
+                    entity_summary,
+                    relationship_summary,
+                )
+                return f"✅ Successfully stored graph memory: {restated_content[:50]}... (Extracted: {entity_summary}, {relationship_summary})"
             except Exception as e:
                 logger.error("Error storing graph memory: %s", e, exc_info=True)
                 return f"❌ Error storing graph memory: {str(e)}"
@@ -2146,13 +2110,27 @@ Returns:
                         content, generated_topics
                     )
                     logger.info("Graph memory result: %s", graph_result)
-                    results.append(f"Graph memory: {graph_result}")
+                    if "✅" in graph_result:
+                        results.append(f"✅ Graph memory: Synced successfully")
+                    else:
+                        results.append(f"⚠️ Graph memory: {graph_result}")
                 else:
-                    logger.error("Could not find store_graph_memory tool to call.")
-                    results.append("❌ Graph memory error: Tool not found")
+                    logger.warning("Could not find store_graph_memory tool - graph sync skipped")
+                    results.append("⚠️ Graph memory: Tool not available (sync skipped)")
             except Exception as e:
                 logger.error("Error storing in graph memory: %s", e)
                 results.append(f"❌ Graph memory error: {str(e)}")
+
+            # Log sync status for debugging
+            local_success_count = sum(1 for r in results if "✅" in r and "Local" in r)
+            graph_success_count = sum(1 for r in results if "✅" in r and "Graph" in r)
+            
+            if local_success_count > 0 and graph_success_count > 0:
+                logger.info("✅ DUAL STORAGE SUCCESS: Memory stored in both local SQLite and LightRAG graph")
+            elif local_success_count > 0:
+                logger.warning("⚠️ PARTIAL STORAGE: Memory stored in local SQLite only (graph sync failed)")
+            else:
+                logger.error("❌ STORAGE FAILURE: Memory not stored in either system")
 
             # Return combined results
             return " | ".join(results)

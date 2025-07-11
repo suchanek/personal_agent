@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.8.7] - 2025-07-10
 
 ### Added
-- **Direct Knowledge Graph Construction**: The agent now performs advanced NLP (coreference resolution, entity/relationship extraction) to build a precise knowledge graph from user statements. This replaces the previous text-upload method with direct API calls to create and link entities and relationships. See [ADR-007](./docs/adr/007-direct-knowledge-graph-construction.md) for details.
+- **Enriched Graph Ingestion Pipeline**: The `store_graph_memory` tool now uses a sophisticated, hybrid approach to build the knowledge graph. The agent performs local NLP (coreference resolution, entity/relationship extraction) to generate rich metadata, which is then embedded in a text file and uploaded to LightRAG. This guides the server's native ingestion pipeline, resulting in a more accurate and detailed graph. See [ADR-007](./docs/adr/007-direct-knowledge-graph-construction.md) for details.
+- New `nlp_extractor.py` module for NLP tasks.
+- New test suites (`test_knowledge_graph_relationships.py`, `run_kg_relationship_test.py`) to validate the new memory system.
+- New `inject_eric_facts_v2.py` script to leverage the new memory system.
 
 ### Changed
-- The `store_graph_memory` tool was completely overhauled to use the new Direct Knowledge Graph Construction pipeline, resulting in more accurate and detailed memory storage in the LightRAG knowledge graph.
+- The `store_graph_memory` tool was completely overhauled to use the new Enriched Graph Ingestion Pipeline, replacing the previous direct text upload.
 
 ## [0.8.6] - 2025-07-10
 
@@ -96,4 +99,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured JSON Response System** using Ollama's JSON schema validation for more reliable tool call detection and response parsing.
 
 ### Fixed
-- **Critical LightRAG Timeout Fix:** Resolved an `httpx.ReadTimeout` error that occurred during large document ingestion by correcting the timeout value in the `lightrag` service's `config.ini`.
+- **Critical LightRAG Timeout Fix:** Resolved an `httpx.ReadTimeout` error that occurred during large document ingestion by correcting the timeout value in the `lightrag` service's `config.ini`. See [ADR-006](./docs/adr/006-lightrag-timeout-fix.md) for details.

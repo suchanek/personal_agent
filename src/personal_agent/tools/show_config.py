@@ -72,6 +72,10 @@ def output_json():
             "repo_dir": settings.REPO_DIR,
             "agno_storage_dir": settings.AGNO_STORAGE_DIR,
             "agno_knowledge_dir": settings.AGNO_KNOWLEDGE_DIR,
+            "lightrag_storage_dir": settings.LIGHTRAG_STORAGE_DIR,
+            "lightrag_inputs_dir": settings.LIGHTRAG_INPUTS_DIR,
+            "lightrag_memory_storage_dir": settings.LIGHTRAG_MEMORY_STORAGE_DIR,
+            "lightrag_memory_inputs_dir": settings.LIGHTRAG_MEMORY_INPUTS_DIR,
         },
         "ai_storage": {
             "storage_backend": settings.STORAGE_BACKEND,
@@ -275,6 +279,10 @@ def print_config_colored():
                 ('Repository Directory', settings.REPO_DIR),
                 ('Agno Storage Directory', settings.AGNO_STORAGE_DIR),
                 ('Agno Knowledge Directory', settings.AGNO_KNOWLEDGE_DIR),
+                ('LightRAG Storage Directory', settings.LIGHTRAG_STORAGE_DIR),
+                ('LightRAG Inputs Directory', settings.LIGHTRAG_INPUTS_DIR),
+                ('LightRAG Memory Storage Directory', settings.LIGHTRAG_MEMORY_STORAGE_DIR),
+                ('LightRAG Memory Inputs Directory', settings.LIGHTRAG_MEMORY_INPUTS_DIR),
             ]
         },
         {
@@ -409,6 +417,10 @@ def print_config_no_color():
                 ('Repository Directory', settings.REPO_DIR),
                 ('Agno Storage Directory', settings.AGNO_STORAGE_DIR),
                 ('Agno Knowledge Directory', settings.AGNO_KNOWLEDGE_DIR),
+                ('LightRAG Storage Directory', settings.LIGHTRAG_STORAGE_DIR),
+                ('LightRAG Inputs Directory', settings.LIGHTRAG_INPUTS_DIR),
+                ('LightRAG Memory Storage Directory', settings.LIGHTRAG_MEMORY_STORAGE_DIR),
+                ('LightRAG Memory Inputs Directory', settings.LIGHTRAG_MEMORY_INPUTS_DIR),
             ]
         },
         {
