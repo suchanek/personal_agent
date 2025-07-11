@@ -58,12 +58,16 @@ def parse_args():
     parser.add_argument(
         "--remote", action="store_true", help="Use remote Ollama URL instead of local"
     )
+    parser.add_argument(
+        "--recreate", action="store_true", help="Recreate the knowledge base and clear all memories"
+    )
     return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
 
 
-# Parse arguments and determine Ollama URL
+# Parse arguments and determine Ollama URL and recreate flag
 args, unknown = parse_args()
 EFFECTIVE_OLLAMA_URL = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
+RECREATE_FLAG = args.recreate
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
@@ -111,7 +115,7 @@ async def initialize_agent_async(
         )
 
 
-def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=True):
+def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False):
     """Sync wrapper for agent initialization."""
     return asyncio.run(
         initialize_agent_async(model_name, ollama_url, existing_agent, recreate)
@@ -141,6 +145,7 @@ def initialize_session_state():
         st.session_state[SESSION_KEY_AGENT] = initialize_agent(
             st.session_state[SESSION_KEY_CURRENT_MODEL],
             st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
+            recreate=RECREATE_FLAG,
         )
 
     if SESSION_KEY_MEMORY_HELPER not in st.session_state:

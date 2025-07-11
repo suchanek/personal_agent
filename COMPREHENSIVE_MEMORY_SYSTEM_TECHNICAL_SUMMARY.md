@@ -2,7 +2,7 @@
 
 ## Executive Overview
 
-The Personal Agent employs a sophisticated **Dual Memory Architecture** that combines the speed and precision of local semantic search with the relationship mapping power of graph-based knowledge storage. This hybrid approach provides comprehensive memory coverage, ensuring both fast retrieval and complex reasoning capabilities while maintaining data integrity and eliminating technical issues.
+The Personal Agent employs a sophisticated **Dual Memory Architecture** that combines the speed and precision of local semantic search with the relationship mapping power of graph-based knowledge storage. This hybrid approach provides comprehensive memory coverage, ensuring both fast retrieval and complex reasoning capabilities while maintaining data integrity and eliminating technical issues. Recent updates have also significantly refactored the CLI for improved maintainability and introduced new testing infrastructure.
 
 ## Architecture Overview
 
@@ -89,6 +89,8 @@ graph TD
     style OLLAMA fill:#fce4ec,stroke:#c2185b,stroke-width:2px
 ```
 
+The CLI interface has been significantly refactored for improved maintainability and organization. Its internal structure is now modularized, with memory-related commands and initialization logic extracted into separate modules. This enhances clarity and extensibility without changing the external CLI usage.
+
 ## Component 1: Local Memory System (SQLite/LanceDB)
 
 ### Technology Stack
@@ -152,8 +154,9 @@ topics = ["personal", "work", "education", "hobbies", "preferences",
 
 ### Core Capabilities
 
-#### 1. Relationship Mapping
+#### 1. Enriched Graph Ingestion Pipeline (ADR-007)
 
+- **Description**: The `store_graph_memory` tool now uses a sophisticated, hybrid approach to build the knowledge graph. The agent performs local NLP (coreference resolution, entity/relationship extraction) to generate rich metadata, which is then embedded in a text file and uploaded to LightRAG. This guides the server's native ingestion pipeline, resulting in a more accurate and detailed graph.
 - **Entity Extraction**: Automatic identification of people, places, concepts
 - **Relationship Discovery**: Connections between entities
 - **Graph Traversal**: Multi-hop relationship queries
@@ -233,6 +236,10 @@ async def store_user_memory(content: str, topics: List[str]) -> str:
     return " | ".join(results)
 ```
 
+#### `recreate` Flag Behavior
+
+When the `recreate` flag is set to `True` during agent initialization, the system now automatically clears all existing memories from both the local SQLite database and the LightRAG graph memory server. This ensures a clean slate for the knowledge base and memory system, which is particularly useful for development and testing scenarios.
+
 ### Error Handling Strategy
 
 - **Graceful Degradation**: If one system fails, the other continues
@@ -243,6 +250,27 @@ async def store_user_memory(content: str, topics: List[str]) -> str:
 ## Technical Innovations
 
 ### 1. File Upload Solution for Pydantic Validation
+
+### 2. Intelligent Topic Management
+
+### 3. Semantic Search Optimization
+
+### 4. Recreate Flag Memory Safety Fix (ADR-009)
+
+**Problem**: The `--recreate` flag, intended for a clean reset of the dual memory system, had critical safety issues. In the Streamlit application, it defaulted to `True`, causing accidental data loss on every launch. In the CLI, `clear_all_memories()` was called prematurely during initialization, leading to SQLite memories not being cleared when explicitly requested via `--recreate`.
+
+**Solution**:
+1.  **Streamlit Default Parameter Fix**: Changed the default `recreate` parameter in `tools/paga_streamlit_agno.py` to `False` to prevent accidental memory destruction on launch.
+2.  **CLI Timing Fix**: Relocated the `clear_all_memories()` call in `src/personal_agent/core/agno_agent.py` to occur *after* the memory system (`self.agno_memory`) is fully initialized. This ensures that when `--recreate` is used, both SQLite and LightRAG memories are properly cleared.
+3.  **Streamlit CLI Parameter Support**: Added explicit command-line argument parsing for `--recreate` in `tools/paga_streamlit_agno.py` to allow users to intentionally clear memories from the Streamlit interface.
+
+**Benefits**:
+-   **Enhanced Memory Safety**: User memories are now preserved by default across all application entry points (CLI and Streamlit).
+-   **Reliable Recreation**: The `--recreate` flag now functions correctly, providing a dependable way to reset both local SQLite and LightRAG graph memories when explicitly requested.
+-   **Improved User Experience**: Prevents unexpected data loss and provides clear control over memory management.
+-   **Consistent Behavior**: Ensures that memory clearing operations are consistently applied to both memory systems.
+
+## API Interface
 
 **Problem**: LightRAG server's `POST /documents/text` endpoint created documents with `"file_path": null`, causing Pydantic validation errors.
 
@@ -290,16 +318,31 @@ if not topics:
 
 ## API Interface
 
+This section details the various memory and knowledge base tools available, including their purpose, arguments, and return types.
+
 ### Memory Storage Tools
 
+#### `store_user_memory`
+*   **Description**: Store personal information with topic classification, now leveraging an **Enriched Graph Ingestion Pipeline** for more accurate knowledge graph construction (see ADR-007).
+*   **Arguments**:
+    *   `content` (str): The information to store as a memory.
+    *   `topics` (Union[List[str], str, None], optional): Optional list of topics for the memory.
+*   **Returns**: `str` (Success or error message).
 ```python
-# Primary storage function
 await store_user_memory(
     content="Alice is my project manager",
     topics=["work", "personal"]
 )
+```
 
-# Graph-specific storage
+#### `store_graph_memory`
+*   **Description**: Store a complex memory in your knowledge graph to capture relationships. Uses file upload approach with enhanced entity and relationship extraction. Combines reliable file upload with advanced NLP processing. The `memory_id` parameter allows for linking graph memories to their corresponding local SQLite memories for deletion tracking.
+*   **Arguments**:
+    *   `content` (str): The information to store as a memory.
+    *   `topics` (Union[List[str], str, None], optional): Optional list of topics for the memory.
+    *   `memory_id` (str, optional): Optional ID to link this graph memory to a local memory for unified deletion.
+*   **Returns**: `str` (Success or error message).
+```python
 await store_graph_memory(
     content="Complex relationship data",
     topics=["relationships"]
@@ -308,34 +351,155 @@ await store_graph_memory(
 
 ### Memory Retrieval Tools
 
+#### `query_memory`
+*   **Description**: Search user memories using semantic similarity.
+*   **Arguments**:
+    *   `query` (str): The query to search for in memories.
+    *   `limit` (int, optional): Maximum number of memories to return.
+*   **Returns**: `str` (Found memories or message if none found).
 ```python
-# Semantic search
 await query_memory("project manager")
+```
 
-# Recent memories
+#### `get_recent_memories`
+*   **Description**: Retrieve recent memories by searching all memories and sorting by date.
+*   **Arguments**:
+    *   `limit` (int, default: 10): Maximum number of recent memories to return.
+*   **Returns**: `str` (Recent memories or message if none found).
+```python
 await get_recent_memories(limit=10)
+```
 
-# All memories
+#### `get_all_memories`
+*   **Description**: Get all user memories.
+*   **Arguments**: None.
+*   **Returns**: `str` (All memories or message if none found).
+```python
 await get_all_memories()
+```
 
-# Graph queries
+#### `get_memories_by_topic`
+*   **Description**: Get memories by topic without similarity search.
+*   **Arguments**:
+    *   `topics` (Union[List[str], str, None], optional): A list of topics to filter by. If None, returns all memories.
+    *   `limit` (Union[int, None], optional): Maximum number of memories to return.
+*   **Returns**: `str` (Found memories or a message if none are found).
+```python
+await get_memories_by_topic(topics="work")
+```
+
+#### `list_memories`
+*   **Description**: List all memories in a simple, user-friendly format.
+*   **Arguments**: None.
+*   **Returns**: `str` (All memories or message if none found).
+```python
+await list_memories()
+```
+
+#### `query_graph_memory`
+*   **Description**: Query the LightRAG memory graph to explore relationships between memories.
+*   **Arguments**:
+    *   `query` (str): The query to search for.
+    *   `mode` (str, default: "mix"): Query mode. Options: "local", "global", "hybrid", "naive", "mix", "bypass".
+    *   `top_k` (int, default: 5): The number of top items to retrieve.
+    *   `response_type` (str, default: "Multiple Paragraphs"): The desired format for the response.
+*   **Returns**: `dict` (Dictionary with query results).
+```python
 await query_graph_memory("relationships between people")
+```
+
+#### `get_memory_graph_labels`
+*   **Description**: Get the list of all entity and relation labels from the memory graph by calling the `/graph/label/list` endpoint.
+*   **Arguments**: None.
+*   **Returns**: `str` (Sorted graph labels).
+```python
+await get_memory_graph_labels()
 ```
 
 ### Memory Management Tools
 
+#### `update_memory`
+*   **Description**: Update an existing memory.
+*   **Arguments**:
+    *   `memory_id` (str): ID of the memory to update.
+    *   `content` (str): New memory content.
+    *   `topics` (Union[List[str], str, None], optional): Optional list of topics/categories for the memory.
+*   **Returns**: `str` (Success or error message).
 ```python
-# Update existing memory
 await update_memory(memory_id, new_content, new_topics)
+```
 
-# Delete specific memory
+#### `delete_memory`
+*   **Description**: Delete a memory from both SQLite and LightRAG systems. It now searches for documents in LightRAG using a filename pattern derived from the `memory_id` and then deletes them.
+*   **Arguments**:
+    *   `memory_id` (str): ID of the memory to delete.
+*   **Returns**: `str` (Success or error message).
+```python
 await delete_memory(memory_id)
+```
 
-# Clear all memories
+#### `delete_memories_by_topic`
+*   **Description**: Delete all memories associated with a specific topic or list of topics.
+*   **Arguments**:
+    *   `topics` (Union[List[str], str]): A single topic or a list of topics to delete memories for.
+*   **Returns**: `str` (Success or error message).
+```python
+await delete_memories_by_topic(topics="old_topic")
+```
+
+#### `clear_memories`
+*   **Description**: Clear all memories for the user.
+*   **Arguments**: None.
+*   **Returns**: `str` (Success or error message).
+```python
 await clear_memories()
+```
 
-# Get statistics
+#### `get_memory_stats`
+*   **Description**: Get memory statistics.
+*   **Arguments**: None.
+*   **Returns**: `str` (Memory statistics).
+```python
 await get_memory_stats()
+```
+
+### Knowledge Base Tools (Unified)
+
+#### `query_knowledge_base`
+*   **Description**: Unified knowledge base query with intelligent routing. This tool automatically routes queries between local semantic search and LightRAG based on the mode parameter and query characteristics.
+*   **Arguments**:
+    *   `query` (str): The search query.
+    *   `mode` (str, default: "auto"): Routing mode. Options: "local" (force local semantic search), "global", "hybrid", "mix", "naive", "bypass" (use LightRAG), "auto" (intelligent auto-detection).
+    *   `limit` (int, default: 5): Maximum results for local search / top_k for LightRAG.
+    *   `response_type` (str, default: "Multiple Paragraphs"): Format for LightRAG responses.
+*   **Returns**: `str` (Formatted search results from the appropriate knowledge system).
+```python
+await query_knowledge_base(
+    query="Who is my project manager?",
+    mode="auto"
+)
+```
+
+#### `query_lightrag_knowledge` (DEPRECATED)
+*   **Description**: DEPRECATED. Direct query to LightRAG knowledge base for backward compatibility. Use `query_knowledge_base` instead.
+*   **Arguments**:
+    *   `query` (str): The query string to search in the knowledge base.
+    *   `mode` (str, default: "naive"): Query mode. Options: "local", "global", "hybrid", "naive", "mix", "bypass".
+    *   `top_k` (int, default: 5): The number of top items to retrieve.
+    *   `response_type` (str, default: "Multiple Paragraphs"): The desired format for the response.
+*   **Returns**: `dict` (Dictionary with query results).
+```python
+await query_lightrag_knowledge(query="LightRAG features")
+```
+
+#### `query_semantic_knowledge` (DEPRECATED)
+*   **Description**: DEPRECATED. Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents. Use `query_knowledge_base` instead.
+*   **Arguments**:
+    *   `query` (str): The query to search for in the semantic knowledge base.
+    *   `limit` (int, default: 5): The maximum number of results to return.
+*   **Returns**: `str` (A formatted string of search results or a message if no results are found).
+```python
+await query_semantic_knowledge(query="Python concepts")
 ```
 
 ## Data Flow Architecture
@@ -508,6 +672,46 @@ def health_check() -> bool:
 2. **Memory Consolidation**: Automatic relationship discovery
 3. **Intelligent Archiving**: Automated data lifecycle management
 4. **Federated Learning**: Privacy-preserving model updates
+
+## Component 4: CLI Architecture Refactor
+
+The Command Line Interface (CLI) has undergone a significant refactoring to enhance maintainability, organization, and extensibility. The previously monolithic `agno_main.py` has been modularized, separating concerns into dedicated packages and modules.
+
+### New File Structure
+
+```
+src/personal_agent/cli/
+├── __init__.py                 # Package initialization and exports
+├── memory_commands.py          # All memory-related CLI functions
+├── command_parser.py           # Command parsing and routing logic
+└── agno_cli.py                # Main CLI interface logic
+```
+
+```
+src/personal_agent/core/agno_initialization.py  # Complex initialization logic
+```
+
+### Benefits
+
+-   **Single Responsibility Principle**: Each module now has a clear, focused purpose.
+-   **Improved Maintainability**: CLI and memory commands are easier to find and modify.
+-   **Better Testability**: Individual components can be unit tested independently.
+-   **Enhanced Extensibility**: Adding new CLI commands is more straightforward.
+-   **Improved Readability**: The main CLI file is significantly shorter and easier to understand.
+-   **Backward Compatibility**: All existing CLI functionality and command syntax are preserved.
+
+### CLI Memory Command Enhancements
+
+The memory-related CLI functions (`show_all_memories`, `show_memories_by_topic_cli`, `show_memory_analysis`, `show_memory_stats`, `clear_all_memories`, `store_immediate_memory`, `delete_memory_by_id_cli`, `delete_memories_by_topic_cli`) now consistently use the agent's tool functions for dual storage operations (SQLite and LightRAG). This ensures that operations performed via the CLI are synchronized across both memory systems, with a fallback to direct memory manager calls if the tool function is not available.
+
+## Component 5: Testing Infrastructure Enhancements
+
+To support the new CLI architecture and ensure the reliability of memory operations, new testing infrastructure has been introduced.
+
+### CLI Memory Command Tests
+
+-   **Location**: `memory_tests/README.md`, `memory_tests/run_cli_memory_tests.sh`, and `memory_tests/test_cli_memory_commands.py`.
+-   **Purpose**: These tests specifically verify the dual storage functionality of CLI memory commands, ensuring that operations correctly update both the local SQLite and LightRAG graph memory systems.
 
 ## Conclusion
 

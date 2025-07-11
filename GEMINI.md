@@ -123,6 +123,10 @@ The project includes several entry points for running different agent configurat
         poetry run paga_cli --recreate
         ```
 
+### Initialization with `--recreate` flag
+
+When the `--recreate` flag is used during agent initialization (e.g., `poetry run paga_cli --recreate` or `poetry run paga_streamlit --recreate`), the system will now automatically clear all existing memories from both the local SQLite database and the LightRAG graph memory server. This ensures a clean slate for the knowledge base and memory system, which is particularly useful for development and testing scenarios.
+
 ## Testing
 
 The project uses a custom testing setup.
@@ -195,11 +199,12 @@ The project has been updated to integrate with the LightRAG server, a powerful t
 *   **get_memories_by_topic**: Get memories by topic without similarity search. Args: `topics` (list[str] or str, optional), `limit` (int, optional). Returns: `str` (found memories or a message if none are found).
 *   **list_memories**: List all memories in a simple, user-friendly format. Returns: `str` (all memories or message if none found).
 *   **update_memory**: Update an existing memory. Args: `memory_id` (str), `content` (str), `topics` (list[str] or str, optional). Returns: `str` (success or error message).
-*   **delete_memory**: Delete a memory. Args: `memory_id` (str). Returns: `str` (success or error message).
+*   **delete_memory**: Delete a memory from both SQLite and LightRAG systems. It now searches for documents in LightRAG using a filename pattern derived from the `memory_id` and then deletes them. Args: `memory_id` (str). Returns: `str` (success or error message).
 *   **delete_memories_by_topic**: Delete all memories associated with a specific topic or list of topics. Args: `topics` (list[str] or str). Returns: `str` (success or error message).
-*   **clear_memories**: Clear all memories for the user. Returns: `str` (success or error message).
+*   **clear_memories**: Clear all memories for the user from local storage. Returns: `str` (success or error message).
+*   **clear_all_memories**: Clear all memories from BOTH local SQLite and LightRAG graph systems. Returns: `str` (success or error message).
 *   **get_memory_stats**: Get memory statistics. Returns: `str` (memory statistics).
-*   **store_graph_memory**: Store a complex memory in your knowledge graph to capture relationships. Uses file upload approach with enhanced entity and relationship extraction. Combines reliable file upload with advanced NLP processing. Args: `content` (str), `topics` (list[str] or str, optional). Returns: `str` (success or error message).
+*   **store_graph_memory**: Store a complex memory in your knowledge graph to capture relationships. Uses file upload approach with enhanced entity and relationship extraction. Combines reliable file upload with advanced NLP processing. Args: `content` (str), `topics` (list[str] or str, optional), `memory_id` (str, optional). Returns: `str` (success or error message).
 *   **get_memory_graph_labels**: Get the list of all entity and relation labels from the memory graph. Returns: `str` (sorted graph labels).
 
 ### Knowledge Tools
