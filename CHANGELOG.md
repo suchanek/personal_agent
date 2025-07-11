@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2025-07-10
+
+### Changed
+- **CLI Refactor for Maintainability**: The `agno_main.py` file was refactored to improve maintainability and organization. Memory-related CLI commands and initialization logic were extracted into new modules (`src/personal_agent/cli/` and `src/personal_agent/core/agno_initialization.py`). This significantly reduced the size and complexity of the main CLI file, enhancing modularity, testability, and extensibility while maintaining full backward compatibility. See [ADR-008](./docs/adr/008-cli-refactor.md) for details.
+
 ## [0.8.7] - 2025-07-10
 
 ### Added
