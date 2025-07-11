@@ -22,6 +22,7 @@ import yaml
 # Import settings from the config module
 try:
     from ..config import settings
+    from ..config.mcp_servers import get_mcp_servers
 except ImportError:
     # Fallback for direct execution
     import sys
@@ -31,6 +32,7 @@ except ImportError:
     src_dir = project_root / "src"
     sys.path.insert(0, str(src_dir))
     from personal_agent.config import settings
+    from personal_agent.config.mcp_servers import get_mcp_servers
 
 
 def get_project_root():
@@ -60,6 +62,7 @@ def output_json():
             "ollama_url": settings.OLLAMA_URL,
             "remote_ollama_url": settings.REMOTE_OLLAMA_URL,
         },
+        "mcp_servers": get_mcp_servers(),
         "feature_flags": {
             "use_weaviate": settings.USE_WEAVIATE,
             "use_mcp": settings.USE_MCP,
@@ -296,6 +299,17 @@ def print_config_colored():
         }
     ]
     
+    # MCP Servers section
+    print(f"\n{BLUE}{BOLD}🔌 MCP Servers{RESET}:")
+    mcp_servers = get_mcp_servers()
+    if mcp_servers:
+        print(f"  {BOLD}Server Name{' '*15}Description{RESET}")
+        for name, config in mcp_servers.items():
+            description = config.get('description', 'No description available')
+            print(f"  {YELLOW}{name:<25}{RESET} {GREEN}{description}{RESET}")
+    else:
+        print(f"  {RED}No MCP servers configured{RESET}")
+    
     for section in sections:
         print(f"\n{section['title']}:")
         print(f"  {BOLD}Setting{' '*22}Value{RESET}")
@@ -433,6 +447,17 @@ def print_config_no_color():
             ]
         }
     ]
+    
+    # MCP Servers section
+    print("\n🔌 MCP Servers:")
+    mcp_servers = get_mcp_servers()
+    if mcp_servers:
+        print(f"  Server Name{' '*15}Description")
+        for name, config in mcp_servers.items():
+            description = config.get('description', 'No description available')
+            print(f"  {name:<25} {description}")
+    else:
+        print("  No MCP servers configured")
     
     for section in sections:
         print(f"\n{section['title']}:")
