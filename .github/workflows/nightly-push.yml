@@ -18,8 +18,8 @@ jobs:
       with:
         # Fetch all branches and history
         fetch-depth: 0
-        # Use a token with write permissions
-        token: ${{ secrets.ghcr.io }}
+        # Use the built-in GITHUB_TOKEN with write permissions
+        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Configure Git
       run: |
