@@ -447,7 +447,7 @@ class AgnoPersonalAgent:
                 return f"❌ Error updating memory: {str(e)}"
 
         async def delete_memory(memory_id: str) -> str:
-            """Delete a memory using direct SemanticMemoryManager calls.
+            """Delete a memory from both SQLite and LightRAG systems.
 
             Args:
                 memory_id: ID of the memory to delete
@@ -456,17 +456,84 @@ class AgnoPersonalAgent:
                 str: Success or error message
             """
             try:
-                # Direct call to SemanticMemoryManager.delete_memory()
+                results = []
+                
+                # 1. Delete from local SQLite memory system
                 success, message = self.agno_memory.memory_manager.delete_memory(
                     memory_id=memory_id, db=self.agno_memory.db, user_id=self.user_id
                 )
 
                 if success:
-                    logger.info("Deleted memory %s", memory_id)
-                    return f"✅ Successfully deleted memory: {memory_id}"
+                    logger.info("Deleted memory %s from SQLite", memory_id)
+                    results.append(f"✅ Local memory: Deleted successfully")
                 else:
-                    logger.error("Failed to delete memory %s: %s", memory_id, message)
-                    return f"❌ Error deleting memory: {message}"
+                    logger.error("Failed to delete memory %s from SQLite: %s", memory_id, message)
+                    results.append(f"❌ Local memory error: {message}")
+                
+                # 2. Delete from LightRAG graph memory system
+                try:
+                    # Construct the filename pattern to search for
+                    filename_pattern = f"memory_{memory_id}_*.txt"
+                    
+                    # Use LightRAG API to find documents matching the pattern
+                    url = f"{LIGHTRAG_MEMORY_URL}/documents"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url, timeout=30) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                all_docs = []
+                                
+                                # Extract documents from response
+                                if isinstance(data, dict) and "statuses" in data:
+                                    statuses = data["statuses"]
+                                    for status_name, docs_list in statuses.items():
+                                        if isinstance(docs_list, list):
+                                            all_docs.extend(docs_list)
+                                elif isinstance(data, dict) and "documents" in data:
+                                    all_docs = data["documents"]
+                                elif isinstance(data, list):
+                                    all_docs = data
+                                
+                                # Find documents matching our memory_id pattern
+                                docs_to_delete = []
+                                for doc in all_docs:
+                                    file_path = doc.get("file_path", "")
+                                    if file_path and f"memory_{memory_id}_" in file_path:
+                                        docs_to_delete.append(doc)
+                                
+                                if docs_to_delete:
+                                    # Delete the matching documents
+                                    doc_ids = [doc["id"] for doc in docs_to_delete]
+                                    payload = {
+                                        "doc_ids": doc_ids,
+                                        "delete_file": True
+                                    }
+                                    
+                                    async with session.delete(
+                                        f"{LIGHTRAG_MEMORY_URL}/documents/delete_document",
+                                        json=payload,
+                                        timeout=60
+                                    ) as del_resp:
+                                        if del_resp.status == 200:
+                                            logger.info("Deleted memory %s from LightRAG", memory_id)
+                                            results.append(f"✅ Graph memory: Deleted successfully")
+                                        else:
+                                            error_text = await del_resp.text()
+                                            logger.error("Failed to delete memory %s from LightRAG: %s", memory_id, error_text)
+                                            results.append(f"❌ Graph memory error: {error_text}")
+                                else:
+                                    logger.info("No matching documents found in LightRAG for memory %s", memory_id)
+                                    results.append("⚠️ Graph memory: No matching documents found")
+                            else:
+                                error_text = await resp.text()
+                                logger.error("Failed to get documents from LightRAG: %s", error_text)
+                                results.append(f"❌ Graph memory error: {error_text}")
+                except Exception as e:
+                    logger.error("Error deleting from LightRAG: %s", e)
+                    results.append(f"❌ Graph memory error: {str(e)}")
+                
+                # Return combined results
+                return " | ".join(results)
 
             except Exception as e:
                 logger.error("Error deleting memory: %s", e)
@@ -755,7 +822,7 @@ class AgnoPersonalAgent:
                 return f"An error occurred while searching the semantic knowledge base: {e}"
 
         async def store_graph_memory(
-            content: str, topics: Union[List[str], str, None] = None
+            content: str, topics: Union[List[str], str, None] = None, memory_id: str = None
         ) -> str:
             """
             Store a memory in the LightRAG graph database to capture relationships.
@@ -764,6 +831,7 @@ class AgnoPersonalAgent:
 
             :param content: The information to store as a memory.
             :param topics: Optional list of topics for the memory.
+            :param memory_id: Optional memory_id to use as part of the filename for deletion tracking.
             :return: Success or error message.
             """
             if not content or not content.strip():
@@ -822,13 +890,19 @@ class AgnoPersonalAgent:
                 logger.info("Extracted entities: %s", entities)
                 logger.info("Extracted relationships: %s", relationships)
 
-                # Create a meaningful filename based on content
-                content_hash = hashlib.md5(restated_content.encode()).hexdigest()[:8]
-                words = restated_content.split()[:3]
-                filename_base = "_".join(
-                    word.lower().replace(" ", "") for word in words if word.isalnum()
-                )
-                filename = f"graph_memory_{filename_base}_{content_hash}.txt"
+                # Create a meaningful filename based on memory_id if provided, otherwise use content hash
+                if memory_id:
+                    # Use memory_id as the primary identifier for the file
+                    content_hash = hashlib.md5(restated_content.encode()).hexdigest()[:8]
+                    filename = f"memory_{memory_id}_{content_hash}.txt"
+                else:
+                    # Fallback to the old method if no memory_id is provided
+                    content_hash = hashlib.md5(restated_content.encode()).hexdigest()[:8]
+                    words = restated_content.split()[:3]
+                    filename_base = "_".join(
+                        word.lower().replace(" ", "") for word in words if word.isalnum()
+                    )
+                    filename = f"graph_memory_{filename_base}_{content_hash}.txt"
 
                 # Create temporary file
                 temp_dir = "/tmp/lightrag_graph_memories"
@@ -955,6 +1029,17 @@ class AgnoPersonalAgent:
                 logger.error("Error getting graph labels: %s", e)
                 return f"❌ Error getting graph labels: {str(e)}"
 
+        async def clear_all_memories_tool() -> str:
+            """Clear all memories from both SQLite and LightRAG systems.
+            
+            This tool provides a complete reset of the dual memory system by clearing
+            all memories from both the local SQLite database and the LightRAG memory server.
+            
+            Returns:
+                str: Success or error message
+            """
+            return await self.clear_all_memories()
+            
         # Set proper function names for tool identification
         store_user_memory_tool.__name__ = "store_user_memory"
         query_memory.__name__ = "query_memory"
@@ -963,6 +1048,7 @@ class AgnoPersonalAgent:
         delete_memory.__name__ = "delete_memory"
         delete_memories_by_topic.__name__ = "delete_memories_by_topic"
         clear_memories.__name__ = "clear_memories"
+        clear_all_memories_tool.__name__ = "clear_all_memories"
         get_recent_memories.__name__ = "get_recent_memories"
         get_all_memories.__name__ = "get_all_memories"
         get_memory_stats.__name__ = "get_memory_stats"
@@ -984,6 +1070,7 @@ class AgnoPersonalAgent:
                 delete_memory,
                 delete_memories_by_topic,
                 clear_memories,
+                clear_all_memories_tool,  # NEW: Tool to clear both memory systems
                 get_recent_memories,
                 get_all_memories,
                 get_memory_stats,
@@ -1377,6 +1464,7 @@ Returns:
             "  - `delete_memory`: Delete a specific memory by its ID.",
             "  - `delete_memories_by_topic`: Delete all memories for a given topic.",
             "  - `clear_memories`: Clear all memories for the user from local storage.",
+            "  - `clear_all_memories`: Clear all memories from BOTH local SQLite and LightRAG graph systems.",
             "  - `get_memory_stats`: Get statistics for the local memory.",
             "- **Graph Memory Tools (LightRAG)**:",
             "  - `store_graph_memory`: Store a complex memory in your knowledge graph to capture relationships.",
@@ -1690,6 +1778,12 @@ Returns:
                 logger.info(
                     "Created Knowledge Coordinator for unified knowledge queries"
                 )
+
+                # If recreate is True, clear all memories AFTER memory system is initialized
+                if recreate and self.enable_memory:
+                    logger.info("Recreate flag is True, clearing all memories after memory system initialization")
+                    clear_result = await self.clear_all_memories()
+                    logger.info("Memory clear result: %s", clear_result)
 
                 logger.info("Initialized Agno storage and knowledge backend")
             else:
@@ -2106,8 +2200,9 @@ Returns:
                             store_graph_memory_func = tool
                             break
                 if store_graph_memory_func:
+                    # Pass the memory_id to store_graph_memory for tracking
                     graph_result = await store_graph_memory_func(
-                        content, generated_topics
+                        content, generated_topics, memory_id
                     )
                     logger.info("Graph memory result: %s", graph_result)
                     if "✅" in graph_result:
@@ -2152,6 +2247,96 @@ Returns:
             )
         except Exception as e:
             logger.error("Error during agno agent cleanup: %s", e)
+            
+    async def clear_all_memories(self) -> str:
+        """Clear all memories from both SQLite and LightRAG systems.
+        
+        This method provides a complete reset of the dual memory system by:
+        1. Clearing all memories from the local SQLite database
+        2. Clearing all documents from the LightRAG memory server
+        
+        Returns:
+            str: Success or error message
+        """
+        try:
+            results = []
+            
+            # 1. Clear local SQLite memories
+            if self.agno_memory and self.agno_memory.memory_manager:
+                success, message = self.agno_memory.memory_manager.clear_memories(
+                    db=self.agno_memory.db, user_id=self.user_id
+                )
+                
+                if success:
+                    logger.info("Cleared all memories from SQLite for user %s", self.user_id)
+                    results.append("✅ Local memory: All memories cleared successfully")
+                else:
+                    logger.error("Failed to clear memories from SQLite: %s", message)
+                    results.append(f"❌ Local memory error: {message}")
+            else:
+                logger.warning("Memory system not initialized, skipping SQLite memory clear")
+                results.append("⚠️ Local memory: System not initialized")
+            
+            # 2. Clear LightRAG graph memories
+            try:
+                # Use LightRAG API to delete all documents
+                url = f"{LIGHTRAG_MEMORY_URL}/documents"
+                
+                # First get all documents
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=30) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            all_docs = []
+                            
+                            # Extract documents from response
+                            if isinstance(data, dict) and "statuses" in data:
+                                statuses = data["statuses"]
+                                for status_name, docs_list in statuses.items():
+                                    if isinstance(docs_list, list):
+                                        all_docs.extend(docs_list)
+                            elif isinstance(data, dict) and "documents" in data:
+                                all_docs = data["documents"]
+                            elif isinstance(data, list):
+                                all_docs = data
+                            
+                            if all_docs:
+                                # Delete all documents
+                                doc_ids = [doc["id"] for doc in all_docs]
+                                payload = {
+                                    "doc_ids": doc_ids,
+                                    "delete_file": True
+                                }
+                                
+                                async with session.delete(
+                                    f"{LIGHTRAG_MEMORY_URL}/documents/delete_document",
+                                    json=payload,
+                                    timeout=60
+                                ) as del_resp:
+                                    if del_resp.status == 200:
+                                        logger.info("Cleared all memories from LightRAG (%d documents)", len(doc_ids))
+                                        results.append(f"✅ Graph memory: All memories cleared successfully ({len(doc_ids)} documents)")
+                                    else:
+                                        error_text = await del_resp.text()
+                                        logger.error("Failed to clear memories from LightRAG: %s", error_text)
+                                        results.append(f"❌ Graph memory error: {error_text}")
+                            else:
+                                logger.info("No documents found in LightRAG to clear")
+                                results.append("✅ Graph memory: No documents found to clear")
+                        else:
+                            error_text = await resp.text()
+                            logger.error("Failed to get documents from LightRAG: %s", error_text)
+                            results.append(f"❌ Graph memory error: {error_text}")
+            except Exception as e:
+                logger.error("Error clearing LightRAG memories: %s", e)
+                results.append(f"❌ Graph memory error: {str(e)}")
+            
+            # Return combined results
+            return " | ".join(results)
+            
+        except Exception as e:
+            logger.error("Error clearing all memories: %s", e)
+            return f"❌ Error clearing all memories: {str(e)}"
 
     async def query_lightrag_knowledge_direct(self, query: str, params: dict) -> str:
         """
