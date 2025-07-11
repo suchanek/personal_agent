@@ -114,7 +114,14 @@ The project includes several entry points for running different agent configurat
 ### Current
 
 *   **Agno-Interface (Streamlit Web UI)**: `poetry run paga_streamlit` or `poetry run paga`
-*   **Agno-Cli**: `poetry run paga_cli`
+*   **Agno-Cli**: The CLI has been refactored for improved maintainability and organization. The main entry point remains `poetry run paga_cli`, but its internal structure has been modularized. See [ADR-008](./docs/adr/008-cli-refactor.md) for details.
+    *   **Usage**: The CLI usage remains identical to before the refactor.
+        ```bash
+        # CLI usage remains identical
+        poetry run paga_cli
+        poetry run paga_cli --remote
+        poetry run paga_cli --recreate
+        ```
 
 ## Testing
 
@@ -320,7 +327,8 @@ If tools are being called but not visible in debug panels:
 ```
 personal_agent/
 ├── src/personal_agent/
-│   ├── core/                 # Core agent and memory systems
+│   ├── cli/                  # CLI commands and parsing
+│   ├── core/                 # Core agent, memory systems, and initialization
 │   ├── tools/               # Tool implementations
 │   ├── config/              # Configuration management
 │   └── web/                 # Web interface
