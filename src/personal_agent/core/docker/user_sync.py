@@ -1,18 +1,12 @@
-#!/usr/bin/env python3
 """
-Docker User ID Synchronization Tool
+Docker User ID Synchronization Module
 
-This script ensures USER_ID consistency between the main personal agent system
-and the Docker-based LightRAG servers by:
-1. Detecting USER_ID mismatches between system config and Docker env files
-2. Safely updating Docker environment files with correct USER_ID
-3. Managing Docker container restarts when changes are needed
-4. Providing validation and rollback capabilities
+This module provides the DockerUserSync class for ensuring USER_ID consistency
+between the main personal agent system and Docker-based LightRAG servers.
 
 Author: Personal Agent Development Team
 """
 
-import argparse
 import logging
 import os
 import shutil
@@ -22,20 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add the src directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-try:
-    from personal_agent.config.settings import USER_ID as SYSTEM_USER_ID
-except ImportError:
-    # Fallback if import fails
-    SYSTEM_USER_ID = os.getenv("USER_ID", "default_user")
-
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
 
 # ANSI color codes for output
@@ -49,6 +30,7 @@ class Colors:
     WHITE = '\033[1;37m'
     NC = '\033[0m'  # No Color
 
+
 class DockerUserSync:
     """Manages USER_ID synchronization between system and Docker containers."""
     
@@ -59,8 +41,17 @@ class DockerUserSync:
             base_dir: Base directory of the project (auto-detected if None)
             dry_run: If True, show what would be done without making changes
         """
-        self.base_dir = base_dir or Path(__file__).parent.parent
+        self.base_dir = base_dir or Path(__file__).parent.parent.parent.parent.parent
         self.dry_run = dry_run
+        
+        # Import USER_ID from settings
+        try:
+            from ...config.settings import USER_ID as SYSTEM_USER_ID
+        except ImportError:
+            # Fallback if import fails
+            SYSTEM_USER_ID = os.getenv("USER_ID", "default_user")
+        
+        self.system_user_id = SYSTEM_USER_ID
         
         # Docker server configurations
         self.docker_configs = {
@@ -83,7 +74,7 @@ class DockerUserSync:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Initialized DockerUserSync with base_dir: {self.base_dir}")
-        logger.info(f"System USER_ID: {SYSTEM_USER_ID}")
+        logger.info(f"System USER_ID: {self.system_user_id}")
         logger.info(f"Dry run mode: {self.dry_run}")
 
     def get_env_file_user_id(self, env_file_path: Path) -> Optional[str]:
@@ -269,7 +260,7 @@ class DockerUserSync:
         results = {}
         
         print(f"\n{Colors.BLUE}🔍 Checking USER_ID Consistency{Colors.NC}")
-        print(f"{Colors.CYAN}System USER_ID: {SYSTEM_USER_ID}{Colors.NC}")
+        print(f"{Colors.CYAN}System USER_ID: {self.system_user_id}{Colors.NC}")
         print("=" * 60)
         
         for server_name, config in self.docker_configs.items():
@@ -277,12 +268,12 @@ class DockerUserSync:
             docker_user_id = self.get_env_file_user_id(env_file_path)
             is_running = self.is_container_running(config['container_name'])
             
-            consistent = docker_user_id == SYSTEM_USER_ID
+            consistent = docker_user_id == self.system_user_id
             
             results[server_name] = {
                 'env_file_path': env_file_path,
                 'docker_user_id': docker_user_id,
-                'system_user_id': SYSTEM_USER_ID,
+                'system_user_id': self.system_user_id,
                 'consistent': consistent,
                 'container_running': is_running,
                 'config': config
@@ -370,8 +361,8 @@ class DockerUserSync:
             
             # Step 3: Update environment file (only if needed)
             if needs_user_id_update:
-                print(f"   📝 Updating USER_ID to '{SYSTEM_USER_ID}'...")
-                if not self.update_env_file_user_id(env_file_path, SYSTEM_USER_ID):
+                print(f"   📝 Updating USER_ID to '{self.system_user_id}'...")
+                if not self.update_env_file_user_id(env_file_path, self.system_user_id):
                     logger.error(f"Failed to update {env_file_path}")
                     all_successful = False
                     continue
@@ -397,7 +388,7 @@ class DockerUserSync:
         
         if all_consistent:
             print(f"\n{Colors.GREEN}🎉 USER_ID synchronization completed successfully!{Colors.NC}")
-            print(f"{Colors.GREEN}All Docker servers now use USER_ID: {SYSTEM_USER_ID}{Colors.NC}")
+            print(f"{Colors.GREEN}All Docker servers now use USER_ID: {self.system_user_id}{Colors.NC}")
         else:
             print(f"\n{Colors.RED}❌ Some inconsistencies remain. Check the logs above.{Colors.NC}")
             all_successful = False
@@ -420,7 +411,7 @@ class DockerUserSync:
         # Check storage directories
         print(f"\n{Colors.BLUE}📁 Storage Directory Validation{Colors.NC}")
         try:
-            from personal_agent.config.settings import (
+            from ...config.settings import (
                 AGNO_STORAGE_DIR, AGNO_KNOWLEDGE_DIR,
                 LIGHTRAG_STORAGE_DIR, LIGHTRAG_MEMORY_STORAGE_DIR
             )
@@ -434,7 +425,7 @@ class DockerUserSync:
             
             storage_consistent = True
             for name, path in storage_paths.items():
-                contains_user_id = SYSTEM_USER_ID in str(path)
+                contains_user_id = self.system_user_id in str(path)
                 icon = f"{Colors.GREEN}✅" if contains_user_id else f"{Colors.RED}❌"
                 print(f"   {icon} {name}: {path}{Colors.NC}")
                 if not contains_user_id:
@@ -458,65 +449,3 @@ class DockerUserSync:
         print(f"   {overall_icon} Overall System: {'Consistent' if overall_consistent else 'Inconsistent'}{Colors.NC}")
         
         return overall_consistent
-
-
-def main():
-    """Main entry point for the Docker User Sync tool."""
-    parser = argparse.ArgumentParser(
-        description="Synchronize USER_ID between personal agent system and Docker containers",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  %(prog)s --check                    # Check USER_ID consistency
-  %(prog)s --sync                     # Synchronize USER_IDs
-  %(prog)s --sync --force-restart     # Sync and restart all containers
-  %(prog)s --validate                 # Comprehensive validation
-  %(prog)s --dry-run --sync           # Show what would be done
-        """
-    )
-    
-    parser.add_argument('--check', action='store_true',
-                       help='Check USER_ID consistency without making changes')
-    parser.add_argument('--sync', action='store_true',
-                       help='Synchronize USER_IDs across Docker configurations')
-    parser.add_argument('--validate', action='store_true',
-                       help='Perform comprehensive system validation')
-    parser.add_argument('--force-restart', action='store_true',
-                       help='Force restart of containers even if not running')
-    parser.add_argument('--dry-run', action='store_true',
-                       help='Show what would be done without making changes')
-    parser.add_argument('--verbose', '-v', action='store_true',
-                       help='Enable verbose logging')
-    
-    args = parser.parse_args()
-    
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
-    # Create sync manager
-    sync_manager = DockerUserSync(dry_run=args.dry_run)
-    
-    # Execute requested action
-    if args.validate:
-        success = sync_manager.validate_system_consistency()
-        sys.exit(0 if success else 1)
-    elif args.sync:
-        success = sync_manager.sync_user_ids(force_restart=args.force_restart)
-        sys.exit(0 if success else 1)
-    elif args.check:
-        results = sync_manager.check_user_id_consistency()
-        all_consistent = all(result['consistent'] for result in results.values())
-        sys.exit(0 if all_consistent else 1)
-    else:
-        # Default: check consistency
-        results = sync_manager.check_user_id_consistency()
-        all_consistent = all(result['consistent'] for result in results.values())
-        
-        if not all_consistent:
-            print(f"\n{Colors.YELLOW}💡 Run with --sync to fix inconsistencies{Colors.NC}")
-        
-        sys.exit(0 if all_consistent else 1)
-
-
-if __name__ == "__main__":
-    main()
