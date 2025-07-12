@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New documentation: `docs/MEMORY_COMMAND_SUMMARY.md` providing a comprehensive overview of all memory-related commands.
 
 ### Fixed
+- **Critical Port Mapping in Memory Server**: Corrected a port mismatch in the `lightrag_memory_server` Docker configuration. The internal container port was incorrectly set to `9621` while the exposed port was `9622`, causing connection failures. Both are now correctly configured to `9622`, restoring access to the memory server.
 - **Recreate Flag Memory Safety Fix**: Resolved a critical memory safety vulnerability where the `--recreate` flag could lead to accidental data loss. The fix ensures that user memories are preserved by default and are only cleared when explicitly requested via the `--recreate` flag, with proper synchronization across both local SQLite and LightRAG graph memory systems. See [ADR-009](./docs/adr/009-recreate-flag-memory-safety-fix.md) for details.
 
 ## [0.8.8] - 2025-07-10

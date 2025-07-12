@@ -3,7 +3,7 @@ services:
     container_name: lightrag_memory
     image: ghcr.io/suchanek/lightrag_pagent:latest
     ports:
-      - "${PORT:-9622}:9621"
+      - "${PORT:-9622}:9622"
     volumes:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
