@@ -7,18 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9] - 2025-07-11
+
 ### Added
 - New documentation: `docs/MEMORY_COMMAND_SUMMARY.md` providing a comprehensive overview of all memory-related commands.
+
+### Changed
+- **AntiDuplicateMemory Refactor for Polymorphism**: Refactored the `AntiDuplicateMemory` class to align its method signatures with the parent `Memory` class. This change ensures polymorphic compatibility, allowing `AntiDuplicateMemory` to be used as a drop-in replacement for `Memory`, which improves code robustness and maintainability. See [ADR-010](./docs/adr/010-anti-duplicate-memory-refactor.md) for details.
+- **CLI Refactor for Maintainability**: The `agno_main.py` file was refactored to improve maintainability and organization. Memory-related CLI commands and initialization logic were extracted into new modules (`src/personal_agent/cli/` and `src/personal_agent/core/agno_initialization.py`). This significantly reduced the size and complexity of the main CLI file, enhancing modularity, testability, and extensibility while maintaining full backward compatibility. See [ADR-008](./docs/adr/008-cli-refactor.md) for details.
+- **Comprehensive Memory System Technical Summary**: Updated `COMPREHENSIVE_MEMORY_SYSTEM_TECHNICAL_SUMMARY.md` to reflect the CLI refactor, enhanced memory tool CLI, and new testing infrastructure.
 
 ### Fixed
 - **Critical Port Mapping in Memory Server**: Corrected a port mismatch in the `lightrag_memory_server` Docker configuration. The internal container port was incorrectly set to `9621` while the exposed port was `9622`, causing connection failures. Both are now correctly configured to `9622`, restoring access to the memory server.
 - **Recreate Flag Memory Safety Fix**: Resolved a critical memory safety vulnerability where the `--recreate` flag could lead to accidental data loss. The fix ensures that user memories are preserved by default and are only cleared when explicitly requested via the `--recreate` flag, with proper synchronization across both local SQLite and LightRAG graph memory systems. See [ADR-009](./docs/adr/009-recreate-flag-memory-safety-fix.md) for details.
 
 ## [0.8.8] - 2025-07-10
-
-### Changed
-- **CLI Refactor for Maintainability**: The `agno_main.py` file was refactored to improve maintainability and organization. Memory-related CLI commands and initialization logic were extracted into new modules (`src/personal_agent/cli/` and `src/personal_agent/core/agno_initialization.py`). This significantly reduced the size and complexity of the main CLI file, enhancing modularity, testability, and extensibility while maintaining full backward compatibility. See [ADR-008](./docs/adr/008-cli-refactor.md) for details.
-- **Comprehensive Memory System Technical Summary**: Updated `COMPREHENSIVE_MEMORY_SYSTEM_TECHNICAL_SUMMARY.md` to reflect the CLI refactor, enhanced memory tool CLI, and new testing infrastructure.
 
 ## [0.8.7] - 2025-07-10
 
