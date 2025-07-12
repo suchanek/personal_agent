@@ -13,27 +13,20 @@ services:
       - "${AGNO_STORAGE_DIR}/rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
-      - ./env.server:/app/.env
-    env_file:
-      - env.server
+      - ./.env:/app/.env
     environment:
       - WORKERS=1
       - MAX_PARALLEL_INSERT=1
-      # Explicit timeout settings for the container
-      - HTTPX_TIMEOUT=7200
-      - HTTPX_CONNECT_TIMEOUT=600
-      - HTTPX_READ_TIMEOUT=7200
-      - HTTPX_WRITE_TIMEOUT=600
-      - HTTPX_POOL_TIMEOUT=600
-      - OLLAMA_TIMEOUT=7200
-      - OLLAMA_KEEP_ALIVE=3600
-      - OLLAMA_NUM_PREDICT=16384
-      - OLLAMA_TEMPERATURE=0.1      # Extended timeout settings for large document processing
+      # Extended timeout settings for large document processing
       - HTTPX_TIMEOUT=14400
       - HTTPX_CONNECT_TIMEOUT=1200
       - HTTPX_READ_TIMEOUT=14400
       - HTTPX_WRITE_TIMEOUT=1200
       - HTTPX_POOL_TIMEOUT=1200
+      - OLLAMA_TIMEOUT=14400
+      - OLLAMA_KEEP_ALIVE=7200
+      - OLLAMA_NUM_PREDICT=32768
+      - OLLAMA_TEMPERATURE=0.1
       - OLLAMA_REQUEST_TIMEOUT=14400
       - REQUESTS_TIMEOUT=14400
       - URLLIB3_TIMEOUT=14400
@@ -43,16 +36,15 @@ services:
       - TCP_KEEPALIVE_IDLE=600
       - TCP_KEEPALIVE_INTERVAL=60
       - TCP_KEEPALIVE_COUNT=9
-
-      - PDF_CHUNK_SIZE=1024
-      - LLM_TIMEOUT=7200
-      - EMBEDDING_TIMEOUT=3600
+      - PDF_CHUNK_SIZE=512
+      - LLM_TIMEOUT=14400
+      - EMBEDDING_TIMEOUT=7200
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9621/health"]
-      interval: 30s
+      interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s

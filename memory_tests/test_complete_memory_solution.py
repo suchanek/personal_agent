@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from rich import print
 from rich.console import Console
-
 from rich.panel import Panel
 
 from personal_agent.config import (
@@ -26,6 +25,8 @@ from personal_agent.config import (
     USER_ID,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent
+
+USER_ID = "test_user"
 
 
 async def test_memory_functionality():
@@ -55,7 +56,7 @@ async def test_memory_functionality():
         knowledge_dir=AGNO_KNOWLEDGE_DIR,
         debug=True,  # Enable debug to see tool calls
         ollama_base_url=OLLAMA_URL,
-        user_id=USER_ID,
+        user_id=USER_ID,  # Use a test user ID
     )
 
     # Initialize the agent

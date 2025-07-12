@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/0.8.9] - 2025-07-12
+
+### Added
+- **Enum-Based Memory Storage Status**: Implemented a new enum-based system (`MemoryStorageStatus`) and a structured result dataclass (`MemoryStorageResult`) for memory storage operations. This replaces ambiguous `None` returns with a clear, type-safe, and extensible status system, providing detailed metadata on storage outcomes, including duplicate detection with similarity scores and dual-storage success status. See [ADR-011](./docs/adr/011-enum-based-memory-status.md) for details.
+- New test suites (`test_enum_memory_status.py`, `test_dual_storage_enum_status.py`) to validate the new memory status system.
+
+### Changed
+- The `store_user_memory` tool and underlying `SemanticMemoryManager.add_memory` method were refactored to return a `MemoryStorageResult` object instead of a simple string or tuple. This provides a structured, detailed, and machine-readable outcome for every memory storage attempt.
+- The tool's user-facing output for memory storage is now more informative, using emojis to clearly indicate success (✅), partial success (⚠️), duplicates (🔄), and failures (❌).
+
 ## [0.8.9] - 2025-07-11
 
 ### Added

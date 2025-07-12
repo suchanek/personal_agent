@@ -14,6 +14,9 @@ from enum import Enum, auto
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union
 
+# Import the new memory storage types
+from .semantic_memory_manager import MemoryStorageResult, MemoryStorageStatus
+
 # pylint: disable=C0413, C0415, C0301
 import aiohttp
 
@@ -247,7 +250,26 @@ class AgnoPersonalAgent:
             content: str = "", topics: Union[List[str], str, None] = None
         ) -> str:
             """A tool that wraps the public store_user_memory method."""
-            return await self.store_user_memory(content=content, topics=topics)
+            result = await self.store_user_memory(content=content, topics=topics)
+            
+            # Format the result for user display
+            if result.is_success:
+                if result.status == MemoryStorageStatus.SUCCESS:
+                    return f"✅ {result.message}"
+                elif result.status == MemoryStorageStatus.SUCCESS_LOCAL_ONLY:
+                    return f"⚠️ {result.message}"
+            else:
+                # Handle different rejection types with appropriate emojis
+                if result.status == MemoryStorageStatus.DUPLICATE_EXACT:
+                    return f"🔄 {result.message}"
+                elif result.status == MemoryStorageStatus.DUPLICATE_SEMANTIC:
+                    return f"🔄 {result.message} (similarity: {result.similarity_score:.2f})"
+                elif result.status == MemoryStorageStatus.CONTENT_EMPTY:
+                    return f"❌ {result.message}"
+                elif result.status == MemoryStorageStatus.CONTENT_TOO_LONG:
+                    return f"❌ {result.message}"
+                else:
+                    return f"❌ {result.message}"
 
         async def query_knowledge_base(
             query: str,
@@ -2114,7 +2136,7 @@ Returns:
 
     async def store_user_memory(
         self, content: str = "", topics: Union[List[str], str, None] = None
-    ) -> str:
+    ) -> MemoryStorageResult:
         """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
 
         This is a public method that can be called directly.
@@ -2124,18 +2146,18 @@ Returns:
             topics: Optional list of topics/categories for the memory (None = auto-classify)
 
         Returns:
-            str: Success or error message
+            MemoryStorageResult: Structured result with detailed status information
         """
         # Validate that content is provided
         if not content or not content.strip():
-            return "❌ Error: Content is required to store a memory. Please provide the information you want me to remember."
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.CONTENT_EMPTY,
+                message="Content is required to store a memory. Please provide the information you want me to remember.",
+                local_success=False,
+                graph_success=False
+            )
+        
         try:
-            import json
-
-            # DON'T set topics to ["general"] here - let the memory manager handle auto-classification
-            # if topics is None:
-            #     topics = ["general"]
-
             # SIMPLIFIED TOPIC HANDLING: Handle the common cases simply
             if topics is None:
                 # Leave as None - let memory manager auto-classify
@@ -2156,41 +2178,31 @@ Returns:
                 topic_str = str(topics).strip()
                 topics = [topic_str] if topic_str and topic_str != "None" else None
 
-            # Don't set a default - let the memory manager handle auto-classification
-            # if topics is None:
-            #     topics = ["general"]
-
-            # DUAL STORAGE: Store in BOTH local SQLite memory AND LightRAG graph memory
-            results = []
-
             # 1. Store in local SQLite memory system
-            (
-                success,
-                message,
-                memory_id,
-                generated_topics,
-            ) = self.agno_memory.memory_manager.add_memory(
+            local_result = self.agno_memory.memory_manager.add_memory(
                 memory_text=content,
                 db=self.agno_memory.db,
                 user_id=self.user_id,
                 topics=topics,
             )
 
-            if success:
-                logger.info(
-                    "Stored in local memory: %s... (ID: %s)",
-                    content[:50],
-                    memory_id,
-                )
-                results.append(f"✅ Local memory: {content[:50]}... (ID: {memory_id})")
-            else:
-                logger.info("Local memory rejected: %s", message)
-                if "duplicate" in message.lower():
-                    results.append(f"✅ Local memory: Already exists")
-                else:
-                    results.append(f"❌ Local memory error: {message}")
+            # Handle different rejection cases
+            if not local_result.is_success:
+                logger.info("Local memory rejected: %s", local_result.message)
+                # Return the rejection status directly from the memory manager
+                return local_result
+
+            # Local storage succeeded
+            logger.info(
+                "Stored in local memory: %s... (ID: %s)",
+                content[:50],
+                local_result.memory_id,
+            )
 
             # 2. Store in LightRAG graph memory system
+            graph_success = False
+            graph_message = ""
+            
             try:
                 # Find the store_graph_memory tool/method to call it
                 store_graph_memory_func = None
@@ -2199,40 +2211,55 @@ Returns:
                         if getattr(tool, "__name__", "") == "store_graph_memory":
                             store_graph_memory_func = tool
                             break
+                
                 if store_graph_memory_func:
                     # Pass the memory_id to store_graph_memory for tracking
                     graph_result = await store_graph_memory_func(
-                        content, generated_topics, memory_id
+                        content, local_result.topics, local_result.memory_id
                     )
                     logger.info("Graph memory result: %s", graph_result)
                     if "✅" in graph_result:
-                        results.append(f"✅ Graph memory: Synced successfully")
+                        graph_success = True
+                        graph_message = "Graph memory synced successfully"
                     else:
-                        results.append(f"⚠️ Graph memory: {graph_result}")
+                        graph_message = f"Graph memory sync failed: {graph_result}"
                 else:
                     logger.warning("Could not find store_graph_memory tool - graph sync skipped")
-                    results.append("⚠️ Graph memory: Tool not available (sync skipped)")
+                    graph_message = "Graph memory tool not available (sync skipped)"
+                    
             except Exception as e:
                 logger.error("Error storing in graph memory: %s", e)
-                results.append(f"❌ Graph memory error: {str(e)}")
+                graph_message = f"Graph memory error: {str(e)}"
 
-            # Log sync status for debugging
-            local_success_count = sum(1 for r in results if "✅" in r and "Local" in r)
-            graph_success_count = sum(1 for r in results if "✅" in r and "Graph" in r)
-            
-            if local_success_count > 0 and graph_success_count > 0:
+            # Determine final status based on local and graph results
+            if graph_success:
+                final_status = MemoryStorageStatus.SUCCESS
+                final_message = f"Memory stored successfully in both systems: {content[:50]}..."
                 logger.info("✅ DUAL STORAGE SUCCESS: Memory stored in both local SQLite and LightRAG graph")
-            elif local_success_count > 0:
-                logger.warning("⚠️ PARTIAL STORAGE: Memory stored in local SQLite only (graph sync failed)")
             else:
-                logger.error("❌ STORAGE FAILURE: Memory not stored in either system")
+                final_status = MemoryStorageStatus.SUCCESS_LOCAL_ONLY
+                final_message = f"Memory stored in local system only: {content[:50]}... | {graph_message}"
+                logger.warning("⚠️ PARTIAL STORAGE: Memory stored in local SQLite only (graph sync failed)")
 
-            # Return combined results
-            return " | ".join(results)
+            # Return the enhanced result with dual storage information
+            return MemoryStorageResult(
+                status=final_status,
+                message=final_message,
+                memory_id=local_result.memory_id,
+                topics=local_result.topics,
+                local_success=True,
+                graph_success=graph_success,
+                similarity_score=local_result.similarity_score
+            )
 
         except Exception as e:
             logger.error("Error storing user memory: %s", e)
-            return f"❌ Error storing memory: {str(e)}"
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.STORAGE_ERROR,
+                message=f"Error storing memory: {str(e)}",
+                local_success=False,
+                graph_success=False
+            )
 
     async def cleanup(self) -> None:
         """Clean up resources.

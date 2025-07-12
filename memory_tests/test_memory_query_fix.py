@@ -48,6 +48,7 @@ async def test_memory_query_behavior():
         "Eric likes pizza and Italian food",
         "Eric works as a software engineer",
         "Eric enjoys hiking and outdoor activities",
+        "Eric lives in Ohio",
     ]
 
     for memory in test_memories:

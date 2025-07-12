@@ -14,6 +14,7 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -28,9 +29,45 @@ from personal_agent.utils import setup_logging
 
 logger = setup_logging(__name__)
 
-import re
-from dataclasses import dataclass
-from typing import Dict, List, Pattern
+
+class MemoryStorageStatus(Enum):
+    """Enum for memory storage operation results."""
+    SUCCESS = auto()                    # Memory stored successfully in both systems
+    SUCCESS_LOCAL_ONLY = auto()         # Stored in local SQLite, graph sync failed
+    DUPLICATE_EXACT = auto()           # Rejected: exact duplicate found
+    DUPLICATE_SEMANTIC = auto()        # Rejected: semantic duplicate found  
+    CONTENT_EMPTY = auto()             # Rejected: empty or invalid content
+    CONTENT_TOO_LONG = auto()          # Rejected: content exceeds max length
+    STORAGE_ERROR = auto()             # Error: database/storage failure
+    VALIDATION_ERROR = auto()          # Error: input validation failed
+
+
+@dataclass
+class MemoryStorageResult:
+    """Structured result for memory storage operations."""
+    status: MemoryStorageStatus
+    message: str
+    memory_id: Optional[str] = None
+    topics: Optional[List[str]] = None
+    local_success: bool = False
+    graph_success: bool = False
+    similarity_score: Optional[float] = None
+    
+    @property
+    def is_success(self) -> bool:
+        """True if memory was stored (fully or partially)."""
+        return self.status in [MemoryStorageStatus.SUCCESS, MemoryStorageStatus.SUCCESS_LOCAL_ONLY]
+    
+    @property
+    def is_rejected(self) -> bool:
+        """True if memory was rejected (duplicate, validation, etc.)."""
+        return self.status in [
+            MemoryStorageStatus.DUPLICATE_EXACT,
+            MemoryStorageStatus.DUPLICATE_SEMANTIC,
+            MemoryStorageStatus.CONTENT_EMPTY,
+            MemoryStorageStatus.CONTENT_TOO_LONG,
+            MemoryStorageStatus.VALIDATION_ERROR
+        ]
 
 
 class SemanticDuplicateDetector:
@@ -419,7 +456,7 @@ class SemanticMemoryManager:
         user_id: str = USER_ID,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[str], Optional[List[str]]]:
+    ) -> MemoryStorageResult:
         """
         Add a memory with duplicate detection and topic classification.
 
@@ -428,27 +465,54 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memory
         :param topics: Optional list of topics (will be auto-classified if not provided)
         :param input_text: Optional input text that generated this memory
-        :return: Tuple of (success, message, memory_id, topics)
+        :return: MemoryStorageResult with detailed status information
         """
+        # Validate input
+        if not memory_text or not memory_text.strip():
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.CONTENT_EMPTY,
+                message="Memory content cannot be empty",
+                local_success=False,
+                graph_success=False
+            )
+
         # Get recent memories for duplicate checking
         existing_memories = self._get_recent_memories(db, user_id)
 
-        # Check if memory should be rejected
-        should_reject, reason = self._should_reject_memory(
-            memory_text, existing_memories
-        )
-
-        if should_reject:
-            logger.info(
-                "Rejecting memory for user %s: %s. Memory: '%s'",
-                user_id,
-                reason,
-                memory_text,
+        # Check memory length
+        if len(memory_text) > self.config.max_memory_length:
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.CONTENT_TOO_LONG,
+                message=f"Memory too long ({len(memory_text)} > {self.config.max_memory_length} chars)",
+                local_success=False,
+                graph_success=False
             )
-            if self.config.debug_mode:
-                print(f"🚫 REJECTED: {reason}")
-                print(f"   Memory: '{memory_text}'")
-            return False, reason, None, None
+
+        # Check for exact duplicates
+        exact_duplicate = self._is_exact_duplicate(memory_text, existing_memories)
+        if exact_duplicate:
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.DUPLICATE_EXACT,
+                message=f"Exact duplicate of: '{exact_duplicate.memory}'",
+                local_success=False,
+                graph_success=False,
+                similarity_score=1.0
+            )
+
+        # Check for semantic duplicates
+        semantic_duplicate = self._is_semantic_duplicate(memory_text, existing_memories)
+        if semantic_duplicate:
+            # Get similarity score for the duplicate
+            existing_texts = [mem.memory for mem in existing_memories]
+            _, _, similarity_score = self.duplicate_detector.is_duplicate(memory_text, existing_texts)
+            
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.DUPLICATE_SEMANTIC,
+                message=f"Semantic duplicate of: '{semantic_duplicate.memory}'",
+                local_success=False,
+                graph_success=False,
+                similarity_score=similarity_score
+            )
 
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
@@ -489,12 +553,24 @@ class SemanticMemoryManager:
             if self.config.debug_mode:
                 print(f"✅ ACCEPTED: '{memory_text}' (topics: {topics})")
 
-            return True, "Memory added successfully", memory_id, topics
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.SUCCESS,
+                message="Memory added successfully",
+                memory_id=memory_id,
+                topics=topics,
+                local_success=True,
+                graph_success=False  # Will be updated by the caller for dual storage
+            )
 
         except Exception as e:
             error_msg = f"Error adding memory: {e}"
             logger.error(error_msg)
-            return False, error_msg, None, None
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.STORAGE_ERROR,
+                message=error_msg,
+                local_success=False,
+                graph_success=False
+            )
 
     def update_memory(
         self,
@@ -1015,7 +1091,7 @@ class SemanticMemoryManager:
             memorable_statements = self._extract_memorable_statements(input_text)
 
             for statement in memorable_statements:
-                success, message, memory_id, topics = self.add_memory(
+                result = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,
@@ -1024,17 +1100,17 @@ class SemanticMemoryManager:
 
                 results["total_processed"] += 1
 
-                if success:
+                if result.is_success:
                     results["memories_added"].append(
                         {
-                            "memory_id": memory_id,
+                            "memory_id": result.memory_id,
                             "memory": statement,
-                            "topics": topics,
+                            "topics": result.topics,
                         }
                     )
                 else:
                     results["memories_rejected"].append(
-                        {"memory": statement, "reason": message}
+                        {"memory": statement, "reason": result.message}
                     )
 
             if results["memories_added"]:
@@ -1136,26 +1212,26 @@ class SemanticMemoryManager:
                 continue
 
             # Add the memory
-            success, message, memory_id, _ = self.add_memory(
+            result = self.add_memory(
                 memory_text=statement,
                 db=db,
                 user_id=user_id,
                 input_text=combined_input,
             )
 
-            if success:
+            if result.is_success:
                 memories_added += 1
                 actions_taken.append(f"Added: '{statement[:50]}...'")
-                logger.debug(f"Added memory: {memory_id}")
+                logger.debug(f"Added memory: {result.memory_id}")
 
                 # Add to existing memories list for subsequent duplicate checking
-                existing_user_memories.append(SimpleMemory(statement, memory_id or ""))
+                existing_user_memories.append(SimpleMemory(statement, result.memory_id or ""))
             else:
                 memories_rejected += 1
                 actions_taken.append(
-                    f"Failed to add: '{statement[:50]}...' - {message}"
+                    f"Failed to add: '{statement[:50]}...' - {result.message}"
                 )
-                logger.warning(f"Failed to add memory: {message}")
+                logger.warning(f"Failed to add memory: {result.message}")
 
         # Set memories_updated flag if any memories were added
         if memories_added > 0:
@@ -1271,28 +1347,28 @@ class SemanticMemoryManager:
                     continue
 
                 # Add the memory
-                success, message, memory_id, _ = self.add_memory(
+                result = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,
                     input_text=task,
                 )
 
-                if success:
+                if result.is_success:
                     memories_added += 1
                     actions_taken.append(f"Added: '{statement[:50]}...'")
-                    logger.debug(f"Added memory: {memory_id}")
+                    logger.debug(f"Added memory: {result.memory_id}")
 
                     # Add to existing memories list for subsequent duplicate checking
                     existing_user_memories.append(
-                        SimpleMemory(statement, memory_id or "")
+                        SimpleMemory(statement, result.memory_id or "")
                     )
                 else:
                     memories_rejected += 1
                     actions_taken.append(
-                        f"Failed to add: '{statement[:50]}...' - {message}"
+                        f"Failed to add: '{statement[:50]}...' - {result.message}"
                     )
-                    logger.warning(f"Failed to add memory: {message}")
+                    logger.warning(f"Failed to add memory: {result.message}")
 
             # Set memories_updated flag if any memories were added
             if memories_added > 0:
