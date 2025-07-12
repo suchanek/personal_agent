@@ -72,6 +72,7 @@ from .agno_storage import (
     load_lightrag_knowledge_base,
 )
 from .knowledge_coordinator import create_knowledge_coordinator
+from .docker_integration import ensure_docker_user_consistency
 
 # Configure logging
 logger = setup_logging(__name__, level=LOG_LEVEL)
@@ -1703,6 +1704,25 @@ Returns:
         logger.info(
             "🚀 AgnoPersonalAgent.initialize() called with recreate=%s", recreate
         )
+        
+        # CRITICAL: Ensure Docker USER_ID consistency with smart restart capability
+        logger.info("🔍 Checking Docker USER_ID consistency for user: %s", self.user_id)
+        try:
+            ready_to_proceed, consistency_message = ensure_docker_user_consistency(
+                user_id=self.user_id, auto_fix=True, force_restart=True
+            )
+            
+            if ready_to_proceed:
+                logger.info("✅ Docker consistency check passed: %s", consistency_message)
+            else:
+                logger.error("❌ Docker consistency check failed: %s", consistency_message)
+                raise RuntimeError(f"Docker USER_ID consistency check failed: {consistency_message}")
+                
+        except Exception as e:
+            logger.error("🚨 Critical error during Docker consistency check: %s", e)
+            # Don't fail initialization for Docker consistency issues in case Docker is not available
+            logger.warning("⚠️ Continuing initialization despite Docker consistency check failure")
+        
         try:
             # Create model
             model = self._create_model()
