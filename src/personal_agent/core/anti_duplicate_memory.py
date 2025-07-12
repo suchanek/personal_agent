@@ -29,12 +29,12 @@ free of redundant information, which is crucial for effective long-term
 recall and reasoning.
 """
 
+# pylint: disable=c0413,c0415,c0301
 import difflib
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -43,6 +43,7 @@ from agno.memory.v2.db.base import MemoryDb
 from agno.memory.v2.memory import Memory
 from agno.memory.v2.schema import UserMemory
 from agno.models.base import Model
+from agno.models.message import Message
 
 from personal_agent.config import USER_ID
 from personal_agent.utils import setup_logging
@@ -255,8 +256,8 @@ class AntiDuplicateMemory(Memory):
                 import re
 
                 # Extract numbers from both memories
-                numbers1 = re.findall(r"\d+", memory1)
-                numbers2 = re.findall(r"\d+", memory2)
+                numbers1 = re.findall(r'\d+', memory1)
+                numbers2 = re.findall(r'\d+', memory2)
 
                 # If they have the same number of numeric values but different values,
                 # this is likely structured test data
@@ -443,15 +444,20 @@ class AntiDuplicateMemory(Memory):
     def add_user_memory(
         self,
         memory: UserMemory,
-        user_id: str = USER_ID,
+        user_id: Optional[str] = None,
+        refresh_from_db: bool = True,
     ) -> Optional[str]:
         """
         Add a user memory with duplicate prevention.
 
         :param memory: UserMemory object to add
         :param user_id: User ID for the memory
+        :param refresh_from_db: Whether to refresh from database before adding
         :return: Memory ID if added, None if rejected
         """
+        # Default user_id if not provided
+        if user_id is None:
+            user_id = USER_ID
         # Handle case where topics comes in as string representation of list
         if memory.topics and isinstance(memory.topics, str):
             try:
@@ -501,7 +507,8 @@ class AntiDuplicateMemory(Memory):
         self,
         message: Optional[str] = None,
         messages: Optional[List] = None,
-        user_id: str = USER_ID,
+        user_id: Optional[str] = None,
+        refresh_from_db: bool = True,
     ) -> List[UserMemory]:
         """
         Create user memories from messages with duplicate prevention.
@@ -509,8 +516,13 @@ class AntiDuplicateMemory(Memory):
         :param message: Single message to create memories from
         :param messages: List of messages to create memories from
         :param user_id: User ID for the memories
+        :param refresh_from_db: Whether to refresh from database before creating
         :return: List of successfully created memories
         """
+        # Default user_id if not provided
+        if user_id is None:
+            user_id = USER_ID
+            
         logger.info("Creating memories for user %s", user_id)
         created_memories = []
 
@@ -544,7 +556,7 @@ class AntiDuplicateMemory(Memory):
 
                 # Create memory and add with deduplication
                 memory_obj = UserMemory(memory=content, topics=["general"])
-                memory_id = self.add_user_memory(memory=memory_obj, user_id=user_id)
+                memory_id = self.add_user_memory(memory=memory_obj, user_id=user_id, refresh_from_db=refresh_from_db)
                 if memory_id is not None:
                     memory_obj.memory_id = memory_id
                     created_memories.append(memory_obj)
@@ -591,28 +603,48 @@ class AntiDuplicateMemory(Memory):
 
         return deduplicated
 
-    def delete_user_memory(self, memory_id: str, user_id: str = USER_ID) -> bool:
+    def delete_user_memory(
+        self,
+        memory_id: str,
+        user_id: Optional[str] = None,
+        refresh_from_db: bool = True,
+    ) -> None:
         """
         Delete a specific user memory.
 
         :param memory_id: ID of the memory to delete
         :param user_id: User ID for the memory
-        :return: True if deleted successfully, False otherwise
+        :param refresh_from_db: Whether to refresh from database before deleting
+        :return: None (raises exception on failure)
         """
+        # Default user_id if not provided
+        if user_id is None:
+            user_id = USER_ID
+            
+        # First, check if the memory exists by getting all memories and looking for the ID
         try:
-            # Use the database's delete_memory method
+            all_memories = self.db.read_memories()
+            memory_exists = any(row.id == memory_id for row in all_memories)
+            
+            if not memory_exists:
+                raise ValueError(f"Memory with ID '{memory_id}' not found")
+            
+            # Memory exists, proceed with deletion
             self.db.delete_memory(memory_id)
             logger.info("Deleted memory %s for user %s", memory_id, user_id)
             if self.debug_mode:
                 print(f"🗑️  Deleted memory: {memory_id}")
-            return True
+        except ValueError:
+            # Re-raise ValueError for non-existent memory
+            raise
         except Exception as e:
             logger.error(
                 "Failed to delete memory %s for user %s: %s", memory_id, user_id, e
             )
             if self.debug_mode:
                 print(f"❌ Failed to delete memory {memory_id}: {e}")
-            return False
+            # Re-raise the exception to match parent class behavior
+            raise
 
     def get_memory_stats(self, user_id: str = USER_ID) -> dict:
         """
@@ -683,17 +715,17 @@ class AntiDuplicateMemory(Memory):
         print(f"Average memory length: {stats['average_memory_length']:.1f} chars")
 
         if stats["exact_duplicates"] > 0:
-            print(f"\n⚠️  EXACT DUPLICATES DETECTED!")
+            print("\n⚠️  EXACT DUPLICATES DETECTED!")
 
         if stats["potential_semantic_duplicates"] > 0:
-            print(f"\n🔍 POTENTIAL SEMANTIC DUPLICATES:")
+            print("\n🔍 POTENTIAL SEMANTIC DUPLICATES:")
             for i, j, similarity in stats["duplicate_pairs"]:
                 print(f"  • {similarity:.2f} similarity:")
                 print(f"    [{i}] {memories[i].memory}")
                 print(f"    [{j}] {memories[j].memory}")
 
         if stats["combined_memories"] > 0:
-            print(f"\n🔗 COMBINED MEMORIES:")
+            print("\n🔗 COMBINED MEMORIES:")
             for idx in stats["combined_memory_indices"]:
                 print(f"   Memory: '{memories[idx].memory}'")
 
@@ -702,7 +734,7 @@ class AntiDuplicateMemory(Memory):
             and stats["potential_semantic_duplicates"] == 0
             and stats["combined_memories"] == 0
         ):
-            print(f"\n✅ EXCELLENT: No duplicates or combined memories detected!")
+            print("\n✅ EXCELLENT: No duplicates or combined memories detected!")
 
 
 # Convenience function for easy usage
@@ -735,8 +767,6 @@ def main():
     Analyzes the current memory database and displays statistics about
     memory quality, duplicates, and potential issues.
     """
-    import sys
-    from pathlib import Path
 
     # Add parent directories to path for imports
     current_file = Path(__file__).resolve()
@@ -745,7 +775,7 @@ def main():
 
     from agno.memory.v2.db.sqlite import SqliteMemoryDb
 
-    from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
+    from personal_agent.config import AGNO_STORAGE_DIR
 
     print("🧠 Anti-Duplicate Memory Analysis Tool")
     print("=" * 50)
@@ -788,7 +818,7 @@ def main():
 
         # Analyze each user
         for user_id in users:
-            print(f"\n" + "=" * 60)
+            print("\n" + "=" * 60)
             print(f"🔍 ANALYZING USER: {user_id}")
             print("=" * 60)
 
@@ -805,7 +835,7 @@ def main():
             # Show sample memories
             memories = anti_dup_memory.get_user_memories(user_id=user_id)
             if memories:
-                print(f"\n📝 SAMPLE MEMORIES (showing first 5):")
+                print("\n📝 SAMPLE MEMORIES (showing first 5):")
                 for i, memory in enumerate(memories[:5], 1):
                     memory_text = (
                         memory.memory[:100] + "..."
@@ -820,7 +850,7 @@ def main():
                     print(f"   ... and {len(memories) - 5} more memories")
 
         # Overall database summary
-        print(f"\n" + "=" * 60)
+        print("\n" + "=" * 60)
         print("📊 OVERALL DATABASE SUMMARY")
         print("=" * 60)
         print(f"Total memories across all users: {len(all_memories)}")
@@ -830,7 +860,7 @@ def main():
         db_size = db_path.stat().st_size
         print(f"Database file size: {db_size:,} bytes ({db_size/1024:.1f} KB)")
 
-        print(f"\n✅ Analysis complete!")
+        print("\n✅ Analysis complete!")
 
     except Exception as e:
         print(f"❌ Error during analysis: {e}")

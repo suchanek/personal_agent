@@ -38,7 +38,7 @@ class EricMemoryTester:
         :param use_temp_db: If True, use temporary database for testing
         """
         self.use_temp_db = use_temp_db
-        self.test_user_id = "eric"
+        self.test_user_id = "eric_test"
 
         # Setup database
         if use_temp_db:
