@@ -8,9 +8,7 @@ services:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
-      - ./env.memory_server:/app/.env
-    env_file:
-      - env.memory_server
+      - ./.env:/app/.env
     environment:
       - WORKERS=1
       - MAX_PARALLEL_INSERT=1
