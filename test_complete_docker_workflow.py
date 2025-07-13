@@ -118,7 +118,7 @@ def test_complete_docker_workflow():
     restart_success = {}
     for server_name in stopped_containers:
         if update_success.get(server_name, False):
-            config = sync_manager.docker_configs[server_name]['config']
+            config = sync_manager.docker_configs[server_name]
             container_name = config['container_name']
             
             print(f"  🚀 Starting {server_name} ({container_name}) with USER_ID={test_user_id}...")
@@ -178,7 +178,7 @@ def test_complete_docker_workflow():
     # Stop containers again
     for server_name in restart_success:
         if restart_success[server_name]:
-            config = sync_manager.docker_configs[server_name]['config']
+            config = sync_manager.docker_configs[server_name]
             container_name = config['container_name']
             print(f"  🛑 Stopping {server_name} for restoration...")
             sync_manager.stop_docker_service(config)
