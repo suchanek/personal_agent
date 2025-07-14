@@ -5,7 +5,7 @@ services:
     env_file:
       - .env
     ports:
-      - "9623:9623"
+      - "${LIGHTRAG_MEMORY_PORT:-9623}:${LIGHTRAG_MEMORY_PORT:-9623}"
     volumes:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
