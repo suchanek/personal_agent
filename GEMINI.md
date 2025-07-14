@@ -6,6 +6,17 @@ This document provides context for the Gemini agent to understand and effectivel
 
 This project is a sophisticated personal AI assistant powered by the **Agno Framework** with native MCP integration, semantic memory management, and local Ollama AI. It leverages `agno`, `Ollama`, and `LightRAG` to create a powerful, locally-run AI assistant with memory and other capabilities. The agent is built with a modular architecture, allowing for different configurations and functionalities. It originally started with ``LangChain``, evolved to use ``SmolAgent`` and now is entirely focused on using the ``agno`` agentic framework. The other implementations are legacy.
 
+## Dynamic Multi-User System
+
+The agent now features a full-stack, dynamic multi-user system that allows for seamless user switching at runtime without requiring an application restart. This ensures strong data isolation and stable service management. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) for details.
+
+### Key Components:
+*   **`UserManager`**: The central orchestrator for all user-related operations (creation, switching, deletion).
+*   **`UserRegistry`**: A JSON-based registry to persistently manage user profiles.
+*   **`LightRAGManager`**: A Python-native manager to control LightRAG Docker services and inject the current `USER_ID` dynamically.
+*   **`smart-restart-lightrag.sh`**: A robust shell script to prevent port conflicts and ensure service stability during user switches.
+*   **`switch-user.py`**: A CLI script for creating and switching between users.
+
 ## Personal Files
 
 Files specific to the user, such as `eric_facts.json` and `eric_structured_facts.txt`, are now located in the `eric/` directory at the project root.
@@ -20,13 +31,13 @@ Files specific to the user, such as `eric_facts.json` and `eric_structured_facts
 
 ### LightRAG Server
 
-The LightRAG server must be running for the agent to function correctly. It is managed via Docker Compose. To start the LightRAG services, navigate to the project root and run:
+The LightRAG server must be running for the agent to function correctly. It is managed via Docker Compose. To start or restart the LightRAG services with proper user context and port handling, use the new smart restart script:
 
 ```bash
-./restart-lightrag.sh
+./smart-restart-lightrag.sh
 ```
 
-This script uses the `docker-compose.yml` file in the `lightrag_server` directory to bring up the necessary services.
+This script intelligently stops, cleans up, and restarts the containers, preventing common "port already allocated" errors.
 
 ## Installation and Dependencies
 
@@ -42,11 +53,23 @@ This is a Python project managed with `Poetry`.
 
 2.  **Start LightRAG Server**
 
+    Use the smart restart script to ensure a clean start.
     ```bash
-    ./restart-lightrag.sh
+    ./smart-restart-lightrag.sh
     ```
 
-3.  **Manage MCP & Ollama Servers**
+3.  **Manage Users (CLI)**
+    
+    Use the `switch-user.py` script to create or switch between user contexts. This will automatically update configurations and restart services.
+    ```bash
+    # Create and switch to a new user named 'alice'
+    python switch-user.py alice
+    
+    # Switch back to the 'eric' user
+    python switch-user.py eric
+    ```
+
+4.  **Manage MCP & Ollama Servers**
 
     Use the provided scripts to manage your MCP and Ollama servers:
 
@@ -61,7 +84,7 @@ This is a Python project managed with `Poetry`.
     ./switch-ollama.sh status
     ```
 
-4.  **Setup Ollama**
+5.  **Setup Ollama**
 
     ```bash
     # Install Ollama (macOS example)
@@ -78,9 +101,9 @@ This is a Python project managed with `Poetry`.
     ollama pull nomic-embed-text
     ```
 
-5.  **Configure Environment**
+6.  **Configure Environment**
 
-    Copy `env.example` to `.env` and configure:
+    Copy `env.example` to `.env`. The `USER_ID` is now managed dynamically by the user system.
 
     ```bash
     # Required: Filesystem paths
@@ -91,7 +114,9 @@ This is a Python project managed with `Poetry`.
     OLLAMA_URL=http://localhost:11434
     OLLAMA_DOCKER_URL=http://host.docker.internal:11434
 
-    # LightRAG Storage Directories
+    # LightRAG Storage Directories (USER_ID is injected dynamically)
+    LIGHTRAG_SERVER_PORT=9621
+    LIGHTRAG_MEMORY_PORT=9623
     LIGHTRAG_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage
     LIGHTRAG_INPUTS_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs
     LIGHTRAG_MEMORY_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/memory_rag_storage
@@ -113,7 +138,7 @@ The project includes several entry points for running different agent configurat
 
 ### Current
 
-*   **Agno-Interface (Streamlit Web UI)**: `poetry run paga_streamlit` or `poetry run paga`
+*   **Agno-Interface (Streamlit Web UI)**: `poetry run paga_streamlit` or `poetry run paga`. The UI is now a full-featured user management dashboard.
 *   **Agno-Cli**: The CLI has been refactored for improved maintainability and organization. The main entry point remains `poetry run paga_cli`, but its internal structure has been modularized. See [ADR-008](./docs/adr/008-cli-refactor.md) for details.
     *   **Usage**: The CLI usage remains identical to before the refactor.
         ```bash
@@ -157,6 +182,7 @@ The project uses a custom testing setup.
 *   **Test memory system**: `python memory_tests/test_comprehensive_memory_search.py`
 *   **Test tool call detection**: `python tests/test_tool_call_detection.py`
 *   **Test memory synchronization**: `python test_memory_sync_fix.py`
+*   **Test multi-user system**: `python test_user_id_propagation.py`
 
 ## Key Technologies
 
@@ -174,6 +200,7 @@ The project has been updated to integrate with the LightRAG server, a powerful t
 
 ### Key Changes:
 
+*   **Dynamic Multi-User Management**: The entire system has been refactored to support dynamic user switching at runtime, with strong data isolation and service management. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) for details.
 *   **`GEMINI.md`**: This file has been significantly updated to reflect the integration with `LightRAG` and recent system enhancements. It now includes:
     *   A detailed overview of `LightRAG`'s features.
     *   Installation and usage instructions for the `lightrag` package.
@@ -191,6 +218,8 @@ The project has been updated to integrate with the LightRAG server, a powerful t
 ## Tools & Capabilities
 
 ### Memory Tools
+
+All memory operations are now user-specific, ensuring data isolation between different users.
 
 *   **store_user_memory**: Store personal information with topic classification, now leveraging an **Enriched Graph Ingestion Pipeline** for more accurate knowledge graph construction (see ADR-007).
 *   **query_memory**: Search user memories using semantic similarity. Args: `query` (str), `limit` (int, optional). Returns: `str` (found memories or message if none found).
@@ -247,6 +276,8 @@ The agent uses an advanced semantic memory system that:
 
 ### Environment Variables
 
+The `USER_ID` is now managed dynamically by the new user system (`switch-user.py`, Streamlit UI) and should not be set manually in the `.env` file for normal operation.
+
 ```bash
 # Required
 ROOT_DIR="/Users/your_username"        # Home directory access
@@ -301,7 +332,14 @@ poetry run python scripts/install_mcp.py
 poetry run test-mcp-servers
 ```
 
-**4. Memory System Issues**
+**4. Docker Restart Issues ("Port already allocated")**
+
+This issue is now largely prevented by the new multi-user system. Use the `smart-restart-lightrag.sh` script to ensure services are restarted cleanly.
+```bash
+./smart-restart-lightrag.sh
+```
+
+**5. Memory System Issues**
 
 If you encounter issues with the memory system, consider the following:
 
@@ -319,7 +357,7 @@ If you encounter issues with the memory system, consider the following:
     ```
 *   **Check memory sync status**: In the Streamlit UI, use the "Memory Sync Status" section to check for inconsistencies between local and graph memories and sync them if needed.
 
-**5. Tool Call Visibility**
+**6. Tool Call Visibility**
 
 If tools are being called but not visible in debug panels:
 
@@ -333,10 +371,12 @@ If tools are being called but not visible in debug panels:
 personal_agent/
 ├── src/personal_agent/
 │   ├── cli/                  # CLI commands and parsing
-│   ├── core/                 # Core agent, memory systems, and initialization
+│   ├── core/                 # Core agent, memory, user management, and initialization
 │   ├── tools/               # Tool implementations
 │   ├── config/              # Configuration management
-│   └── web/                 # Web interface
+│   └── web/                 # Web interface (Streamlit)
+│       ├── components/      # Streamlit UI components
+│       └── utils/           # Streamlit utility functions
 ├── tools/                   # Standalone tools and utilities
 ├── scripts/                 # Installation and utility scripts
 ├── memory_tests/           # Memory system tests
