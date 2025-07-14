@@ -1705,6 +1705,17 @@ Returns:
             "🚀 AgnoPersonalAgent.initialize() called with recreate=%s", recreate
         )
         
+        # CRITICAL: Ensure user is registered in the user registry
+        logger.info("📝 Ensuring user %s is registered in user registry", self.user_id)
+        try:
+            from .user_registry import UserRegistry
+            user_registry = UserRegistry()
+            user_registry.ensure_current_user_registered()
+            logger.info("✅ User registration check completed")
+        except Exception as e:
+            logger.warning("⚠️ User registry check failed: %s", e)
+            # Don't fail initialization for user registry issues
+        
         # CRITICAL: Ensure Docker USER_ID consistency with smart restart capability
         logger.info("🔍 Checking Docker USER_ID consistency for user: %s", self.user_id)
         try:

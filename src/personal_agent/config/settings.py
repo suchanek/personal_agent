@@ -126,6 +126,64 @@ EMBEDDING_TIMEOUT = get_env_var("EMBEDDING_TIMEOUT", "3600")
 SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
 
 
+def get_current_user_id():
+    """Get the current USER_ID dynamically from environment.
+    
+    This function always reads from os.environ to ensure we get the latest value
+    after user switching, rather than the cached value from module import time.
+    
+    Returns:
+        Current USER_ID from environment or default fallback
+    """
+    return os.getenv("USER_ID", "default_user")
+
+
+def refresh_user_dependent_settings(user_id: str = None):
+    """Refresh all USER_ID-dependent settings after user switching.
+    
+    This function recalculates all storage paths and settings that depend on USER_ID
+    to ensure they reflect the current user after switching.
+    
+    Args:
+        user_id: Optional user_id to refresh settings for. If not provided,
+                 the current user_id from the environment will be used.
+    
+    Returns:
+        Dictionary with updated settings
+    """
+    current_user_id = user_id or get_current_user_id()
+    
+    # Recalculate storage directories with current USER_ID
+    agno_storage_dir = os.path.expandvars(
+        get_env_var("AGNO_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}")
+    )
+    agno_knowledge_dir = os.path.expandvars(
+        get_env_var("AGNO_KNOWLEDGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/knowledge")
+    )
+    lightrag_storage_dir = os.path.expandvars(
+        get_env_var("LIGHTRAG_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/rag_storage")
+    )
+    lightrag_inputs_dir = os.path.expandvars(
+        get_env_var("LIGHTRAG_INPUTS_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/inputs")
+    )
+    lightrag_memory_storage_dir = os.path.expandvars(
+        get_env_var("LIGHTRAG_MEMORY_STORAGE_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_rag_storage")
+    )
+    lightrag_memory_inputs_dir = os.path.expandvars(
+        get_env_var("LIGHTRAG_MEMORY_INPUTS_DIR", f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs")
+    )
+    
+    return {
+        "USER_ID": current_user_id,
+        "AGNO_STORAGE_DIR": agno_storage_dir,
+        "AGNO_KNOWLEDGE_DIR": agno_knowledge_dir,
+        "LIGHTRAG_STORAGE_DIR": lightrag_storage_dir,
+        "LIGHTRAG_INPUTS_DIR": lightrag_inputs_dir,
+        "LIGHTRAG_MEMORY_STORAGE_DIR": lightrag_memory_storage_dir,
+        "LIGHTRAG_MEMORY_INPUTS_DIR": lightrag_memory_inputs_dir,
+    }
+
+
 def get_package_version():
     """Get package version from the package __init__.py."""
     try:

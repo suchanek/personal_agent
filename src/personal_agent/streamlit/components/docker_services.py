@@ -23,6 +23,7 @@ from personal_agent.streamlit.utils.docker_utils import (
     get_container_logs,
     get_container_stats
 )
+from personal_agent.streamlit.utils.smart_docker_restart import get_smart_restart_manager
 
 
 def docker_services_tab():
@@ -113,6 +114,67 @@ def _render_container_management():
                             st.error(f"Failed to restart container '{selected_container}'.")
                     except Exception as e:
                         st.error(f"Error restarting container: {str(e)}")
+            
+            # Smart restart section
+            st.write("### Smart Restart")
+            st.info("🧠 Smart restart includes proper port cleanup and waiting periods to prevent 'port already allocated' errors.")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("🔄 Smart Restart Selected", help="Intelligently restart the selected container with proper cleanup"):
+                    try:
+                        smart_restart = get_smart_restart_manager()
+                        
+                        # Map container names to service names
+                        service_mapping = {
+                            'lightrag_pagent': 'lightrag_server',
+                            'lightrag_memory': 'lightrag_memory_server'
+                        }
+                        
+                        service_name = service_mapping.get(selected_container)
+                        if service_name:
+                            with st.spinner(f"Performing smart restart of {service_name}..."):
+                                success, message = smart_restart.smart_restart_service(service_name)
+                            
+                            if success:
+                                st.success(f"✅ {message}")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {message}")
+                        else:
+                            st.warning(f"Smart restart not available for container: {selected_container}")
+                    except Exception as e:
+                        st.error(f"Error during smart restart: {str(e)}")
+            
+            with col2:
+                if st.button("🔄 Smart Restart All", help="Intelligently restart all LightRAG services with proper cleanup"):
+                    try:
+                        smart_restart = get_smart_restart_manager()
+                        with st.spinner("Performing smart restart of all services..."):
+                            success, message = smart_restart.smart_restart_all_services()
+                        
+                        if success:
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {message}")
+                    except Exception as e:
+                        st.error(f"Error during smart restart: {str(e)}")
+            
+            with col3:
+                if st.button("🔧 Force User Sync", help="Force restart containers with USER_ID synchronization"):
+                    try:
+                        with st.spinner("Performing Docker user synchronization..."):
+                            success, message = docker_integration.ensure_docker_consistency(force_restart=True)
+                        
+                        if success:
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {message}")
+                    except Exception as e:
+                        st.error(f"Error during user sync: {str(e)}")
             
             # Bulk actions
             st.write("### Bulk Actions")

@@ -43,8 +43,7 @@ def main():
     check_dependencies()
     
     # Sidebar navigation
-    st.sidebar.title("Memory & User Manager")
-    st.sidebar.image("https://raw.githubusercontent.com/yourusername/personal_agent/main/assets/logo.png", width=100)
+    st.sidebar.title("🧠 Memory & User Manager")
     
     # Navigation
     selected_tab = st.sidebar.radio(

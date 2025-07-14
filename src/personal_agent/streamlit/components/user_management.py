@@ -134,9 +134,16 @@ def _render_switch_user():
             # Form for switching user
             with st.form("switch_user_form"):
                 selected_user = st.selectbox("Select User", user_ids)
-                restart_containers = st.checkbox("Restart Docker Containers", 
-                                               value=True,
-                                               help="Restart Docker containers after switching user")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    restart_containers = st.checkbox("Restart LightRAG Containers", 
+                                                   value=True,
+                                                   help="Restart LightRAG Docker containers after switching user")
+                with col2:
+                    update_global_config = st.checkbox("Update Global USER_ID", 
+                                                      value=True,
+                                                      help="Update the global USER_ID configuration")
                 
                 submitted = st.form_submit_button("Switch User")
                 
@@ -150,7 +157,14 @@ def _render_switch_user():
                         
                         if result['success']:
                             st.success(f"Switched to user '{selected_user}' successfully!")
-                            st.info("Please refresh the page to see the changes.")
+                            
+                            if update_global_config:
+                                st.info("Global USER_ID configuration updated.")
+                            
+                            if restart_containers:
+                                st.info("LightRAG containers will be restarted.")
+                            
+                            st.warning("Please refresh the page to see the changes.")
                         else:
                             st.error(f"Failed to switch user: {result['error']}")
                             
@@ -158,6 +172,28 @@ def _render_switch_user():
                         st.error(f"Error switching user: {str(e)}")
         else:
             st.warning("No other users available to switch to.")
+        
+        # Add manual LightRAG restart section
+        st.subheader("Manual LightRAG Restart")
+        st.write("Restart LightRAG containers for the current user:")
+        
+        if st.button("Restart LightRAG Containers"):
+            try:
+                from personal_agent.streamlit.utils.user_utils import get_user_manager
+                user_manager = get_user_manager()
+                result = user_manager.restart_lightrag_for_current_user()
+                
+                if result["success"]:
+                    st.success("LightRAG containers restarted successfully!")
+                    if result.get("services_restarted"):
+                        st.info(f"Services restarted: {', '.join(result['services_restarted'])}")
+                else:
+                    st.error(f"Error restarting LightRAG containers: {result.get('error', 'Unknown error')}")
+                    if result.get("errors"):
+                        for error in result["errors"]:
+                            st.warning(error)
+            except Exception as e:
+                st.error(f"Error restarting LightRAG containers: {str(e)}")
             
     except Exception as e:
         st.error(f"Error loading user information: {str(e)}")

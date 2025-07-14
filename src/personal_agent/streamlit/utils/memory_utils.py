@@ -15,6 +15,8 @@ from datetime import datetime
 
 # Import project modules
 from personal_agent.core.agno_agent import AgnoPersonalAgent
+from personal_agent.config import USER_ID
+from personal_agent.streamlit.utils.agent_utils import get_agent_instance, get_agent_memory, check_agent_status
 
 
 def get_all_memories(
@@ -36,61 +38,64 @@ def get_all_memories(
         List of dictionaries containing memory information
     """
     try:
-        # This is a placeholder implementation
-        # In a real implementation, you would get this from the agent's memory system
+        # Get the agent instance
+        agent = get_agent_instance()
+        if not agent:
+            st.warning("Agent not initialized. Cannot access memories.")
+            return []
         
-        # Create a list of sample memories
-        memories = [
-            {
-                "id": "mem_001",
-                "type": "conversation",
-                "content": "User asked about the weather in San Francisco",
-                "created_at": "2023-07-01 09:15:00",
-                "metadata": {
-                    "source": "chat",
-                    "importance": "medium"
+        # Get the memory system
+        memory_system = get_agent_memory(agent)
+        if not memory_system:
+            st.warning("Memory system not available.")
+            return []
+        
+        # Get memories from the agent's memory system
+        raw_memories = memory_system.get_user_memories(user_id=USER_ID)
+        
+        if not raw_memories:
+            st.info("No memories found in the system.")
+            return []
+        
+        # Convert raw memories to the expected format
+        formatted_memories = []
+        for memory in raw_memories:
+            try:
+                # Extract memory content and metadata
+                memory_content = getattr(memory, 'memory', str(memory))
+                memory_id = getattr(memory, 'id', f"mem_{len(formatted_memories) + 1}")
+                created_at = getattr(memory, 'created_at', datetime.now())
+                
+                # Format the created_at timestamp
+                if isinstance(created_at, datetime):
+                    created_at_str = created_at.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    created_at_str = str(created_at)
+                
+                # Determine memory type based on content or metadata
+                memory_type_detected = "conversation"  # Default type
+                if hasattr(memory, 'metadata') and memory.metadata:
+                    memory_type_detected = memory.metadata.get('type', 'conversation')
+                
+                formatted_memory = {
+                    "id": str(memory_id),
+                    "type": memory_type_detected,
+                    "content": memory_content,
+                    "created_at": created_at_str,
+                    "metadata": getattr(memory, 'metadata', {}) or {}
                 }
-            },
-            {
-                "id": "mem_002",
-                "type": "document",
-                "content": "Annual report for 2023 fiscal year",
-                "created_at": "2023-07-01 10:30:00",
-                "metadata": {
-                    "source": "file_upload",
-                    "importance": "high",
-                    "filename": "annual_report_2023.pdf"
-                }
-            },
-            {
-                "id": "mem_003",
-                "type": "tool",
-                "content": "Calendar event created for team meeting",
-                "created_at": "2023-07-01 11:45:00",
-                "metadata": {
-                    "source": "calendar_tool",
-                    "importance": "medium",
-                    "event_id": "evt_123456"
-                }
-            },
-            {
-                "id": "mem_004",
-                "type": "system",
-                "content": "System updated to version 2.0.0",
-                "created_at": "2023-07-01 12:00:00",
-                "metadata": {
-                    "source": "system",
-                    "importance": "high",
-                    "version": "2.0.0"
-                }
-            }
-        ]
+                
+                formatted_memories.append(formatted_memory)
+                
+            except Exception as memory_error:
+                st.warning(f"Error processing memory: {str(memory_error)}")
+                continue
         
         # Apply filters
-        filtered_memories = memories
+        filtered_memories = formatted_memories
         
-        if memory_type:
-            filtered_memories = [m for m in filtered_memories if m["type"] == memory_type]
+        if memory_type and memory_type.lower() != "all":
+            filtered_memories = [m for m in filtered_memories if m["type"].lower() == memory_type.lower()]
         
         if start_date:
             start_date_str = start_date.strftime("%Y-%m-%d")
@@ -307,21 +312,43 @@ def get_memory_stats() -> Dict[str, Any]:
         Dictionary containing memory statistics
     """
     try:
-        # This is a placeholder implementation
-        # In a real implementation, you would get this from the agent's memory system
+        # Get all memories to calculate statistics
+        all_memories = get_all_memories(limit=10000)  # Get a large number for stats
+        
+        if not all_memories:
+            return {
+                "total_memories": 0,
+                "by_type": {},
+                "storage_size": "0 MB",
+                "last_sync": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        
+        # Calculate statistics
+        total_memories = len(all_memories)
+        
+        # Count by type
+        type_counts = {}
+        for memory in all_memories:
+            memory_type = memory.get("type", "unknown")
+            type_counts[memory_type] = type_counts.get(memory_type, 0) + 1
+        
+        # Estimate storage size (rough calculation)
+        total_content_length = sum(len(str(memory.get("content", ""))) for memory in all_memories)
+        storage_size_mb = total_content_length / (1024 * 1024)  # Convert to MB
+        storage_size = f"{storage_size_mb:.2f} MB"
         
         return {
-            "total_memories": 125,
-            "by_type": {
-                "conversation": 42,
-                "document": 35,
-                "tool": 28,
-                "system": 20
-            },
-            "storage_size": "24.5 MB",
+            "total_memories": total_memories,
+            "by_type": type_counts,
+            "storage_size": storage_size,
             "last_sync": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
     
     except Exception as e:
         st.error(f"Error getting memory statistics: {str(e)}")
-        return {}
+        return {
+            "total_memories": 0,
+            "by_type": {},
+            "storage_size": "0 MB",
+            "last_sync": "Error"
+        }
