@@ -23,7 +23,7 @@ from agno.memory.v2.schema import UserMemory
 from agno.models.base import Model
 from pydantic import BaseModel, Field
 
-from personal_agent.config import USER_ID
+from personal_agent.config import get_current_user_id
 from personal_agent.core.topic_classifier import TopicClassifier
 from personal_agent.utils import setup_logging
 
@@ -453,7 +453,7 @@ class SemanticMemoryManager:
         self,
         memory_text: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
     ) -> MemoryStorageResult:
@@ -467,6 +467,10 @@ class SemanticMemoryManager:
         :param input_text: Optional input text that generated this memory
         :return: MemoryStorageResult with detailed status information
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         # Validate input
         if not memory_text or not memory_text.strip():
             return MemoryStorageResult(
@@ -577,7 +581,7 @@ class SemanticMemoryManager:
         memory_id: str,
         memory_text: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
     ) -> Tuple[bool, str]:
@@ -592,6 +596,10 @@ class SemanticMemoryManager:
         :param input_text: Optional input text that generated this memory
         :return: Tuple of (success, message)
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
             topics = self.topic_classifier.classify(memory_text)
@@ -632,7 +640,7 @@ class SemanticMemoryManager:
             return False, error_msg
 
     def delete_memory(
-        self, memory_id: str, db: MemoryDb, user_id: str = USER_ID
+        self, memory_id: str, db: MemoryDb, user_id: str = None
     ) -> Tuple[bool, str]:
         """
         Delete a memory.
@@ -659,7 +667,7 @@ class SemanticMemoryManager:
             return False, error_msg
 
     def delete_memories_by_topic(
-        self, topics: List[str], db: MemoryDb, user_id: str = USER_ID
+        self, topics: List[str], db: MemoryDb, user_id: str = None
     ) -> Tuple[bool, str]:
         """
         Delete all memories associated with a specific topic or list of topics.
@@ -669,6 +677,10 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memories.
         :return: Tuple of (success, message).
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         if not topics:
             return False, "No topics provided for deletion."
 
@@ -715,7 +727,7 @@ class SemanticMemoryManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def clear_memories(self, db: MemoryDb, user_id: str = USER_ID) -> Tuple[bool, str]:
+    def clear_memories(self, db: MemoryDb, user_id: str = None) -> Tuple[bool, str]:
         """
         Clear all memories for a user.
 
@@ -723,6 +735,10 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memories
         :return: Tuple of (success, message)
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             # Get all memories for the user first
             memory_rows = db.read_memories(user_id=user_id)
@@ -749,7 +765,7 @@ class SemanticMemoryManager:
         self,
         query: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         limit: int = None,
         similarity_threshold: float = 0.3,
         search_topics: bool = True,
@@ -767,6 +783,10 @@ class SemanticMemoryManager:
         :param topic_boost: Score boost for topic matches (default: 0.5)
         :return: List of (UserMemory, combined_score) tuples
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             # Enhanced query expansion for better semantic matching
             expanded_queries = self._expand_query(query)
@@ -869,7 +889,7 @@ class SemanticMemoryManager:
     def get_memories_by_topic(
         self,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         topics: Optional[List[str]] = None,
         limit: Optional[int] = None,
     ) -> List[UserMemory]:
@@ -882,6 +902,10 @@ class SemanticMemoryManager:
         :param limit: Maximum number of results to return
         :return: List of UserMemory objects matching the topics.
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id, sort="desc")
@@ -1009,7 +1033,7 @@ class SemanticMemoryManager:
 
         return max_score
 
-    def get_memory_stats(self, db: MemoryDb, user_id: str = USER_ID) -> Dict[str, Any]:
+    def get_memory_stats(self, db: MemoryDb, user_id: str = None) -> Dict[str, Any]:
         """
         Get statistics about memories for a user.
 
@@ -1017,6 +1041,10 @@ class SemanticMemoryManager:
         :param user_id: User ID to analyze
         :return: Dictionary with memory statistics
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             memories = self._get_recent_memories(db, user_id)
 
@@ -1063,7 +1091,7 @@ class SemanticMemoryManager:
         self,
         input_text: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         extract_multiple: bool = True,
     ) -> Dict[str, Any]:
         """

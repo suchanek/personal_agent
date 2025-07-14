@@ -2,14 +2,17 @@ services:
   lightrag:
     container_name: lightrag_memory
     image: ghcr.io/suchanek/lightrag_pagent:latest
+    env_file:
+      - .env
     ports:
-      - "${PORT:-9622}:9622"
+      - "9623:9623"
     volumes:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
       - ./.env:/app/.env
     environment:
+      - USER_ID=Eric
       - WORKERS=1
       - MAX_PARALLEL_INSERT=1
       # Explicit timeout settings for the container
@@ -40,9 +43,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9622/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9623/health"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 120s
-

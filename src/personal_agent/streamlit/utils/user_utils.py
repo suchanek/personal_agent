@@ -12,54 +12,29 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Import project modules
+from personal_agent.core.user_manager import UserManager
 from personal_agent.core.docker.user_sync import DockerUserSync
+
+
+# Create a cached user manager instance
+@st.cache_resource
+def get_user_manager() -> UserManager:
+    """Get a cached UserManager instance for Streamlit."""
+    return UserManager()
 
 
 def get_all_users() -> List[Dict[str, Any]]:
     """
-    Get a list of all users in the system.
+    Get a list of all users in the personal agent system.
     
     Returns:
         List of dictionaries containing user information
     """
     try:
-        # This is a placeholder implementation
-        # In a real implementation, you would get this from a database or config file
-        
-        # Get current user
-        from personal_agent.config.settings import USER_ID
-        current_user = USER_ID
-        
-        # Create a list of sample users
-        users = [
-            {
-                "user_id": current_user,
-                "user_name": "Current User",
-                "user_type": "Admin",
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "last_login": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "is_current": True
-            },
-            {
-                "user_id": "user1",
-                "user_name": "User One",
-                "user_type": "Standard",
-                "created_at": "2023-01-01 12:00:00",
-                "last_login": "2023-06-15 09:30:00",
-                "is_current": False
-            },
-            {
-                "user_id": "user2",
-                "user_name": "User Two",
-                "user_type": "Guest",
-                "created_at": "2023-03-15 14:30:00",
-                "last_login": "2023-07-01 16:45:00",
-                "is_current": False
-            }
-        ]
-        
-        return users
-    
+        user_manager = get_user_manager()
+        # Ensure current user is registered
+        user_manager.ensure_current_user_registered()
+        return user_manager.get_all_users()
     except Exception as e:
         st.error(f"Error getting users: {str(e)}")
         return []
@@ -76,36 +51,8 @@ def get_user_details(user_id: str) -> Dict[str, Any]:
         Dictionary containing user details
     """
     try:
-        # Get all users
-        users = get_all_users()
-        
-        # Find the specified user
-        user = next((u for u in users if u["user_id"] == user_id), None)
-        
-        if user:
-            # Add additional details
-            user_details = user.copy()
-            
-            # Add memory statistics
-            user_details["memory_count"] = 42  # Placeholder
-            user_details["memory_size"] = "24.5 MB"  # Placeholder
-            
-            # Add Docker container information
-            user_details["containers"] = [
-                {
-                    "name": "lightrag-server",
-                    "status": "running"
-                },
-                {
-                    "name": "ollama",
-                    "status": "running"
-                }
-            ]
-            
-            return user_details
-        
-        return {}
-    
+        user_manager = get_user_manager()
+        return user_manager.get_user_details(user_id)
     except Exception as e:
         st.error(f"Error getting user details: {str(e)}")
         return {}
@@ -125,41 +72,8 @@ def create_new_user(user_id: str, user_name: str, user_type: str, create_docker:
         Dictionary containing result information
     """
     try:
-        # Validate input
-        if not user_id:
-            return {"success": False, "error": "User ID is required"}
-        
-        if not user_name:
-            return {"success": False, "error": "User name is required"}
-        
-        # Check if user already exists
-        users = get_all_users()
-        if any(u["user_id"] == user_id for u in users):
-            return {"success": False, "error": f"User '{user_id}' already exists"}
-        
-        # Create user directory
-        user_dir = Path.home() / ".personal_agent" / "users" / user_id
-        user_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create user configuration file
-        user_config = {
-            "user_id": user_id,
-            "user_name": user_name,
-            "user_type": user_type,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "last_login": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        
-        with open(user_dir / "config.json", "w") as f:
-            json.dump(user_config, f, indent=2)
-        
-        # Create Docker containers if requested
-        if create_docker:
-            docker_user_sync = DockerUserSync()
-            docker_user_sync.sync_user_ids(force_restart=True)
-        
-        return {"success": True}
-    
+        user_manager = get_user_manager()
+        return user_manager.create_user(user_id, user_name, user_type)
     except Exception as e:
         st.error(f"Error creating user: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -177,33 +91,8 @@ def switch_user(user_id: str, restart_containers: bool = True) -> Dict[str, Any]
         Dictionary containing result information
     """
     try:
-        # Validate input
-        if not user_id:
-            return {"success": False, "error": "User ID is required"}
-        
-        # Check if user exists
-        users = get_all_users()
-        if not any(u["user_id"] == user_id for u in users):
-            return {"success": False, "error": f"User '{user_id}' does not exist"}
-        
-        # Get current user
-        from personal_agent.config.settings import USER_ID
-        current_user = USER_ID
-        
-        # Don't switch if already the current user
-        if user_id == current_user:
-            return {"success": False, "error": f"Already logged in as '{user_id}'"}
-        
-        # Update environment variable
-        os.environ["USER_ID"] = user_id
-        
-        # Update Docker containers if requested
-        if restart_containers:
-            docker_user_sync = DockerUserSync()
-            docker_user_sync.sync_user_ids(force_restart=True)
-        
-        return {"success": True}
-    
+        user_manager = get_user_manager()
+        return user_manager.switch_user(user_id, restart_lightrag=restart_containers, update_global_config=True)
     except Exception as e:
         st.error(f"Error switching user: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -221,32 +110,8 @@ def delete_user(user_id: str, delete_data: bool = False) -> Dict[str, Any]:
         Dictionary containing result information
     """
     try:
-        # Validate input
-        if not user_id:
-            return {"success": False, "error": "User ID is required"}
-        
-        # Check if user exists
-        users = get_all_users()
-        if not any(u["user_id"] == user_id for u in users):
-            return {"success": False, "error": f"User '{user_id}' does not exist"}
-        
-        # Get current user
-        from personal_agent.config.settings import USER_ID
-        current_user = USER_ID
-        
-        # Don't delete the current user
-        if user_id == current_user:
-            return {"success": False, "error": "Cannot delete the current user"}
-        
-        # Delete user directory if requested
-        if delete_data:
-            user_dir = Path.home() / ".personal_agent" / "users" / user_id
-            if user_dir.exists():
-                import shutil
-                shutil.rmtree(user_dir)
-        
-        return {"success": True}
-    
+        user_manager = get_user_manager()
+        return user_manager.delete_user(user_id)
     except Exception as e:
         st.error(f"Error deleting user: {str(e)}")
         return {"success": False, "error": str(e)}

@@ -57,17 +57,29 @@ def _render_memory_stats():
     st.subheader("Memory Statistics")
     
     try:
-        # This would be replaced with actual memory stats from your system
-        # For now, using placeholder data
-        memory_stats = {
-            "Total Memories": "125",
-            "User Memories": "42",
-            "System Memories": "83",
-            "Memory DB Size": "24.5 MB",
-            "Last Sync": "2 minutes ago",
-        }
+        # Import memory utilities
+        from personal_agent.streamlit.utils.memory_utils import get_memory_stats
         
-        st.table(pd.DataFrame(list(memory_stats.items()), columns=["Metric", "Value"]))
+        # Get real memory statistics
+        stats = get_memory_stats()
+        
+        if stats:
+            # Format the statistics for display
+            memory_stats = {
+                "Total Memories": str(stats.get("total_memories", 0)),
+                "Storage Size": stats.get("storage_size", "0 MB"),
+                "Last Updated": stats.get("last_sync", "Unknown"),
+            }
+            
+            # Add type breakdown if available
+            type_counts = stats.get("by_type", {})
+            if type_counts:
+                for memory_type, count in type_counts.items():
+                    memory_stats[f"{memory_type.title()} Memories"] = str(count)
+            
+            st.table(pd.DataFrame(list(memory_stats.items()), columns=["Metric", "Value"]))
+        else:
+            st.warning("Unable to load memory statistics")
         
     except Exception as e:
         st.error(f"Error loading memory statistics: {str(e)}")

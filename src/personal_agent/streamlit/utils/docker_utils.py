@@ -47,9 +47,12 @@ def get_container_status(docker_integration: Optional[DockerIntegrationManager] 
         # Get all containers
         containers = client.containers.list(all=True)
         
+        # Filter for lightrag_* containers only
+        lightrag_containers = [c for c in containers if c.name.startswith('lightrag')]
+        
         # Format container information
         container_info = []
-        for container in containers:
+        for container in lightrag_containers:
             # Get container status
             status = container.status
             

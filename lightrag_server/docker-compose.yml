@@ -7,14 +7,17 @@ services:
       dockerfile: Dockerfile
       tags:
         - ghcr.io/suchanek/lightrag_pagent:latest
+    env_file:
+      - .env
     ports:
-      - "${PORT:-9621}:9621"
+      - "9621:9621"
     volumes:
       - "${AGNO_STORAGE_DIR}/rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
       - ./.env:/app/.env
     environment:
+      - USER_ID=Eric
       - WORKERS=1
       - MAX_PARALLEL_INSERT=1
       # Extended timeout settings for large document processing

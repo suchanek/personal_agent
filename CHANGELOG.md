@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/0.9.0] - 2025-07-13
+
+### Added
+- **Dynamic Multi-User Management System**: Implemented a comprehensive, full-stack multi-user system. This allows for dynamic user switching at runtime without requiring an application restart. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) for details.
+- **UserRegistry**: A new JSON-based registry (`src/personal_agent/core/user_registry.py`) to persistently manage user profiles.
+- **UserManager**: A central orchestrator (`src/personal_agent/core/user_manager.py`) for all user-related operations, including creation, switching, and deletion.
+- **LightRAGManager**: A Python-native manager (`src/personal_agent/core/lightrag_manager.py`) to control LightRAG Docker services and inject the current `USER_ID` dynamically.
+- **Smart Docker Restart**: A robust shell script (`smart-restart-lightrag.sh`) and Python module (`SmartDockerRestart`) to prevent port conflicts and ensure service stability during restarts.
+- **Full-Featured Streamlit UI**: The Streamlit dashboard now includes a complete user management interface, allowing for creating, switching, and managing users, as well as viewing real-time, user-specific data.
+- **Dynamic Configuration**: The system now uses `get_current_user_id()` and `refresh_user_dependent_settings()` to dynamically update the user context across the application.
+- New test suite (`test_user_id_propagation.py`) to validate the multi-user implementation.
+
+### Changed
+- **`SemanticMemoryManager`**: Refactored to be fully user-aware by dynamically resolving the `USER_ID` for all memory operations.
+- **Docker Configuration**: `docker-compose.yml` files for LightRAG services were updated to accept a `USER_ID` environment variable, ensuring containers run in the correct user context.
+- **Streamlit UI**: Replaced all placeholder data with live, user-specific data from the new management modules.
+
+
 ## [dev/0.8.9] - 2025-07-12
 
 ### Added

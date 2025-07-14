@@ -30,6 +30,9 @@ def memory_management_tab():
     """Render the memory management tab."""
     st.title("Memory Management")
     
+    # Show agent status
+    _render_agent_status()
+    
     # Create tabs for different memory management functions
     tabs = st.tabs(["Memory Explorer", "Search", "Sync & Backup", "Settings"])
     
@@ -44,6 +47,44 @@ def memory_management_tab():
     
     with tabs[3]:
         _render_memory_settings()
+
+
+def _render_agent_status():
+    """Display agent initialization status."""
+    try:
+        from personal_agent.streamlit.utils.agent_utils import get_agent_instance, check_agent_status
+        
+        agent = get_agent_instance()
+        status = check_agent_status(agent)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if status["initialized"]:
+                st.success("🤖 Agent: Initialized")
+            else:
+                st.error("🤖 Agent: Not Initialized")
+                if "error" in status:
+                    st.caption(f"Error: {status['error']}")
+        
+        with col2:
+            if status["memory_available"]:
+                st.success("💾 Memory: Available")
+            else:
+                st.warning("💾 Memory: Not Available")
+        
+        with col3:
+            if status.get("user_id"):
+                st.info(f"👤 User: {status['user_id']}")
+            else:
+                st.warning("👤 User: Unknown")
+        
+        # Show additional details in an expander
+        with st.expander("Agent Details"):
+            st.json(status)
+            
+    except Exception as e:
+        st.error(f"Error checking agent status: {str(e)}")
 
 
 def _render_memory_explorer():

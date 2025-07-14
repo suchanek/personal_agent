@@ -23,6 +23,8 @@ from .settings import (
     WEAVIATE_URL,
     get_env_bool,
     get_env_var,
+    get_current_user_id,
+    refresh_user_dependent_settings,
 )
 
 
@@ -80,4 +82,6 @@ __all__ = [
     "get_env_var",
     "get_mcp_servers",
     "get_settings",
+    "get_current_user_id",
+    "refresh_user_dependent_settings",
 ]
