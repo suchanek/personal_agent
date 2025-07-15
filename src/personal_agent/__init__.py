@@ -59,7 +59,7 @@ from .utils.pag_logging import (
 from .web import create_app, register_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.6"  # Defined once to avoid duplication
+__version__ = "0.8.12dev"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -89,7 +89,7 @@ from .smol_main import run_smolagents_cli, run_smolagents_web
 
 def print_configuration() -> str:
     """Print comprehensive configuration information for the Personal AI Agent.
-    
+
     Uses the enhanced configuration display method from the module's tools.
 
     :return: Configuration information as formatted string
@@ -97,23 +97,26 @@ def print_configuration() -> str:
     try:
         # Import and use the enhanced display function from the module's tools
         from .tools.show_config import show_config
-        
+
         # Call the show_config function with default colored output
         show_config()
-        
+
         return "Configuration displayed successfully using module tools.show_config method."
-        
+
     except Exception as e:
         # Fallback to the settings.print_config() method if enhanced method fails
         _logger.warning("Could not use module tools.show_config display: %s", e)
-        
+
         try:
             from .config.settings import print_config
+
             print_config()
             return "Configuration displayed successfully using settings.print_config() fallback."
         except ImportError as fallback_error:
-            _logger.warning("Could not import settings.print_config: %s", fallback_error)
-            
+            _logger.warning(
+                "Could not import settings.print_config: %s", fallback_error
+            )
+
             # Final fallback to basic configuration display
             from .config import get_mcp_servers
             from .config.settings import (
