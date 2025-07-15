@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.8.11] - 2025-07-14
+
+### Added
+- **Persistent User Context**: Implemented a new system where the `env.userid` file acts as the single source of truth for the current user. This ensures that the user context is persistent across application restarts. See [ADR-015](./docs/adr/015-persistent-user-context.md) for details.
+- New test suite (`test_persistent_user_context.py`) to validate the new persistent user context logic.
+
+### Changed
+- **`AgnoPersonalAgent` Initialization**: The agent's initialization logic is now more robust. If the agent is initialized with a user ID that differs from the one in `env.userid`, it will automatically trigger a formal user switch, ensuring the change is persisted.
+- **`UserManager`**: The `switch_user` method now writes the new user ID to the `env.userid` file, making the change persistent.
+- **Configuration Loading**: The application now reads `env.userid` at startup to set the initial user context.
+
+### Fixed
+- **Dedicated Service Ports**: Resolved a critical issue where both LightRAG services were configured to use the same `PORT` environment variable. They now use dedicated `LIGHTRAG_SERVER_PORT` and `LIGHTRAG_MEMORY_PORT` variables to prevent port conflicts. See [ADR-014](./docs/adr/014-dedicated-service-ports.md) for details.
+- **Test Script Safety**: The `test_persistent_user_context.py` script now uses a `.test` suffixed file to avoid interfering with the actual `env.userid` file.
+
 ## [dev/0.9.0] - 2025-07-13
 
 ### Added

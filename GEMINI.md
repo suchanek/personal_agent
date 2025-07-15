@@ -8,7 +8,7 @@ This project is a sophisticated personal AI assistant powered by the **Agno Fram
 
 ## Dynamic Multi-User System
 
-The agent now features a full-stack, dynamic multi-user system that allows for seamless user switching at runtime without requiring an application restart. This ensures strong data isolation and stable service management. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) for details.
+The agent now features a full-stack, dynamic multi-user system that allows for seamless user switching at runtime. This ensures strong data isolation and stable service management. The single source of truth for the current user is the `env.userid` file at the project root. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) and [ADR-015](./docs/adr/015-persistent-user-context.md) for details.
 
 ### Key Components:
 *   **`UserManager`**: The central orchestrator for all user-related operations (creation, switching, deletion).
