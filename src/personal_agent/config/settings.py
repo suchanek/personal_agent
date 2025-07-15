@@ -90,15 +90,15 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
 
 
 # LighRAG server
-LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEPRECATED
-LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
+LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9622")  # DEPRECATED
+LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9622")
 LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9623")
 
 # Docker port configurations
-PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server
+PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server (internal)
 LIGHTRAG_PORT = get_env_var(
-    "LIGHTRAG_PORT", "9621"
-)  # Explicit port for lightrag_server
+    "LIGHTRAG_PORT", "9622"
+)  # Explicit port for lightrag_server (host port)
 LIGHTRAG_MEMORY_PORT = get_env_var(
     "LIGHTRAG_MEMORY_PORT", "9623"
 )  # Explicit port for lightrag_memory_server
