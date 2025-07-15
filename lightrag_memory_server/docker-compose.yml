@@ -5,7 +5,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${LIGHTRAG_MEMORY_PORT:-9623}:9621"
+      - 9623:9621
     volumes:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
@@ -15,7 +15,6 @@ services:
       - USER_ID=Eric
       - WORKERS=1
       - MAX_PARALLEL_INSERT=1
-      - PORT=9623
       # Explicit timeout settings for the container
       - HTTPX_TIMEOUT=7200
       - HTTPX_CONNECT_TIMEOUT=600
