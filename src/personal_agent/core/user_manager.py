@@ -135,11 +135,21 @@ class UserManager:
                 "config_refresh": {}
             }
             
-            # Update global environment variable
+            # Update global environment variable and persistent user file
             if update_global_config:
                 os.environ["USER_ID"] = user_id
                 results["actions_performed"].append("Updated global USER_ID environment variable")
-                
+
+                # Write to env.userid to persist the change
+                try:
+                    from personal_agent.config.settings import BASE_DIR
+                    userid_file = BASE_DIR / "env.userid"
+                    with open(userid_file, 'w') as f:
+                        f.write(f'USER_ID="{user_id}"\n')
+                    results["actions_performed"].append(f"Persisted current user to {userid_file}")
+                except Exception as e:
+                    results["warnings"].append(f"Could not write to env.userid: {e}")
+
                 # Refresh user-dependent configuration settings
                 from personal_agent.config import refresh_user_dependent_settings
                 refreshed_settings = refresh_user_dependent_settings()

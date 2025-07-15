@@ -1704,7 +1704,33 @@ Returns:
         logger.info(
             "🚀 AgnoPersonalAgent.initialize() called with recreate=%s", recreate
         )
-        
+
+        # CRITICAL: Synchronize the agent's user_id with the persistent user setting
+        try:
+            from .user_manager import UserManager
+            from ..config import get_current_user_id
+
+            user_manager = UserManager()
+            persistent_user_id = get_current_user_id() # This is loaded from env.userid at startup
+
+            if self.user_id != persistent_user_id:
+                logger.warning(
+                    "Agent initialized with user '%s', but persistent user is '%s'. Switching context...",
+                    self.user_id,
+                    persistent_user_id
+                )
+                # This is a formal user switch. Update the persistent user file.
+                switch_result = user_manager.switch_user(self.user_id, restart_lightrag=True, update_global_config=True)
+                if not switch_result.get("success") and "Already logged in" not in switch_result.get("error", ""):
+                    raise RuntimeError(f"Failed to switch user context to '{self.user_id}': {switch_result.get('error')}")
+                else:
+                    logger.info("Successfully switched user context to '%s'", self.user_id)
+
+        except Exception as e:
+            logger.error("🚨 Critical error during user context synchronization: %s", e)
+            # This is a critical step, so we raise an exception if it fails.
+            raise RuntimeError(f"User context synchronization failed: {e}") from e
+
         # CRITICAL: Ensure user is registered in the user registry
         logger.info("📝 Ensuring user %s is registered in user registry", self.user_id)
         try:
