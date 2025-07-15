@@ -168,7 +168,7 @@ class LightRAGManager:
         
         # Smart restart services with port conflict handling
         services = [
-            ("lightrag_server", self.lightrag_server_dir, os.getenv("LIGHTRAG_SERVER_PORT", 9621)),
+            ("lightrag_server", self.lightrag_server_dir, os.getenv("LIGHTRAG_SERVER_PORT", 9622)),
             ("lightrag_memory_server", self.lightrag_memory_dir, os.getenv("LIGHTRAG_MEMORY_PORT", 9623))
         ]
         

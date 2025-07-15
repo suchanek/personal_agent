@@ -39,7 +39,9 @@ services:
       - TCP_KEEPALIVE_IDLE=600
       - TCP_KEEPALIVE_INTERVAL=60
       - TCP_KEEPALIVE_COUNT=9
-      - PDF_CHUNK_SIZE=512
+      - PDF_CHUNK_SIZE=300
+      - CHUNK_SIZE=300
+      - CHUNK_OVERLAP_SIZE=50
       - LLM_TIMEOUT=14400
       - EMBEDDING_TIMEOUT=7200
     restart: unless-stopped
