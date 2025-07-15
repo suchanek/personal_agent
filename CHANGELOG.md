@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.8.12] - 2025-07-15
+
+### Fixed
+- **Critical Port Configuration Fix**: Resolved a widespread connection failure issue where the application was incorrectly configured to use internal Docker container ports (`9621`) instead of the exposed host ports (`9622` for KB, `9623` for Memory). All configurations and scripts have been updated to use the correct host ports, restoring access to the LightRAG services. See [ADR-016](./docs/adr/016-consistent-port-mapping.md) for details.
+
 ## [dev/v0.8.11] - 2025-07-14
 
 ### Added
