@@ -116,7 +116,7 @@ This is a Python project managed with `Poetry`.
 
     # LightRAG Storage Directories (USER_ID is injected dynamically)
     LIGHTRAG_SERVER_PORT=9621
-    LIGHTRAG_MEMORY_PORT=9623
+    LIGHTRAG_MEMORY_PORT=9622
     LIGHTRAG_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage
     LIGHTRAG_INPUTS_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs
     LIGHTRAG_MEMORY_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/memory_rag_storage

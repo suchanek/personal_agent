@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 # This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
+
 # Handle imports differently when run as a script vs imported as a module
 def _get_logger():
     """Get logger with fallback for circular import issues."""
@@ -27,8 +28,10 @@ def _get_logger():
     except ImportError:
         # Fallback to basic logging if circular import occurs
         import logging
+
         logging.basicConfig(level=logging.INFO)
         return logging.getLogger(__name__)
+
 
 # Set up paths for environment files
 dotenv_path = BASE_DIR / ".env"
@@ -90,17 +93,17 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
 
 
 # LighRAG server
-LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9622")  # DEPRECATED
-LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9622")
-LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9623")
+LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEPRECATED
+LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
+LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9622")
 
 # Docker port configurations
 PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server (internal)
 LIGHTRAG_PORT = get_env_var(
-    "LIGHTRAG_PORT", "9622"
+    "LIGHTRAG_PORT", "9621"
 )  # Explicit port for lightrag_server (host port)
 LIGHTRAG_MEMORY_PORT = get_env_var(
-    "LIGHTRAG_MEMORY_PORT", "9623"
+    "LIGHTRAG_MEMORY_PORT", "9622"
 )  # Explicit port for lightrag_memory_server
 
 # Configuration constants - All configurable via environment variables

@@ -683,7 +683,7 @@ def render_knowledge_status(knowledge_helper):
                     st.error(f"❌ Error ({health_response.status_code})")
             except requests.exceptions.RequestException as e:
                 st.warning("⚠️ Offline")
-                st.caption(f"({st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]})")
+                st.caption(f"({st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]})" )
             
             # Show current server info
             if not location_changed:

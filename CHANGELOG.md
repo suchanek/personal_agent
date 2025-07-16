@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [dev/v0.8.12] - 2025-07-15
 
 ### Fixed
-- **Critical Port Configuration Fix**: Resolved a widespread connection failure issue where the application was incorrectly configured to use internal Docker container ports (`9621`) instead of the exposed host ports (`9622` for KB, `9623` for Memory). All configurations and scripts have been updated to use the correct host ports, restoring access to the LightRAG services. See [ADR-016](./docs/adr/016-consistent-port-mapping.md) for details.
+- **Definitive Port Standardization**: Implemented a final, consistent port mapping standard to resolve all connection failures between the application and the LightRAG services. The Knowledge Base server now correctly runs on host port `9621` and the Memory server on `9622`. See [ADR-017](./docs/adr/017-definitive-port-standardization.md) for details.
+- **Service Reliability**: Enhanced Docker health checks and optimized PDF processing settings (timeouts, chunk sizes) to improve the stability and reliability of the LightRAG services.
+
+## [dev/v0.8.12] - 2025-07-15
+
+### Fixed
+- **Critical Port Configuration Fix**: Resolved a widespread connection failure issue where the application was incorrectly configured to use internal Docker container ports instead of the exposed host ports. The Knowledge Base server now correctly runs on host port `9621` and the Memory server on `9622`. See [ADR-016](./docs/adr/016-consistent-port-mapping.md) for details.
 
 ## [dev/v0.8.11] - 2025-07-14
 
