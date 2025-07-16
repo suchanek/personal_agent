@@ -75,9 +75,17 @@ This fix resolves the dual memory storage system where:
 2. `env.example` - Updated template port configurations
 3. `src/personal_agent/core/agent_memory_manager.py` - Fixed UserMemory attribute access
 
-## Additional Fix: UserMemory Attribute Error
+## Additional Fixes
 
+### 2. UserMemory Attribute Error
 After fixing the port configuration, a secondary issue was discovered where the code was trying to access `memory.id` but the `UserMemory` object uses `memory.memory_id`. Fixed all three occurrences in the agent_memory_manager.py file.
+
+### 3. Async Cleanup Method Warning
+A third issue emerged where the application was showing a warning "object NoneType can't be used in 'await' expression" during shutdown. This was caused by the cleanup method being synchronous while being called from an async context. Fixed by:
+- Making the `cleanup()` method async
+- Adding proper async/sync detection for agent cleanup
+- Adding a `sync_cleanup()` method for compatibility
+- Improving error handling during cleanup
 
 ## Prevention
 

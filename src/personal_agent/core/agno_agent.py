@@ -865,7 +865,7 @@ Returns:
 
             console.print(mcp_table)
 
-    def cleanup(self) -> None:
+    async def cleanup(self) -> None:
         """Clean up resources when the agent is being shut down.
         
         This method is called during application shutdown to properly
@@ -876,8 +876,64 @@ Returns:
             
             # Clean up agent resources
             if self.agent:
-                # The Agno agent doesn't have explicit cleanup methods,
-                # but we can clear references to help with garbage collection
+                # Clear the agent reference
+                self.agent = None
+                logger.debug("Cleared agent reference")
+            
+            # Clean up storage references
+            if self.agno_storage:
+                self.agno_storage = None
+                logger.debug("Cleared storage reference")
+                
+            if self.agno_knowledge:
+                self.agno_knowledge = None
+                logger.debug("Cleared knowledge reference")
+                
+            if self.agno_memory:
+                self.agno_memory = None
+                logger.debug("Cleared memory reference")
+                
+            if self.knowledge_coordinator:
+                self.knowledge_coordinator = None
+                logger.debug("Cleared knowledge coordinator reference")
+            
+            # Clean up manager references safely
+            if self.model_manager:
+                self.model_manager = None
+                logger.debug("Cleared model manager reference")
+                
+            if self.instruction_manager:
+                self.instruction_manager = None
+                logger.debug("Cleared instruction manager reference")
+                
+            if self.memory_manager:
+                self.memory_manager = None
+                logger.debug("Cleared memory manager reference")
+                
+            if self.knowledge_manager:
+                self.knowledge_manager = None
+                logger.debug("Cleared knowledge manager reference")
+                
+            if self.tool_manager:
+                self.tool_manager = None
+                logger.debug("Cleared tool manager reference")
+            
+            logger.info("AgnoPersonalAgent cleanup completed successfully")
+            
+        except Exception as e:
+            logger.warning("Error during AgnoPersonalAgent cleanup: %s", e)
+    
+    def sync_cleanup(self) -> None:
+        """Synchronous cleanup method for compatibility.
+        
+        This method provides a synchronous interface to cleanup for cases
+        where async cleanup cannot be used.
+        """
+        try:
+            logger.info("Running synchronous cleanup...")
+            
+            # Clean up agent resources without async calls
+            if self.agent:
                 self.agent = None
                 logger.debug("Cleared agent reference")
             
@@ -905,10 +961,10 @@ Returns:
             self.knowledge_manager = None
             self.tool_manager = None
             
-            logger.info("AgnoPersonalAgent cleanup completed successfully")
+            logger.info("Synchronous cleanup completed successfully")
             
         except Exception as e:
-            logger.warning("Error during AgnoPersonalAgent cleanup: %s", e)
+            logger.warning("Error during synchronous cleanup: %s", e)
 
 
 def create_simple_personal_agent(
