@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.8.14] - 2025-07-17
+
+### Changed
+- **Environment Variable Consolidation**: The `.env` files have been cleaned up and reorganized to separate secrets, remove unused variables, and rely on sensible defaults. This improves security and maintainability. See [ADR-020](./docs/adr/020-environment-variable-consolidation.md) for details.
+
+### Fixed
+- **Deprecation Warnings**: Implemented a multi-layered strategy to suppress noisy `DeprecationWarning` messages from third-party libraries, providing a cleaner developer experience.
+
+## [dev/v0.8.13] - 2025-07-16
+
+### Changed
+- **Major Agent Refactoring**: The monolithic `AgnoPersonalAgent` class (2,800+ lines) has been refactored into a modular architecture with specialized manager classes (`AgentModelManager`, `AgentInstructionManager`, `AgentMemoryManager`, `AgentKnowledgeManager`, `AgentToolManager`). This significantly improves maintainability, testability, and adherence to the Single Responsibility Principle. See [ADR-019](./docs/adr/019-modular-agent-architecture.md) for details.
+- **CodeGPT Refactor Analysis**: A comprehensive analysis of the refactored codebase was performed by CodeGPT, validating the new modular architecture and its benefits. See the full analysis in [docs/CODEGPT_REFACTOR_ANALYSIS.md](./docs/CODEGPT_REFACTOR_ANALYSIS.md).
+
+### Fixed
+- **LightRAG Memory Port Fix**: Corrected a critical connection error where the agent was attempting to connect to the LightRAG Memory Server on the wrong port (`9623` instead of `9622`), which was preventing the dual-memory system from functioning correctly.
+- **Deprecation Warnings**: Suppressed `DeprecationWarning` messages from `spacy` and `weasel` libraries to reduce console noise.
+
 ## [dev/v0.8.13] - 2025-07-16
 
 ### Changed

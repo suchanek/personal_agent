@@ -16,6 +16,9 @@ Key Features:
 - Comprehensive verification and status reporting.
 """
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module='click')
+
 import asyncio
 import fnmatch
 import os
