@@ -1,9 +1,13 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.8.12dev"
-license = "GPL-3.0-only"
-description = "Personal AI agent with MCP and Memory, powered by Agno and Ollama"
+version = "0.9.0dev0"
+description = "Personal AI agent with MCP and Memory, powered by Agno , LightRAG and Ollama"
 authors = ["Eric Suchanek <suchanek@mac.com>"]
+readme = "README.md"
+homepage = "https://github.com/suchanek/personal_agent"
+repository = "https://github.com/suchanek/personal_agent"
+keywords = ["personal-agent", "mcp", "memory", "ollama", "langchain"]
+license = "GPL-3.0-only"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"

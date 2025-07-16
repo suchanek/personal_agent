@@ -5,7 +5,7 @@ convey logging information at a fine-grained level. The functions are completely
 independent of the application and can be used in any Python project.
 
 Author: Eric G. Suchanek, PhD
-Last update: 2025-06-02 23:17:39
+Last update: 2025-07-16 19:27:10
 """
 
 import logging
@@ -105,7 +105,7 @@ def setup_logging_filters() -> None:
     warnings.filterwarnings(
         "ignore", category=ResourceWarning, message=".*subprocess.*"
     )
-    
+
     # Note: Click, spacy, weasel, and thinc warnings are now handled by the virtual environment
     # via PYTHONWARNINGS environment variable set in .venv/bin/activate
 
