@@ -20,8 +20,8 @@ python tools/docmgr.py --delete-processing
 The Docker Compose configuration showed:
 ```yaml
 ports:
-  - 9622:9621  # LightRAG Server: Host port 9622 → Container port 9621
-  - 9623:9621  # LightRAG Memory: Host port 9623 → Container port 9621
+  - 9621:9621  # LightRAG Server: Host port 9621 → Container port 9621
+  - 9622:9621  # LightRAG Memory: Host port 9622 → Container port 9621
 ```
 
 However, multiple configuration files were still referencing the old port 9621 for external connections, when they should have been using the mapped host ports.
@@ -30,19 +30,19 @@ However, multiple configuration files were still referencing the old port 9621 f
 
 ### Correct Port Configuration
 - **LightRAG Server (Knowledge Base)**: 
-  - Host Port: `9622` (for external connections)
+  - Host Port: `9621` (for external connections)
   - Container Port: `9621` (internal)
 - **LightRAG Memory Server**: 
-  - Host Port: `9623` (for external connections)  
+  - Host Port: `9622` (for external connections)  
   - Container Port: `9621` (internal)
 
 ## Files Modified
 
 ### 1. `src/personal_agent/config/settings.py`
 **Changes:**
-- `LIGHTRAG_SERVER` default: `9621` → `9622`
-- `LIGHTRAG_URL` default: `9621` → `9622`
-- `LIGHTRAG_PORT` default: `9621` → `9622`
+- `LIGHTRAG_SERVER` default: `9621` → `9621`
+- `LIGHTRAG_URL` default: `9621` → `9621`
+- `LIGHTRAG_PORT` default: `9621` → `9621`
 - Added clarifying comments about host vs internal ports
 
 **Before:**
@@ -53,15 +53,15 @@ LIGHTRAG_PORT = get_env_var("LIGHTRAG_PORT", "9621")
 
 **After:**
 ```python
-LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9622")
-LIGHTRAG_PORT = get_env_var("LIGHTRAG_PORT", "9622")  # Host port
+LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
+LIGHTRAG_PORT = get_env_var("LIGHTRAG_PORT", "9621")  # Host port
 ```
 
 ### 2. `.env`
 **Changes:**
-- `LIGHTRAG_URL`: `http://localhost:9621` → `http://localhost:9622`
-- `LIGHTRAG_SERVER_URL`: `http://localhost:9621/webui` → `http://localhost:9622/webui`
-- `LIGHTRAG_PORT`: `9621` → `9622`
+- `LIGHTRAG_URL`: `http://localhost:9621` → `http://localhost:9621`
+- `LIGHTRAG_SERVER_URL`: `http://localhost:9621/webui` → `http://localhost:9621/webui`
+- `LIGHTRAG_PORT`: `9621` → `9621`
 
 **Before:**
 ```bash
@@ -71,13 +71,13 @@ LIGHTRAG_PORT=9621
 
 **After:**
 ```bash
-LIGHTRAG_URL=http://localhost:9622
-LIGHTRAG_PORT=9622
+LIGHTRAG_URL=http://localhost:9621
+LIGHTRAG_PORT=9621
 ```
 
 ### 3. `lightrag_server/env.server`
 **Changes:**
-- `LIGHTRAG_SERVER_PORT`: `9621` → `9622`
+- `LIGHTRAG_SERVER_PORT`: `9621` → `9621`
 
 **Before:**
 ```bash
@@ -86,12 +86,12 @@ LIGHTRAG_SERVER_PORT=9621
 
 **After:**
 ```bash
-LIGHTRAG_SERVER_PORT=9622
+LIGHTRAG_SERVER_PORT=9621
 ```
 
 ### 4. `src/personal_agent/core/lightrag_manager.py`
 **Changes:**
-- Updated default port in service configuration from `9621` → `9622`
+- Updated default port in service configuration from `9621` → `9621`
 
 **Before:**
 ```python
@@ -100,13 +100,13 @@ LIGHTRAG_SERVER_PORT=9622
 
 **After:**
 ```python
-("lightrag_server", self.lightrag_server_dir, os.getenv("LIGHTRAG_SERVER_PORT", 9622))
+("lightrag_server", self.lightrag_server_dir, os.getenv("LIGHTRAG_SERVER_PORT", 9621))
 ```
 
 ### 5. `smart-restart-lightrag.sh`
 **Changes:**
-- `LIGHTRAG_SERVER_PORT` default: `9621` → `9622`
-- `LIGHTRAG_MEMORY_PORT` default: `9622` → `9623` (was incorrectly set)
+- `LIGHTRAG_SERVER_PORT` default: `9621` → `9621`
+- `LIGHTRAG_MEMORY_PORT` default: `9622` → `9622` (was incorrectly set)
 
 **Before:**
 ```bash
@@ -116,8 +116,8 @@ LIGHTRAG_MEMORY_PORT=${LIGHTRAG_MEMORY_PORT:-9622}  # Wrong!
 
 **After:**
 ```bash
-LIGHTRAG_SERVER_PORT=${LIGHTRAG_SERVER_PORT:-9622}
-LIGHTRAG_MEMORY_PORT=${LIGHTRAG_MEMORY_PORT:-9623}  # Correct
+LIGHTRAG_SERVER_PORT=${LIGHTRAG_SERVER_PORT:-9621}
+LIGHTRAG_MEMORY_PORT=${LIGHTRAG_MEMORY_PORT:-9622}  # Correct
 ```
 
 ## Verification Results
@@ -126,14 +126,14 @@ After implementing the fixes, the `docmgr.py` tool now works correctly:
 
 ```bash
 $ python tools/docmgr.py --status
-🌐 Using LightRAG server URL: http://localhost:9622
+🌐 Using LightRAG server URL: http://localhost:9621
 🗄️ Using storage path: /Users/Shared/personal_agent_data/agno/Eric
 ✅ LightRAG server is accessible.
 
 🔍 System Status Check
 ----------------------------------------
 Server Status: 🟢 Online
-  URL: http://localhost:9622
+  URL: http://localhost:9621
 Documents Found: 0
 ```
 
@@ -141,8 +141,8 @@ Documents Found: 0
 
 | Service | Host Port | Container Port | Purpose |
 |---------|-----------|----------------|---------|
-| LightRAG Server | 9622 | 9621 | Knowledge Base RAG |
-| LightRAG Memory | 9623 | 9621 | Memory/Context RAG |
+| LightRAG Server | 9621 | 9621 | Knowledge Base RAG |
+| LightRAG Memory | 9622 | 9621 | Memory/Context RAG |
 
 ## Docker Compose Configuration
 
@@ -150,18 +150,18 @@ The Docker Compose files correctly map:
 ```yaml
 # lightrag_server/docker-compose.yml
 ports:
-  - 9622:9621
+  - 9621:9621
 
 # lightrag_memory_server/docker-compose.yml  
 ports:
-  - 9623:9621
+  - 9622:9621
 ```
 
 ## Connection Guidelines
 
 ### For External Applications
-- **LightRAG Server**: Connect to `http://localhost:9622`
-- **LightRAG Memory**: Connect to `http://localhost:9623`
+- **LightRAG Server**: Connect to `http://localhost:9621`
+- **LightRAG Memory**: Connect to `http://localhost:9622`
 
 ### For Container-to-Container Communication
 - Both services run on port `9621` inside their respective containers
@@ -191,7 +191,7 @@ ports:
 
 ## Best Practices Established
 
-1. **Consistent Port References**: All external connections use host ports (9622/9623)
+1. **Consistent Port References**: All external connections use host ports (9621/9622)
 2. **Clear Documentation**: Comments distinguish between host and container ports
 3. **Environment Variable Priority**: `.env` file takes precedence over defaults
 4. **Centralized Configuration**: Settings managed through `settings.py`

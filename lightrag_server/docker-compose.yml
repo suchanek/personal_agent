@@ -10,45 +10,17 @@ services:
     env_file:
       - .env
     ports:
-      - 9622:9621
+      - 9621:9621
     volumes:
       - "${AGNO_STORAGE_DIR}/rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/inputs:/app/data/inputs"
       - ./config.ini:/app/config.ini
       - ./.env:/app/.env
-    environment:
-      - USER_ID=Eric
-      - WORKERS=1
-      - MAX_PARALLEL_INSERT=1
-      # Extended timeout settings for large document processing
-      - HTTPX_TIMEOUT=14400
-      - HTTPX_CONNECT_TIMEOUT=1200
-      - HTTPX_READ_TIMEOUT=14400
-      - HTTPX_WRITE_TIMEOUT=1200
-      - HTTPX_POOL_TIMEOUT=1200
-      - OLLAMA_TIMEOUT=14400
-      - OLLAMA_KEEP_ALIVE=7200
-      - OLLAMA_NUM_PREDICT=32768
-      - OLLAMA_TEMPERATURE=0.1
-      - OLLAMA_REQUEST_TIMEOUT=14400
-      - REQUESTS_TIMEOUT=14400
-      - URLLIB3_TIMEOUT=14400
-      - AIOHTTP_TIMEOUT=14400
-      - SOCKET_TIMEOUT=14400
-      - TCP_KEEPALIVE=true
-      - TCP_KEEPALIVE_IDLE=600
-      - TCP_KEEPALIVE_INTERVAL=60
-      - TCP_KEEPALIVE_COUNT=9
-      - PDF_CHUNK_SIZE=300
-      - CHUNK_SIZE=300
-      - CHUNK_OVERLAP_SIZE=50
-      - LLM_TIMEOUT=14400
-      - EMBEDDING_TIMEOUT=7200
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9621/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9621/health')"]
       interval: 60s
       timeout: 10s
       retries: 3

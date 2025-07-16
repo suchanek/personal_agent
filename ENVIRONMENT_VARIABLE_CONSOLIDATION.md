@@ -1,3 +1,22 @@
+# Environment Variable Consolidation
+
+## Overview
+
+This document provides instructions for consolidating environment variables from the `docker-compose.yml` file into the `env.memory_server` file. This will simplify configuration management by keeping all environment variables in a single location.
+
+## Current Setup Analysis
+
+The current setup has environment variables defined in two places:
+1. `env.memory_server` (which gets copied to `.env` for use)
+2. The `environment` section of `docker-compose.yml`
+
+Some variables appear in both files, with one case (PDF_CHUNK_SIZE) having different values. The docker-compose.yml values take precedence when both are present.
+
+## Updated env.memory_server
+
+Below is the updated content for `env.memory_server` with all environment variables consolidated:
+
+```
 # Personal AI Agent Environment Variables
 # Copy this file to .env and fill in your actual API keys
 
@@ -35,11 +54,11 @@ AGNO_KNOWLEDGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/knowledge
 # Override context sizes for specific models (optional)
 # Format: MODEL_NAME_CTX_SIZE (replace : with _ and . with _)
 # Examples:
-QWEN3_1_7B_CTX_SIZE=16384
-QWEN3_4B_CTX_SIZE=16384
+QWEN3_1_7B_CTX_SIZE=32768
+QWEN3_4B_CTX_SIZE=32768
 
 # LLAMA3_1_8B_INSTRUCT_Q8_0_CTX_SIZE=65536
-DEFAULT_MODEL_CTX_SIZE=8192
+DEFAULT_MODEL_CTX_SIZE=32768
 
 
 # Embedding model (also via Ollama)
@@ -108,3 +127,66 @@ TCP_KEEPALIVE=true
 TCP_KEEPALIVE_IDLE=600
 TCP_KEEPALIVE_INTERVAL=60
 TCP_KEEPALIVE_COUNT=9
+```
+
+## Updated docker-compose.yml
+
+Below is the updated content for `docker-compose.yml` with the environment section removed:
+
+```yaml
+services:
+  lightrag:
+    container_name: lightrag_memory
+    image: ghcr.io/suchanek/lightrag_pagent:latest
+    env_file:
+      - .env
+    ports:
+      - 9622:9621
+    volumes:
+      - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
+      - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
+      - ./config.ini:/app/config.ini
+      - ./.env:/app/.env
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9621/health')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+```
+
+## Implementation Steps
+
+1. **Backup your current files**:
+   ```bash
+   cp lightrag_memory_server/env.memory_server lightrag_memory_server/env.memory_server.bak
+   cp lightrag_memory_server/docker-compose.yml lightrag_memory_server/docker-compose.yml.bak
+   ```
+
+2. **Update env.memory_server**:
+   Replace the content of `lightrag_memory_server/env.memory_server` with the updated content provided above.
+
+3. **Update docker-compose.yml**:
+   Replace the content of `lightrag_memory_server/docker-compose.yml` with the updated content provided above.
+
+4. **Copy env.memory_server to .env**:
+   ```bash
+   cp lightrag_memory_server/env.memory_server lightrag_memory_server/.env
+   ```
+
+5. **Test the changes**:
+   ```bash
+   cd lightrag_memory_server
+   docker-compose down
+   docker-compose up -d
+   ```
+
+## Benefits of This Approach
+
+1. **Single Source of Truth**: All environment variables are defined in one place
+2. **Simplified Maintenance**: Easier to update and manage environment variables
+3. **Cleaner Docker Configuration**: The docker-compose.yml file is more concise and focused on container configuration
+4. **Consistent Configuration**: Eliminates the risk of inconsistent values between files
