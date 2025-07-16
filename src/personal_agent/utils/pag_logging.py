@@ -96,7 +96,7 @@ def configure_master_logger(
 
 def setup_logging_filters() -> None:
     """Set up logging configuration with Rich handler and configure agno loggers."""
-    # Suppress warnings
+    # Suppress warnings from specific modules (non-spacy/click warnings)
     warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
     warnings.filterwarnings(
         "ignore", message=".*model_fields.*", category=DeprecationWarning
@@ -105,6 +105,9 @@ def setup_logging_filters() -> None:
     warnings.filterwarnings(
         "ignore", category=ResourceWarning, message=".*subprocess.*"
     )
+    
+    # Note: Click, spacy, weasel, and thinc warnings are now handled by the virtual environment
+    # via PYTHONWARNINGS environment variable set in .venv/bin/activate
 
     # Reduce httpx logging verbosity to WARNING to reduce noise
     logging.getLogger("httpx").setLevel(logging.WARNING)

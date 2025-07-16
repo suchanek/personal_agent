@@ -1,4 +1,23 @@
 #!/usr/bin/env python3
+# Filter out all warnings from problematic packages before any imports
+import warnings
+
+# Suppress Click deprecation warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module='click')
+warnings.filterwarnings("ignore", message="Importing 'parser.split_arg_string' is deprecated")
+
+# Suppress all warnings from spacy and related packages
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="spacy")
+warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="weasel")
+warnings.filterwarnings("ignore", category=UserWarning, module="weasel")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="thinc")
+warnings.filterwarnings("ignore", category=UserWarning, module="thinc")
+
+# Set environment variable to filter warnings at the Python interpreter level
+import os
+os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning:click,ignore::DeprecationWarning:spacy,ignore::DeprecationWarning:weasel"
+
 """
 LightRAG Document Manager Driver Script
 
