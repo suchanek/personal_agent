@@ -13,7 +13,7 @@ that leverages specialized manager classes for different responsibilities:
 import asyncio
 import os
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 
 import aiohttp
 from agno.agent import Agent
@@ -117,34 +117,45 @@ class AgnoPersonalAgent:
 
         # Set up storage paths
         self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
-
+        
         # MCP configuration
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
 
         # Initialize component managers
         self.model_manager: AgentModelManager = AgentModelManager(
-            model_provider, model_name, ollama_base_url, seed
+            model_provider,
+            model_name,
+            ollama_base_url,
+            seed
         )
-
+        
         self.instruction_manager: AgentInstructionManager = AgentInstructionManager(
-            instruction_level, user_id, enable_memory, self.enable_mcp, self.mcp_servers
+            instruction_level,
+            user_id,
+            enable_memory,
+            self.enable_mcp,
+            self.mcp_servers
         )
-
+        
         self.memory_manager: AgentMemoryManager = AgentMemoryManager(
             user_id,
             self.storage_dir,
             None,  # agno_memory will be set during initialization
             LIGHTRAG_URL,
             LIGHTRAG_MEMORY_URL,
-            enable_memory,
+            enable_memory
         )
-
+        
         self.knowledge_manager: AgentKnowledgeManager = AgentKnowledgeManager(
-            user_id, self.storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
+            user_id,
+            self.storage_dir,
+            LIGHTRAG_URL,
+            LIGHTRAG_MEMORY_URL
         )
-
+        
         self.tool_manager: AgentToolManager = AgentToolManager(
-            user_id, self.storage_dir
+            user_id,
+            self.storage_dir
         )
 
         # Storage components
@@ -166,12 +177,10 @@ class AgnoPersonalAgent:
             self.enable_mcp,
             self.user_id,
         )
-
-    def _setup_storage_paths(
-        self, storage_dir: str, knowledge_dir: str, user_id: str
-    ) -> None:
+        
+    def _setup_storage_paths(self, storage_dir: str, knowledge_dir: str, user_id: str) -> None:
         """Set up storage paths based on user ID.
-
+        
         Args:
             storage_dir: Default storage directory
             knowledge_dir: Default knowledge directory
@@ -195,7 +204,7 @@ class AgnoPersonalAgent:
 
         Args:
             recreate: Whether to recreate the agent knowledge bases
-
+            
         Returns:
             True if initialization successful, False otherwise
         """
@@ -205,34 +214,24 @@ class AgnoPersonalAgent:
 
         # CRITICAL: Synchronize the agent's user_id with the persistent user setting
         try:
-            from ..config import get_current_user_id
             from .user_manager import UserManager
+            from ..config import get_current_user_id
 
             user_manager = UserManager()
-            persistent_user_id = (
-                get_current_user_id()
-            )  # This is loaded from env.userid at startup
+            persistent_user_id = get_current_user_id() # This is loaded from env.userid at startup
 
             if self.user_id != persistent_user_id:
                 logger.warning(
                     "Agent initialized with user '%s', but persistent user is '%s'. Switching context...",
                     self.user_id,
-                    persistent_user_id,
+                    persistent_user_id
                 )
                 # This is a formal user switch. Update the persistent user file.
-                switch_result = user_manager.switch_user(
-                    self.user_id, restart_lightrag=True, update_global_config=True
-                )
-                if not switch_result.get(
-                    "success"
-                ) and "Already logged in" not in switch_result.get("error", ""):
-                    raise RuntimeError(
-                        f"Failed to switch user context to '{self.user_id}': {switch_result.get('error')}"
-                    )
+                switch_result = user_manager.switch_user(self.user_id, restart_lightrag=True, update_global_config=True)
+                if not switch_result.get("success") and "Already logged in" not in switch_result.get("error", ""):
+                    raise RuntimeError(f"Failed to switch user context to '{self.user_id}': {switch_result.get('error')}")
                 else:
-                    logger.info(
-                        "Successfully switched user context to '%s'", self.user_id
-                    )
+                    logger.info("Successfully switched user context to '%s'", self.user_id)
 
         except Exception as e:
             logger.error("🚨 Critical error during user context synchronization: %s", e)
@@ -243,40 +242,31 @@ class AgnoPersonalAgent:
         logger.info("📝 Ensuring user %s is registered in user registry", self.user_id)
         try:
             from .user_registry import UserRegistry
-
             user_registry = UserRegistry()
             user_registry.ensure_current_user_registered()
             logger.info("✅ User registration check completed")
         except Exception as e:
             logger.warning("⚠️ User registry check failed: %s", e)
             # Don't fail initialization for user registry issues
-
+        
         # CRITICAL: Ensure Docker USER_ID consistency with smart restart capability
         logger.info("🔍 Checking Docker USER_ID consistency for user: %s", self.user_id)
         try:
             ready_to_proceed, consistency_message = ensure_docker_user_consistency(
                 user_id=self.user_id, auto_fix=True, force_restart=True
             )
-
+            
             if ready_to_proceed:
-                logger.info(
-                    "✅ Docker consistency check passed: %s", consistency_message
-                )
+                logger.info("✅ Docker consistency check passed: %s", consistency_message)
             else:
-                logger.error(
-                    "❌ Docker consistency check failed: %s", consistency_message
-                )
-                raise RuntimeError(
-                    f"Docker USER_ID consistency check failed: {consistency_message}"
-                )
-
+                logger.error("❌ Docker consistency check failed: %s", consistency_message)
+                raise RuntimeError(f"Docker USER_ID consistency check failed: {consistency_message}")
+                
         except Exception as e:
             logger.error("🚨 Critical error during Docker consistency check: %s", e)
             # Don't fail initialization for Docker consistency issues in case Docker is not available
-            logger.warning(
-                "⚠️ Continuing initialization despite Docker consistency check failure"
-            )
-
+            logger.warning("⚠️ Continuing initialization despite Docker consistency check failure")
+        
         try:
             # Create model using the model manager
             model = self.model_manager.create_model()
@@ -336,13 +326,17 @@ class AgnoPersonalAgent:
                 # Add Lightrag knowledge if enabled
                 if self.enable_memory:
                     try:
-                        self.lightrag_knowledge = await load_lightrag_knowledge_base()
+                        self.lightrag_knowledge = (
+                            await load_lightrag_knowledge_base()
+                        )
                         self.lightrag_knowledge_enabled = (
                             self.lightrag_knowledge is not None
                         )
                         logger.info("Loaded Lightrag knowledge base metadata")
                     except Exception as e:
-                        logger.warning("Failed to load Lightrag knowledge base: %s", e)
+                        logger.warning(
+                            "Failed to load Lightrag knowledge base: %s", e
+                        )
                         self.lightrag_knowledge = None
                         self.lightrag_knowledge_enabled = False
 
@@ -358,9 +352,7 @@ class AgnoPersonalAgent:
 
                 # If recreate is True, clear all memories AFTER memory system is initialized
                 if recreate and self.enable_memory:
-                    logger.info(
-                        "Recreate flag is True, clearing all memories after memory system initialization"
-                    )
+                    logger.info("Recreate flag is True, clearing all memories after memory system initialization")
                     clear_result = await self.memory_manager.clear_all_memories()
                     logger.info("Memory clear result: %s", clear_result)
 
@@ -429,7 +421,6 @@ class AgnoPersonalAgent:
             # Display splash screen if enabled
             if SHOW_SPLASH_SCREEN:
                 import importlib.metadata
-
                 agent_info = self.get_agent_info()
                 agent_version = importlib.metadata.version("personal-agent")
                 display_splash_screen(agent_info, agent_version)
@@ -449,10 +440,10 @@ class AgnoPersonalAgent:
             query: User query to process
             stream: Whether to stream the response
             add_thought_callback: Optional callback for adding thoughts during processing
-
+            
         Returns:
             Agent's final string response or response dictionary
-
+            
         Raises:
             RuntimeError: If agent is not initialized
         """
@@ -469,9 +460,7 @@ class AgnoPersonalAgent:
 
             # Use tool_manager to analyze tool calls if needed
             if hasattr(response, "tool_calls") and response.tool_calls:
-                logger.debug(
-                    f"Agent used {len(response.tool_calls)} tools in this response"
-                )
+                logger.debug(f"Agent used {len(response.tool_calls)} tools in this response")
                 # We could use tool_manager here for additional tool analysis if needed
 
             if add_thought_callback:
@@ -508,7 +497,7 @@ class AgnoPersonalAgent:
 
         Args:
             content: The original fact from the user
-
+            
         Returns:
             The restated fact
         """
@@ -516,13 +505,13 @@ class AgnoPersonalAgent:
 
     async def seed_entity_in_graph(self, entity_name: str, entity_type: str) -> bool:
         """Seed an entity into the graph by creating and uploading a physical file.
-
+        
         Delegates to the memory_manager for processing.
-
+        
         Args:
             entity_name: Name of the entity to create
             entity_type: Type of the entity
-
+            
         Returns:
             True if entity was successfully seeded
         """
@@ -530,12 +519,12 @@ class AgnoPersonalAgent:
 
     async def check_entity_exists(self, entity_name: str) -> bool:
         """Check if entity exists in the graph.
-
+        
         Delegates to the memory_manager for processing.
-
+        
         Args:
             entity_name: Name of the entity to check
-
+            
         Returns:
             True if entity exists
         """
@@ -543,9 +532,9 @@ class AgnoPersonalAgent:
 
     async def clear_all_memories(self) -> str:
         """Clear all memories from both SQLite and LightRAG systems.
-
+        
         Delegates to the memory_manager for processing.
-
+        
         Returns:
             str: Success or error message
         """
@@ -553,13 +542,13 @@ class AgnoPersonalAgent:
 
     async def query_lightrag_knowledge_direct(self, query: str, params: dict) -> str:
         """Directly query the LightRAG knowledge base and return the raw response.
-
+        
         Delegates to the knowledge_manager for processing.
 
         Args:
             query: The query string to search in the knowledge base
             params: A dictionary of query parameters
-
+            
         Returns:
             String with query results exactly as LightRAG returns them
         """
@@ -611,12 +600,11 @@ class AgnoPersonalAgent:
                 desc: str,
             ) -> Any:
                 """Create MCP tool function with proper closure."""
-
+                
                 from textwrap import dedent
-
-                from agno.tools.mcp import MCPTools
                 from mcp import ClientSession, StdioServerParameters
                 from mcp.client.stdio import stdio_client
+                from agno.tools.mcp import MCPTools
 
                 async def mcp_tool(query: str) -> str:
                     """MCP tool function that creates session on-demand."""
@@ -805,9 +793,7 @@ Returns:
         main_table.add_row("Model Name", info["model_name"])
         main_table.add_row("Memory Enabled", str(info["memory_enabled"]))
         main_table.add_row("Knowledge Enabled", str(info["knowledge_enabled"]))
-        main_table.add_row(
-            "LightRAG Knowledge", str(info["lightrag_knowledge_enabled"])
-        )
+        main_table.add_row("LightRAG Knowledge", str(info["lightrag_knowledge_enabled"]))
         main_table.add_row("MCP Enabled", str(info["mcp_enabled"]))
         main_table.add_row("Debug Mode", str(info["debug_mode"]))
         main_table.add_row("User ID", info["user_id"])
@@ -864,179 +850,3 @@ Returns:
                 )
 
             console.print(mcp_table)
-
-    def cleanup(self) -> None:
-        """Clean up resources when the agent is being shut down.
-        
-        This method is called during application shutdown to properly
-        clean up any resources, connections, or background tasks.
-        """
-        try:
-            logger.info("Cleaning up AgnoPersonalAgent resources...")
-            
-            # Clean up agent resources
-            if self.agent:
-                # The Agno agent doesn't have explicit cleanup methods,
-                # but we can clear references to help with garbage collection
-                self.agent = None
-                logger.debug("Cleared agent reference")
-            
-            # Clean up storage references
-            if self.agno_storage:
-                self.agno_storage = None
-                logger.debug("Cleared storage reference")
-                
-            if self.agno_knowledge:
-                self.agno_knowledge = None
-                logger.debug("Cleared knowledge reference")
-                
-            if self.agno_memory:
-                self.agno_memory = None
-                logger.debug("Cleared memory reference")
-                
-            if self.knowledge_coordinator:
-                self.knowledge_coordinator = None
-                logger.debug("Cleared knowledge coordinator reference")
-            
-            # Clean up manager references
-            self.model_manager = None
-            self.instruction_manager = None
-            self.memory_manager = None
-            self.knowledge_manager = None
-            self.tool_manager = None
-            
-            logger.info("AgnoPersonalAgent cleanup completed successfully")
-            
-        except Exception as e:
-            logger.warning("Error during AgnoPersonalAgent cleanup: %s", e)
-
-
-def create_simple_personal_agent(
-    storage_dir: str = None,
-    knowledge_dir: str = None,
-    model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
-):
-    """Create a simple personal agent following the working pattern from knowledge_agent_example.py
-
-    This function creates an agent with knowledge base integration using the simple
-    pattern that avoids async initialization complexity.
-
-    Args:
-        storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
-        knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
-        model_provider: LLM provider ('ollama' or 'openai')
-        model_name: Model name to use
-        
-    Returns:
-        Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
-    """
-    from agno.knowledge.combined import CombinedKnowledgeBase
-    
-    # Create knowledge base (synchronous creation)
-    knowledge_base = create_combined_knowledge_base(storage_dir, knowledge_dir)
-
-    # Create the model
-    if model_provider == "openai":
-        model = OpenAIChat(id=model_name)
-    elif model_provider == "ollama":
-        model = Ollama(id=model_name)
-    else:
-        raise ValueError(f"Unsupported model provider: {model_provider}")
-
-    # Create agent with simple pattern
-    agent = Agent(
-        name="Personal AI Agent",
-        model=model,
-        knowledge=knowledge_base,
-        search_knowledge=True,  # Enable automatic knowledge search
-        show_tool_calls=True,  # Show what tools the agent uses
-        markdown=True,  # Format responses in markdown
-        instructions=[
-            "You are a personal AI assistant with access to the user's knowledge base.",
-            "Always search your knowledge base when asked about personal information.",
-            "Provide detailed responses based on the information you find.",
-            "If you can't find specific information, say so clearly.",
-            "Include relevant details from the knowledge base in your responses.",
-        ],
-    )
-
-    logger.info("✅ Created simple personal agent")
-    if knowledge_base:
-        logger.info("   Knowledge base: Enabled")
-        logger.info("   Search enabled: %s", agent.search_knowledge)
-    else:
-        logger.info("   Knowledge base: None (no knowledge files found)")
-
-    return agent, knowledge_base
-
-
-async def load_agent_knowledge(knowledge_base, recreate: bool = False) -> None:
-    """Load knowledge base content asynchronously.
-
-    This should be called after creating the agent to load the knowledge content.
-
-    Args:
-        knowledge_base: Knowledge base instance to load
-        recreate: Whether to recreate the knowledge base from scratch
-        
-    Returns:
-        None
-    """
-    if knowledge_base:
-        await load_combined_knowledge_base(knowledge_base, recreate=recreate)
-        logger.info("✅ Knowledge base loaded successfully")
-    else:
-        logger.info("No knowledge base to load")
-
-
-async def create_agno_agent(
-    model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
-    enable_memory: bool = True,
-    enable_mcp: bool = True,
-    storage_dir: str = AGNO_STORAGE_DIR,
-    knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
-    debug: bool = False,
-    ollama_base_url: str = OLLAMA_URL,
-    user_id: str = USER_ID,
-    recreate: bool = False,
-    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
-) -> AgnoPersonalAgent:
-    """Create and initialize an agno-based personal agent.
-
-    Args:
-        model_provider: LLM provider ('ollama' or 'openai')
-        model_name: Model name to use
-        enable_memory: Whether to enable memory and knowledge features
-        enable_mcp: Whether to enable MCP tool integration
-        storage_dir: Directory for Agno storage files
-        knowledge_dir: Directory containing knowledge files to load
-        debug: Enable debug mode
-        ollama_base_url: Base URL for Ollama API
-        user_id: User identifier for memory operations
-        recreate: Whether to recreate knowledge bases
-        instruction_level: The sophistication level for agent instructions
-        
-    Returns:
-        Initialized agent instance
-    """
-    agent = AgnoPersonalAgent(
-        model_provider=model_provider,
-        model_name=model_name,
-        enable_memory=enable_memory,
-        enable_mcp=enable_mcp,
-        storage_dir=storage_dir,
-        knowledge_dir=knowledge_dir,
-        debug=debug,
-        ollama_base_url=ollama_base_url,
-        user_id=user_id,
-        recreate=recreate,
-        instruction_level=instruction_level,
-    )
-
-    success = await agent.initialize(recreate=recreate)
-    if not success:
-        raise RuntimeError("Failed to initialize agno agent")
-
-    return agent

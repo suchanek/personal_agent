@@ -23,9 +23,9 @@ from agno.memory.v2.schema import UserMemory
 from agno.models.base import Model
 from pydantic import BaseModel, Field
 
-from personal_agent.config import get_current_user_id
-from personal_agent.core.topic_classifier import TopicClassifier
-from personal_agent.utils import setup_logging
+from ..config import get_current_user_id
+from .topic_classifier import TopicClassifier
+from ..utils import setup_logging
 
 logger = setup_logging(__name__)
 
@@ -1032,6 +1032,40 @@ class SemanticMemoryManager:
                 max_score = max(max_score, score)
 
         return max_score
+
+    def get_all_memories(self, db: MemoryDb, user_id: str = None) -> List[UserMemory]:
+        """
+        Get all memories for a user.
+
+        :param db: Memory database instance
+        :param user_id: User ID to retrieve memories for
+        :return: List of UserMemory objects
+        """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
+        try:
+            # Get all memories for the user
+            memory_rows = db.read_memories(user_id=user_id, sort="desc")
+
+            user_memories = []
+            for row in memory_rows:
+                if row.user_id == user_id and row.memory:
+                    try:
+                        user_memory = UserMemory.from_dict(row.memory)
+                        user_memories.append(user_memory)
+                    except (ValueError, KeyError, TypeError) as e:
+                        logger.warning(
+                            "Failed to convert memory row to UserMemory: %s", e
+                        )
+
+            logger.info("Retrieved %d memories for user %s", len(user_memories), user_id)
+            return user_memories
+
+        except Exception as e:
+            logger.error("Error retrieving all memories: %s", e)
+            return []
 
     def get_memory_stats(self, db: MemoryDb, user_id: str = None) -> Dict[str, Any]:
         """
