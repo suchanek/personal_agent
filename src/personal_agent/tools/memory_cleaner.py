@@ -53,22 +53,29 @@ class MemoryClearingManager:
         print(f"   Semantic DB Path: {self.semantic_db_path}")
 
     def _initialize_semantic_memory(self) -> bool:
-        """Initialize semantic memory components."""
+        """Initialize semantic memory components using the EXACT same pattern as the agent."""
         try:
-            # Create memory database connection
+            # Ensure storage directory exists
+            self.storage_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Use the EXACT same initialization pattern as create_agno_memory() in agno_storage.py
+            # This ensures we're working with the same database and table as the actual agent
             self.memory_db = SqliteMemoryDb(
-                table_name="semantic_memory",
-                db_file=str(self.semantic_db_path),
+                table_name="personal_agent_memory",  # <-- FIXED: Use the correct table name!
+                db_file=str(self.storage_dir / "agent_memory.db"),  # <-- FIXED: Use the correct file name!
             )
 
-            # Create semantic memory manager
+            # Create semantic memory manager with the same configuration as the agent
             self.memory_manager = create_semantic_memory_manager(
                 similarity_threshold=0.8,
                 debug_mode=self.verbose,
             )
 
             if self.verbose:
-                print(f"✅ Semantic memory components initialized")
+                print(f"✅ Semantic memory components initialized using agent pattern")
+                print(f"   Database file: {self.storage_dir / 'agent_memory.db'}")
+                print(f"   Table name: personal_agent_memory")
+                print(f"   Database exists: {(self.storage_dir / 'agent_memory.db').exists()}")
             return True
 
         except Exception as e:
@@ -232,6 +239,34 @@ class MemoryClearingManager:
                 
         return success
 
+    def _vacuum_database(self) -> bool:
+        """Vacuum the SQLite database to ensure deletions are committed and space is reclaimed."""
+        try:
+            import sqlite3
+            
+            # Use the correct database file path that matches the agent
+            agent_db_path = self.storage_dir / "agent_memory.db"
+            
+            if agent_db_path.exists():
+                # Connect directly to the SQLite database and vacuum it
+                conn = sqlite3.connect(str(agent_db_path))
+                conn.execute("VACUUM")
+                conn.commit()
+                conn.close()
+                
+                if self.verbose:
+                    print("✅ Database vacuumed successfully")
+                return True
+            else:
+                if self.verbose:
+                    print("ℹ️ Database file does not exist, skipping vacuum")
+                return True
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"⚠️ Warning: Could not vacuum database: {e}")
+            return False
+
     def _get_semantic_memory_stats(self) -> Dict[str, Any]:
         """Get statistics about semantic memories."""
         if not self.memory_manager or not self.memory_db:
@@ -257,11 +292,55 @@ class MemoryClearingManager:
             return True, f"DRY RUN: Would clear {total_memories} semantic memories"
 
         try:
+            # Get count before clearing for verification
+            pre_clear_stats = self._get_semantic_memory_stats()
+            pre_clear_count = pre_clear_stats.get("total_memories", 0)
+            
+            if self.verbose:
+                print(f"📊 Pre-clear: {pre_clear_count} memories found")
+            
+            # Clear memories using the memory manager
             success, message = self.memory_manager.clear_memories(
                 db=self.memory_db,
                 user_id=self.user_id
             )
+            
+            if success:
+                # Force database connection to flush and close
+                try:
+                    # Try to close the database connection to ensure changes are persisted
+                    if hasattr(self.memory_db, 'close'):
+                        self.memory_db.close()
+                    
+                    # Add a small delay to ensure database operations complete
+                    import time
+                    time.sleep(0.1)
+                    
+                    # Vacuum the database to ensure deletions are committed
+                    self._vacuum_database()
+                    
+                    # Reinitialize the database connection for verification
+                    self._initialize_semantic_memory()
+                    
+                    # Verify clearing was successful
+                    post_clear_stats = self._get_semantic_memory_stats()
+                    post_clear_count = post_clear_stats.get("total_memories", 0)
+                    
+                    if self.verbose:
+                        print(f"📊 Post-clear: {post_clear_count} memories found")
+                    
+                    if post_clear_count == 0:
+                        return True, f"Successfully cleared {pre_clear_count} semantic memories (verified)"
+                    else:
+                        return False, f"Clearing incomplete: {post_clear_count} memories still remain after clearing {pre_clear_count}"
+                        
+                except Exception as e:
+                    if self.verbose:
+                        print(f"⚠️ Warning: Could not verify clearing: {e}")
+                    return True, f"{message} (verification failed: {e})"
+            
             return success, message
+            
         except Exception as e:
             return False, f"Error clearing semantic memories: {e}"
 

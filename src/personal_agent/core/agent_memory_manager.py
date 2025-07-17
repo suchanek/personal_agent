@@ -318,6 +318,9 @@ class AgentMemoryManager:
             )
 
         try:
+            # Restate the user fact from first-person to third-person
+            restated_content = self.restate_user_fact(content)
+            
             # SIMPLIFIED TOPIC HANDLING: Handle the common cases simply
             if topics is None:
                 # Leave as None - let memory manager auto-classify
@@ -340,7 +343,7 @@ class AgentMemoryManager:
 
             # 1. Store in local SQLite memory system
             local_result = self.agno_memory.memory_manager.add_memory(
-                memory_text=content,
+                memory_text=restated_content,
                 db=self.agno_memory.db,
                 user_id=self.user_id,
                 topics=topics,
@@ -366,7 +369,7 @@ class AgentMemoryManager:
             try:
                 # Store in graph memory
                 graph_result = await self.store_graph_memory(
-                    content, local_result.topics, local_result.memory_id
+                    restated_content, local_result.topics, local_result.memory_id
                 )
                 logger.info("Graph memory result: %s", graph_result)
                 if "✅" in graph_result:

@@ -106,7 +106,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.8] - 2025-07-10
 
-## [0.8.7] - 2025-07-10
+## [0.8.7] - 2025-07-16
+
+### Fixed
+- **Memory Clearing**: Resolved a critical bug where clearing memories via scripts did not consistently update the agent's state. The fix standardizes database connection handling and ensures all components are properly synchronized. See [ADR-016](./docs/adr/016-standardized-memory-clearing.md).
+- **Memory Restatement**: Ensured all user memories are stored in a consistent third-person format to improve knowledge graph accuracy and entity recognition.
+
+### Added
+- **Scripts Cheatsheet**: Added `SCRIPTS_CHEATSHEET.md` to provide a quick reference for common project scripts and tools.
+- **Memory Clearing Test**: Added `test_memory_clearing_fix.py` to verify the memory clearing fix.
+
+### Removed
+- **Legacy Script**: Removed the unused `scripts/clear_lightrag_data.py` script.
+
+
 
 ### Added
 - **Enriched Graph Ingestion Pipeline**: The `store_graph_memory` tool now uses a sophisticated, hybrid approach to build the knowledge graph. The agent performs local NLP (coreference resolution, entity/relationship extraction) to generate rich metadata, which is then embedded in a text file and uploaded to LightRAG. This guides the server's native ingestion pipeline, resulting in a more accurate and detailed graph. See [ADR-007](./docs/adr/007-direct-knowledge-graph-construction.md) for details.
