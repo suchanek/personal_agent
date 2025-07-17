@@ -3,7 +3,7 @@
 Clear LightRAG Data Script
 
 This script clears LightRAG data files and deletes the knowledge graph file
-from both LIGHTRAG_MEMORY_STORAGE_DIR.
+from both LIGHTRAG_STORAGE_DIR and LIGHTRAG_MEMORY_STORAGE_DIR.
 
 It properly gets the storage directories from the personal agent environment
 settings and supports a --dry-run option to preview what would be deleted.
@@ -89,6 +89,7 @@ def main():
     graph_file_name = "graph_chunk_entity_relation.graphml"
 
     # Print storage directories
+    print(f"📁 LightRAG Storage Directory: {LIGHTRAG_STORAGE_DIR}")
     print(f"📁 LightRAG Memory Storage Directory: {LIGHTRAG_MEMORY_STORAGE_DIR}\n")
 
     # Clear JSON files in memory storage directory

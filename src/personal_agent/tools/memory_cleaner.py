@@ -155,6 +155,10 @@ class MemoryClearingManager:
                         if status == "deletion_started":
                             # Clear cache after deletion
                             await self._clear_lightrag_cache()
+                            
+                            # Also delete the knowledge graph file
+                            await self._delete_knowledge_graph_file()
+                            
                             return {
                                 "success": True,
                                 "message": f"Successfully deleted {len(doc_ids)} documents from LightRAG",
@@ -201,6 +205,32 @@ class MemoryClearingManager:
         except Exception as e:
             print(f"❌ Failed to clear LightRAG cache: {e}")
             return False
+            
+    async def _delete_knowledge_graph_file(self) -> bool:
+        """Delete the knowledge graph file from LightRAG storage directories."""
+        from ..config.settings import LIGHTRAG_STORAGE_DIR, LIGHTRAG_MEMORY_STORAGE_DIR
+        import os
+        
+        graph_file_paths = [
+            os.path.join(LIGHTRAG_STORAGE_DIR, "graph_chunk_entity_relation.graphml"),
+            os.path.join(LIGHTRAG_MEMORY_STORAGE_DIR, "graph_chunk_entity_relation.graphml")
+        ]
+        
+        success = True
+        for graph_file_path in graph_file_paths:
+            try:
+                if os.path.exists(graph_file_path):
+                    os.remove(graph_file_path)
+                    if self.verbose:
+                        print(f"✅ Deleted knowledge graph file: {graph_file_path}")
+                else:
+                    if self.verbose:
+                        print(f"ℹ️ Knowledge graph file not found: {graph_file_path}")
+            except Exception as e:
+                success = False
+                print(f"❌ Failed to delete knowledge graph file {graph_file_path}: {e}")
+                
+        return success
 
     def _get_semantic_memory_stats(self) -> Dict[str, Any]:
         """Get statistics about semantic memories."""
