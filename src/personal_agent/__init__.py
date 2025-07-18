@@ -35,6 +35,21 @@ from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
 from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
 from .core.memory import is_weaviate_connected, vector_store, weaviate_client
 
+# Import key classes for pdoc documentation
+from .core.agno_agent import AgnoPersonalAgent, create_agno_agent, create_simple_personal_agent, load_agent_knowledge
+from .core.semantic_memory_manager import (
+    SemanticMemoryManager,
+    MemoryStorageStatus,
+    MemoryStorageResult,
+    SemanticDuplicateDetector,
+    create_semantic_memory_manager
+)
+from .core.agent_memory_manager import AgentMemoryManager
+from .core.agent_instruction_manager import AgentInstructionManager
+from .core.agent_knowledge_manager import AgentKnowledgeManager
+from .core.agent_tool_manager import AgentToolManager
+from .core.agent_model_manager import AgentModelManager
+
 # Import tools
 from .tools import get_all_tools
 
@@ -73,11 +88,86 @@ setup_logging_filters()
 # Package-level logger
 _logger = setup_logging()
 
+# Export public API
+__all__ = [
+    # Core components
+    "SimpleMCPClient",
+    "create_agent_executor",
+    "setup_weaviate",
+    "is_weaviate_connected",
+    "vector_store",
+    "weaviate_client",
+    # Key classes for pdoc documentation
+    "AgnoPersonalAgent",
+    "create_agno_agent",
+    "create_simple_personal_agent",
+    "load_agent_knowledge",
+    "SemanticMemoryManager",
+    "MemoryStorageStatus",
+    "MemoryStorageResult",
+    "SemanticDuplicateDetector",
+    "create_semantic_memory_manager",
+    "AgentMemoryManager",
+    "AgentInstructionManager",
+    "AgentKnowledgeManager",
+    "AgentToolManager",
+    "AgentModelManager",
+    # Configuration
+    "USE_MCP",
+    "USE_WEAVIATE",
+    "get_mcp_servers",
+    # Tools
+    "get_all_tools",
+    # Utilities
+    "cleanup",
+    "inject_dependencies",
+    "register_cleanup_handlers",
+    "configure_all_rich_logging",
+    "configure_master_logger",
+    "disable_stream_handlers_for_namespace",
+    "list_all_loggers",
+    "list_handlers",
+    "set_logger_level",
+    "set_logger_level_for_module",
+    "set_logging_level_for_all_handlers",
+    "setup_agno_rich_logging",
+    "setup_logging",
+    "toggle_stream_handler",
+    "setup_logging_filters",
+    # Web interface
+    "create_app",
+    "register_routes",
+    # Main entry points - Agno (primary)
+    "cli_main",
+    "run_agno_cli",
+    # Main entry points - LangChain (legacy)
+    "langchain_main",
+    "langchain_cli_main",
+    # Main entry points - Smolagents
+    "run_smolagents_web",
+    "run_smolagents_cli",
+    # Utility functions
+    "print_configuration",
+    # Package info
+    "__version__",
+]
+
 # Only log initialization message if log level allows it AND root logger allows it
 # This prevents spam when scripts want to suppress logging
 root_logger = logging.getLogger()
 if _logger.isEnabledFor(logging.INFO) and root_logger.isEnabledFor(logging.INFO):
     _logger.info("Initializing Personal AI Agent package v%s...", __version__)
+    
+    # Debug logging for pdoc class discovery
+    _logger.info("PDOC DEBUG: Listing all imported classes and modules:")
+    import inspect
+    import sys
+    current_module = sys.modules[__name__]
+    for name, obj in inspect.getmembers(current_module):
+        if inspect.isclass(obj) or inspect.ismodule(obj):
+            _logger.info("PDOC DEBUG: Found %s: %s", "class" if inspect.isclass(obj) else "module", name)
+    
+    _logger.info("PDOC DEBUG: __all__ list contains %d items", len(__all__))
 
 
 # Main entry points
@@ -173,51 +263,4 @@ def print_configuration() -> str:
             return config_text
 
 
-# Export public API
-__all__ = [
-    # Core components
-    "SimpleMCPClient",
-    "create_agent_executor",
-    "setup_weaviate",
-    "is_weaviate_connected",
-    "vector_store",
-    "weaviate_client",
-    # Configuration
-    "USE_MCP",
-    "USE_WEAVIATE",
-    "get_mcp_servers",
-    # Tools
-    "get_all_tools",
-    # Utilities
-    "cleanup",
-    "inject_dependencies",
-    "register_cleanup_handlers",
-    "configure_all_rich_logging",
-    "configure_master_logger",
-    "disable_stream_handlers_for_namespace",
-    "list_all_loggers",
-    "list_handlers",
-    "set_logger_level",
-    "set_logger_level_for_module",
-    "set_logging_level_for_all_handlers",
-    "setup_agno_rich_logging",
-    "setup_logging",
-    "toggle_stream_handler",
-    "setup_logging_filters",
-    # Web interface
-    "create_app",
-    "register_routes",
-    # Main entry points - Agno (primary)
-    "cli_main",
-    "run_agno_cli",
-    # Main entry points - LangChain (legacy)
-    "langchain_main",
-    "langchain_cli_main",
-    # Main entry points - Smolagents
-    "run_smolagents_web",
-    "run_smolagents_cli",
-    # Utility functions
-    "print_configuration",
-    # Package info
-    "__version__",
-]
+# The __all__ list has been moved above to fix the "using variable before assignment" issue
