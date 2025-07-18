@@ -894,7 +894,7 @@ class SemanticMemoryManager:
         limit: Optional[int] = None,
     ) -> List[UserMemory]:
         """
-        Get memories filtered by a list of topics, without similarity search.
+        Get memories filtered by a list of topics, with enhanced topic expansion using the topic classifier.
 
         :param db: Memory database instance
         :param user_id: User ID to search within
@@ -925,12 +925,37 @@ class SemanticMemoryManager:
                 # If no topics are specified, return all memories up to the limit
                 return user_memories[:limit]
 
-            # Filter memories by the given topics
+            # ENHANCED: Expand topics using the topic classifier
+            # This solves the issue where searching for "education" doesn't find "academic" memories
+            expanded_topics = set()
+            
+            for topic in topics:
+                topic_lower = topic.lower()
+                expanded_topics.add(topic_lower)  # Add the original topic
+                
+                # Check if this topic appears as a keyword in any category
+                for category, keywords in self.topic_classifier.categories.items():
+                    if topic_lower in [kw.lower() for kw in keywords]:
+                        # Add the category name
+                        expanded_topics.add(category.lower())
+                        logger.debug(f"Expanded topic '{topic}' to include category '{category}'")
+                        break
+                
+                # Also check if this topic is a category name, and if so, add all its keywords
+                if topic_lower in [cat.lower() for cat in self.topic_classifier.categories.keys()]:
+                    # Find the actual category name (with correct case)
+                    for category, keywords in self.topic_classifier.categories.items():
+                        if category.lower() == topic_lower:
+                            for keyword in keywords:
+                                expanded_topics.add(keyword.lower())
+                            logger.debug(f"Expanded category '{topic}' to include keywords: {keywords}")
+                            break
+
+            # Filter memories by the expanded topics
             filtered_memories = []
-            topic_set = {t.lower() for t in topics}
             for memory in user_memories:
                 if memory.topics and any(
-                    t.lower() in topic_set for t in memory.topics
+                    t.lower() in expanded_topics for t in memory.topics
                 ):
                     filtered_memories.append(memory)
 
@@ -943,7 +968,7 @@ class SemanticMemoryManager:
 
     def _expand_query(self, query: str) -> List[str]:
         """
-        Expand query with synonyms and related terms for better semantic matching.
+        Expand query with synonyms, related terms, and topic classifier mappings for better semantic matching.
 
         :param query: Original search query
         :return: List of expanded queries including the original
@@ -951,7 +976,39 @@ class SemanticMemoryManager:
         query_lower = query.lower().strip()
         expanded = [query]  # Always include original query
 
-        # Work-related expansions
+        # NEW: Use topic classifier to find which categories the query keywords belong to
+        # This solves the issue where searching for "education" doesn't find "academic" memories
+        query_words = query_lower.split()
+        for word in query_words:
+            # Check if this word appears in any category's keywords
+            for category, keywords in self.topic_classifier.categories.items():
+                if word in [kw.lower() for kw in keywords]:
+                    # Add the category name as an expanded query
+                    if category not in expanded:
+                        expanded.append(category)
+                    
+                    # Also add other keywords from the same category
+                    for related_keyword in keywords:
+                        related_lower = related_keyword.lower()
+                        if related_lower != word and related_lower not in expanded:
+                            expanded.append(related_lower)
+                    
+                    # Stop after finding the first matching category for this word
+                    # (though a word could theoretically be in multiple categories)
+                    break
+            
+            # Also check phrases for more comprehensive matching
+            for category, phrases in self.topic_classifier.phrases.items():
+                for phrase in phrases:
+                    if word in phrase.lower().split():
+                        # Add the category name
+                        if category not in expanded:
+                            expanded.append(category)
+                        # Add the full phrase
+                        if phrase.lower() not in expanded:
+                            expanded.append(phrase.lower())
+
+        # Work-related expansions (keeping existing hardcoded synonyms for backward compatibility)
         work_synonyms = {
             "work": [
                 "job",
@@ -989,7 +1046,6 @@ class SemanticMemoryManager:
         all_synonyms = {**work_synonyms, **education_synonyms, **personal_synonyms}
 
         # Add synonyms for words in the query
-        query_words = query_lower.split()
         for word in query_words:
             if word in all_synonyms:
                 for synonym in all_synonyms[word]:

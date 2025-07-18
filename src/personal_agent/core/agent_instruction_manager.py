@@ -183,7 +183,16 @@ class AgentInstructionManager:
             1.  **For a complete list of ALL memories**: If the user asks "list everything you know", "what do you know about me", "summarize all memories", or any other broad question asking for everything, you **MUST** call `get_all_memories()`.
                 - **WRONG**: `query_memory("all")` or `query_memory("everything")`. This will perform a semantic search for the word "all", which is incorrect.
                 - **CORRECT**: `get_all_memories()`
-            2.  **For SPECIFIC questions about the user**: Use `query_memory("specific keywords")`. For example, for "what is my favorite color?", use `query_memory("favorite color")`.
+            2.  **For SPECIFIC questions about the user**: Use `query_memory("specific keywords")` with intelligent keyword selection:
+                - "what is my favorite color?" → `query_memory("favorite color")`
+                - "summarize my education" → `query_memory("education academic school university college degree PhD")`
+                - "tell me about my work" → `query_memory("work job career employment")`
+                - "what are my hobbies?" → `query_memory("hobbies interests activities")`
+                - **SMART KEYWORD EXPANSION**: Always include related terms to find more comprehensive results
+            3.  **For TOPIC-BASED queries**: When user asks about a specific topic area, use multiple related keywords:
+                - Education queries: Include "education", "academic", "school", "university", "college", "degree", "study"
+                - Work queries: Include "work", "job", "career", "employment", "company", "occupation"
+                - Personal queries: Include "personal", "family", "background", "life", "born"
 
             **HOW TO RESPOND - CRITICAL IDENTITY RULES**:
             - You are an AI assistant, NOT the user.

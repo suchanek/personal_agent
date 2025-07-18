@@ -1146,7 +1146,7 @@ class AgentMemoryManager:
     async def get_memories_by_topic(
         self, topics: Union[List[str], str, None] = None, limit: Union[int, None] = None
     ) -> str:
-        """Get memories by topic without similarity search.
+        """Get memories by topic without similarity search, using enhanced SemanticMemoryManager.
 
         Args:
             topics: Topic or list of topics to filter memories by
@@ -1182,46 +1182,25 @@ class AgentMemoryManager:
                 logger.warning("No valid topics provided after parsing")
                 return "❌ Error: No valid topics provided. Please specify at least one topic."
 
-            # Get all memories first
-            all_memories = self.agno_memory.memory_manager.get_all_memories(
-                db=self.agno_memory.db, user_id=self.user_id
+            # ENHANCED: Use the SemanticMemoryManager's enhanced get_memories_by_topic method
+            # This method includes topic classifier integration for query expansion
+            filtered_memories = self.agno_memory.memory_manager.get_memories_by_topic(
+                db=self.agno_memory.db,
+                user_id=self.user_id,
+                topics=topic_list,
+                limit=limit,
             )
-
-            if not all_memories:
-                logger.info("No memories found for user %s", self.user_id)
-                return "🔍 No memories found. Try storing some information first!"
-
-            # Filter memories by topic
-            filtered_memories = []
-            for memory in all_memories:
-                if hasattr(memory, "topics") and memory.topics:
-                    # Check if any of the requested topics match this memory's topics
-                    if any(
-                        topic.lower() in [t.lower() for t in memory.topics]
-                        for topic in topic_list
-                    ):
-                        filtered_memories.append(memory)
 
             if not filtered_memories:
                 topics_str = ", ".join(topic_list)
                 logger.info("No memories found for topics: %s", topics_str)
                 return f"🔍 No memories found for topics: {topics_str}. Try different topics or store new memories with these topics."
 
-            # Sort memories by timestamp (newest first)
-            sorted_memories = sorted(
-                filtered_memories,
-                key=lambda m: m.timestamp if hasattr(m, "timestamp") else 0,
-                reverse=True,
-            )
-
-            # Limit the number of memories if specified
-            display_memories = sorted_memories[:limit] if limit else sorted_memories
-
             # Format results
             topics_str = ", ".join(topic_list)
-            result = f"🧠 MEMORIES BY TOPIC: {topics_str} (showing {len(display_memories)} of {len(filtered_memories)} matching memories)\n\n"
+            result = f"🧠 MEMORIES BY TOPIC: {topics_str} (showing {len(filtered_memories)} of {len(filtered_memories)} matching memories)\n\n"
 
-            for i, memory in enumerate(display_memories, 1):
+            for i, memory in enumerate(filtered_memories, 1):
                 # Format the memory content
                 result += f"{i}. {memory.memory}\n"
 
@@ -1241,7 +1220,8 @@ class AgentMemoryManager:
                 result += f"   ID: {memory.memory_id}\n\n"
 
             logger.info(
-                "Retrieved %d memories for topics %s", len(display_memories), topics_str
+                "Retrieved %d memories for topics %s using enhanced SemanticMemoryManager", 
+                len(filtered_memories), topics_str
             )
             return result
 

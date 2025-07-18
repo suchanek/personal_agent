@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.9.2] - 2025-07-18
+
+### Added
+- **Bidirectional Topic Classification System**: Implemented a breakthrough enhancement to the semantic memory system that creates a universal bridge between natural user language and internal topic categories. This system intelligently expands user queries (e.g., "my education") to include all related system keywords (e.g., "academic," "school," "degree"), dramatically improving memory recall across all topics. See [ADR-024](./refs/adr/024-bidirectional-topic-classification.md) for details.
+
+### Changed
+- **Universal Query Expansion**: The `SemanticMemoryManager` now uses bidirectional mapping to expand both search queries and topic filters, ensuring that queries for terms like "job" correctly retrieve memories tagged with "work," and vice-versa.
+- **Agent Instructions**: Updated agent instructions to leverage the new query expansion, guiding the agent to perform more comprehensive and effective memory searches.
+
+### Fixed
+- **Education Memory Retrieval**: Corrected the specific, high-profile bug where queries for "education" failed to retrieve memories tagged as "academic," which was the catalyst for the universal system enhancement.
+
 ## [dev/v0.9.1] - 2025-07-18
 
 ### Changed
