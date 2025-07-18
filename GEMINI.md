@@ -9,6 +9,7 @@ This project is a sophisticated personal AI assistant powered by the **Agno Fram
 ## Prime Directives
 
 - When writing new scripts or classes check existing classes and functions for the desired functionality FIRST. Do not recreate existing functionality!
+- **Versioning and Branching**: Before committing any changes, ALWAYS verify that the project version in `pyproject.toml` has been updated and that you are on the correct branch. Ensure all version, branch, and changelog information is consistent.
 
 ## Dynamic Multi-User System
 
