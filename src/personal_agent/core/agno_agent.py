@@ -396,8 +396,8 @@ class AgnoPersonalAgent:
                 name="Personal AI Agent",
                 agent_id="personal_agent",
                 user_id=self.user_id,
-                enable_agentic_memory=True,  # Enable agno's native memory
-                enable_user_memories=False,  # Enable agno's native memory
+                enable_agentic_memory=False,  # Disable agno's native memory to use our custom memory system
+                enable_user_memories=True,  # Re-enable agno's native memory to allow user retrieval
                 add_history_to_messages=True,  # Add conversation history to context
                 num_history_responses=3,
                 knowledge=self.agno_knowledge if self.enable_memory else None,

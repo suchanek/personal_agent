@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Centralized Memory Clearing Service**: Implemented a new, centralized service for all memory clearing operations. This service consolidates logic from various parts of the application, ensuring consistent and complete memory clearing, including the previously missed `memory_inputs` directory. This resolves inconsistencies and eliminates code duplication. See [ADR-021](./refs/adr/021-centralized-memory-clearing-service.md) for details.
 
 ### Fixed
+- **User Memory Retrieval Re-enabled**: Corrected a critical configuration error in `src/personal_agent/core/agno_agent.py` where `enable_user_memories` was inadvertently set to `False`, disabling user memory retrieval. Setting this to `True` re-enables the agent's ability to effectively utilize custom memory tools for personalized responses. See [ADR-023](./refs/adr/023-re-enable-user-memory-retrieval.md) for details.
 - **Docker Restart Optimization**: Eliminated unnecessary Docker container restarts during agent initialization by setting `force_restart=False`. This significantly improves startup performance and reduces system load. See [ADR-022](./refs/adr/022-docker-restart-optimization.md) for details.
 
 
