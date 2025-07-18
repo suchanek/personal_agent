@@ -33,22 +33,27 @@ if "RUST_LOG" not in os.environ:
 # Import core components
 from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
 from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
-from .core.memory import is_weaviate_connected, vector_store, weaviate_client
-
-# Import key classes for pdoc documentation
-from .core.agno_agent import AgnoPersonalAgent, create_agno_agent, create_simple_personal_agent, load_agent_knowledge
-from .core.semantic_memory_manager import (
-    SemanticMemoryManager,
-    MemoryStorageStatus,
-    MemoryStorageResult,
-    SemanticDuplicateDetector,
-    create_semantic_memory_manager
-)
-from .core.agent_memory_manager import AgentMemoryManager
 from .core.agent_instruction_manager import AgentInstructionManager
 from .core.agent_knowledge_manager import AgentKnowledgeManager
-from .core.agent_tool_manager import AgentToolManager
+from .core.agent_memory_manager import AgentMemoryManager
 from .core.agent_model_manager import AgentModelManager
+from .core.agent_tool_manager import AgentToolManager
+
+# Import key classes for pdoc documentation
+from .core.agno_agent import (
+    AgnoPersonalAgent,
+    create_agno_agent,
+    create_simple_personal_agent,
+    load_agent_knowledge,
+)
+from .core.memory import is_weaviate_connected, vector_store, weaviate_client
+from .core.semantic_memory_manager import (
+    MemoryStorageResult,
+    MemoryStorageStatus,
+    SemanticDuplicateDetector,
+    SemanticMemoryManager,
+    create_semantic_memory_manager,
+)
 
 # Import tools
 from .tools import get_all_tools
@@ -157,17 +162,6 @@ __all__ = [
 root_logger = logging.getLogger()
 if _logger.isEnabledFor(logging.INFO) and root_logger.isEnabledFor(logging.INFO):
     _logger.info("Initializing Personal AI Agent package v%s...", __version__)
-    
-    # Debug logging for pdoc class discovery
-    _logger.info("PDOC DEBUG: Listing all imported classes and modules:")
-    import inspect
-    import sys
-    current_module = sys.modules[__name__]
-    for name, obj in inspect.getmembers(current_module):
-        if inspect.isclass(obj) or inspect.ismodule(obj):
-            _logger.info("PDOC DEBUG: Found %s: %s", "class" if inspect.isclass(obj) else "module", name)
-    
-    _logger.info("PDOC DEBUG: __all__ list contains %d items", len(__all__))
 
 
 # Main entry points
