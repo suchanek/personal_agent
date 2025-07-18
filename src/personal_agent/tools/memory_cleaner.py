@@ -23,11 +23,16 @@ from ..config.settings import (
     USER_ID,
 )
 from ..core.semantic_memory_manager import create_semantic_memory_manager
+from ..core.memory_clearing_service import MemoryClearingService, ClearingOptions
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 
 
 class MemoryClearingManager:
-    """Manages the clearing of both semantic and LightRAG graph memories."""
+    """Manages the clearing of both semantic and LightRAG graph memories.
+    
+    This class now acts as a thin wrapper around the centralized MemoryClearingService
+    to provide the CLI interface while delegating all clearing logic to the service.
+    """
 
     def __init__(
         self,
@@ -41,19 +46,21 @@ class MemoryClearingManager:
         self.lightrag_memory_url = lightrag_memory_url
         self.verbose = verbose
 
-        # Initialize semantic memory components
-        self.semantic_db_path = self.storage_dir / "semantic_memory.db"
+        # Initialize semantic memory components for the service
         self.memory_db = None
         self.memory_manager = None
+        self.agno_memory = None
+        
+        # Initialize the centralized clearing service
+        self.clearing_service = None
 
         print("🧠 Memory Clearing Manager initialized")
         print(f"   User ID: {self.user_id}")
         print(f"   Storage Directory: {self.storage_dir}")
         print(f"   LightRAG Memory URL: {self.lightrag_memory_url}")
-        print(f"   Semantic DB Path: {self.semantic_db_path}")
 
     def _initialize_semantic_memory(self) -> bool:
-        """Initialize semantic memory components using the EXACT same pattern as the agent."""
+        """Initialize semantic memory components and the clearing service."""
         try:
             # Ensure storage directory exists
             self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -71,8 +78,24 @@ class MemoryClearingManager:
                 debug_mode=self.verbose,
             )
 
+            # Create a mock agno_memory object for the clearing service
+            class MockAgnoMemory:
+                def __init__(self, db, memory_manager):
+                    self.db = db
+                    self.memory_manager = memory_manager
+            
+            self.agno_memory = MockAgnoMemory(self.memory_db, self.memory_manager)
+            
+            # Initialize the centralized clearing service
+            self.clearing_service = MemoryClearingService(
+                user_id=self.user_id,
+                agno_memory=self.agno_memory,
+                lightrag_memory_url=self.lightrag_memory_url,
+                verbose=self.verbose
+            )
+
             if self.verbose:
-                print(f"✅ Semantic memory components initialized using agent pattern")
+                print(f"✅ Semantic memory components and clearing service initialized")
                 print(f"   Database file: {self.storage_dir / 'agent_memory.db'}")
                 print(f"   Table name: personal_agent_memory")
                 print(f"   Database exists: {(self.storage_dir / 'agent_memory.db').exists()}")
@@ -373,57 +396,62 @@ class MemoryClearingManager:
         semantic_only: bool = False,
         lightrag_only: bool = False,
     ) -> Dict[str, Any]:
-        """Clear memories from both systems."""
+        """Clear memories from both systems using the centralized service."""
+        # Initialize the clearing service if not already done
+        if not self.clearing_service:
+            if not self._initialize_semantic_memory():
+                return {
+                    "semantic_memory": {"attempted": True, "success": False, "message": "Failed to initialize semantic memory"},
+                    "lightrag_memory": {"attempted": False, "success": False, "message": ""},
+                    "overall_success": False,
+                }
+        
+        # Create clearing options
+        options = ClearingOptions(
+            dry_run=dry_run,
+            semantic_only=semantic_only,
+            lightrag_only=lightrag_only,
+            include_memory_inputs=True,  # NEW: Include memory inputs clearing
+            include_knowledge_graph=True,
+            include_cache=True,
+            verbose=self.verbose
+        )
+        
+        # Use the centralized service to clear all memories
+        service_results = await self.clearing_service.clear_all_memories(options)
+        
+        # Convert service results to the expected format for backward compatibility
         results = {
             "semantic_memory": {"attempted": False, "success": False, "message": ""},
             "lightrag_memory": {"attempted": False, "success": False, "message": ""},
-            "overall_success": False,
+            "memory_inputs": {"attempted": False, "success": False, "message": ""},  # NEW
+            "overall_success": service_results["overall_success"],
         }
-
-        # Clear semantic memories
-        if not lightrag_only:
+        
+        # Map semantic memory results
+        if service_results["semantic_memory"]["attempted"]:
             results["semantic_memory"]["attempted"] = True
-            if self._initialize_semantic_memory():
-                success, message = self._clear_semantic_memories(dry_run)
-                results["semantic_memory"]["success"] = success
-                results["semantic_memory"]["message"] = message
-            else:
-                results["semantic_memory"]["message"] = "Failed to initialize semantic memory"
-
-        # Clear LightRAG memories
-        if not semantic_only:
+            semantic_result = service_results["semantic_memory"]["result"]
+            if semantic_result:
+                results["semantic_memory"]["success"] = semantic_result.success
+                results["semantic_memory"]["message"] = semantic_result.message
+        
+        # Map LightRAG memory results
+        if service_results["lightrag_memory"]["attempted"]:
             results["lightrag_memory"]["attempted"] = True
-            lightrag_available = await self._check_lightrag_server_status()
-
-            if lightrag_available:
-                documents = await self._get_lightrag_documents()
-                if documents:
-                    doc_ids = [doc["id"] for doc in documents]
-                    clear_result = await self._clear_lightrag_documents(doc_ids, dry_run)
-                    results["lightrag_memory"]["success"] = clear_result["success"]
-                    results["lightrag_memory"]["message"] = clear_result["message"]
-                else:
-                    results["lightrag_memory"]["success"] = True
-                    results["lightrag_memory"]["message"] = "No LightRAG documents to clear"
-            else:
-                results["lightrag_memory"]["message"] = "LightRAG memory server not available"
-
-        # Determine overall success
-        attempted_systems = []
-        successful_systems = []
-
-        if results["semantic_memory"]["attempted"]:
-            attempted_systems.append("semantic")
-            if results["semantic_memory"]["success"]:
-                successful_systems.append("semantic")
-
-        if results["lightrag_memory"]["attempted"]:
-            attempted_systems.append("lightrag")
-            if results["lightrag_memory"]["success"]:
-                successful_systems.append("lightrag")
-
-        results["overall_success"] = len(successful_systems) == len(attempted_systems)
-
+            lightrag_result = service_results["lightrag_memory"]["result"]
+            if lightrag_result:
+                results["lightrag_memory"]["success"] = lightrag_result.success
+                results["lightrag_memory"]["message"] = lightrag_result.message
+        
+        # Map memory inputs results (NEW)
+        if service_results["memory_inputs"]["attempted"]:
+            results["memory_inputs"]["attempted"] = True
+            inputs_result = service_results["memory_inputs"]["result"]
+            if inputs_result:
+                results["memory_inputs"]["success"] = inputs_result.success
+                results["memory_inputs"]["message"] = inputs_result.message
+        
         return results
 
     async def verify_clearing(self) -> Dict[str, Any]:
@@ -520,6 +548,13 @@ def print_clearing_results(results: Dict[str, Any]) -> None:
         print("\n🌐 LightRAG Graph Memory System:")
         print(f"   Status: {'✅ Success' if lightrag['success'] else '❌ Failed'}")
         print(f"   Message: {lightrag['message']}")
+
+    # Memory Inputs Results (NEW)
+    memory_inputs = results.get("memory_inputs", {})
+    if memory_inputs.get("attempted"):
+        print("\n📁 Memory Inputs Directory:")
+        print(f"   Status: {'✅ Success' if memory_inputs['success'] else '❌ Failed'}")
+        print(f"   Message: {memory_inputs['message']}")
 
     # Overall Result
     print(f"\n🎯 Overall Result: {'✅ SUCCESS' if results['overall_success'] else '❌ PARTIAL/FAILED'}")

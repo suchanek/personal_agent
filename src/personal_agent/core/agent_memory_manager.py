@@ -606,152 +606,102 @@ class AgentMemoryManager:
             return False
 
     async def clear_all_memories(self) -> str:
-        """Clear all memories from both SQLite and LightRAG systems.
+        """Clear all memories from both SQLite and LightRAG systems using the centralized service.
 
         This method provides a complete reset of the dual memory system by:
         1. Clearing all memories from the local SQLite database
         2. Clearing all documents from the LightRAG memory server
-        3. Deleting the knowledge graph file
+        3. Clearing the memory_inputs directory (NEW)
+        4. Deleting the knowledge graph file
+        5. Clearing server cache
 
         Returns:
             str: Success or error message
         """
         try:
+            # Import the centralized clearing service
+            from ..core.memory_clearing_service import MemoryClearingService, ClearingOptions
+            
+            # Create the clearing service
+            clearing_service = MemoryClearingService(
+                user_id=self.user_id,
+                agno_memory=self.agno_memory,
+                lightrag_memory_url=self.lightrag_memory_url,
+                verbose=False  # Keep quiet for agent use
+            )
+            
+            # Create clearing options
+            options = ClearingOptions(
+                dry_run=False,
+                semantic_only=False,
+                lightrag_only=False,
+                include_memory_inputs=True,  # NEW: Include memory inputs clearing
+                include_knowledge_graph=True,
+                include_cache=True,
+                verbose=False
+            )
+            
+            # Use the centralized service to clear all memories
+            service_results = await clearing_service.clear_all_memories(options)
+            
+            # Convert service results to user-friendly messages
             results = []
-
-            # 1. Clear local SQLite memories
-            if self.agno_memory and self.agno_memory.memory_manager:
-                success, message = self.agno_memory.memory_manager.clear_memories(
-                    db=self.agno_memory.db, user_id=self.user_id
-                )
-
-                if success:
-                    logger.info(
-                        "Cleared all memories from SQLite for user %s", self.user_id
-                    )
-                    results.append("✅ Local memory: All memories cleared successfully")
+            
+            # Process semantic memory results
+            if service_results["semantic_memory"]["attempted"]:
+                semantic_result = service_results["semantic_memory"]["result"]
+                if semantic_result and semantic_result.success:
+                    results.append(f"✅ Local memory: {semantic_result.message}")
+                    logger.info("Cleared all memories from SQLite for user %s", self.user_id)
                 else:
-                    logger.error("Failed to clear memories from SQLite: %s", message)
-                    results.append(f"❌ Local memory error: {message}")
-            else:
-                logger.warning(
-                    "Memory system not initialized, skipping SQLite memory clear"
-                )
-                results.append("⚠️ Local memory: System not initialized")
-
-            # 2. Clear LightRAG graph memories
-            try:
-                # Use LightRAG API to delete all documents
-                url = f"{self.lightrag_memory_url}/documents"
-
-                # First get all documents
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, timeout=30) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            all_docs = []
-
-                            # Extract documents from response
-                            if isinstance(data, dict) and "statuses" in data:
-                                statuses = data["statuses"]
-                                for status_name, docs_list in statuses.items():
-                                    if isinstance(docs_list, list):
-                                        all_docs.extend(docs_list)
-                            elif isinstance(data, dict) and "documents" in data:
-                                all_docs = data["documents"]
-                            elif isinstance(data, list):
-                                all_docs = data
-
-                            if all_docs:
-                                # Delete all documents
-                                doc_ids = [doc["id"] for doc in all_docs]
-                                payload = {"doc_ids": doc_ids, "delete_file": True}
-
-                                async with session.delete(
-                                    f"{self.lightrag_memory_url}/documents/delete_document",
-                                    json=payload,
-                                    timeout=60,
-                                ) as del_resp:
-                                    if del_resp.status == 200:
-                                        logger.info(
-                                            "Cleared all memories from LightRAG (%d documents)",
-                                            len(doc_ids),
-                                        )
-                                        results.append(
-                                            f"✅ Graph memory: All memories cleared successfully ({len(doc_ids)} documents)"
-                                        )
-                                    else:
-                                        error_text = await del_resp.text()
-                                        logger.error(
-                                            "Failed to clear memories from LightRAG: %s",
-                                            error_text,
-                                        )
-                                        results.append(
-                                            f"❌ Graph memory error: {error_text}"
-                                        )
-                            else:
-                                logger.info("No documents found in LightRAG to clear")
-                                results.append(
-                                    "✅ Graph memory: No documents found to clear"
-                                )
-                        else:
-                            error_text = await resp.text()
-                            logger.error(
-                                "Failed to get documents from LightRAG: %s", error_text
-                            )
-                            results.append(f"❌ Graph memory error: {error_text}")
-
-                    # 3. Clear the knowledge graph file
-                    try:
-                        # Clear cache to ensure all in-memory data is flushed
-                        await session.post(
-                            f"{self.lightrag_memory_url}/documents/clear_cache",
-                            json={"modes": None},
-                            timeout=30,
-                        )
-
-                        # Delete the knowledge graph files
-                        import os
-
-                        from ..config.settings import (
-                            LIGHTRAG_MEMORY_STORAGE_DIR,
-                            LIGHTRAG_STORAGE_DIR,
-                        )
-
-                        graph_file_paths = [
-                            os.path.join(
-                                LIGHTRAG_MEMORY_STORAGE_DIR,
-                                "graph_chunk_entity_relation.graphml",
-                            )
-                        ]
-
-                        graph_deleted = False
-                        for graph_file_path in graph_file_paths:
-                            if os.path.exists(graph_file_path):
-                                os.remove(graph_file_path)
-                                logger.info(
-                                    "Deleted knowledge graph file: %s", graph_file_path
-                                )
-                                graph_deleted = True
-
-                        if graph_deleted:
-                            results.append(
-                                "✅ Knowledge graph: Graph file deleted successfully"
-                            )
-                        else:
-                            logger.info("No knowledge graph files found to delete")
-                            results.append(
-                                "ℹ️ Knowledge graph: No graph files found to delete"
-                            )
-
-                    except Exception as e:
-                        logger.error("Error deleting knowledge graph file: %s", e)
-                        results.append(f"❌ Knowledge graph error: {str(e)}")
-
-            except Exception as e:
-                logger.error("Error clearing LightRAG memories: %s", e)
-                results.append(f"❌ Graph memory error: {str(e)}")
-
+                    error_msg = semantic_result.message if semantic_result else "Unknown error"
+                    results.append(f"❌ Local memory error: {error_msg}")
+                    logger.error("Failed to clear memories from SQLite: %s", error_msg)
+            
+            # Process LightRAG memory results
+            if service_results["lightrag_memory"]["attempted"]:
+                lightrag_result = service_results["lightrag_memory"]["result"]
+                if lightrag_result and lightrag_result.success:
+                    results.append(f"✅ Graph memory: {lightrag_result.message}")
+                    logger.info("Cleared all memories from LightRAG")
+                else:
+                    error_msg = lightrag_result.message if lightrag_result else "Unknown error"
+                    results.append(f"❌ Graph memory error: {error_msg}")
+                    logger.error("Failed to clear memories from LightRAG: %s", error_msg)
+            
+            # Process memory inputs results (NEW)
+            if service_results["memory_inputs"]["attempted"]:
+                inputs_result = service_results["memory_inputs"]["result"]
+                if inputs_result and inputs_result.success:
+                    results.append(f"✅ Memory inputs: {inputs_result.message}")
+                    logger.info("Cleared memory inputs directory")
+                else:
+                    error_msg = inputs_result.message if inputs_result else "Unknown error"
+                    results.append(f"❌ Memory inputs error: {error_msg}")
+                    logger.error("Failed to clear memory inputs: %s", error_msg)
+            
+            # Process knowledge graph results
+            if service_results["knowledge_graph"]["attempted"]:
+                graph_result = service_results["knowledge_graph"]["result"]
+                if graph_result and graph_result.success:
+                    results.append(f"✅ Knowledge graph: {graph_result.message}")
+                    logger.info("Deleted knowledge graph files")
+                else:
+                    error_msg = graph_result.message if graph_result else "Unknown error"
+                    results.append(f"❌ Knowledge graph error: {error_msg}")
+                    logger.error("Failed to delete knowledge graph files: %s", error_msg)
+            
+            # Process server cache results
+            if service_results["server_cache"]["attempted"]:
+                cache_result = service_results["server_cache"]["result"]
+                if cache_result and cache_result.success:
+                    results.append(f"✅ Server cache: {cache_result.message}")
+                    logger.info("Cleared server cache")
+                else:
+                    error_msg = cache_result.message if cache_result else "Unknown error"
+                    results.append(f"❌ Server cache error: {error_msg}")
+                    logger.error("Failed to clear server cache: %s", error_msg)
+            
             # Return combined results
             return " | ".join(results)
 

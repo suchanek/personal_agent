@@ -1,0 +1,15 @@
+feat: Centralized memory clearing and Docker restart optimization
+
+This commit introduces two major improvements:
+
+1.  **Centralized Memory Clearing Service**:
+    - Implemented a new `MemoryClearingService` to consolidate all memory clearing operations, including the previously missed `memory_inputs` directory.
+    - Refactored `MemoryClearingManager` and `AgentMemoryManager` to delegate to this new service, eliminating code duplication and ensuring consistent behavior.
+    - See [ADR-021](./refs/adr/021-centralized-memory-clearing-service.md) for details.
+
+2.  **Docker Restart Optimization**:
+    - Eliminated unnecessary Docker container restarts during agent initialization by changing `force_restart=True` to `force_restart=False` in the `ensure_docker_user_consistency` function.
+    - This significantly improves startup performance, reduces system load, and provides cleaner logs.
+    - See [ADR-022](./refs/adr/022-docker-restart-optimization.md) for details.
+
+These changes enhance the overall stability, performance, and maintainability of the personal agent.

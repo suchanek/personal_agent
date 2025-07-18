@@ -59,7 +59,7 @@ from .utils.pag_logging import (
 from .web import create_app, register_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.12dev"  # Defined once to avoid duplication
+__version__ = "0.9.1dev"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package

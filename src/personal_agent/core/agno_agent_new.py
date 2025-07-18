@@ -253,7 +253,7 @@ class AgnoPersonalAgent:
         logger.info("🔍 Checking Docker USER_ID consistency for user: %s", self.user_id)
         try:
             ready_to_proceed, consistency_message = ensure_docker_user_consistency(
-                user_id=self.user_id, auto_fix=True, force_restart=True
+                user_id=self.user_id, auto_fix=True, force_restart=False  # Only restart if actually needed
             )
             
             if ready_to_proceed:

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.9.1] - 2025-07-18
+
+### Changed
+- **Centralized Memory Clearing Service**: Implemented a new, centralized service for all memory clearing operations. This service consolidates logic from various parts of the application, ensuring consistent and complete memory clearing, including the previously missed `memory_inputs` directory. This resolves inconsistencies and eliminates code duplication. See [ADR-021](./refs/adr/021-centralized-memory-clearing-service.md) for details.
+
+### Fixed
+- **Docker Restart Optimization**: Eliminated unnecessary Docker container restarts during agent initialization by setting `force_restart=False`. This significantly improves startup performance and reduces system load. See [ADR-022](./refs/adr/022-docker-restart-optimization.md) for details.
+
+
 ## [dev/v0.8.14] - 2025-07-17
 
 ### Changed
