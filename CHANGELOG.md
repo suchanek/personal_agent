@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.9.3] - 2025-07-18
+
+### Changed
+- **MCP Manager Architecture**: Refactored the `MCPManager` from a stateful Singleton to a stateless Factory pattern. The manager now creates fresh `MCPTools` instances and delegates their lifecycle management entirely to the `agno` framework. This change was necessary to align with `asyncio` best practices. See [ADR-025](./refs/adr/025-mcp-manager-factory-fix.md) for details.
+
+### Fixed
+- **Critical Asyncio Context Error**: Corrected a `RuntimeError: Attempted to exit cancel scope in a different task...` that occurred during cleanup. The previous singleton implementation was incompatible with the `asyncio` task-specific contexts of the MCP tools, and the new factory pattern resolves this by ensuring resources are managed within the correct task scope.
+
 ## [dev/v0.9.2] - 2025-07-18
 
 ### Added

@@ -385,12 +385,22 @@ All memory operations are now user-specific, ensuring data isolation between dif
 
 ### MCP-Powered Tools
 
-*   **Filesystem**: File operations with security restrictions
-*   **GitHub**: Repository search and code analysis
-*   **Web Search**: Real-time information via DuckDuckGo
-*   **Puppeteer**: Web content extraction and automation
-*   **Finance**: Stock analysis with working Yahoo Finance endpoints
-*   **Python**: Safe code execution for calculations
+The agent integrates with external tools and services through the Model Context Protocol (MCP). This integration is managed by a central, stateless **`MCPManager` factory**.
+
+**Key Features of the `MCPManager` Factory:**
+
+*   **Stateless Factory Pattern**: The manager's sole responsibility is to create correctly configured `MCPTools` instances on demand. It does not hold any persistent connections or state.
+*   **Framework-Managed Lifecycle**: The agent receives fresh tool instances from the factory and delegates their entire lifecycle management to the `agno` framework. This ensures that `asyncio` contexts are handled correctly, preventing critical runtime errors.
+*   **Centralized Configuration**: It provides a single, consistent place to manage the configuration for all MCP servers.
+
+This architecture provides access to a suite of powerful tools, including:
+
+*   **Filesystem**: Secure file operations.
+*   **GitHub**: Repository search and code analysis.
+*   **Brave Search**: Real-time web search.
+*   **Puppeteer**: Web content extraction and automation.
+*   **Finance**: Stock analysis.
+*   **Python**: Safe code execution.
 
 ### Built-in Tools
 

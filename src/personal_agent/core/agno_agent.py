@@ -58,6 +58,7 @@ from .agno_storage import (
 )
 from .docker_integration import ensure_docker_user_consistency
 from .knowledge_coordinator import create_knowledge_coordinator
+from .mcp_manager import mcp_manager
 from .semantic_memory_manager import MemoryStorageResult, MemoryStorageStatus
 
 # Configure logging
@@ -158,6 +159,11 @@ class AgnoPersonalAgent:
         # Agent instance
         self.agent = None
         self._last_response = None
+
+        # MCP tool instances for persistent connections
+        self.mcp_tools_instances = []
+        # Track the original MCP tool configs for proper cleanup
+        self._mcp_tool_configs = []
 
         logger.info(
             "Initialized AgnoPersonalAgent with model=%s, memory=%s, mcp=%s, user_id=%s",
@@ -370,12 +376,18 @@ class AgnoPersonalAgent:
                     "Memory disabled, skipping storage and knowledge initialization"
                 )
 
-            # Get MCP tools as function wrappers (no pre-initialization)
-            mcp_tool_functions = []
+            # Initialize MCP tools using the factory pattern
             if self.enable_mcp:
-                mcp_tool_functions = await self._get_mcp_tools()
-                tools.extend(mcp_tool_functions)
-                logger.info("Added %d MCP tools to agent", len(mcp_tool_functions))
+                # Create fresh MCP tools for this agent
+                mcp_tools = mcp_manager.create_mcp_tools()
+                if mcp_tools:
+                    # Add MCP tools directly to the agent without manual initialization
+                    # Let agno handle the MCP tool lifecycle internally
+                    tools.extend(mcp_tools)
+                    self.mcp_tools_instances = mcp_tools
+                    logger.info("Added %d MCP tools to agent", len(mcp_tools))
+                else:
+                    logger.info("No MCP tools configured")
 
             # Get memory tools from the memory manager
             memory_tool_functions = []
@@ -416,7 +428,7 @@ class AgnoPersonalAgent:
                 logger.info("Agent configured with knowledge base search")
 
             # Calculate tool counts for logging using already-created tool lists
-            mcp_tool_count = len(mcp_tool_functions)
+            mcp_tool_count = mcp_manager.get_tool_count() if self.enable_mcp else 0
             memory_tool_count = len(memory_tool_functions)
 
             logger.info(
@@ -565,143 +577,46 @@ class AgnoPersonalAgent:
         """
         return await self.knowledge_manager.query_graph(query)
 
-    async def _get_mcp_tools(self) -> List:
-        """Create MCP tools as native async functions compatible with Agno.
+    def _get_mcp_tools(self) -> List:
+        """Create and return a list of MCPTools instances based on configuration."""
+        from agno.tools.mcp import MCPTools
 
-        Returns:
-            List of MCP tool functions
-        """
         logger.info(
             "_get_mcp_tools called - enable_mcp: %s, mcp_servers: %s",
             self.enable_mcp,
             self.mcp_servers,
         )
 
-        if not self.enable_mcp:
-            logger.info("MCP disabled - enable_mcp is False")
+        if not self.enable_mcp or not self.mcp_servers:
             return []
 
-        if not self.mcp_servers:
-            logger.info(
-                "No MCP servers configured - mcp_servers is empty: %s", self.mcp_servers
-            )
-            return []
-
-        # This method is complex and specific to MCP integration
-        # For now, we'll keep the original implementation
-        # In the future, this could be moved to the tool_manager
         tools = []
-
         for server_name, config in self.mcp_servers.items():
-            logger.info("Setting up MCP tool for server: %s", server_name)
+            logger.info("Creating MCPTools instance for server: %s", server_name)
 
-            command = config.get("command", "npx")
+            command = config.get("command")
             args = config.get("args", [])
-            env = config.get("env", {})
-            description = config.get(
-                "description", f"Access to {server_name} MCP server"
-            )
+            env = config.get("env", {}).copy()
 
-            # Create the actual tool function with closure
-            def make_mcp_tool(
-                name: str,
-                cmd: str,
-                tool_args: List[str],
-                tool_env: Dict[str, str],
-                desc: str,
-            ) -> Any:
-                """Create MCP tool function with proper closure."""
+            # Apply server-specific environment variable mappings
+            if server_name == "github" and "GITHUB_PERSONAL_ACCESS_TOKEN" in os.environ:
+                env["GITHUB_TOKEN"] = os.environ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+                logger.info("Mapped GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN for GitHub MCP server")
 
-                from textwrap import dedent
-
-                from agno.tools.mcp import MCPTools
-                from mcp import ClientSession, StdioServerParameters
-                from mcp.client.stdio import stdio_client
-
-                async def mcp_tool(query: str) -> str:
-                    """MCP tool function that creates session on-demand."""
-                    try:
-                        # Prepare environment - convert GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN if needed
-                        server_env = tool_env.copy() if tool_env else {}
-                        if (
-                            name == "github"
-                            and "GITHUB_PERSONAL_ACCESS_TOKEN" in server_env
-                        ):
-                            # The GitHub MCP server expects GITHUB_TOKEN
-                            server_env["GITHUB_TOKEN"] = server_env[
-                                "GITHUB_PERSONAL_ACCESS_TOKEN"
-                            ]
-                            logger.info(
-                                "Converted GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN for GitHub MCP server"
-                            )
-
-                        server_params = StdioServerParameters(
-                            command=cmd,
-                            args=tool_args,
-                            env=server_env,
-                        )
-
-                        # Create client session using async context manager
-                        async with stdio_client(server_params) as (read, write):
-                            async with ClientSession(read, write) as session:
-                                # Initialize MCP toolkit with session
-                                mcp_tools = MCPTools(session=session)
-                                await mcp_tools.initialize()
-
-                                # Create specialized instructions based on server type
-                                if name == "github":
-                                    instructions = dedent(
-                                        """\
-                                        You are a GitHub assistant. Help users explore repositories and their activity.
-                                        - Provide organized, concise insights about the repository
-                                        - Focus on facts and data from the GitHub API
-                                        - Use markdown formatting for better readability
-                                        - Present numerical data in tables when appropriate
-                                        - Include links to relevant GitHub pages when helpful
-                                    """
-                                    )
-                                elif name.startswith("filesystem"):
-                                    instructions = f"You are a filesystem assistant for {name}. Help with file and directory operations."
-                                elif name == "brave-search":
-                                    instructions = "You are a web search assistant. Help users find information on the web."
-                                elif name == "puppeteer":
-                                    instructions = "You are a browser automation assistant. Help with web scraping and automation tasks."
-                                else:
-                                    instructions = f"You are an assistant using {name} MCP server. Help with the user's request."
-
-                                # Create a temporary agent for this MCP server
-                                temp_agent = Agent(
-                                    model=self.model_manager.create_model(),
-                                    tools=[mcp_tools],
-                                    instructions=instructions,
-                                    markdown=True,
-                                    show_tool_calls=self.debug,
-                                )
-
-                                # Run the query
-                                response = await temp_agent.arun(query)
-                                return response.content
-
-                    except Exception as e:
-                        logger.error("Error running %s MCP server: %s", name, e)
-                        return f"Error using {name}: {str(e)}"
-
-                # Set function metadata
-                mcp_tool.__name__ = f"use_{name.replace('-', '_')}_server"
-                mcp_tool.__doc__ = f"""Use {name} MCP server for: {desc}
-
-Args:
-    query: The query or task to execute using {name}
-
-Returns:
-    str: Result from the MCP server
-"""
-
-                return mcp_tool
-
-            tool_func = make_mcp_tool(server_name, command, args, env, description)
-            tools.append(tool_func)
-            logger.info("Created MCP tool function for: %s", server_name)
+            if command:
+                # Combine command and args into a single command string
+                full_command = f"{command} {' '.join(args)}" if args else command
+                
+                mcp_tool = MCPTools(
+                    command=full_command,
+                    env=env,
+                    transport="stdio",
+                    timeout_seconds=5,
+                )
+                tools.append(mcp_tool)
+                logger.info("Created MCPTools instance for: %s", server_name)
+            else:
+                logger.warning("No command specified for MCP server: %s", server_name)
 
         return tools
 
@@ -754,12 +669,16 @@ Returns:
                     "env_vars": len(config.get("env", {})),
                 }
 
+        # Add logging to help debug knowledge_enabled value
+        knowledge_enabled = self.enable_memory
+        logger.debug(f"Agent info: knowledge_enabled={knowledge_enabled}, enable_memory={self.enable_memory}")
+
         return {
             "framework": "agno",
             "model_provider": self.model_provider,
             "model_name": self.model_name,
             "memory_enabled": self.enable_memory,
-            "knowledge_enabled": self.agno_knowledge is not None,
+            "knowledge_enabled": knowledge_enabled,
             "lightrag_knowledge_enabled": self.lightrag_knowledge_enabled,
             "mcp_enabled": self.enable_mcp,
             "debug_mode": self.debug,
@@ -870,9 +789,24 @@ Returns:
         
         This method is called during application shutdown to properly
         clean up any resources, connections, or background tasks.
+        
+        Note: MCP tools are intentionally NOT cleaned up here to avoid
+        asyncio context management issues. They will be cleaned up
+        automatically when the process exits.
         """
         try:
             logger.info("Cleaning up AgnoPersonalAgent resources...")
+            
+            # DO NOT attempt to clean up MCP tools manually
+            # This causes asyncio context management issues because the tools
+            # were created in a different task context. Let them clean up
+            # naturally when the process exits.
+            if self._mcp_tool_configs:
+                logger.info("Skipping manual MCP tool cleanup to avoid asyncio context issues")
+                logger.info("MCP tools will be cleaned up automatically when process exits")
+                # Just clear the references without calling __aexit__
+                self._mcp_tool_configs = []
+                self.mcp_tools_instances = []
             
             # Clean up agent resources
             if self.agent:
@@ -928,9 +862,23 @@ Returns:
         
         This method provides a synchronous interface to cleanup for cases
         where async cleanup cannot be used.
+        
+        Note: MCP tools are intentionally NOT cleaned up here to avoid
+        asyncio context management issues. They will be cleaned up
+        automatically when the process exits.
         """
         try:
             logger.info("Running synchronous cleanup...")
+            
+            # DO NOT attempt to clean up MCP tools manually
+            # This causes asyncio context management issues. Let them clean up
+            # naturally when the process exits.
+            if self._mcp_tool_configs:
+                logger.info("Skipping manual MCP tool cleanup to avoid asyncio context issues")
+                logger.info("MCP tools will be cleaned up automatically when process exits")
+                # Just clear the references without calling __aexit__
+                self._mcp_tool_configs = []
+                self.mcp_tools_instances = []
             
             # Clean up agent resources without async calls
             if self.agent:

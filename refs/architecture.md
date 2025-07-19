@@ -69,6 +69,14 @@ This layer consists of the external services that provide the agent with its cor
 - **LightRAG Server**: A dedicated server for knowledge management, providing a REST API for document ingestion, querying, and graph-based reasoning.
 - **MCP (Model Context Protocol) Servers**: A suite of specialized servers that provide access to external tools and services, such as web search, file system operations, and financial data.
 
+### 2.5. MCP Factory
+
+To integrate with MCP servers, the system uses a stateless **Factory pattern**. The `MCPManager` acts as a central factory responsible for creating correctly configured `MCPTools` instances.
+
+- **Stateless Factory**: The manager does not hold any state or persistent connections. Its sole purpose is to generate new `MCPTools` objects based on the application's configuration.
+- **Framework-Managed Lifecycle**: The `AgnoPersonalAgent` requests tool instances from the factory and passes them directly to the `agno` framework. The framework then correctly manages the entire lifecycle of the tool, including its `asyncio` context, preventing cross-task context errors.
+- **Configuration Hub**: It centralizes the logic for reading MCP server configurations and preparing them for the agent.
+
 ## 3. Data Flow
 
 The data flow within the system is designed to be efficient and secure.

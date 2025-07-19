@@ -3,32 +3,43 @@
 This module serves as the main entry point for the Personal AI Agent package,
 providing a comprehensive suite of AI-powered tools and capabilities including:
 
-- Multi-framework support: LangChain, smolagents, and Agno frameworks
+- Agno framework as the primary modern async agent framework
 - Model Context Protocol (MCP) integration with multiple servers
-- Weaviate vector database for persistent memory
-- Advanced memory management with semantic deduplication
+- Agno semantic memory via SQLite and LanceDB storage
+- Advanced memory management with semantic deduplication and anti-duplicate features
+- Knowledge coordination and multi-agent system support
 - Comprehensive tool suite for file operations, web research, and system tasks
-- Multiple interface options: Streamlit, Flask, and CLI
-- Modular architecture with organized code structure
+- Multiple interface options: Streamlit dashboard, Flask web interface, and CLI
+- Modular architecture with organized code structure and structured response handling
 
-The package supports three main frameworks:
-1. LangChain ReAct (legacy support)
-2. Smolagents (multi-agent coordination)
-3. Agno (modern async agent framework) - primary interface
+Framework Support:
+- Agno (modern async agent framework) - **PRIMARY INTERFACE**
+- LangChain ReAct (legacy support - deprecated)
+- Smolagents (legacy support - deprecated)
 
-Author: Personal Agent Development Team
-Last modified: 2025-07-10 15:12:58
-Version: 0.8.7.dev
+Key Features:
+- MCP server integration with factory pattern for tool creation
+- Agno semantic memory with SQLite and LanceDB backends
+- Semantic memory management with duplicate detection
+- Topic classification and knowledge coordination
+- Multi-agent system support
+- Structured response parsing
+- Comprehensive logging and configuration management
+- LightRAG integration for advanced knowledge management
+
+Storage Architecture:
+- Primary: Agno storage with SQLite and LanceDB
+- Legacy: Weaviate vector database (deprecated)
+
+Author: Eric G. Suchanek, PhD.
+Last modified: 2025-07-18 21:28:13
+Version: 0.10.0
 """
 
 # pylint: disable=C0413
 
 import logging
 import os
-
-# Set Rust logging to ERROR level to suppress Lance warnings before any imports
-if "RUST_LOG" not in os.environ:
-    os.environ["RUST_LOG"] = "error"
 
 # Import core components
 from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
@@ -46,7 +57,32 @@ from .core.agno_agent import (
     create_simple_personal_agent,
     load_agent_knowledge,
 )
-from .core.memory import is_weaviate_connected, vector_store, weaviate_client
+
+# Import additional core components
+from .core.agno_storage import (
+    create_agno_memory,
+    create_agno_storage,
+    create_combined_knowledge_base,
+    load_combined_knowledge_base,
+    load_lightrag_knowledge_base,
+)
+from .core.anti_duplicate_memory import (
+    AntiDuplicateMemory,
+    create_anti_duplicate_memory,
+)
+from .core.knowledge_coordinator import (
+    KnowledgeCoordinator,
+    create_knowledge_coordinator,
+)
+from .core.mcp_manager import mcp_manager
+from .core.memory import (
+    is_agno_storage_connected,
+    is_memory_connected,
+    is_weaviate_connected,
+    vector_store,
+    weaviate_client,
+)
+from .core.multi_agent_system import MultiAgentSystem, create_multi_agent_system
 from .core.semantic_memory_manager import (
     MemoryStorageResult,
     MemoryStorageStatus,
@@ -54,6 +90,16 @@ from .core.semantic_memory_manager import (
     SemanticMemoryManager,
     create_semantic_memory_manager,
 )
+from .core.structured_response import (
+    ResponseError,
+    ResponseMetadata,
+    StructuredResponse,
+    StructuredResponseParser,
+    ToolCall,
+    create_structured_instructions,
+    get_ollama_format_schema,
+)
+from .core.topic_classifier import RuleSet, TopicClassifier
 
 # Import tools
 from .tools import get_all_tools
@@ -74,12 +120,13 @@ from .utils.pag_logging import (
     setup_logging_filters,
     toggle_stream_handler,
 )
+from .utils.store_fact import store_fact_in_knowledge_base
 
 # Import web interface
 from .web import create_app, register_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.9.2dev"  # Defined once to avoid duplication
+__version__ = "0.10.0"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -95,38 +142,68 @@ _logger = setup_logging()
 
 # Export public API
 __all__ = [
-    # Core components
-    "SimpleMCPClient",
-    "create_agent_executor",
-    "setup_weaviate",
-    "is_weaviate_connected",
-    "vector_store",
-    "weaviate_client",
-    # Key classes for pdoc documentation
+    # === PRIMARY AGNO FRAMEWORK ===
+    # Core Agno components
     "AgnoPersonalAgent",
     "create_agno_agent",
     "create_simple_personal_agent",
     "load_agent_knowledge",
+    # Agno storage components (SQLite + LanceDB)
+    "create_agno_memory",
+    "create_agno_storage",
+    "create_combined_knowledge_base",
+    "load_combined_knowledge_base",
+    "load_lightrag_knowledge_base",
+    "is_agno_storage_connected",
+    "is_memory_connected",
+    # Agno semantic memory management
     "SemanticMemoryManager",
     "MemoryStorageStatus",
     "MemoryStorageResult",
     "SemanticDuplicateDetector",
     "create_semantic_memory_manager",
+    # Anti-duplicate memory
+    "AntiDuplicateMemory",
+    "create_anti_duplicate_memory",
+    # Knowledge coordination
+    "KnowledgeCoordinator",
+    "create_knowledge_coordinator",
+    # Multi-agent system
+    "MultiAgentSystem",
+    "create_multi_agent_system",
+    # Structured response handling
+    "StructuredResponse",
+    "StructuredResponseParser",
+    "ToolCall",
+    "ResponseMetadata",
+    "ResponseError",
+    "get_ollama_format_schema",
+    "create_structured_instructions",
+    # Topic classification
+    "RuleSet",
+    "TopicClassifier",
+    # Agent managers
     "AgentMemoryManager",
     "AgentInstructionManager",
     "AgentKnowledgeManager",
     "AgentToolManager",
     "AgentModelManager",
-    # Configuration
+    # Main entry points - Agno (primary)
+    "cli_main",
+    "run_agno_cli",
+    # === MCP INTEGRATION ===
+    "SimpleMCPClient",
+    "mcp_manager",
     "USE_MCP",
-    "USE_WEAVIATE",
     "get_mcp_servers",
-    # Tools
+    # === TOOLS ===
     "get_all_tools",
-    # Utilities
+    # === UTILITIES ===
     "cleanup",
     "inject_dependencies",
     "register_cleanup_handlers",
+    "store_fact_in_knowledge_base",
+    # Logging utilities
     "configure_all_rich_logging",
     "configure_master_logger",
     "disable_stream_handlers_for_namespace",
@@ -139,21 +216,26 @@ __all__ = [
     "setup_logging",
     "toggle_stream_handler",
     "setup_logging_filters",
-    # Web interface
+    # === WEB INTERFACE ===
     "create_app",
     "register_routes",
-    # Main entry points - Agno (primary)
-    "cli_main",
-    "run_agno_cli",
-    # Main entry points - LangChain (legacy)
+    # === LEGACY COMPONENTS (DEPRECATED) ===
+    # Legacy LangChain components
+    "create_agent_executor",
     "langchain_main",
     "langchain_cli_main",
-    # Main entry points - Smolagents
+    # Legacy Smolagents components
     "run_smolagents_web",
     "run_smolagents_cli",
-    # Utility functions
+    # Legacy Weaviate components
+    "setup_weaviate",
+    "is_weaviate_connected",
+    "vector_store",
+    "weaviate_client",
+    "USE_WEAVIATE",
+    # === UTILITY FUNCTIONS ===
     "print_configuration",
-    # Package info
+    # === PACKAGE INFO ===
     "__version__",
 ]
 
@@ -226,25 +308,32 @@ def print_configuration() -> str:
                 "",
                 "📊 CORE SETTINGS:",
                 f"  • Package Version: {__version__}",
+                f"  • Primary Framework: Agno (modern async agent framework)",
                 f"  • LLM Model: {LLM_MODEL}",
                 f"  • Storage Backend: {STORAGE_BACKEND}",
                 f"  • Log Level: {LOG_LEVEL_STR}",
                 "",
                 "🌐 SERVICE ENDPOINTS:",
                 f"  • Ollama URL: {OLLAMA_URL}",
-                f"  • Weaviate URL: {WEAVIATE_URL}",
+                f"  • Weaviate URL: {WEAVIATE_URL} (legacy)",
                 "",
                 "🔧 FEATURE FLAGS:",
-                f"  • Weaviate Enabled: {'✅' if USE_WEAVIATE else '❌'} ({USE_WEAVIATE})",
                 f"  • MCP Enabled: {'✅' if USE_MCP else '❌'} ({USE_MCP})",
+                f"  • Weaviate Enabled: {'⚠️' if USE_WEAVIATE else '❌'} ({USE_WEAVIATE}) - LEGACY",
                 "",
                 "📁 DIRECTORY CONFIGURATION:",
                 f"  • Root Directory: {ROOT_DIR}",
                 f"  • Home Directory: {HOME_DIR}",
                 f"  • Data Directory: {DATA_DIR}",
                 f"  • Repository Directory: {REPO_DIR}",
-                f"  • Agno Storage Directory: {AGNO_STORAGE_DIR}",
-                f"  • Agno Knowledge Directory: {AGNO_KNOWLEDGE_DIR}",
+                f"  • Agno Storage Directory: {AGNO_STORAGE_DIR} (primary)",
+                f"  • Agno Knowledge Directory: {AGNO_KNOWLEDGE_DIR} (primary)",
+                "",
+                "🏗️ ARCHITECTURE:",
+                "  • Primary: Agno semantic memory (SQLite + LanceDB)",
+                "  • Legacy: Weaviate vector database (deprecated)",
+                "  • Legacy: LangChain ReAct (deprecated)",
+                "  • Legacy: Smolagents (deprecated)",
                 "",
                 "=" * 80,
                 "🚀 Configuration loaded successfully!",
