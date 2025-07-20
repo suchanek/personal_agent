@@ -241,14 +241,20 @@ All memory operations are now user-specific, ensuring data isolation between dif
 *   **query_knowledge_base**: Unified knowledge base query with intelligent routing. Automatically routes queries between local semantic search and LightRAG based on mode and query characteristics. Supports modes like "local", "global", "hybrid", "mix", "naive", and "auto" (default).
 *   **query_semantic_knowledge**: DEPRECATED. Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents. Args: `query` (str), `limit` (int, default: 5). Returns: `str` (formatted search results or message if none found).
 
-### MCP-Powered Tools
+### MCP-Powered Tools: The Ephemeral Agent Requirement
 
-*   **Filesystem**: File operations with security restrictions
-*   **GitHub**: Repository search and code analysis
-*   **Web Search**: Real-time information via DuckDuckGo
-*   **Puppeteer**: Web content extraction and automation
-*   **Finance**: Stock analysis with working Yahoo Finance endpoints
-*   **Python**: Safe code execution for calculations
+To ensure absolute stability, the agent **must** use an **ephemeral agent pattern** for all MCP tool interactions. This is a mandatory architectural requirement, not an implementation choice.
+
+Previous experiments with persistent clients or factories proved to be fundamentally unstable. The correct and required pattern, detailed in [ADR-028](./refs/adr/028-ephemeral-mcp-tool-agents.md), is to create a new, single-purpose client for every tool call, execute the operation, and immediately tear it down. This guarantees perfect isolation and prevents resource conflicts.
+
+This architecture provides access to a powerful suite of external tools, including:
+
+*   **Filesystem**: Secure, configurable access to the local filesystem.
+*   **GitHub**: Repository search and code analysis.
+*   **Web Search**: Real-time information via DuckDuckGo.
+*   **Puppeteer**: Web content extraction and automation.
+*   **Finance**: Stock analysis.
+*   **Python**: Safe code execution.
 
 ### Built-in Tools
 

@@ -42,11 +42,6 @@ MCP_SERVERS = {
         "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
         "description": "Browser automation and web content fetching",
     },
-    "serena": {
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-serena"],
-        "description": "AI-powered research assistant",
-    },
 }
 
 
