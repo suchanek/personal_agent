@@ -22,7 +22,7 @@ with st.sidebar:
     
     # Use environment token if available, otherwise show input field
     if github_token_from_env:
-        st.success("✅ GitHub token loaded from environment (GITHUB_PERSONAL_ACCESS_TOKEN)")
+        st.success("✅ GitHub token loaded from environment")
         github_token = github_token_from_env
         os.environ["GITHUB_TOKEN"] = github_token
     else:

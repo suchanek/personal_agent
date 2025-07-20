@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 import nest_asyncio
 import streamlit as st
@@ -40,6 +41,32 @@ async def main() -> None:
     ####################################################################
     selected_model = get_selected_model()
     mcp_server_config = get_mcp_server_config()
+
+    # If the selected server is GitHub, show the authentication section in the sidebar
+    if mcp_server_config and "github" in mcp_server_config.id:
+        with st.sidebar:
+            st.header("🔑 Authentication")
+            # Try to get GitHub token from environment
+            github_token_from_env = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+            # Use environment token if available, otherwise show input field
+            if github_token_from_env:
+                st.success("✅ GitHub token loaded from environment")
+                github_token = github_token_from_env
+                os.environ["GITHUB_TOKEN"] = github_token
+            else:
+                github_token = st.text_input(
+                    "GitHub Token",
+                    type="password",
+                    help="Create a token with repo scope at github.com/settings/tokens",
+                )
+                if github_token:
+                    os.environ["GITHUB_TOKEN"] = github_token
+
+    # Check if MCP server config is available
+    if mcp_server_config is None:
+        st.error("Please configure an MCP server in the sidebar to continue.")
+        st.stop()
+    
     mcp_server_id = mcp_server_config.id
     num_history_responses = get_num_history_responses()
 
