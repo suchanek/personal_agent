@@ -27,12 +27,15 @@ def get_selected_model() -> str:
         "gemini-flash": "gemini:gemini-2.0-flash",
         "gemini-pro": "gemini:gemini-2.0-pro-exp-02-05",
         "llama-3.3-70b": "groq:llama-3.3-70b-versatile",
+        "qwen3-1.7b": "ollama:qwen3:1.7B",
+        "llama3.2-3b": "ollama:llama3.2:3b",
+        "phi3.5-3.8b": "ollama:phi3.5:3.8b",
     }
     st.sidebar.markdown("#### :sparkles: Select a model")
     selected_model = st.sidebar.selectbox(
         "Select a model",
         options=list(model_options.keys()),
-        index=list(model_options.keys()).index("gpt-4o"),
+        index=list(model_options.keys()).index("qwen3-1.7b"),  # Default to Ollama model
         key="selected_model",
         label_visibility="collapsed",
     )
@@ -74,15 +77,12 @@ def get_mcp_server_config() -> Optional[MCPServerConfig]:
         )
 
         if selected_tool == "GitHub":
-            github_token_from_env = os.getenv("GITHUB_TOKEN")
-            github_token = st.text_input(
-                "GitHub Token",
-                type="password",
-                help="Create a token with repo scope at github.com/settings/tokens",
-                value=github_token_from_env,
-            )
-            if github_token:
-                os.environ["GITHUB_TOKEN"] = github_token
+            # Try to get GitHub token from environment (check both possible env vars)
+            github_token_from_env = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN") or os.getenv("GITHUB_TOKEN")
+            
+            if github_token_from_env:
+                st.success("✅ GitHub token loaded from environment (GITHUB_PERSONAL_ACCESS_TOKEN)")
+                os.environ["GITHUB_TOKEN"] = github_token_from_env
                 return MCPServerConfig(
                     id="github",
                     command="npx",
@@ -90,7 +90,21 @@ def get_mcp_server_config() -> Optional[MCPServerConfig]:
                     env_vars=["GITHUB_TOKEN"],
                 )
             else:
-                st.error("GitHub Token is required to use GitHub MCP Tools")
+                github_token = st.text_input(
+                    "GitHub Token",
+                    type="password",
+                    help="Create a token with repo scope at github.com/settings/tokens",
+                )
+                if github_token:
+                    os.environ["GITHUB_TOKEN"] = github_token
+                    return MCPServerConfig(
+                        id="github",
+                        command="npx",
+                        args=["-y", "@modelcontextprotocol/server-github"],
+                        env_vars=["GITHUB_TOKEN"],
+                    )
+                else:
+                    st.error("GitHub Token is required to use GitHub MCP Tools")
 
         elif selected_tool == "Filesystem":
             # Get the repository root

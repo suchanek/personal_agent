@@ -5,9 +5,9 @@ from typing import List, Optional
 from agno.agent import Agent
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge.url import UrlKnowledge
-from agno.models.anthropic import Claude
 from agno.models.google import Gemini
 from agno.models.groq import Groq
+from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.storage.agent.sqlite import SqliteAgentStorage
 from agno.tools.mcp import MCPTools
@@ -45,16 +45,18 @@ agent_knowledge = UrlKnowledge(
 
 def get_mcp_agent(
     user_id: Optional[str] = None,
-    model_str: str = "openai:gpt-4o",
+    model_str: str = "ollama:qwen3:1.7B",
     session_id: Optional[str] = None,
     num_history_responses: int = 5,
     mcp_tools: Optional[List[MCPTools]] = None,
     mcp_server_ids: Optional[List[str]] = None,
     debug_mode: bool = True,
+    ollama_base_url: str = "http://localhost:11434",
 ) -> Agent:
-    model = get_model_for_provider(model_str)
+    model = get_model_for_provider(model_str, ollama_base_url)
 
-    description = dedent("""\
+    description = dedent(
+        """\
         You are UAgI, a universal MCP (Model Context Protocol) agent designed to interact with MCP servers.
         You can connect to various MCP servers to access resources and execute tools.
 
@@ -73,17 +75,21 @@ def get_mcp_agent(
         - If you encounter errors with an MCP server, explain the issue and suggest alternatives
         - Always cite sources when providing information retrieved through MCP servers
         </critical>\
-    """)
+    """
+    )
 
     if mcp_server_ids:
         description += dedent(
             """\n
             You have access to the following MCP servers:
             {}
-        """.format("\n".join([f"- {server_id}" for server_id in mcp_server_ids]))
+        """.format(
+                "\n".join([f"- {server_id}" for server_id in mcp_server_ids])
+            )
         )
 
-    instructions = dedent("""\
+    instructions = dedent(
+        """\
         Here's how you should fulfill a user request:
 
         1. Understand the user's request
@@ -110,7 +116,8 @@ def get_mcp_agent(
         - You have access to a knowledge base of MCP documentation
         - To answer questions about MCP, use the knowledge base
         - If you don't know the answer or can't find the information in the knowledge base, say so\
-    """)
+    """
+    )
 
     return Agent(
         name="UAgI: The Universal MCP Agent",
@@ -139,12 +146,15 @@ def get_mcp_agent(
     )
 
 
-def get_model_for_provider(model_str: str):
+def get_model_for_provider(
+    model_str: str, ollama_base_url: str = "http://localhost:11434"
+):
     """
     Creates and returns the appropriate model for a model string.
 
     Args:
-        model_str: The model string (e.g., 'openai:gpt-4o', 'google:gemini-2.0-flash', 'anthropic:claude-3-5-sonnet', 'groq:llama-3.3-70b-versatile')
+        model_str: The model string (e.g., 'openai:gpt-4o', 'google:gemini-2.0-flash', 'anthropic:claude-3-5-sonnet', 'groq:llama-3.3-70b-versatile', 'ollama:qwen3:1.7B')
+        ollama_base_url: Base URL for Ollama API (default: http://localhost:11434)
 
     Returns:
         An instance of the appropriate model class
@@ -152,20 +162,29 @@ def get_model_for_provider(model_str: str):
     Raises:
         ValueError: If the provider is not supported
     """
-    provider, model_name = model_str.split(":")
+    parts = model_str.split(":", 1)  # Split only on the first colon
+    if len(parts) != 2:
+        raise ValueError(f"Invalid model string format: {model_str}. Expected 'provider:model-name'")
+    provider, model_name = parts
     if provider == "openai":
         return OpenAIChat(id=model_name)
     elif provider == "gemini":
         return Gemini(id=model_name)
-    elif provider == "anthropic":
-        if "thinking" in model_name:
-            return Claude(
-                id=model_name,
-                max_tokens=16384,
-                thinking={"type": "enabled", "budget_tokens": 8192},
-            )
-        return Claude(id=model_name, max_tokens=16384)
     elif provider == "groq":
         return Groq(id=model_name)
+    elif provider == "ollama":
+        # Use Ollama-compatible interface with optimized configuration like in personal agent
+        return Ollama(
+            id=model_name,
+            host=ollama_base_url,  # Use host parameter for Ollama
+            options={
+                "num_ctx": 8192,  # Default context window size
+                "temperature": 0.7,  # Set temperature for consistency
+                "num_predict": -1,  # Allow unlimited prediction length
+                "top_k": 40,
+                "top_p": 0.9,
+                "repeat_penalty": 1.1,
+            },
+        )
     else:
         raise ValueError(f"Unsupported model provider: {provider}")
