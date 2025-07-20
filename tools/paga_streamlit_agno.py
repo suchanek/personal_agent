@@ -184,6 +184,52 @@ def initialize_session_state():
         st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = "localhost"
 
 
+def display_tool_calls(container, tools):
+    """Display tool calls in real-time during streaming."""
+    if not tools:
+        return
+    
+    with container.container():
+        st.markdown("**🔧 Tool Calls:**")
+        for i, tool in enumerate(tools, 1):
+            tool_name = getattr(tool, 'name', 'Unknown Tool')
+            tool_args = getattr(tool, 'arguments', {})
+            
+            with st.expander(f"Tool {i}: {tool_name}", expanded=False):
+                if tool_args:
+                    st.json(tool_args)
+                else:
+                    st.write("No arguments")
+
+
+def format_tool_call_for_debug(tool_call):
+    """Standardize tool call format for consistent storage and display."""
+    if hasattr(tool_call, 'name'):
+        # Direct tool object
+        return {
+            "name": getattr(tool_call, 'name', 'Unknown'),
+            "arguments": getattr(tool_call, 'arguments', {}),
+            "result": getattr(tool_call, 'result', None),
+            "status": "success"
+        }
+    elif hasattr(tool_call, 'function'):
+        # Tool call with function attribute
+        return {
+            "name": getattr(tool_call.function, 'name', 'Unknown'),
+            "arguments": getattr(tool_call.function, 'arguments', {}),
+            "result": getattr(tool_call, 'result', None),
+            "status": "success"
+        }
+    else:
+        # Fallback for unknown format
+        return {
+            "name": str(type(tool_call).__name__),
+            "arguments": {},
+            "result": str(tool_call),
+            "status": "unknown"
+        }
+
+
 def render_chat_tab():
     st.markdown("### Have a conversation with your AI friend")
 
@@ -199,21 +245,111 @@ def render_chat_tab():
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
+            # Create containers for tool calls and response
+            tool_calls_container = st.empty()
+            resp_container = st.empty()
+            
+            with st.spinner("🤔 Thinking..."):
                 start_time = time.time()
                 start_timestamp = datetime.now()
+                response = ""
+                tool_calls_made = 0
+                tool_call_details = []
+                all_tools_used = []
 
                 try:
                     agent = st.session_state[SESSION_KEY_AGENT]
+                    
+                    # Handle AgnoPersonalAgent with proper streaming support
+                    # Following the working example pattern from github_agent_streamlit.py
                     if isinstance(agent, AgnoPersonalAgent):
-                        response_content = asyncio.run(agent.run(prompt))
+                        async def run_agent_with_streaming():
+                            nonlocal response, tool_calls_made, tool_call_details, all_tools_used
+                            
+                            try:
+                                # Get the raw streaming response from the agent
+                                # This matches the working example: github_agent.run(question, stream=True, stream_intermediate_steps=True)
+                                raw_response = await agent.agent.arun(prompt, user_id=agent.user_id)
+                                
+                                # Check if it's a streaming generator
+                                if hasattr(raw_response, '__aiter__'):
+                                    # Process streaming chunks like the working example
+                                    response_content = ""
+                                    
+                                    async for chunk in raw_response:
+                                        # Display tool calls if available (singular tool like working example)
+                                        if hasattr(chunk, "tool") and chunk.tool:
+                                            # Format tool for display and storage
+                                            formatted_tool = format_tool_call_for_debug(chunk.tool)
+                                            tool_call_details.append(formatted_tool)
+                                            all_tools_used.append(chunk.tool)
+                                            tool_calls_made += 1
+                                            
+                                            # Display tool call in real-time
+                                            display_tool_calls(tool_calls_container, [chunk.tool])
+                                        
+                                        # Display response if available - be more flexible with content detection
+                                        content_found = False
+                                        
+                                        # First try the working example pattern (RunResponse event)
+                                        if (hasattr(chunk, "event") and chunk.event == "RunResponse" 
+                                            and hasattr(chunk, "content") and chunk.content is not None):
+                                            response_content += chunk.content
+                                            content_found = True
+                                        
+                                        # Fallback: try any chunk with content (in case event filtering is too strict)
+                                        elif hasattr(chunk, "content") and chunk.content is not None:
+                                            response_content += chunk.content
+                                            content_found = True
+                                        
+                                        # Update display if content was found
+                                        if content_found:
+                                            resp_container.markdown(response_content)
+                                    
+                                    # Store the final response for tool call inspection
+                                    # Create a response object with collected tools (like working example's github_agent.run_response.tools)
+                                    class StreamingResponse:
+                                        def __init__(self, tools):
+                                            self.tool_calls = tools
+                                            self.tools = tools
+                                    
+                                    agent._last_response = StreamingResponse(all_tools_used)
+                                    return response_content
+                                else:
+                                    # It's a direct response object, handle normally
+                                    response_content = raw_response.content if hasattr(raw_response, 'content') else str(raw_response)
+                                    
+                                    # Check for tool calls in direct response
+                                    if hasattr(raw_response, 'tool_calls') and raw_response.tool_calls:
+                                        for tool_call in raw_response.tool_calls:
+                                            formatted_tool = format_tool_call_for_debug(tool_call)
+                                            tool_call_details.append(formatted_tool)
+                                            all_tools_used.append(tool_call)
+                                            tool_calls_made += 1
+                                        
+                                        # Display tool calls
+                                        if all_tools_used:
+                                            display_tool_calls(tool_calls_container, all_tools_used)
+                                    
+                                    agent._last_response = raw_response
+                                    return response_content
+                                    
+                            except Exception as e:
+                                raise Exception(f"Error in streaming agent execution: {e}") from e
+                        
+                        response_content = asyncio.run(run_agent_with_streaming())
+                        response = response_content if response_content else ""
                     else:
-                        response = agent.run(prompt)
-                        response_content = (
-                            response.content
-                            if hasattr(response, "content")
-                            else str(response)
+                        # Non-AgnoPersonalAgent fallback
+                        agent_response = agent.run(prompt)
+                        response = (
+                            agent_response.content
+                            if hasattr(agent_response, "content")
+                            else str(agent_response)
                         )
+
+                    # Display the final response
+                    resp_container.markdown(response)
 
                     end_time = time.time()
                     response_time = end_time - start_time
@@ -221,40 +357,14 @@ def render_chat_tab():
                     # Calculate token estimates
                     input_tokens = len(prompt.split()) * 1.3
                     output_tokens = (
-                        len(response_content.split()) * 1.3 if response_content else 0
+                        len(response.split()) * 1.3 if response else 0
                     )
                     total_tokens = input_tokens + output_tokens
 
-                    # Get tool call info from the last response object
-                    last_response = agent._last_response
-                    tool_calls = (
-                        last_response.tool_calls
-                        if last_response and hasattr(last_response, "tool_calls")
-                        else []
-                    )
-
-                    tool_calls_made = len(tool_calls)
-                    tool_call_details = []
-                    if tool_calls:
-                        for tool_call in tool_calls:
-                            tool_call_details.append(
-                                {
-                                    "function_name": getattr(
-                                        tool_call.function, "name", "Unknown"
-                                    ),
-                                    "function_args": getattr(
-                                        tool_call.function, "arguments", {}
-                                    ),
-                                    "reasoning": getattr(tool_call, "reasoning", None),
-                                }
-                            )
-
-                    response_metadata = (
-                        getattr(last_response, "metadata", {}) if last_response else {}
-                    )
+                    response_metadata = {}
                     response_type = "AgnoResponse"
 
-                    # Update performance stats
+                    # Update performance stats with real-time tool call count
                     stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
                     stats["total_requests"] += 1
                     stats["total_response_time"] += response_time
@@ -273,7 +383,7 @@ def render_chat_tab():
                     )
                     stats["tool_calls_count"] += tool_calls_made
 
-                    # Store debug metrics
+                    # Store debug metrics with standardized format
                     debug_entry = {
                         "timestamp": start_timestamp.strftime("%H:%M:%S"),
                         "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
@@ -341,19 +451,17 @@ def render_chat_tab():
                                 st.write("**Structured Response Metadata:**")
                                 st.json(response_metadata)
 
-                    st.markdown(response_content)
-
                     # Store message with metadata for future reference
                     message_data = {
                         "role": "assistant",
-                        "content": response_content,
+                        "content": response,
                         "metadata": (
                             response_metadata
                             if response_type == "StructuredResponse"
                             else None
                         ),
                         "response_type": response_type,
-                        "tool_calls": tool_calls_made,
+                        "tool_calls": tool_call_details,  # Store the standardized list
                         "response_time": response_time,
                     }
                     st.session_state[SESSION_KEY_MESSAGES].append(message_data)
@@ -377,6 +485,7 @@ def render_chat_tab():
                         "output_tokens": 0,
                         "total_tokens": 0,
                         "tool_calls": 0,
+                        "tool_call_details": [],
                         "response_type": "Error",
                         "success": False,
                         "error": str(e),
@@ -984,15 +1093,36 @@ def render_sidebar():
                             if tool_call_details:
                                 st.write("**Tool Call Details:**")
                                 for i, tool_call in enumerate(tool_call_details, 1):
-                                    st.write(
-                                        f"**Tool {i}:** {tool_call.get('function_name', 'Unknown')}"
-                                    )
-                                    if tool_call.get("function_args"):
-                                        st.json(tool_call["function_args"])
+                                    # Use standardized format - check for 'name' field first
+                                    tool_name = tool_call.get('name', tool_call.get('function_name', 'Unknown'))
+                                    tool_status = tool_call.get('status', 'unknown')
+                                    
+                                    # Status indicator
+                                    status_icon = "✅" if tool_status == "success" else "❓" if tool_status == "unknown" else "❌"
+                                    
+                                    st.write(f"**Tool {i}:** {status_icon} {tool_name}")
+                                    
+                                    # Show arguments
+                                    tool_args = tool_call.get("arguments", tool_call.get("function_args", {}))
+                                    if tool_args:
+                                        st.write("**Arguments:**")
+                                        st.json(tool_args)
+                                    
+                                    # Show result if available
+                                    tool_result = tool_call.get("result", tool_call.get("content"))
+                                    if tool_result:
+                                        st.write("**Result:**")
+                                        if isinstance(tool_result, str) and len(tool_result) > 200:
+                                            st.write(f"{tool_result[:200]}...")
+                                        else:
+                                            st.write(str(tool_result))
+                                    
+                                    # Show reasoning if available (legacy field)
                                     if tool_call.get("reasoning"):
-                                        st.write(
-                                            f"**Reasoning:** {tool_call['reasoning']}"
-                                        )
+                                        st.write(f"**Reasoning:** {tool_call['reasoning']}")
+                                    
+                                    if i < len(tool_call_details):  # Add separator between tools
+                                        st.markdown("---")
                 else:
                     st.info("No tool calls made yet.")
             else:
