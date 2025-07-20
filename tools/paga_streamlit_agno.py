@@ -225,12 +225,34 @@ def render_chat_tab():
                     )
                     total_tokens = input_tokens + output_tokens
 
-                    # Get tool call info with structured response support
-                    tool_call_info = agent.get_last_tool_calls()
-                    tool_calls_made = tool_call_info.get("tool_calls_count", 0)
-                    tool_call_details = tool_call_info.get("tool_call_details", [])
-                    response_metadata = tool_call_info.get("metadata", {})
-                    response_type = tool_call_info.get("response_type", "Unknown")
+                    # Get tool call info from the last response object
+                    last_response = agent._last_response
+                    tool_calls = (
+                        last_response.tool_calls
+                        if last_response and hasattr(last_response, "tool_calls")
+                        else []
+                    )
+
+                    tool_calls_made = len(tool_calls)
+                    tool_call_details = []
+                    if tool_calls:
+                        for tool_call in tool_calls:
+                            tool_call_details.append(
+                                {
+                                    "function_name": getattr(
+                                        tool_call.function, "name", "Unknown"
+                                    ),
+                                    "function_args": getattr(
+                                        tool_call.function, "arguments", {}
+                                    ),
+                                    "reasoning": getattr(tool_call, "reasoning", None),
+                                }
+                            )
+
+                    response_metadata = (
+                        getattr(last_response, "metadata", {}) if last_response else {}
+                    )
+                    response_type = "AgnoResponse"
 
                     # Update performance stats
                     stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
@@ -335,6 +357,7 @@ def render_chat_tab():
                         "response_time": response_time,
                     }
                     st.session_state[SESSION_KEY_MESSAGES].append(message_data)
+                    st.rerun()
 
                 except Exception as e:
                     end_time = time.time()
@@ -370,6 +393,7 @@ def render_chat_tab():
                             st.write(f"**Error Type:** {type(e).__name__}")
                             st.write(f"**Error Message:** {str(e)}")
                             st.code(traceback.format_exc())
+                    st.rerun()
 
 
 def render_memory_tab():

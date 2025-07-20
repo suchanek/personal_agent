@@ -364,14 +364,25 @@ def export_chat_history():
         if msg.get("tool_calls"):
             chat_text += "#### Tool Calls:\n"
             for i, tool_call in enumerate(msg["tool_calls"]):
-                tool_name = tool_call.get("name", "Unknown Tool")
-                chat_text += f"**{i + 1}. {tool_name}**\n\n"
-                if "arguments" in tool_call:
-                    chat_text += (
-                        f"Arguments: ```json\n{tool_call['arguments']}\n```\n\n"
-                    )
-                if "content" in tool_call:
-                    chat_text += f"Results: ```\n{tool_call['content']}\n```\n\n"
+                # Handle both ToolExecution objects and dictionary formats
+                if hasattr(tool_call, 'tool_name'):
+                    # ToolExecution object
+                    tool_name = tool_call.tool_name or "Unknown Tool"
+                    chat_text += f"**{i + 1}. {tool_name}**\n\n"
+                    if hasattr(tool_call, 'tool_args') and tool_call.tool_args:
+                        chat_text += f"Arguments: ```json\n{tool_call.tool_args}\n```\n\n"
+                    if hasattr(tool_call, 'result') and tool_call.result:
+                        chat_text += f"Results: ```\n{tool_call.result}\n```\n\n"
+                else:
+                    # Dictionary format (legacy)
+                    tool_name = tool_call.get("name", "Unknown Tool")
+                    chat_text += f"**{i + 1}. {tool_name}**\n\n"
+                    if "arguments" in tool_call:
+                        chat_text += (
+                            f"Arguments: ```json\n{tool_call['arguments']}\n```\n\n"
+                        )
+                    if "content" in tool_call:
+                        chat_text += f"Results: ```\n{tool_call['content']}\n```\n\n"
 
     return chat_text
 
