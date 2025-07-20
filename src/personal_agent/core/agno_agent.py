@@ -257,7 +257,7 @@ class AgnoPersonalAgent:
         logger.info("🔍 Checking Docker USER_ID consistency for user: %s", self.user_id)
         try:
             ready_to_proceed, consistency_message = ensure_docker_user_consistency(
-                user_id=self.user_id, auto_fix=True, force_restart=True
+                user_id=self.user_id, auto_fix=True, force_restart=False
             )
 
             if ready_to_proceed:
@@ -404,8 +404,10 @@ class AgnoPersonalAgent:
                 search_knowledge=(
                     True if self.enable_memory and self.agno_knowledge else False
                 ),  # Enable automatic knowledge search
-                storage=self.agno_storage if self.enable_memory else None,
-                memory=None,  # Don't pass memory to avoid auto-storage conflicts
+                storage=self.agno_storage if self.enable_memory else None
+                memory=(
+                    self.agno_memory if self.enable_memory else None
+                ),  # Don't pass memory to avoid auto-storage conflicts
                 # Enable telemetry and verbose logging
                 debug_mode=self.debug,
                 # Enable streaming for intermediate steps
