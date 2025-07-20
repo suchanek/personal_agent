@@ -21,7 +21,6 @@ from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.python import PythonTools
-from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
 from rich.console import Console
 from rich.table import Table
@@ -41,7 +40,10 @@ from ..config.settings import (
     USE_MCP,
     USER_ID,
 )
-from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
+from ..tools.personal_agent_tools import (
+    PersonalAgentFilesystemTools,
+    PersonalAgentSystemTools,
+)
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -294,10 +296,8 @@ class AgnoPersonalAgent:
                     analyst_recommendations=True,
                 ),
                 PythonTools(),
-                ShellTools(
-                    base_dir="."
-                ),  # Match Streamlit configuration for consistency
                 PersonalAgentFilesystemTools(),
+                PersonalAgentSystemTools(),
                 # Removed PersonalAgentWebTools as it was causing confusion with MCP references
             ]
 
@@ -396,8 +396,8 @@ class AgnoPersonalAgent:
                 name="Personal AI Agent",
                 agent_id="personal_agent",
                 user_id=self.user_id,
-                enable_agentic_memory=True,  # Enable agno's native memory
-                enable_user_memories=False,  # Enable agno's native memory
+                enable_agentic_memory=False,  # Enable agno's native memory
+                enable_user_memories=True,  # Enable agno's native memory
                 add_history_to_messages=True,  # Add conversation history to context
                 num_history_responses=3,
                 knowledge=self.agno_knowledge if self.enable_memory else None,
@@ -867,102 +867,102 @@ Returns:
 
     async def cleanup(self) -> None:
         """Clean up resources when the agent is being shut down.
-        
+
         This method is called during application shutdown to properly
         clean up any resources, connections, or background tasks.
         """
         try:
             logger.info("Cleaning up AgnoPersonalAgent resources...")
-            
+
             # Clean up agent resources
             if self.agent:
                 # Clear the agent reference
                 self.agent = None
                 logger.debug("Cleared agent reference")
-            
+
             # Clean up storage references
             if self.agno_storage:
                 self.agno_storage = None
                 logger.debug("Cleared storage reference")
-                
+
             if self.agno_knowledge:
                 self.agno_knowledge = None
                 logger.debug("Cleared knowledge reference")
-                
+
             if self.agno_memory:
                 self.agno_memory = None
                 logger.debug("Cleared memory reference")
-                
+
             if self.knowledge_coordinator:
                 self.knowledge_coordinator = None
                 logger.debug("Cleared knowledge coordinator reference")
-            
+
             # Clean up manager references safely
             if self.model_manager:
                 self.model_manager = None
                 logger.debug("Cleared model manager reference")
-                
+
             if self.instruction_manager:
                 self.instruction_manager = None
                 logger.debug("Cleared instruction manager reference")
-                
+
             if self.memory_manager:
                 self.memory_manager = None
                 logger.debug("Cleared memory manager reference")
-                
+
             if self.knowledge_manager:
                 self.knowledge_manager = None
                 logger.debug("Cleared knowledge manager reference")
-                
+
             if self.tool_manager:
                 self.tool_manager = None
                 logger.debug("Cleared tool manager reference")
-            
+
             logger.info("AgnoPersonalAgent cleanup completed successfully")
-            
+
         except Exception as e:
             logger.warning("Error during AgnoPersonalAgent cleanup: %s", e)
-    
+
     def sync_cleanup(self) -> None:
         """Synchronous cleanup method for compatibility.
-        
+
         This method provides a synchronous interface to cleanup for cases
         where async cleanup cannot be used.
         """
         try:
             logger.info("Running synchronous cleanup...")
-            
+
             # Clean up agent resources without async calls
             if self.agent:
                 self.agent = None
                 logger.debug("Cleared agent reference")
-            
+
             # Clean up storage references
             if self.agno_storage:
                 self.agno_storage = None
                 logger.debug("Cleared storage reference")
-                
+
             if self.agno_knowledge:
                 self.agno_knowledge = None
                 logger.debug("Cleared knowledge reference")
-                
+
             if self.agno_memory:
                 self.agno_memory = None
                 logger.debug("Cleared memory reference")
-                
+
             if self.knowledge_coordinator:
                 self.knowledge_coordinator = None
                 logger.debug("Cleared knowledge coordinator reference")
-            
+
             # Clean up manager references
             self.model_manager = None
             self.instruction_manager = None
             self.memory_manager = None
             self.knowledge_manager = None
             self.tool_manager = None
-            
+
             logger.info("Synchronous cleanup completed successfully")
-            
+
         except Exception as e:
             logger.warning("Error during synchronous cleanup: %s", e)
 
@@ -983,12 +983,12 @@ def create_simple_personal_agent(
         knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
         model_provider: LLM provider ('ollama' or 'openai')
         model_name: Model name to use
-        
+
     Returns:
         Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
     """
     from agno.knowledge.combined import CombinedKnowledgeBase
-    
+
     # Create knowledge base (synchronous creation)
     knowledge_base = create_combined_knowledge_base(storage_dir, knowledge_dir)
 
@@ -1035,7 +1035,7 @@ async def load_agent_knowledge(knowledge_base, recreate: bool = False) -> None:
     Args:
         knowledge_base: Knowledge base instance to load
         recreate: Whether to recreate the knowledge base from scratch
-        
+
     Returns:
         None
     """
@@ -1073,7 +1073,7 @@ async def create_agno_agent(
         user_id: User identifier for memory operations
         recreate: Whether to recreate knowledge bases
         instruction_level: The sophistication level for agent instructions
-        
+
     Returns:
         Initialized agent instance
     """

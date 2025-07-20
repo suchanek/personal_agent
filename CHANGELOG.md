@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [dev/v0.11.0] - 2025-07-18
+
+### Changed
+- **Reaffirmed Ephemeral MCP Agent Architecture**: Reverted the MCP tool handling to the original, stable ephemeral agent pattern. This resolves critical stability and `asyncio` context issues discovered in the experimental `v0.10.1` and `v0.10.2` branches, which have now been abandoned. The ephemeral pattern, where a new client is created for each tool call, is now mandated as a core architectural requirement for all MCP interactions. See [ADR-028](./refs/adr/028-ephemeral-mcp-tool-agents.md) for details.
+
 ## [dev/v0.8.14] - 2025-07-17
 
 ### Changed
