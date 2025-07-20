@@ -39,7 +39,7 @@ from .core.memory import is_weaviate_connected, vector_store, weaviate_client
 from .tools import get_all_tools
 
 # Import utilities
-from .utils import cleanup, inject_dependencies, register_cleanup_handlers
+from .utils import cleanup, inject_dependencies, register_cleanup_handlers, store_fact_in_knowledge_base
 from .utils.pag_logging import (
     configure_all_rich_logging,
     configure_master_logger,
@@ -56,10 +56,10 @@ from .utils.pag_logging import (
 )
 
 # Import web interface
-from .web import create_app, register_routes
+from .web import create_app, register_routes, create_smol_app, register_smol_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.12dev"  # Defined once to avoid duplication
+__version__ = "0.11.0dev"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -81,7 +81,7 @@ if _logger.isEnabledFor(logging.INFO) and root_logger.isEnabledFor(logging.INFO)
 
 
 # Main entry points
-from .agno_main import cli_main, run_agno_cli
+from .agno_main import cli_main, run_agno_cli, run_agno_cli_wrapper
 from .langchain_main import cli_main as langchain_cli_main
 from .langchain_main import main as langchain_main
 from .smol_main import run_smolagents_cli, run_smolagents_web
@@ -192,6 +192,7 @@ __all__ = [
     "cleanup",
     "inject_dependencies",
     "register_cleanup_handlers",
+    "store_fact_in_knowledge_base",
     "configure_all_rich_logging",
     "configure_master_logger",
     "disable_stream_handlers_for_namespace",
@@ -207,9 +208,12 @@ __all__ = [
     # Web interface
     "create_app",
     "register_routes",
+    "create_smol_app",
+    "register_smol_routes",
     # Main entry points - Agno (primary)
     "cli_main",
     "run_agno_cli",
+    "run_agno_cli_wrapper",
     # Main entry points - LangChain (legacy)
     "langchain_main",
     "langchain_cli_main",

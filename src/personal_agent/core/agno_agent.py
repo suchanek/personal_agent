@@ -404,7 +404,7 @@ class AgnoPersonalAgent:
                 search_knowledge=(
                     True if self.enable_memory and self.agno_knowledge else False
                 ),  # Enable automatic knowledge search
-                storage=self.agno_storage if self.enable_memory else None
+                storage=(self.agno_storage if self.enable_memory else None),
                 memory=(
                     self.agno_memory if self.enable_memory else None
                 ),  # Don't pass memory to avoid auto-storage conflicts

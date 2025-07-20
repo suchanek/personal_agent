@@ -12,15 +12,15 @@ from .agno_storage import (
 from .anti_duplicate_memory import AntiDuplicateMemory, create_anti_duplicate_memory
 from .knowledge_coordinator import KnowledgeCoordinator, create_knowledge_coordinator
 from .mcp_client import SimpleMCPClient
-from .nlp_extractor import extract_entities, extract_relationships
 from .memory import (
+    is_agno_storage_connected,
+    is_memory_connected,
     is_weaviate_connected,
     reset_weaviate_if_corrupted,
     setup_weaviate,
-    is_agno_storage_connected,
-    is_memory_connected,
 )
 from .multi_agent_system import MultiAgentSystem, create_multi_agent_system
+from .nlp_extractor import extract_entities, extract_relationships
 from .semantic_memory_manager import (
     SemanticDuplicateDetector,
     SemanticMemoryManager,
@@ -29,13 +29,13 @@ from .semantic_memory_manager import (
 )
 from .smol_agent import create_smolagents_executor, create_smolagents_model
 from .structured_response import (
+    ResponseError,
+    ResponseMetadata,
     StructuredResponse,
     StructuredResponseParser,
     ToolCall,
-    ResponseMetadata,
-    ResponseError,
-    get_ollama_format_schema,
     create_structured_instructions,
+    get_ollama_format_schema,
 )
 from .topic_classifier import RuleSet, TopicClassifier
 
