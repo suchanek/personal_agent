@@ -93,7 +93,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `store_user_memory` tool and underlying `SemanticMemoryManager.add_memory` method were refactored to return a `MemoryStorageResult` object instead of a simple string or tuple. This provides a structured, detailed, and machine-readable outcome for every memory storage attempt.
 - The tool's user-facing output for memory storage is now more informative, using emojis to clearly indicate success (✅), partial success (⚠️), duplicates (🔄), and failures (❌).
 
-## [0.8.9] - 2025-07-11
+### Fixed
+- Refined agent instructions to prevent the agent from incorrectly storing its own creative writing and other actions as user memories. The new instructions are more precise and less aggressive, leading to higher quality and more relevant memory storage.
+- Updated the CLI entry point to use the refined `CONCISE` instruction level, ensuring consistent behavior across all interfaces.
+
+## [0.11.0] - 2024-07-19
 
 ### Added
 - New documentation: `docs/MEMORY_COMMAND_SUMMARY.md` providing a comprehensive overview of all memory-related commands.
