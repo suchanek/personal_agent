@@ -56,6 +56,7 @@ async def initialize_agno_system(
         user_id=settings.USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
         recreate=recreate,
+        instruction_level="CONCISE",
     )
 
     agent_info = agno_agent.get_agent_info()

@@ -296,9 +296,8 @@ class AgnoPersonalAgent:
                     analyst_recommendations=True,
                 ),
                 PythonTools(),
-                PersonalAgentFilesystemTools(),
+                PersonalAgentFilesystemTools(),  # @todo: modify to pass a proper starting dir
                 PersonalAgentSystemTools(),
-                # Removed PersonalAgentWebTools as it was causing confusion with MCP references
             ]
 
             # Initialize Agno native storage and knowledge following the working example pattern
@@ -396,7 +395,7 @@ class AgnoPersonalAgent:
                 name="Personal AI Agent",
                 agent_id="personal_agent",
                 user_id=self.user_id,
-                enable_agentic_memory=False,  # Enable agno's native memory
+                enable_agentic_memory=False,  # Disable agno's native memory to avoid saving everything!
                 enable_user_memories=True,  # Enable agno's native memory
                 add_history_to_messages=True,  # Add conversation history to context
                 num_history_responses=3,
@@ -469,76 +468,100 @@ class AgnoPersonalAgent:
             # The agent will handle the full tool-use loop internally
             # Since the agent is configured with stream=True, arun returns an async generator
             response_generator = await self.agent.arun(query, user_id=self.user_id)
-            
+
             # Check if we got a generator (streaming) or a direct response
-            if hasattr(response_generator, '__aiter__'):
+            if hasattr(response_generator, "__aiter__"):
                 # It's an async generator, consume it to get the final response
                 # Following the working example pattern from github_agent_streamlit.py
                 final_response = None
                 response_content = ""
                 all_tools_used = []
-                
+
                 async for chunk in response_generator:
                     # Look for individual tool in chunk (singular, like the working example)
-                    if hasattr(chunk, 'tool') and chunk.tool:
+                    if hasattr(chunk, "tool") and chunk.tool:
                         all_tools_used.append(chunk.tool)
-                        logger.debug(f"Found tool in chunk: {getattr(chunk.tool, 'name', 'Unknown')}")
-                    
+                        logger.debug(
+                            f"Found tool in chunk: {getattr(chunk.tool, 'name', 'Unknown')}"
+                        )
+
                     # Look for content in RunResponse events (like the working example)
-                    if (hasattr(chunk, 'event') and chunk.event == "RunResponse" 
-                        and hasattr(chunk, 'content') and chunk.content is not None):
+                    if (
+                        hasattr(chunk, "event")
+                        and chunk.event == "RunResponse"
+                        and hasattr(chunk, "content")
+                        and chunk.content is not None
+                    ):
                         response_content += chunk.content
-                    
+
                     # Keep track of the last chunk
                     final_response = chunk
-                
+
                 # Create a response object with collected tools
                 if final_response:
                     # Create a simple object to hold tools for compatibility
                     class ResponseWithTools:
                         def __init__(self, original_response, tools):
-                            self.tool_calls = tools  # Store as tool_calls for compatibility
-                            self.tools = tools       # Also store as tools
+                            self.tool_calls = (
+                                tools  # Store as tool_calls for compatibility
+                            )
+                            self.tools = tools  # Also store as tools
                             # Copy other attributes from original response
                             for attr in dir(original_response):
-                                if not attr.startswith('_') and attr not in ['tool_calls', 'tools']:
+                                if not attr.startswith("_") and attr not in [
+                                    "tool_calls",
+                                    "tools",
+                                ]:
                                     try:
-                                        setattr(self, attr, getattr(original_response, attr))
+                                        setattr(
+                                            self, attr, getattr(original_response, attr)
+                                        )
                                     except:
                                         pass
-                    
+
                     if all_tools_used:
-                        final_response = ResponseWithTools(final_response, all_tools_used)
+                        final_response = ResponseWithTools(
+                            final_response, all_tools_used
+                        )
                     else:
                         # Ensure we have empty tool_calls for consistency
-                        if not hasattr(final_response, 'tool_calls'):
+                        if not hasattr(final_response, "tool_calls"):
                             final_response.tool_calls = []
-                
+
                 # Store the final response for tool call inspection
                 self._last_response = final_response
-                
+
                 # Use tool_manager to analyze tool calls if needed
                 if all_tools_used:
-                    logger.debug(f"Agent used {len(all_tools_used)} tools in this response")
-                
+                    logger.debug(
+                        f"Agent used {len(all_tools_used)} tools in this response"
+                    )
+
                 if add_thought_callback:
                     add_thought_callback("✅ Agent execution complete.")
-                
+
                 return response_content
             else:
                 # It's a direct response object
                 self._last_response = response_generator
-                
+
                 # Use tool_manager to analyze tool calls if needed
-                if hasattr(response_generator, "tool_calls") and response_generator.tool_calls:
+                if (
+                    hasattr(response_generator, "tool_calls")
+                    and response_generator.tool_calls
+                ):
                     logger.debug(
                         f"Agent used {len(response_generator.tool_calls)} tools in this response"
                     )
-                
+
                 if add_thought_callback:
                     add_thought_callback("✅ Agent execution complete.")
-                
-                return response_generator.content if hasattr(response_generator, 'content') else str(response_generator)
+
+                return (
+                    response_generator.content
+                    if hasattr(response_generator, "content")
+                    else str(response_generator)
+                )
 
         except Exception as e:
             logger.error("Error running agno agent: %s", e)
