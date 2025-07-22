@@ -32,11 +32,26 @@ if "RUST_LOG" not in os.environ:
 
 # Import core components
 from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
+from .config.settings import ROOT_DIR
 from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
 from .core.memory import is_weaviate_connected, vector_store, weaviate_client
 
 # Import tools
 from .tools import get_all_tools
+from .tools.filesystem import create_and_save_file, mcp_read_file, mcp_write_file
+from .tools.web import mcp_github_search
+
+# Initialize global MCP client if MCP is enabled
+mcp_client = None
+if USE_MCP:
+    try:
+        mcp_servers = get_mcp_servers()
+        if mcp_servers:
+            mcp_client = SimpleMCPClient(mcp_servers)
+    except Exception as e:
+        _logger = logging.getLogger(__name__)
+        _logger.warning("Failed to initialize MCP client: %s", e)
+        mcp_client = None
 
 # Import utilities
 from .utils import cleanup, inject_dependencies, register_cleanup_handlers, store_fact_in_knowledge_base
@@ -72,6 +87,9 @@ setup_logging_filters()
 
 # Package-level logger
 _logger = setup_logging()
+
+# Export logger for backward compatibility
+logger = _logger
 
 # Only log initialization message if log level allows it AND root logger allows it
 # This prevents spam when scripts want to suppress logging
@@ -186,8 +204,17 @@ __all__ = [
     "USE_MCP",
     "USE_WEAVIATE",
     "get_mcp_servers",
+    "ROOT_DIR",
+    # MCP Client
+    "mcp_client",
     # Tools
     "get_all_tools",
+    "create_and_save_file",
+    "mcp_read_file",
+    "mcp_write_file",
+    "mcp_github_search",
+    # Logger
+    "logger",
     # Utilities
     "cleanup",
     "inject_dependencies",

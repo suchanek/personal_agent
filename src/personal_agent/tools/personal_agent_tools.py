@@ -121,8 +121,10 @@ class PersonalAgentFilesystemTools(Toolkit):
             if not any(file_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
                 return f"Error: Access denied to {file_path}. Only allowed in home, data, tmp, or current directories."
 
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            # Create directory if it doesn't exist (only if there's a directory path)
+            dir_path = os.path.dirname(file_path)
+            if dir_path:  # Only create directory if there is one
+                os.makedirs(dir_path, exist_ok=True)
 
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)

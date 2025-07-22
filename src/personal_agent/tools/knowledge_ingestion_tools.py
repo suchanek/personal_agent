@@ -368,19 +368,48 @@ class KnowledgeIngestionTools(Toolkit):
             return f"❌ Error in batch ingestion: {str(e)}"
 
     def query_knowledge_base(self, query: str, mode: str = "auto", limit: int = 5) -> str:
-        """Query the unified knowledge base with intelligent routing.
+        """Query the unified knowledge base to retrieve stored factual information and documents.
+        
+        This tool is for SEARCHING existing knowledge, NOT for creative tasks like writing stories,
+        generating content, or answering general questions. Use this only when you need to find
+        specific information that was previously stored in the knowledge base.
 
         Args:
-            query: The search query
+            query: The search query for finding existing knowledge/documents
             mode: Query mode - "local" (semantic), "global" (graph), "hybrid", "mix", "auto"
             limit: Maximum number of results to return
 
         Returns:
-            Search results from the knowledge base.
+            Search results from the knowledge base, or rejection message for inappropriate requests.
         """
         try:
             if not query or not query.strip():
                 return "❌ Error: Query cannot be empty"
+
+            # Filter out inappropriate creative requests
+            query_lower = query.lower().strip()
+            
+            # Creative/generative request patterns that should NOT use knowledge search
+            creative_patterns = [
+                "write", "create", "generate", "make", "compose", "draft",
+                "tell me a", "give me a", "come up with", "think of",
+                "story", "poem", "joke", "song", "essay", "article",
+                "funny", "creative", "imagine", "pretend"
+            ]
+            
+            # Check if this looks like a creative request
+            if any(pattern in query_lower for pattern in creative_patterns):
+                # Additional check: if it's asking for factual info WITH creative words, allow it
+                factual_patterns = [
+                    "what is", "who is", "when did", "where is", "how does",
+                    "definition of", "information about", "facts about",
+                    "details about", "explain", "describe"
+                ]
+                
+                # If it has factual patterns, it might be legitimate
+                if not any(factual in query_lower for factual in factual_patterns):
+                    logger.info(f"Rejected creative request for knowledge search: {query[:50]}...")
+                    return f"❌ This appears to be a creative request ('{query}'). The knowledge base is for searching existing stored information, not for generating new content. Please rephrase as a search for existing knowledge, or ask me to create content directly without using knowledge tools."
 
             # Validate mode
             valid_modes = ["local", "global", "hybrid", "mix", "naive", "auto"]

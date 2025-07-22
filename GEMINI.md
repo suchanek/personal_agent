@@ -375,6 +375,10 @@ If tools are being called but not visible in debug panels:
 *   Verify tool call detection is working: `python tests/test_tool_call_detection.py`
 *   Review debug information in the Streamlit interface
 
+## Issue Tracking
+
+When requested to add an issue, add it to the `ISSUES.md` file. Each issue should be on a new line and must include the current git branch, the current date, and a timestamp.
+
 ## Project Structure
 
 ```
