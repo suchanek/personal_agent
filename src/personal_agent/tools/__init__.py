@@ -18,6 +18,7 @@ from .memory_tools import (
     query_knowledge_base,
     store_interaction,
 )
+from .knowledge_ingestion_tools import KnowledgeIngestionTools
 from .research import comprehensive_research
 from .system import mcp_shell_command
 from .web import mcp_brave_search, mcp_fetch_url, mcp_github_search
@@ -27,6 +28,8 @@ __all__ = [
     "store_interaction",
     "query_knowledge_base",
     "clear_knowledge_base",
+    # Knowledge ingestion tools
+    "KnowledgeIngestionTools",
     # Filesystem tools
     "mcp_read_file",
     "mcp_write_file",

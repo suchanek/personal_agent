@@ -44,6 +44,7 @@ from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
+from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -298,6 +299,7 @@ class AgnoPersonalAgent:
                 PythonTools(),
                 PersonalAgentFilesystemTools(),  # @todo: modify to pass a proper starting dir
                 PersonalAgentSystemTools(),
+                KnowledgeIngestionTools(),  # Add knowledge ingestion capabilities
             ]
 
             # Initialize Agno native storage and knowledge following the working example pattern

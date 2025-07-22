@@ -58,6 +58,7 @@ The heart of the system, powered by the **Agno Framework**. This layer is respon
 This layer provides the agent with long-term memory and access to a structured knowledge base.
 
 - **Semantic Memory Manager**: A sophisticated system that stores and retrieves user-specific memories. It uses a hybrid approach, combining a local SQLite database for structured data and a LanceDB-powered vector store for semantic search.
+- **Knowledge Ingestion System**: A unified system for adding knowledge to the agent from various sources, including files, text, and URLs. It uses a dedicated `KnowledgeManager` to orchestrate the ingestion process and leverages the LightRAG server for content processing and indexing.
 - **Knowledge Base (LightRAG)**: A powerful, RAG-enhanced knowledge base that allows the agent to store, query, and reason about large document collections and complex relationships. It is powered by the LightRAG server.
 - **Multi-User System**: A robust system that ensures data isolation and service stability in a multi-user environment. It dynamically manages user contexts, configurations, and services.
 
@@ -89,6 +90,7 @@ The architecture has been shaped by a series of key decisions, documented in Arc
 - **ADR-008: CLI Refactor**: Modularizes the CLI for improved maintainability.
 - **ADR-013: Dynamic Multi-User Management**: Implements a full-stack, dynamic multi-user system.
 - **ADR-015: Persistent User Context**: Ensures that the user context persists across sessions.
+- **ADR-030: Knowledge Ingestion System**: Defines the architecture for the new knowledge ingestion system.
 
 ## 5. Deployment and Configuration
 
