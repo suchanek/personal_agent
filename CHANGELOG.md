@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Memory Grammar Conversion**: Corrected an issue where memories stored in third-person were not consistently converted to second-person when presented to the user, improving conversational flow and identity consistency. See [ADR-032](./docs/adr/032-memory-grammar-conversion-fix.md) for details.
+
 ### Added
 - **Formalized Agent Personality**: Embraced and formalized the agent's emergent "AI Friend" personality as a core feature. The agent is now explicitly guided to use memories creatively for building rapport and generating personalized content, while maintaining a strong distinction between its identity and the user's. See [ADR-031](./docs/adr/031-formalizing-emergent-agent-personality.md) for details.
 - **Issue Tracking**: Added a new `ISSUES.md` file for internal tracking of running issues and todos.

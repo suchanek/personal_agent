@@ -16,7 +16,7 @@ from .agno_agent import AgnoPersonalAgent, create_agno_agent
 
 
 async def initialize_agno_system(
-    use_remote_ollama: bool = False, recreate: bool = False
+    use_remote_ollama: bool = False, recreate: bool = False, instruction_level: str = "STANDARD"
 ) -> Tuple[AgnoPersonalAgent, callable, callable, callable, str]:
     """
     Initialize all system components for agno framework.
@@ -56,7 +56,7 @@ async def initialize_agno_system(
         user_id=settings.USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
         recreate=recreate,
-        instruction_level="CONCISE",
+        instruction_level=instruction_level,
     )
 
     agent_info = agno_agent.get_agent_info()
