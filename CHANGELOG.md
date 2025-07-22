@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Formalized Agent Personality**: Embraced and formalized the agent's emergent "AI Friend" personality as a core feature. The agent is now explicitly guided to use memories creatively for building rapport and generating personalized content, while maintaining a strong distinction between its identity and the user's. See [ADR-031](./docs/adr/031-formalizing-emergent-agent-personality.md) for details.
+- **Issue Tracking**: Added a new `ISSUES.md` file for internal tracking of running issues and todos.
+
 ## [dev/v0.11.0] - 2025-07-18
 
 ### Changed
