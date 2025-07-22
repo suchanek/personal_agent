@@ -19,6 +19,7 @@ import aiohttp
 from agno.agent import Agent
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
+from agno.tools.calculator import CalculatorTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.python import PythonTools
 from agno.tools.yfinance import YFinanceTools
@@ -300,6 +301,7 @@ class AgnoPersonalAgent:
                 PersonalAgentFilesystemTools(),  # @todo: modify to pass a proper starting dir
                 PersonalAgentSystemTools(),
                 KnowledgeIngestionTools(),  # Add knowledge ingestion capabilities
+                CalculatorTools(enable_all=True),
             ]
 
             # Initialize Agno native storage and knowledge following the working example pattern
