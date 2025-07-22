@@ -238,6 +238,10 @@ All memory operations are now user-specific, ensuring data isolation between dif
 
 ### Knowledge Tools
 
+*   **ingest_knowledge_file**: Ingest a file into the knowledge base.
+*   **ingest_knowledge_text**: Ingest text content directly.
+*   **ingest_knowledge_from_url**: Ingest content from a URL.
+*   **batch_ingest_directory**: Process multiple files from a directory.
 *   **query_knowledge_base**: Unified knowledge base query with intelligent routing. Automatically routes queries between local semantic search and LightRAG based on mode and query characteristics. Supports modes like "local", "global", "hybrid", "mix", "naive", and "auto" (default).
 *   **query_semantic_knowledge**: DEPRECATED. Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents. Args: `query` (str), `limit` (int, default: 5). Returns: `str` (formatted search results or message if none found).
 

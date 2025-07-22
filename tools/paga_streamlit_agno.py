@@ -828,6 +828,185 @@ def render_knowledge_tab():
     knowledge_helper = st.session_state[SESSION_KEY_KNOWLEDGE_HELPER]
     render_knowledge_status(knowledge_helper)
 
+    # File Upload Section
+    st.markdown("---")
+    st.subheader("📁 Add Knowledge Files")
+    st.markdown("*Upload files directly to your knowledge base*")
+    
+    # File uploader
+    uploaded_files = st.file_uploader(
+        "Choose files to add to your knowledge base",
+        accept_multiple_files=True,
+        type=['txt', 'md', 'pdf', 'docx', 'doc', 'html', 'csv', 'json'],
+        key="knowledge_file_uploader"
+    )
+    
+    if uploaded_files:
+        st.write(f"Selected {len(uploaded_files)} file(s):")
+        for file in uploaded_files:
+            st.write(f"- {file.name} ({file.size} bytes)")
+        
+        if st.button("🚀 Upload and Process Files", key="upload_files_btn", type="primary"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            results = []
+            
+            for i, uploaded_file in enumerate(uploaded_files):
+                status_text.text(f"Processing {uploaded_file.name}...")
+                
+                try:
+                    # Save uploaded file temporarily
+                    import tempfile
+                    import os
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{uploaded_file.name}") as tmp_file:
+                        tmp_file.write(uploaded_file.getvalue())
+                        tmp_file_path = tmp_file.name
+                    
+                    try:
+                        # Use the knowledge ingestion tools from the agent
+                        agent = st.session_state[SESSION_KEY_AGENT]
+                        if hasattr(agent, 'agent') and hasattr(agent.agent, 'tools'):
+                            # Find the knowledge ingestion tools
+                            knowledge_tools = None
+                            for tool in agent.agent.tools:
+                                if hasattr(tool, '__class__') and 'KnowledgeIngestionTools' in str(tool.__class__):
+                                    knowledge_tools = tool
+                                    break
+                            
+                            if knowledge_tools:
+                                # Use the ingest_knowledge_file method
+                                result = knowledge_tools.ingest_knowledge_file(
+                                    file_path=tmp_file_path,
+                                    title=uploaded_file.name
+                                )
+                                results.append(f"**{uploaded_file.name}**: {result}")
+                            else:
+                                results.append(f"**{uploaded_file.name}**: ❌ Knowledge ingestion tools not available")
+                        else:
+                            results.append(f"**{uploaded_file.name}**: ❌ Agent tools not accessible")
+                    
+                    finally:
+                        # Clean up temporary file
+                        try:
+                            os.unlink(tmp_file_path)
+                        except OSError:
+                            pass
+                
+                except Exception as e:
+                    results.append(f"**{uploaded_file.name}**: ❌ Error: {str(e)}")
+                
+                # Update progress
+                progress_bar.progress((i + 1) / len(uploaded_files))
+            
+            # Show results
+            status_text.text("Upload complete!")
+            st.markdown("### Upload Results:")
+            for result in results:
+                st.markdown(result)
+            
+            # Clear the file uploader
+            st.rerun()
+
+    # Text Input Section
+    st.markdown("---")
+    st.subheader("📝 Add Text Knowledge")
+    st.markdown("*Add text content directly to your knowledge base*")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        knowledge_title = st.text_input("Title for your knowledge entry:", key="knowledge_title")
+    with col2:
+        file_type = st.selectbox("Format:", ["txt", "md", "html", "json"], key="knowledge_format")
+    
+    knowledge_content = st.text_area(
+        "Enter your knowledge content:",
+        height=200,
+        key="knowledge_content",
+        placeholder="Enter the text content you want to add to your knowledge base..."
+    )
+    
+    if st.button("💾 Save Text Knowledge", key="save_text_knowledge", type="primary"):
+        if knowledge_title and knowledge_content:
+            try:
+                # Use the knowledge ingestion tools from the agent
+                agent = st.session_state[SESSION_KEY_AGENT]
+                if hasattr(agent, 'agent') and hasattr(agent.agent, 'tools'):
+                    # Find the knowledge ingestion tools
+                    knowledge_tools = None
+                    for tool in agent.agent.tools:
+                        if hasattr(tool, '__class__') and 'KnowledgeIngestionTools' in str(tool.__class__):
+                            knowledge_tools = tool
+                            break
+                    
+                    if knowledge_tools:
+                        # Use the ingest_knowledge_text method
+                        result = knowledge_tools.ingest_knowledge_text(
+                            content=knowledge_content,
+                            title=knowledge_title,
+                            file_type=file_type
+                        )
+                        st.success(result)
+                        
+                        # Clear the form
+                        st.session_state.knowledge_title = ""
+                        st.session_state.knowledge_content = ""
+                        st.rerun()
+                    else:
+                        st.error("❌ Knowledge ingestion tools not available")
+                else:
+                    st.error("❌ Agent tools not accessible")
+            except Exception as e:
+                st.error(f"❌ Error saving knowledge: {str(e)}")
+        else:
+            st.warning("⚠️ Please provide both title and content")
+
+    # URL Input Section
+    st.markdown("---")
+    st.subheader("🌐 Add Knowledge from URL")
+    st.markdown("*Extract and add content from web pages*")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        knowledge_url = st.text_input("URL to extract content from:", key="knowledge_url")
+    with col2:
+        url_title = st.text_input("Title (optional):", key="url_title")
+    
+    if st.button("🌐 Extract and Save from URL", key="save_url_knowledge", type="primary"):
+        if knowledge_url:
+            try:
+                with st.spinner("Extracting content from URL..."):
+                    # Use the knowledge ingestion tools from the agent
+                    agent = st.session_state[SESSION_KEY_AGENT]
+                    if hasattr(agent, 'agent') and hasattr(agent.agent, 'tools'):
+                        # Find the knowledge ingestion tools
+                        knowledge_tools = None
+                        for tool in agent.agent.tools:
+                            if hasattr(tool, '__class__') and 'KnowledgeIngestionTools' in str(tool.__class__):
+                                knowledge_tools = tool
+                                break
+                        
+                        if knowledge_tools:
+                            # Use the ingest_knowledge_from_url method
+                            result = knowledge_tools.ingest_knowledge_from_url(
+                                url=knowledge_url,
+                                title=url_title if url_title else None
+                            )
+                            st.success(result)
+                            
+                            # Clear the form
+                            st.session_state.knowledge_url = ""
+                            st.session_state.url_title = ""
+                            st.rerun()
+                        else:
+                            st.error("❌ Knowledge ingestion tools not available")
+                    else:
+                        st.error("❌ Agent tools not accessible")
+            except Exception as e:
+                st.error(f"❌ Error extracting from URL: {str(e)}")
+        else:
+            st.warning("⚠️ Please provide a URL")
+
     # SQLite/LanceDB Knowledge Search Section
     st.markdown("---")
     st.subheader("🔍 SQLite/LanceDB Knowledge Search")
