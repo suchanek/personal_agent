@@ -21,7 +21,7 @@ class InstructionLevel(Enum):
     CONCISE = auto()  # For capable models, focuses on capabilities over rules
     STANDARD = auto()  # The current, highly-detailed instructions
     EXPLICIT = auto()  # Even more verbose, for models that need extra guidance
-    EXPERIMENTAL = auto() # For testing new rule prioritization strategies
+    EXPERIMENTAL = auto()  # For testing new rule prioritization strategies
 
 
 class AgentInstructionManager:
@@ -112,7 +112,7 @@ class AgentInstructionManager:
             # Experimental level to test strict rule prioritization
             parts = [
                 header,
-                self.get_experimental_priority_rules(), # New priority rules
+                self.get_experimental_priority_rules(),  # New priority rules
                 identity,
                 personality,
                 self.get_detailed_memory_rules(),
@@ -241,7 +241,7 @@ class AgentInstructionManager:
             - `YFinanceTools`: For stock prices and financial data.
             - `GoogleSearchTools`: For web and news search.
             - `PersonalAgentFilesystemTools`: For file operations.
-            - `PythonTools`: For calculations and code execution.
+            - `PythonTools`: For code execution.
         """
 
     def get_detailed_tool_rules(self) -> str:
@@ -268,6 +268,9 @@ class AgentInstructionManager:
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
             - Searching existing knowledge? → query_knowledge_base IMMEDIATELY
+            - Calculator operations? - CalculatorTools IMMEDIATELY
+            - System commands? → ShellTools IMMEDIATELY
+            - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
 
             **CREATIVE vs. FACTUAL REQUESTS - CRITICAL DISTINCTION**:
