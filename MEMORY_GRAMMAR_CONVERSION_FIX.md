@@ -46,11 +46,12 @@ Provided specific examples of correct and incorrect responses:
 - "I enjoy hiking." (claiming user's attributes as your own)
 
 #### 3. Key Conversion Patterns
-Defined specific grammar transformation rules:
-- `"charlie was/is" → "you were/are"`
-- `"charlie has/had" → "you have/had"`
-- `"charlie's [noun]" → "your [noun]"`
+Defined generic grammar transformation rules that work for any user:
+- `"{user_id} was/is" → "you were/are"`
+- `"{user_id} has/had" → "you have/had"`
+- `"{user_id}'s [noun]" → "your [noun]"`
 - Always use second person pronouns (you, your, yours) when presenting user information
+- Rules dynamically adapt to any user ID (charlie, alice, bob, etc.)
 
 ## Technical Details
 

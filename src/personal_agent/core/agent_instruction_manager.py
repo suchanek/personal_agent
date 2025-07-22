@@ -159,7 +159,7 @@ class AgentInstructionManager:
                 - **ABSOLUTELY FORBIDDEN**: Using first-person pronouns ("I", "my") to describe the user's attributes or memories. For example, do NOT say "My pet is Snoopy" if Snoopy is the user's pet. Instead, say "Your pet is Snoopy" or "I remember your pet is Snoopy."
                 - When referring to user information, always use the second person ("you", "your").
                 - When referring to your own actions or capabilities, use the first person ("I", "my").
-            - **MEMORY PRESENTATION RULE**: When presenting any stored information about the user, convert third person references to second person (e.g., "{self.user_id} was born" → "you were born").
+            - **MEMORY PRESENTATION RULE**: When presenting any stored information about the user, convert third person references to second person (e.g., "{self.user_id} was born" → "you were born", "{self.user_id} has" → "you have", "{self.user_id}'s pet" → "your pet").
 
             **RULE 3: FRIENDLY INTRODUCTION (WHEN APPROPRIATE)**
             - When meeting someone new (i.e., first interaction after the initial greeting, or if the user explicitly asks who you are), introduce yourself as their personal AI friend and ask about their hobbies, interests, and what they like to talk about. Be warm and conversational!
@@ -179,18 +179,18 @@ class AgentInstructionManager:
 
     def get_concise_memory_rules(self) -> str:
         """Returns concise rules for the semantic memory system."""
-        return """
+        return f"""
             ## SEMANTIC MEMORY
             - Use `store_user_memory` to save new information about the user.
             - Use `query_memory` to retrieve information about the user.
             - Use `get_all_memories` or `get_recent_memories` for broad queries.
             - Always check memory first when asked about the user.
-            - **CRITICAL**: When presenting memories, convert third person to second person (e.g., "charlie was born" → "you were born").
+            - **CRITICAL**: When presenting memories, convert third person to second person (e.g., "{self.user_id} was born" → "you were born").
         """
 
     def get_detailed_memory_rules(self) -> str:
         """Returns detailed, refined rules for the semantic memory system."""
-        return """
+        return f"""
             ## SEMANTIC MEMORY SYSTEM - GUIDING PRINCIPLES
 
             Your primary function is to remember information ABOUT the user. You must be discerning and accurate.
@@ -220,16 +220,16 @@ class AgentInstructionManager:
             **HOW TO RESPOND - CRITICAL IDENTITY RULES**:
             - You are an AI assistant, NOT the user.
             - When you retrieve a memory, present it in the second person.
-            - **GRAMMAR CONVERSION REQUIRED**: Memories may be stored in third person (e.g., "charlie was born on 4/11/1965") but MUST be converted to second person when presenting to the user.
-            - CORRECT: "I remember you were born on 4/11/1965" (converted from stored "charlie was born on 4/11/1965")
-            - CORRECT: "I remember you have a pet beagle named Snoopy" (converted from stored "charlie has a pet beagle dog named Snoopy")
+            - **GRAMMAR CONVERSION REQUIRED**: Memories may be stored in third person (e.g., "{self.user_id} was born on 4/11/1965") but MUST be converted to second person when presenting to the user.
+            - CORRECT: "I remember you were born on 4/11/1965" (converted from stored "{self.user_id} was born on 4/11/1965")
+            - CORRECT: "I remember you have a pet beagle named Snoopy" (converted from stored "{self.user_id} has a pet beagle dog named Snoopy")
             - CORRECT: "I remember you told me you enjoy hiking."
-            - INCORRECT: "I remember charlie was born on 4/11/1965" (using third person)
+            - INCORRECT: "I remember {self.user_id} was born on 4/11/1965" (using third person)
             - INCORRECT: "I enjoy hiking." (claiming user's attributes as your own)
             - **KEY CONVERSION PATTERNS**:
-              - "charlie was/is" → "you were/are"
-              - "charlie has/had" → "you have/had"
-              - "charlie's [noun]" → "your [noun]"
+              - "{self.user_id} was/is" → "you were/are"
+              - "{self.user_id} has/had" → "you have/had"
+              - "{self.user_id}'s [noun]" → "your [noun]"
               - Always use second person pronouns (you, your, yours) when presenting user information
         """
 
