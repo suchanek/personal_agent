@@ -40,11 +40,11 @@ from ..config.settings import (
     USE_MCP,
     USER_ID,
 )
+from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
-from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -637,19 +637,93 @@ class AgnoPersonalAgent:
         """
         return await self.memory_manager.clear_all_memories()
 
-    async def query_lightrag_knowledge_direct(self, query: str, params: dict) -> str:
+    async def query_lightrag_knowledge_direct(
+        self, query: str, params: dict = None
+    ) -> str:
         """Directly query the LightRAG knowledge base and return the raw response.
-
-        Delegates to the knowledge_manager for processing.
 
         Args:
             query: The query string to search in the knowledge base
-            params: A dictionary of query parameters
+            params: A dictionary of query parameters (mode, response_type, top_k, etc.)
 
         Returns:
             String with query results exactly as LightRAG returns them
         """
-        return await self.knowledge_manager.query_graph(query)
+        if not query or not query.strip():
+            return "❌ Error: Query cannot be empty"
+
+        # Use default parameters if none provided
+        if params is None:
+            params = {}
+
+        # Set up the query parameters with defaults
+        query_params = {
+            "query": query.strip(),
+            "mode": params.get("mode", "global"),
+            "response_type": params.get("response_type", "Multiple Paragraphs"),
+            "top_k": params.get("top_k", 10),
+            "only_need_context": params.get("only_need_context", False),
+            "only_need_prompt": params.get("only_need_prompt", False),
+            "stream": params.get("stream", False),
+        }
+
+        # Add optional parameters if provided
+        if "max_token_for_text_unit" in params:
+            query_params["max_token_for_text_unit"] = params["max_token_for_text_unit"]
+        if "max_token_for_global_context" in params:
+            query_params["max_token_for_global_context"] = params[
+                "max_token_for_global_context"
+            ]
+        if "max_token_for_local_context" in params:
+            query_params["max_token_for_local_context"] = params[
+                "max_token_for_local_context"
+            ]
+        if "conversation_history" in params:
+            query_params["conversation_history"] = params["conversation_history"]
+        if "history_turns" in params:
+            query_params["history_turns"] = params["history_turns"]
+        if "ids" in params:
+            query_params["ids"] = params["ids"]
+
+        try:
+            # Use the correct LightRAG URL and endpoint
+            from ..config.settings import LIGHTRAG_URL
+
+            url = f"{LIGHTRAG_URL}/query"
+
+            logger.debug(f"Querying LightRAG at {url} with params: {query_params}")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=query_params, timeout=60) as response:
+                    if response.status == 200:
+                        result = await response.json()
+
+                        # Extract the response content
+                        if isinstance(result, dict):
+                            content = result.get(
+                                "response", result.get("content", str(result))
+                            )
+                        else:
+                            content = str(result)
+
+                        if content and content.strip():
+                            logger.info(f"LightRAG query successful: {query[:50]}...")
+                            return content
+                        else:
+                            return f"🔍 No relevant knowledge found for '{query}'. Try different keywords or add more knowledge to your base."
+                    else:
+                        error_text = await response.text()
+                        logger.warning(
+                            f"LightRAG query failed with status {response.status}: {error_text}"
+                        )
+                        return f"❌ Error querying knowledge base (status {response.status}): {error_text}"
+
+        except aiohttp.ClientError as e:
+            logger.error(f"Error connecting to LightRAG server: {e}")
+            return f"❌ Error connecting to knowledge base server: {str(e)}"
+        except Exception as e:
+            logger.error(f"Error querying LightRAG knowledge base: {e}")
+            return f"❌ Error querying knowledge base: {str(e)}"
 
     async def _get_mcp_tools(self) -> List:
         """Create MCP tools as native async functions compatible with Agno.

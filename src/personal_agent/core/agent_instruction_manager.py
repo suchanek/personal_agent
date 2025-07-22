@@ -5,12 +5,12 @@ This module provides a dedicated class for managing agent instructions,
 extracted from the AgnoPersonalAgent class to improve modularity and maintainability.
 """
 
-from enum import Enum, auto
-from textwrap import dedent
-from typing import List, Dict, Any, Optional
-
 # Configure logging
 import logging
+from enum import Enum, auto
+from textwrap import dedent
+from typing import Any, Dict, List, Optional
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,11 +25,17 @@ class InstructionLevel(Enum):
 
 class AgentInstructionManager:
     """Manages the creation and customization of agent instructions."""
-    
-    def __init__(self, instruction_level: InstructionLevel, user_id: str, 
-                 enable_memory: bool, enable_mcp: bool, mcp_servers: Dict[str, Any]):
+
+    def __init__(
+        self,
+        instruction_level: InstructionLevel,
+        user_id: str,
+        enable_memory: bool,
+        enable_mcp: bool,
+        mcp_servers: Dict[str, Any],
+    ):
         """Initialize the instruction manager.
-        
+
         Args:
             instruction_level: The sophistication level for agent instructions
             user_id: User identifier for memory operations
@@ -42,7 +48,7 @@ class AgentInstructionManager:
         self.enable_memory = enable_memory
         self.enable_mcp = enable_mcp
         self.mcp_servers = mcp_servers
-        
+
     def create_instructions(self) -> str:
         """Create complete instructions based on the sophistication level."""
         level = self.instruction_level
@@ -101,7 +107,7 @@ class AgentInstructionManager:
             ]
 
         return "\n\n".join(dedent(p) for p in parts)
-        
+
     def get_header_instructions(self) -> str:
         """Returns the header section of the instructions."""
         mcp_status = "enabled" if self.enable_mcp else "disabled"
@@ -117,7 +123,7 @@ class AgentInstructionManager:
             - **User ID**: {self.user_id}
             - **Debug Mode**: {False}
         """
-        
+
     def get_identity_rules(self) -> str:
         """Returns the critical identity rules for the agent."""
         return f"""
@@ -135,7 +141,7 @@ class AgentInstructionManager:
 
             **FRIENDLY INTRODUCTION**: When meeting someone new, introduce yourself as their personal AI friend and ask about their hobbies, interests, and what they like to talk about. Be warm and conversational!
         """
-        
+
     def get_personality_and_tone(self) -> str:
         """Returns the personality and tone guidelines."""
         return """
@@ -147,7 +153,7 @@ class AgentInstructionManager:
             - **Be Remembering**: Reference past conversations and show you care
             - **Be Encouraging**: Celebrate their achievements and interests
         """
-        
+
     def get_concise_memory_rules(self) -> str:
         """Returns concise rules for the semantic memory system."""
         return """
@@ -157,7 +163,7 @@ class AgentInstructionManager:
             - Use `get_all_memories` or `get_recent_memories` for broad queries.
             - Always check memory first when asked about the user.
         """
-        
+
     def get_detailed_memory_rules(self) -> str:
         """Returns detailed, refined rules for the semantic memory system."""
         return """
@@ -193,7 +199,7 @@ class AgentInstructionManager:
             - CORRECT: "I remember you told me you enjoy hiking."
             - INCORRECT: "I enjoy hiking."
         """
-        
+
     def get_concise_tool_rules(self) -> str:
         """Returns concise rules for general tool usage."""
         return """
@@ -204,7 +210,7 @@ class AgentInstructionManager:
             - `PersonalAgentFilesystemTools`: For file operations.
             - `PythonTools`: For calculations and code execution.
         """
-        
+
     def get_detailed_tool_rules(self) -> str:
         """Returns detailed rules for general tool usage."""
         return """
@@ -228,11 +234,18 @@ class AgentInstructionManager:
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
-            - General knowledge questions? → query_lightrag_knowledge IMMEDIATELY
-            - Specific document/fact search? → query_semantic_knowledge IMMEDIATELY
+            - Searching existing knowledge? → query_knowledge_base IMMEDIATELY
             - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
+
+            **CREATIVE vs. FACTUAL REQUESTS - CRITICAL DISTINCTION**:
+            - **CREATIVE REQUESTS** (write story, create poem, generate content, make jokes, compose essay): 
+              → DO NOT use knowledge tools! Generate content directly using your language model.
+            - **FACTUAL SEARCHES** (find information about X, what do you know about Y, search for Z):
+              → Use query_knowledge_base to search existing stored knowledge.
+              - If no results are found from local search use your web tools.
+            - **NEVER** use knowledge tools for "write", "create", "generate", "make", "compose", "tell me a story", etc.
         """
-        
+
     def get_anti_hesitation_rules(self) -> str:
         """Returns explicit rules to prevent hesitation and overthinking for tool usage."""
         return """
@@ -250,7 +263,7 @@ class AgentInstructionManager:
             - ✅ "Calculate..." → IMMEDIATELY use PythonTools
             - ✅ NO hesitation, just ACTION
         """
-        
+
     def get_tool_list(self) -> str:
         """Dynamically returns the list of available tools."""
         # Start with the static list of built-in tools
@@ -297,7 +310,7 @@ class AgentInstructionManager:
             tool_parts.append("- **MCP Server Tools**: Disabled")
 
         return "\n".join(tool_parts)
-        
+
     def get_core_principles(self) -> str:
         """Returns the core principles and conversation guidelines."""
         return """

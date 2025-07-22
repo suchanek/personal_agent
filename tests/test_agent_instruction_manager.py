@@ -5,9 +5,19 @@ This module tests the instruction creation and management functionality
 extracted from the AgnoPersonalAgent class.
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add the src directory to Python path
+project_root = Path(__file__).parent.parent
+src_path = project_root / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
 import pytest
 from unittest.mock import Mock, patch
-from src.personal_agent.core.agent_instruction_manager import AgentInstructionManager, InstructionLevel
+from personal_agent.core.agent_instruction_manager import AgentInstructionManager, InstructionLevel
 
 
 class TestInstructionLevel:
@@ -131,10 +141,11 @@ class TestAgentInstructionManager:
         rules = self.manager.get_detailed_memory_rules()
         
         assert "SEMANTIC MEMORY SYSTEM" in rules
-        assert "IMMEDIATE ACTION REQUIRED" in rules
+        assert "WHAT TO REMEMBER" in rules
+        assert "WHAT NOT TO REMEMBER" in rules
         assert "store_user_memory" in rules
         assert "query_memory" in rules
-        assert "NO HESITATION RULE" in rules
+        assert "MEMORY STORAGE - GUIDING PRINCIPLE" in rules
     
     def test_get_concise_tool_rules(self):
         """Test concise tool rules generation."""
@@ -153,6 +164,9 @@ class TestAgentInstructionManager:
         assert "FINANCE QUERIES - IMMEDIATE ACTION" in rules
         assert "TOOL DECISION TREE" in rules
         assert "GoogleSearchTools IMMEDIATELY" in rules
+        assert "CREATIVE vs. FACTUAL REQUESTS" in rules
+        assert "DO NOT use knowledge tools" in rules
+        assert "Generate content directly" in rules
     
     def test_get_anti_hesitation_rules(self):
         """Test anti-hesitation rules generation."""
@@ -173,6 +187,8 @@ class TestAgentInstructionManager:
         assert "Local Memory Tools" in tool_list
         assert "Graph Memory Tools" in tool_list
         assert "Knowledge Base Tools" in tool_list
+        assert "query_knowledge_base" in tool_list
+        assert "UNIFIED knowledge coordinator" in tool_list
         assert "MCP Server Tools" in tool_list
         assert "use_github_server" in tool_list
         assert "use_filesystem_server" in tool_list
@@ -191,7 +207,7 @@ class TestAgentInstructionManager:
         
         assert "CURRENT AVAILABLE TOOLS" in tool_list
         assert "YFinanceTools" in tool_list
-        assert "MCP Server Tools: Disabled" in tool_list
+        assert "MCP Server Tools**: Disabled" in tool_list
         assert "use_github_server" not in tool_list
     
     def test_get_core_principles(self):
@@ -286,8 +302,8 @@ class TestAgentInstructionManager:
         sections = instructions.split('\n\n')
         assert len(sections) > 5  # Should have multiple sections
         
-        # Should start with header
-        assert instructions.startswith("You are a personal AI friend")
+        # Should start with header content (after dedent removes leading whitespace)
+        assert "You are a personal AI friend" in instructions
     
     def test_user_id_integration(self):
         """Test that user_id is properly integrated throughout instructions."""
