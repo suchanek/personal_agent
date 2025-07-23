@@ -13,6 +13,7 @@ from ..config import settings
 
 from ..utils import inject_dependencies, setup_logging
 from .agno_agent import AgnoPersonalAgent, create_agno_agent
+from .agent_instruction_manager import InstructionLevel
 
 
 async def initialize_agno_system(
@@ -45,6 +46,14 @@ async def initialize_agno_system(
     # Create agno agent with native storage
     logger.info("Creating agno agent with native storage...")
 
+    # Convert string instruction level to enum
+    try:
+        instruction_level_enum = InstructionLevel[instruction_level.upper()]
+        logger.info(f"Using instruction level: {instruction_level_enum.name}")
+    except KeyError:
+        logger.warning(f"Invalid instruction level '{instruction_level}', defaulting to CONCISE")
+        instruction_level_enum = InstructionLevel.CONCISE
+
     agno_agent = await create_agno_agent(
         model_provider="ollama",  # Default to Ollama
         model_name=settings.LLM_MODEL,  # Use configured model
@@ -56,7 +65,7 @@ async def initialize_agno_system(
         user_id=settings.USER_ID,
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
         recreate=recreate,
-        instruction_level=instruction_level,
+        instruction_level=instruction_level_enum,
     )
 
     agent_info = agno_agent.get_agent_info()
