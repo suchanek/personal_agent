@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Agno Response Handling Simplification**: Refactored agent response processing to trust Agno's built-in parsing, eliminating redundant content extraction and simplifying streaming logic. This reduces code complexity and improves maintainability. See [ADR-033](./docs/adr/033-agno-response-handling-simplification.md) for details.
+
 ### Fixed
+- **Tool Call Extraction**: Resolved an issue where tool calls were not consistently displayed in the Streamlit sidebar, despite successful execution. Implemented an event-based collection strategy to ensure reliable visibility of tool usage. See [ADR-033](./docs/adr/033-agno-response-handling-simplification.md) for details.
 - **Memory Grammar Conversion**: Corrected an issue where memories stored in third-person were not consistently converted to second-person when presented to the user, improving conversational flow and identity consistency. See [ADR-032](./docs/adr/032-memory-grammar-conversion-fix.md) for details.
 
 ### Added
