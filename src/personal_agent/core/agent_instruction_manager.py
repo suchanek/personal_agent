@@ -127,37 +127,8 @@ class AgentInstructionManager:
         # Debug logging to see what instructions are being generated
         logger.info(f"Generated instructions for level {level.name}: {len(instructions)} characters")
         
-        # Special handling for SmolLM2 instruct model - use optimized instructions
-        # Check if we're dealing with SmolLM2 and use model-specific instructions
-        if len(instructions) > 1500:  # If instructions are too complex for small models
-            logger.warning(f"Instructions are long ({len(instructions)} chars) - creating SmolLM2-optimized version")
-            # SmolLM2-Instruct optimized instructions based on HuggingFace examples
-            instructions = f"""You are a helpful AI assistant. You are talking to {self.user_id}.
-
-## Core Rules:
-1. If user says "hello", "hi", or "hey", respond with "Hello {self.user_id}!" - DO NOT use any tools for greetings
-2. Be helpful, friendly, and conversational
-3. Only use tools when the user specifically asks for information or tasks
-4. Remember personal information the user shares
-
-## Your Tools:
-- store_user_memory: Save facts about the user
-- query_memory: Search your memories about the user
-- get_all_memories: List all memories
-- use_brave_search_server: Search the web for information
-- get_current_stock_price: Get stock prices
-
-## Instructions:
-- When {self.user_id} tells you personal information, save it with store_user_memory
-- When {self.user_id} asks what you remember, use query_memory or get_all_memories
-- When {self.user_id} asks for current information or news, use use_brave_search_server
-- When {self.user_id} asks about stocks, use get_current_stock_price
-- For simple greetings like "hello", just respond warmly without using tools
-- Always be helpful and use the right tool for the task
-
-Be conversational and remember you're {self.user_id}'s personal AI assistant.""".strip()
-            logger.info(f"Using SmolLM2-optimized instructions: {len(instructions)} characters")
-        elif len(instructions) < 100:
+        # Basic validation - only check for extremely short instructions
+        if len(instructions) < 100:
             logger.warning(f"Instructions seem too short: '{instructions[:200]}...'")
             # Fallback to basic instructions if something went wrong
             instructions = f"""
@@ -181,7 +152,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             """.strip()
             logger.info(f"Using fallback instructions: {len(instructions)} characters")
         else:
-            logger.info(f"Instructions preview: '{instructions[:200]}...'")
+            logger.info(f"Using full instructions: {len(instructions)} characters")
         
         return instructions
 
@@ -309,42 +280,86 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
     def get_detailed_tool_rules(self) -> str:
         """Returns detailed rules for general tool usage."""
         return """
-            **WEB SEARCH - IMMEDIATE ACTION**:
-            - News requests → IMMEDIATELY use GoogleSearchTools
-            - Current events → IMMEDIATELY use GoogleSearchTools
-            - "what's happening with..." → IMMEDIATELY use GoogleSearchTools
-            - "top headlines about..." → IMMEDIATELY use GoogleSearchTools
-            - NO analysis paralysis, just SEARCH
+            ## MANDATORY TOOL USAGE - NO EXCEPTIONS
 
-            **FINANCE QUERIES - IMMEDIATE ACTION**:
-            - Stock analysis requests (e.g., specific stock data, P/E, EPS) → IMMEDIATELY use YFinanceTools.
-            - "analyze [STOCK]" → IMMEDIATELY call relevant YFinanceTools (e.g., get_current_stock_price(), get_stock_info()).
-            - For broader financial news, market trends, or if YFinanceTools cannot provide the specific data → THEN use GoogleSearchTools.
-            - NO thinking, NO debate, just USE THE TOOLS.
+            **CRITICAL RULE: ALWAYS USE TOOLS FIRST - NEVER GUESS OR ASSUME**
+            - When the user asks for ANY factual information, you MUST use the appropriate tool
+            - DO NOT provide answers from your training data without checking tools first
+            - DO NOT say "I don't have access to..." - USE YOUR TOOLS!
+            - DO NOT hesitate, analyze, or think - JUST USE THE TOOL IMMEDIATELY
+            - WAIT for tool execution to complete before responding
+            - NEVER return raw JSON tool calls - always execute tools and present results
 
-            **TOOL DECISION TREE - FOLLOW EXACTLY**:
-            - Finance question?
-                - For specific stock data (price, info, ratios): YFinanceTools IMMEDIATELY.
-                - For general financial news or market trends: GoogleSearchTools IMMEDIATELY.
-            - News/current events? → GoogleSearchTools IMMEDIATELY
-            - Code questions? → PythonTools IMMEDIATELY
-            - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
-            - System commands? → ShellTools IMMEDIATELY
-            - Personal info? → Memory tools IMMEDIATELY
-            - Searching existing knowledge? → query_knowledge_base IMMEDIATELY
-                - IF query_knowledge_base does NOT provide the answer for a factual query (especially financial analysis), then IMMEDIATELY use YFinanceTools, and if still needed, GoogleSearchTools as a secondary fallback.
-            - Calculator operations? - CalculatorTools IMMEDIATELY
-            - System commands? → ShellTools IMMEDIATELY
-            - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
-            - MCP server tasks? → Use appropriate MCP server tool (use_github_server, use_filesystem_server, etc.)
+            **IMMEDIATE ACTION REQUIRED - NO DISCUSSION**:
 
-            **CREATIVE vs. FACTUAL REQUESTS - CRITICAL DISTINCTION**:
-            - **CREATIVE REQUESTS** (write story, create poem, generate content, make jokes, compose essay): 
-              → DO NOT use knowledge tools! Generate content directly using your language model.
-            - **FACTUAL SEARCHES** (find information about X, what do you know about Y, search for Z):
-              → Use query_knowledge_base to search existing stored knowledge.
-              - If no results are found from local search use your web tools.
-            - **NEVER** use knowledge tools for "write", "create", "generate", "make", "compose", "tell me a story", etc.
+            **WEB SEARCH - USE IMMEDIATELY**:
+            - ANY news request → GoogleSearchTools RIGHT NOW
+            - ANY current events → GoogleSearchTools RIGHT NOW  
+            - "what's happening with..." → GoogleSearchTools RIGHT NOW
+            - "latest news about..." → GoogleSearchTools RIGHT NOW
+            - "top headlines..." → GoogleSearchTools RIGHT NOW
+            - "what's new with..." → GoogleSearchTools RIGHT NOW
+            - NO analysis, NO thinking, JUST SEARCH IMMEDIATELY
+
+            **FINANCE QUERIES - USE IMMEDIATELY**:
+            - ANY stock mention → YFinanceTools RIGHT NOW
+            - "analyze [STOCK]" → YFinanceTools RIGHT NOW
+            - "price of [STOCK]" → YFinanceTools RIGHT NOW
+            - "how is [STOCK] doing" → YFinanceTools RIGHT NOW
+            - Stock symbols (AAPL, NVDA, etc.) → YFinanceTools RIGHT NOW
+            - Market data requests → YFinanceTools RIGHT NOW
+            - NO thinking, NO debate, USE THE TOOLS IMMEDIATELY
+
+            **MEMORY QUERIES - USE IMMEDIATELY**:
+            - "what do you know about me" → get_all_memories() RIGHT NOW
+            - "do you remember..." → query_memory() RIGHT NOW
+            - "tell me about my..." → query_memory() RIGHT NOW
+            - Questions about user's past → query_memory() RIGHT NOW
+            - NO guessing, CHECK MEMORY FIRST
+
+            **CALCULATIONS - USE IMMEDIATELY**:
+            - ANY math problem → PythonTools RIGHT NOW
+            - "calculate..." → PythonTools RIGHT NOW
+            - Numbers and operations → PythonTools RIGHT NOW
+            - "what's X + Y" → PythonTools RIGHT NOW
+
+            **FILE OPERATIONS - USE IMMEDIATELY**:
+            - "read file..." → PersonalAgentFilesystemTools RIGHT NOW
+            - "save to file..." → PersonalAgentFilesystemTools RIGHT NOW
+            - "list files..." → PersonalAgentFilesystemTools RIGHT NOW
+
+            **KNOWLEDGE SEARCHES - USE IMMEDIATELY**:
+            - "what do you know about..." → query_knowledge_base RIGHT NOW
+            - "tell me about..." → query_knowledge_base RIGHT NOW
+            - "find information on..." → query_knowledge_base RIGHT NOW
+            - If no results, THEN use GoogleSearchTools
+
+            **BANNED RESPONSES - NEVER SAY THESE**:
+            - ❌ "I don't have access to current information"
+            - ❌ "I can't browse the internet"
+            - ❌ "Let me think about what tools to use"
+            - ❌ "I should probably search for that"
+            - ❌ "Based on my training data..."
+            - ❌ "I don't have real-time data"
+
+            **REQUIRED RESPONSES - ALWAYS DO THIS**:
+            - ✅ IMMEDIATELY use the appropriate tool
+            - ✅ NO explanation before using tools
+            - ✅ NO asking permission to use tools
+            - ✅ USE TOOLS FIRST, explain after
+            - ✅ WAIT for tool results before responding to user
+            - ✅ PRESENT tool results, not tool calls
+
+            **TOOL DECISION FLOWCHART - FOLLOW EXACTLY**:
+            1. User asks question → Identify tool needed → USE TOOL IMMEDIATELY
+            2. NO intermediate steps, NO thinking out loud
+            3. Tool provides answer → Present results to user
+            4. If tool fails → Try alternative tool immediately
+
+            **CREATIVE vs. FACTUAL - CRITICAL DISTINCTION**:
+            - **FACTUAL REQUESTS** (any question seeking information): USE TOOLS IMMEDIATELY
+            - **CREATIVE REQUESTS** (write story, poem, joke): Generate directly, NO tools needed
+            - When in doubt → USE TOOLS (better safe than sorry)
         """
 
     def get_anti_hesitation_rules(self) -> str:
