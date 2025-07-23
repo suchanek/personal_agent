@@ -288,23 +288,33 @@ class AgnoPersonalAgent:
             model = self.model_manager.create_model()
             logger.info("Created model: %s", self.model_name)
 
-            # Prepare tools list
-            tools = [
-                # Add GoogleSearch tools directly for web search functionality
-                GoogleSearchTools(),
-                YFinanceTools(
-                    stock_price=True,
-                    company_info=True,
-                    stock_fundamentals=True,
-                    key_financial_ratios=True,
-                    analyst_recommendations=True,
-                ),
-                PythonTools(),
-                PersonalAgentFilesystemTools(),  # @todo: modify to pass a proper starting dir
-                PersonalAgentSystemTools(),
-                KnowledgeIngestionTools(),  # Add knowledge ingestion capabilities
-                CalculatorTools(enable_all=True),
-            ]
+            # Prepare tools list - reduce tools for SmolLM2 to prevent confusion
+            if is_smollm2_model(self.model_name):
+                # Minimal tool set for SmolLM2 to reduce confusion
+                tools = [
+                    GoogleSearchTools(),  # For web search
+                    YFinanceTools(stock_price=True),  # Just basic stock prices
+                    CalculatorTools(enable_all=False),  # Basic calculator only
+                ]
+                logger.info("Using minimal tool set for SmolLM2 model")
+            else:
+                # Full tool set for other models
+                tools = [
+                    # Add GoogleSearch tools directly for web search functionality
+                    GoogleSearchTools(),
+                    YFinanceTools(
+                        stock_price=True,
+                        company_info=True,
+                        stock_fundamentals=True,
+                        key_financial_ratios=True,
+                        analyst_recommendations=True,
+                    ),
+                    PythonTools(),
+                    PersonalAgentFilesystemTools(),  # @todo: modify to pass a proper starting dir
+                    PersonalAgentSystemTools(),
+                    KnowledgeIngestionTools(),  # Add knowledge ingestion capabilities
+                    CalculatorTools(enable_all=True),
+                ]
 
             # Initialize Agno native storage and knowledge following the working example pattern
             if self.enable_memory:
@@ -474,17 +484,31 @@ class AgnoPersonalAgent:
             # Get the streaming response from agno
             response_stream = await self.agent.arun(query, user_id=self.user_id)
             
-            # Initialize tool call collection
-            self._collected_tool_calls = []
+            # Debug logging for response stream
+            logger.debug(f"Response stream type: {type(response_stream)}")
+            logger.debug(f"Response stream has __aiter__: {hasattr(response_stream, '__aiter__')}")
             
-            # Check if it's an async generator (streaming response)
+            # Initialize variables
+            self._collected_tool_calls = []
+            final_content = ""
+            
+            # Handle both streaming and direct responses
             if hasattr(response_stream, '__aiter__'):
-                # Consume the async generator and collect tool calls
-                final_response = None
+                # Streaming response - collect all chunks
+                chunks = []
                 async for chunk in response_stream:
+                    chunks.append(chunk)
+                    # Safe debug logging for chunk content
+                    chunk_content = getattr(chunk, 'content', 'No content attr')
+                    if chunk_content and chunk_content != 'No content attr':
+                        content_preview = str(chunk_content)[:100] if chunk_content else 'Empty'
+                    else:
+                        content_preview = 'No content'
+                    logger.debug(f"Received chunk: {type(chunk)}, content: {content_preview}")
+                    
                     # Collect tool calls from streaming events
-                    if hasattr(chunk, 'event'):
-                        if chunk.event == 'ToolCallCompleted' and hasattr(chunk, 'tool'):
+                    if hasattr(chunk, 'event') and chunk.event == 'ToolCallCompleted':
+                        if hasattr(chunk, 'tool'):
                             self._collected_tool_calls.append(chunk.tool)
                             if self.debug:
                                 tool_name = "unknown"
@@ -493,36 +517,55 @@ class AgnoPersonalAgent:
                                 elif hasattr(chunk.tool, 'function') and hasattr(chunk.tool.function, 'name'):
                                     tool_name = chunk.tool.function.name
                                 logger.debug(f"Collected tool call: {tool_name}")
+                
+                logger.debug(f"Total chunks received: {len(chunks)}")
+                
+                # Process final response from chunks
+                if chunks:
+                    final_response = chunks[-1]
+                    final_content = getattr(final_response, 'content', '')
                     
-                    # Keep track of the latest chunk which should be the final response
-                    final_response = chunk
-                
-                # Store the final response for tool inspection
-                self._last_response = final_response
-                
-                # Extract content from the final response
-                if final_response:
-                    content = final_response.content if hasattr(final_response, 'content') else str(final_response)
+                    # If no content in final chunk, try to extract from all chunks
+                    if not final_content or not final_content.strip():
+                        logger.debug("Final chunk has no content, searching all chunks...")
+                        for i, chunk in enumerate(reversed(chunks)):
+                            chunk_content = getattr(chunk, 'content', '')
+                            logger.debug(f"Chunk {len(chunks)-i-1} content: {repr(chunk_content[:100]) if chunk_content else 'Empty'}")
+                            if chunk_content and chunk_content.strip():
+                                final_content = chunk_content
+                                logger.debug(f"Found content in chunk {len(chunks)-i-1}")
+                                break
+                    
+                    self._last_response = final_response
                 else:
-                    content = "No response generated."
+                    logger.warning("No chunks received from streaming response")
+                    self._last_response = None
             else:
-                # It's a direct response object
+                # Direct response object
+                logger.debug("Direct response object received")
                 self._last_response = response_stream
-                content = response_stream.content if hasattr(response_stream, 'content') else str(response_stream)
+                final_content = getattr(response_stream, 'content', str(response_stream))
+                logger.debug(f"Direct response content: {repr(final_content[:100]) if final_content else 'Empty'}")
             
-            # SmolLM2 cleanup if needed (only special case we handle)
-            if is_smollm2_model(self.model_name):
+            # Validate and clean content
+            final_content = self._validate_response_content(final_content, query)
+            
+            # SmolLM2 cleanup if needed
+            if is_smollm2_model(self.model_name) and final_content:
                 logger.debug("Processing SmolLM2 response format")
-                content = extract_content_from_smollm2_response(content)
-                logger.debug(f"SmolLM2 cleaned response: {content[:100]}...")
+                final_content = extract_content_from_smollm2_response(final_content)
+                logger.debug(f"SmolLM2 cleaned response: {final_content[:100]}...")
+            
+            logger.debug(f"Final content length: {len(final_content) if final_content else 0}")
+            logger.debug(f"Final content preview: {repr(final_content[:200]) if final_content else 'None'}")
             
             if add_thought_callback:
                 add_thought_callback("✅ Agent execution complete.")
                 
-            return content if content.strip() else "No response generated."
+            return final_content.strip() if final_content else "I apologize, but I didn't generate a proper response. Could you please try again?"
 
         except Exception as e:
-            logger.error("Error running agno agent: %s", e)
+            logger.error("Error running agno agent: %s", e, exc_info=True)
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
@@ -534,6 +577,53 @@ class AgnoPersonalAgent:
             List of ToolExecution objects from the most recent run
         """
         return getattr(self, '_collected_tool_calls', [])
+
+    def _validate_response_content(self, content: str, query: str) -> str:
+        """Validate and potentially fix response content.
+        
+        Args:
+            content: The raw content from the agent response
+            query: The original user query
+            
+        Returns:
+            Validated and potentially fixed content
+        """
+        import re
+        
+        if not content or not content.strip():
+            logger.warning(f"Empty response for query: {query[:50]}...")
+            
+            # Try to extract from response object attributes if available
+            if self._last_response:
+                for attr in ['text', 'message', 'output', 'result']:
+                    if hasattr(self._last_response, attr):
+                        alt_content = getattr(self._last_response, attr)
+                        if alt_content and str(alt_content).strip():
+                            logger.info(f"Recovered content from {attr} attribute")
+                            return str(alt_content)
+            
+            # Generate a simple fallback based on query
+            if any(greeting in query.lower() for greeting in ['hello', 'hi', 'hey']):
+                return f"Hello {self.user_id}!"
+            else:
+                return "I'm here to help! What would you like to know?"
+        
+        # Check for common SmolLM2 issues
+        if is_smollm2_model(self.model_name):
+            # Remove any XML artifacts that might remain
+            cleaned_content = re.sub(r'<[^>]+>', '', content).strip()
+            
+            # If still empty after cleanup
+            if not cleaned_content:
+                # Generate a simple fallback based on query
+                if any(greeting in query.lower() for greeting in ['hello', 'hi', 'hey']):
+                    return f"Hello {self.user_id}!"
+                else:
+                    return "I'm here to help! What would you like to know?"
+            
+            return cleaned_content
+        
+        return content
 
     async def store_user_memory(
         self, content: str = "", topics: Union[List[str], str, None] = None

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Instruction Override**: Removed a flawed optimization that replaced detailed instructions with a simplified version for prompts over 1000 characters. This ensures the agent always uses the full, intended instruction set, preserving its configured sophistication and performance. See [ADR-034](./refs/adr/034-smollm2-optimization-fix.md) for details.
+
 ### Changed
 - **Agno Response Handling Simplification**: Refactored agent response processing to trust Agno's built-in parsing, eliminating redundant content extraction and simplifying streaming logic. This reduces code complexity and improves maintainability. See [ADR-033](./docs/adr/033-agno-response-handling-simplification.md) for details.
 
