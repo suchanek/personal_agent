@@ -53,6 +53,7 @@ from .agent_knowledge_manager import AgentKnowledgeManager
 from .agent_memory_manager import AgentMemoryManager
 from .agent_model_manager import AgentModelManager
 from .agent_tool_manager import AgentToolManager
+from .smollm2_parser import is_smollm2_model, parse_smollm2_response, extract_content_from_smollm2_response
 from .agno_storage import (
     create_agno_memory,
     create_agno_storage,
@@ -88,7 +89,7 @@ class AgnoPersonalAgent:
         ollama_base_url: str = OLLAMA_URL,
         user_id: str = USER_ID,
         recreate: bool = False,
-        instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+        instruction_level: InstructionLevel = InstructionLevel.CONCISE,
         seed: Optional[int] = None,
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -476,12 +477,20 @@ class AgnoPersonalAgent:
             # Check if we got a generator (streaming) or a direct response
             if hasattr(response_generator, "__aiter__"):
                 # It's an async generator, consume it to get the final response
-                # Following the working example pattern from github_agent_streamlit.py
+                # Enhanced response handling for different model response structures
                 final_response = None
                 response_content = ""
                 all_tools_used = []
 
                 async for chunk in response_generator:
+                    # Debug logging for chunk structure (only in debug mode)
+                    if self.debug:
+                        logger.debug(f"Processing chunk: {type(chunk).__name__}")
+                        if hasattr(chunk, "event"):
+                            logger.debug(f"  Event: {chunk.event}")
+                        if hasattr(chunk, "content"):
+                            logger.debug(f"  Content: {chunk.content}")
+
                     # Look for individual tool in chunk (singular, like the working example)
                     if hasattr(chunk, "tool") and chunk.tool:
                         all_tools_used.append(chunk.tool)
@@ -489,14 +498,41 @@ class AgnoPersonalAgent:
                             f"Found tool in chunk: {getattr(chunk.tool, 'name', 'Unknown')}"
                         )
 
-                    # Look for content in RunResponse events (like the working example)
+                    # Enhanced content extraction - try multiple approaches
+                    chunk_content = None
+                    
+                    # Method 1: Look for content in RunResponse events (original approach)
                     if (
                         hasattr(chunk, "event")
                         and chunk.event == "RunResponse"
                         and hasattr(chunk, "content")
                         and chunk.content is not None
                     ):
-                        response_content += chunk.content
+                        chunk_content = chunk.content
+                        if self.debug:
+                            logger.debug(f"Found content via RunResponse event: {chunk_content}")
+                    
+                    # Method 2: Direct content attribute (fallback for different response structures)
+                    elif hasattr(chunk, "content") and chunk.content is not None:
+                        chunk_content = chunk.content
+                        if self.debug:
+                            logger.debug(f"Found content via direct attribute: {chunk_content}")
+                    
+                    # Method 3: Check if chunk itself is a string (some models return direct strings)
+                    elif isinstance(chunk, str) and chunk.strip():
+                        chunk_content = chunk
+                        if self.debug:
+                            logger.debug(f"Found content as direct string: {chunk_content}")
+                    
+                    # Method 4: Check for delta content (streaming models sometimes use delta)
+                    elif hasattr(chunk, "delta") and hasattr(chunk.delta, "content") and chunk.delta.content:
+                        chunk_content = chunk.delta.content
+                        if self.debug:
+                            logger.debug(f"Found content via delta: {chunk_content}")
+
+                    # Add any found content to response
+                    if chunk_content:
+                        response_content += chunk_content
 
                     # Keep track of the last chunk
                     final_response = chunk
@@ -544,7 +580,22 @@ class AgnoPersonalAgent:
                 if add_thought_callback:
                     add_thought_callback("✅ Agent execution complete.")
 
-                return response_content
+                # SmolLM2-specific response processing
+                if is_smollm2_model(self.model_name):
+                    logger.debug("Processing SmolLM2 response format")
+                    
+                    # Extract readable content (without tool response XML tags)
+                    readable_content = extract_content_from_smollm2_response(response_content)
+                    
+                    # SmolLM2 doesn't use <tool_call> format for requests, it uses standard tool execution
+                    # The <tool_response> tags are just formatting artifacts that need to be cleaned
+                    logger.debug(f"SmolLM2 cleaned response: {readable_content[:100]}...")
+                    
+                    # Return the cleaned content, or the original if cleaning resulted in empty string
+                    return readable_content if readable_content.strip() else response_content
+                else:
+                    # Standard processing for non-SmolLM2 models
+                    return response_content
             else:
                 # It's a direct response object
                 self._last_response = response_generator
@@ -561,11 +612,29 @@ class AgnoPersonalAgent:
                 if add_thought_callback:
                     add_thought_callback("✅ Agent execution complete.")
 
-                return (
+                # Get the response content
+                response_content = (
                     response_generator.content
                     if hasattr(response_generator, "content")
                     else str(response_generator)
                 )
+
+                # SmolLM2-specific response processing for non-streaming responses
+                if is_smollm2_model(self.model_name):
+                    logger.debug("Processing SmolLM2 non-streaming response format")
+                    
+                    # Extract readable content (without tool response XML tags)
+                    readable_content = extract_content_from_smollm2_response(response_content)
+                    
+                    # SmolLM2 doesn't use <tool_call> format for requests, it uses standard tool execution
+                    # The <tool_response> tags are just formatting artifacts that need to be cleaned
+                    logger.debug(f"SmolLM2 non-streaming cleaned response: {readable_content[:100]}...")
+                    
+                    # Return the cleaned content, or the original if cleaning resulted in empty string
+                    return readable_content if readable_content.strip() else response_content
+                else:
+                    # Standard processing for non-SmolLM2 models
+                    return response_content
 
         except Exception as e:
             logger.error("Error running agno agent: %s", e)

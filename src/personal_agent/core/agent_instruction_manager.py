@@ -121,7 +121,69 @@ class AgentInstructionManager:
                 principles,
             ]
 
-        return "\n\n".join(dedent(p) for p in parts)
+        # Join all parts and log for debugging
+        instructions = "\n\n".join(dedent(p) for p in parts)
+        
+        # Debug logging to see what instructions are being generated
+        logger.info(f"Generated instructions for level {level.name}: {len(instructions)} characters")
+        
+        # Special handling for SmolLM2 instruct model - use optimized instructions
+        # Check if we're dealing with SmolLM2 and use model-specific instructions
+        if len(instructions) > 1500:  # If instructions are too complex for small models
+            logger.warning(f"Instructions are long ({len(instructions)} chars) - creating SmolLM2-optimized version")
+            # SmolLM2-Instruct optimized instructions based on HuggingFace examples
+            instructions = f"""You are a helpful AI assistant. You are talking to {self.user_id}.
+
+## Core Rules:
+1. If user says "hello", "hi", or "hey", respond with "Hello {self.user_id}!" - DO NOT use any tools for greetings
+2. Be helpful, friendly, and conversational
+3. Only use tools when the user specifically asks for information or tasks
+4. Remember personal information the user shares
+
+## Your Tools:
+- store_user_memory: Save facts about the user
+- query_memory: Search your memories about the user
+- get_all_memories: List all memories
+- use_brave_search_server: Search the web for information
+- get_current_stock_price: Get stock prices
+
+## Instructions:
+- When {self.user_id} tells you personal information, save it with store_user_memory
+- When {self.user_id} asks what you remember, use query_memory or get_all_memories
+- When {self.user_id} asks for current information or news, use use_brave_search_server
+- When {self.user_id} asks about stocks, use get_current_stock_price
+- For simple greetings like "hello", just respond warmly without using tools
+- Always be helpful and use the right tool for the task
+
+Be conversational and remember you're {self.user_id}'s personal AI assistant.""".strip()
+            logger.info(f"Using SmolLM2-optimized instructions: {len(instructions)} characters")
+        elif len(instructions) < 100:
+            logger.warning(f"Instructions seem too short: '{instructions[:200]}...'")
+            # Fallback to basic instructions if something went wrong
+            instructions = f"""
+You are a helpful AI assistant and personal friend to {self.user_id}.
+
+## CRITICAL GREETING RULE
+- If the user says 'hello', 'hi', or 'hey', respond with: 'Hello {self.user_id}!'
+- Do not add anything else to this greeting response.
+
+## YOUR IDENTITY
+- You are an AI assistant, not the user
+- You help and remember things about the user
+- Be friendly, warm, and conversational
+- Use your tools when needed to help the user
+
+## CORE BEHAVIOR
+- Be helpful and supportive
+- Remember information about the user
+- Use tools immediately when requested
+- Stay positive and encouraging
+            """.strip()
+            logger.info(f"Using fallback instructions: {len(instructions)} characters")
+        else:
+            logger.info(f"Instructions preview: '{instructions[:200]}...'")
+        
+        return instructions
 
     def get_header_instructions(self) -> str:
         """Returns the header section of the instructions."""
@@ -255,19 +317,22 @@ class AgentInstructionManager:
             - NO analysis paralysis, just SEARCH
 
             **FINANCE QUERIES - IMMEDIATE ACTION**:
-            - Stock analysis requests → IMMEDIATELY use YFinanceTools
-            - "analyze [STOCK]" → IMMEDIATELY call get_current_stock_price() and get_stock_info()
-            - Financial data requests → IMMEDIATELY use finance tools
-            - NO thinking, NO debate, just USE THE TOOLS
+            - Stock analysis requests (e.g., specific stock data, P/E, EPS) → IMMEDIATELY use YFinanceTools.
+            - "analyze [STOCK]" → IMMEDIATELY call relevant YFinanceTools (e.g., get_current_stock_price(), get_stock_info()).
+            - For broader financial news, market trends, or if YFinanceTools cannot provide the specific data → THEN use GoogleSearchTools.
+            - NO thinking, NO debate, just USE THE TOOLS.
 
             **TOOL DECISION TREE - FOLLOW EXACTLY**:
-            - Finance question? → YFinanceTools IMMEDIATELY (get_current_stock_price, get_stock_info, etc.)
+            - Finance question?
+                - For specific stock data (price, info, ratios): YFinanceTools IMMEDIATELY.
+                - For general financial news or market trends: GoogleSearchTools IMMEDIATELY.
             - News/current events? → GoogleSearchTools IMMEDIATELY
             - Code questions? → PythonTools IMMEDIATELY
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - Personal info? → Memory tools IMMEDIATELY
             - Searching existing knowledge? → query_knowledge_base IMMEDIATELY
+                - IF query_knowledge_base does NOT provide the answer for a factual query (especially financial analysis), then IMMEDIATELY use YFinanceTools, and if still needed, GoogleSearchTools as a secondary fallback.
             - Calculator operations? - CalculatorTools IMMEDIATELY
             - System commands? → ShellTools IMMEDIATELY
             - File operations? → PersonalAgentFilesystemTools IMMEDIATELY

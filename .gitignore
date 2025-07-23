@@ -187,3 +187,4 @@ weaviate_data/
 .DS_Store
 data/
 cookbook/
+examples/mcp_agent/tmp/
