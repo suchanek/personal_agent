@@ -163,6 +163,7 @@ class AgnoPersonalAgent:
         # Agent instance
         self.agent = None
         self._last_response = None
+        self._collected_tool_calls = []
 
         logger.info(
             "Initialized AgnoPersonalAgent with model=%s, memory=%s, mcp=%s, user_id=%s",
@@ -449,16 +450,16 @@ class AgnoPersonalAgent:
 
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
-    ) -> Union[str, Dict[str, Any]]:
+    ) -> str:
         """Run a query through the agno agent, allowing for native tool execution.
 
         Args:
             query: User query to process
-            stream: Whether to stream the response
+            stream: Whether to stream the response (parameter kept for compatibility)
             add_thought_callback: Optional callback for adding thoughts during processing
 
         Returns:
-            Agent's final string response or response dictionary
+            Agent's final string response
 
         Raises:
             RuntimeError: If agent is not initialized
@@ -470,177 +471,69 @@ class AgnoPersonalAgent:
             if add_thought_callback:
                 add_thought_callback("🚀 Executing agno agent...")
 
-            # The agent will handle the full tool-use loop internally
-            # Since the agent is configured with stream=True, arun returns an async generator
-            response_generator = await self.agent.arun(query, user_id=self.user_id)
-
-            # Check if we got a generator (streaming) or a direct response
-            if hasattr(response_generator, "__aiter__"):
-                # It's an async generator, consume it to get the final response
-                # Enhanced response handling for different model response structures
+            # Get the streaming response from agno
+            response_stream = await self.agent.arun(query, user_id=self.user_id)
+            
+            # Initialize tool call collection
+            self._collected_tool_calls = []
+            
+            # Check if it's an async generator (streaming response)
+            if hasattr(response_stream, '__aiter__'):
+                # Consume the async generator and collect tool calls
                 final_response = None
-                response_content = ""
-                all_tools_used = []
-
-                async for chunk in response_generator:
-                    # Debug logging for chunk structure (only in debug mode)
-                    if self.debug:
-                        logger.debug(f"Processing chunk: {type(chunk).__name__}")
-                        if hasattr(chunk, "event"):
-                            logger.debug(f"  Event: {chunk.event}")
-                        if hasattr(chunk, "content"):
-                            logger.debug(f"  Content: {chunk.content}")
-
-                    # Look for individual tool in chunk (singular, like the working example)
-                    if hasattr(chunk, "tool") and chunk.tool:
-                        all_tools_used.append(chunk.tool)
-                        logger.debug(
-                            f"Found tool in chunk: {getattr(chunk.tool, 'name', 'Unknown')}"
-                        )
-
-                    # Enhanced content extraction - try multiple approaches
-                    chunk_content = None
+                async for chunk in response_stream:
+                    # Collect tool calls from streaming events
+                    if hasattr(chunk, 'event'):
+                        if chunk.event == 'ToolCallCompleted' and hasattr(chunk, 'tool'):
+                            self._collected_tool_calls.append(chunk.tool)
+                            if self.debug:
+                                tool_name = "unknown"
+                                if hasattr(chunk.tool, 'tool_name'):
+                                    tool_name = chunk.tool.tool_name
+                                elif hasattr(chunk.tool, 'function') and hasattr(chunk.tool.function, 'name'):
+                                    tool_name = chunk.tool.function.name
+                                logger.debug(f"Collected tool call: {tool_name}")
                     
-                    # Method 1: Look for content in RunResponse events (original approach)
-                    if (
-                        hasattr(chunk, "event")
-                        and chunk.event == "RunResponse"
-                        and hasattr(chunk, "content")
-                        and chunk.content is not None
-                    ):
-                        chunk_content = chunk.content
-                        if self.debug:
-                            logger.debug(f"Found content via RunResponse event: {chunk_content}")
-                    
-                    # Method 2: Direct content attribute (fallback for different response structures)
-                    elif hasattr(chunk, "content") and chunk.content is not None:
-                        chunk_content = chunk.content
-                        if self.debug:
-                            logger.debug(f"Found content via direct attribute: {chunk_content}")
-                    
-                    # Method 3: Check if chunk itself is a string (some models return direct strings)
-                    elif isinstance(chunk, str) and chunk.strip():
-                        chunk_content = chunk
-                        if self.debug:
-                            logger.debug(f"Found content as direct string: {chunk_content}")
-                    
-                    # Method 4: Check for delta content (streaming models sometimes use delta)
-                    elif hasattr(chunk, "delta") and hasattr(chunk.delta, "content") and chunk.delta.content:
-                        chunk_content = chunk.delta.content
-                        if self.debug:
-                            logger.debug(f"Found content via delta: {chunk_content}")
-
-                    # Add any found content to response
-                    if chunk_content:
-                        response_content += chunk_content
-
-                    # Keep track of the last chunk
+                    # Keep track of the latest chunk which should be the final response
                     final_response = chunk
-
-                # Create a response object with collected tools
-                if final_response:
-                    # Create a simple object to hold tools for compatibility
-                    class ResponseWithTools:
-                        def __init__(self, original_response, tools):
-                            self.tool_calls = (
-                                tools  # Store as tool_calls for compatibility
-                            )
-                            self.tools = tools  # Also store as tools
-                            # Copy other attributes from original response
-                            for attr in dir(original_response):
-                                if not attr.startswith("_") and attr not in [
-                                    "tool_calls",
-                                    "tools",
-                                ]:
-                                    try:
-                                        setattr(
-                                            self, attr, getattr(original_response, attr)
-                                        )
-                                    except:
-                                        pass
-
-                    if all_tools_used:
-                        final_response = ResponseWithTools(
-                            final_response, all_tools_used
-                        )
-                    else:
-                        # Ensure we have empty tool_calls for consistency
-                        if not hasattr(final_response, "tool_calls"):
-                            final_response.tool_calls = []
-
-                # Store the final response for tool call inspection
+                
+                # Store the final response for tool inspection
                 self._last_response = final_response
-
-                # Use tool_manager to analyze tool calls if needed
-                if all_tools_used:
-                    logger.debug(
-                        f"Agent used {len(all_tools_used)} tools in this response"
-                    )
-
-                if add_thought_callback:
-                    add_thought_callback("✅ Agent execution complete.")
-
-                # SmolLM2-specific response processing
-                if is_smollm2_model(self.model_name):
-                    logger.debug("Processing SmolLM2 response format")
-                    
-                    # Extract readable content (without tool response XML tags)
-                    readable_content = extract_content_from_smollm2_response(response_content)
-                    
-                    # SmolLM2 doesn't use <tool_call> format for requests, it uses standard tool execution
-                    # The <tool_response> tags are just formatting artifacts that need to be cleaned
-                    logger.debug(f"SmolLM2 cleaned response: {readable_content[:100]}...")
-                    
-                    # Return the cleaned content, or the original if cleaning resulted in empty string
-                    return readable_content if readable_content.strip() else response_content
+                
+                # Extract content from the final response
+                if final_response:
+                    content = final_response.content if hasattr(final_response, 'content') else str(final_response)
                 else:
-                    # Standard processing for non-SmolLM2 models
-                    return response_content
+                    content = "No response generated."
             else:
                 # It's a direct response object
-                self._last_response = response_generator
-
-                # Use tool_manager to analyze tool calls if needed
-                if (
-                    hasattr(response_generator, "tool_calls")
-                    and response_generator.tool_calls
-                ):
-                    logger.debug(
-                        f"Agent used {len(response_generator.tool_calls)} tools in this response"
-                    )
-
-                if add_thought_callback:
-                    add_thought_callback("✅ Agent execution complete.")
-
-                # Get the response content
-                response_content = (
-                    response_generator.content
-                    if hasattr(response_generator, "content")
-                    else str(response_generator)
-                )
-
-                # SmolLM2-specific response processing for non-streaming responses
-                if is_smollm2_model(self.model_name):
-                    logger.debug("Processing SmolLM2 non-streaming response format")
-                    
-                    # Extract readable content (without tool response XML tags)
-                    readable_content = extract_content_from_smollm2_response(response_content)
-                    
-                    # SmolLM2 doesn't use <tool_call> format for requests, it uses standard tool execution
-                    # The <tool_response> tags are just formatting artifacts that need to be cleaned
-                    logger.debug(f"SmolLM2 non-streaming cleaned response: {readable_content[:100]}...")
-                    
-                    # Return the cleaned content, or the original if cleaning resulted in empty string
-                    return readable_content if readable_content.strip() else response_content
-                else:
-                    # Standard processing for non-SmolLM2 models
-                    return response_content
+                self._last_response = response_stream
+                content = response_stream.content if hasattr(response_stream, 'content') else str(response_stream)
+            
+            # SmolLM2 cleanup if needed (only special case we handle)
+            if is_smollm2_model(self.model_name):
+                logger.debug("Processing SmolLM2 response format")
+                content = extract_content_from_smollm2_response(content)
+                logger.debug(f"SmolLM2 cleaned response: {content[:100]}...")
+            
+            if add_thought_callback:
+                add_thought_callback("✅ Agent execution complete.")
+                
+            return content if content.strip() else "No response generated."
 
         except Exception as e:
             logger.error("Error running agno agent: %s", e)
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
+
+    def get_last_tool_calls(self) -> List[Any]:
+        """Get tool calls from the last agent run.
+        
+        Returns:
+            List of ToolExecution objects from the most recent run
+        """
+        return getattr(self, '_collected_tool_calls', [])
 
     async def store_user_memory(
         self, content: str = "", topics: Union[List[str], str, None] = None

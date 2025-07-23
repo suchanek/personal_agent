@@ -260,82 +260,37 @@ def render_chat_tab():
                 try:
                     agent = st.session_state[SESSION_KEY_AGENT]
                     
-                    # Handle AgnoPersonalAgent with proper streaming support
-                    # Following the working example pattern from github_agent_streamlit.py
+                    # Handle AgnoPersonalAgent with simplified response handling
                     if isinstance(agent, AgnoPersonalAgent):
                         async def run_agent_with_streaming():
                             nonlocal response, tool_calls_made, tool_call_details, all_tools_used
                             
                             try:
-                                # Get the raw streaming response from the agent
-                                # This matches the working example: github_agent.run(question, stream=True, stream_intermediate_steps=True)
-                                raw_response = await agent.agent.arun(prompt, user_id=agent.user_id)
+                                # Use the simplified agent.run() method
+                                response_content = await agent.run(prompt, add_thought_callback=None)
                                 
-                                # Check if it's a streaming generator
-                                if hasattr(raw_response, '__aiter__'):
-                                    # Process streaming chunks like the working example
-                                    response_content = ""
+                                # Get tool calls using the new method that collects from streaming events
+                                tools_used = agent.get_last_tool_calls()
+                                
+                                # Process and display tool calls
+                                if tools_used:
+                                    print(f"DEBUG: Processing {len(tools_used)} tool calls from streaming events")
+                                    for i, tool_call in enumerate(tools_used):
+                                        print(f"DEBUG: Tool call {i}: {tool_call}")
+                                        formatted_tool = format_tool_call_for_debug(tool_call)
+                                        tool_call_details.append(formatted_tool)
+                                        all_tools_used.append(tool_call)
+                                        tool_calls_made += 1
                                     
-                                    async for chunk in raw_response:
-                                        # Display tool calls if available (singular tool like working example)
-                                        if hasattr(chunk, "tool") and chunk.tool:
-                                            # Format tool for display and storage
-                                            formatted_tool = format_tool_call_for_debug(chunk.tool)
-                                            tool_call_details.append(formatted_tool)
-                                            all_tools_used.append(chunk.tool)
-                                            tool_calls_made += 1
-                                            
-                                            # Display tool call in real-time
-                                            display_tool_calls(tool_calls_container, [chunk.tool])
-                                        
-                                        # Display response if available - be more flexible with content detection
-                                        content_found = False
-                                        
-                                        # First try the working example pattern (RunResponse event)
-                                        if (hasattr(chunk, "event") and chunk.event == "RunResponse" 
-                                            and hasattr(chunk, "content") and chunk.content is not None):
-                                            response_content += chunk.content
-                                            content_found = True
-                                        
-                                        # Fallback: try any chunk with content (in case event filtering is too strict)
-                                        elif hasattr(chunk, "content") and chunk.content is not None:
-                                            response_content += chunk.content
-                                            content_found = True
-                                        
-                                        # Update display if content was found
-                                        if content_found:
-                                            resp_container.markdown(response_content)
-                                    
-                                    # Store the final response for tool call inspection
-                                    # Create a response object with collected tools (like working example's github_agent.run_response.tools)
-                                    class StreamingResponse:
-                                        def __init__(self, tools):
-                                            self.tool_calls = tools
-                                            self.tools = tools
-                                    
-                                    agent._last_response = StreamingResponse(all_tools_used)
-                                    return response_content
+                                    # Display tool calls
+                                    display_tool_calls(tool_calls_container, all_tools_used)
                                 else:
-                                    # It's a direct response object, handle normally
-                                    response_content = raw_response.content if hasattr(raw_response, 'content') else str(raw_response)
-                                    
-                                    # Check for tool calls in direct response
-                                    if hasattr(raw_response, 'tool_calls') and raw_response.tool_calls:
-                                        for tool_call in raw_response.tool_calls:
-                                            formatted_tool = format_tool_call_for_debug(tool_call)
-                                            tool_call_details.append(formatted_tool)
-                                            all_tools_used.append(tool_call)
-                                            tool_calls_made += 1
-                                        
-                                        # Display tool calls
-                                        if all_tools_used:
-                                            display_tool_calls(tool_calls_container, all_tools_used)
-                                    
-                                    agent._last_response = raw_response
-                                    return response_content
+                                    print("DEBUG: No tool calls collected from streaming events")
+                                
+                                return response_content
                                     
                             except Exception as e:
-                                raise Exception(f"Error in streaming agent execution: {e}") from e
+                                raise Exception(f"Error in agent execution: {e}") from e
                         
                         response_content = asyncio.run(run_agent_with_streaming())
                         response = response_content if response_content else ""
