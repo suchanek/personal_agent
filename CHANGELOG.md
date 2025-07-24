@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Decisive Tool Usage**: Overhauled the agent's instructions to be more decisive and accurate. The new prompts establish a clear distinction between "Memory" (user-specific info) and "Knowledge" (factual info), provide an explicit decision-making flowchart, and map common queries directly to specific tool calls (e.g., "what do you know about me" -> `get_all_memories()`). This resolves issues of tool hesitation and incorrect tool selection. See [ADR-036](./refs/adr/036-tool-use-hesitation-fix.md) for details.
+
+### Fixed
+- **Toolkit Initialization**: Corrected a bug in the `MemoryAndKnowledgeTools` `Toolkit` where `async` tools were not being registered correctly. All sync and async tools are now passed to the parent constructor at once, ensuring all tools are available to the agent.
+
+### Changed
 - **Unified Tool Architecture**: Refactored the agent's architecture by consolidating all memory and knowledge-related tools into a single, cohesive `MemoryAndKnowledgeTools` class. This simplifies agent initialization, improves modularity, and aligns with `agno` framework best practices. See [ADR-035](./refs/adr/035-unified-memory-and-knowledge-tools.md) for details.
 
 ### Fixed

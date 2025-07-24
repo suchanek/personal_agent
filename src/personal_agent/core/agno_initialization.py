@@ -10,14 +10,15 @@ import os
 from typing import Optional, Tuple
 
 from ..config import settings
-
 from ..utils import inject_dependencies, setup_logging
-from .agno_agent import AgnoPersonalAgent, create_agno_agent
 from .agent_instruction_manager import InstructionLevel
+from .agno_agent import AgnoPersonalAgent, create_agno_agent
 
 
 async def initialize_agno_system(
-    use_remote_ollama: bool = False, recreate: bool = False, instruction_level: str = "STANDARD"
+    use_remote_ollama: bool = False,
+    recreate: bool = False,
+    instruction_level: str = "STANDARD",
 ) -> Tuple[AgnoPersonalAgent, callable, callable, callable, str]:
     """
     Initialize all system components for agno framework.
@@ -51,8 +52,10 @@ async def initialize_agno_system(
         instruction_level_enum = InstructionLevel[instruction_level.upper()]
         logger.info(f"Using instruction level: {instruction_level_enum.name}")
     except KeyError:
-        logger.warning(f"Invalid instruction level '{instruction_level}', defaulting to CONCISE")
-        instruction_level_enum = InstructionLevel.CONCISE
+        logger.warning(
+            f"Invalid instruction level '{instruction_level}', defaulting to STANDARD"
+        )
+        instruction_level_enum = InstructionLevel.STANDARD
 
     agno_agent = await create_agno_agent(
         model_provider="ollama",  # Default to Ollama

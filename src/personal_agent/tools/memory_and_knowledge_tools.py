@@ -32,7 +32,7 @@ class MemoryAndKnowledgeTools(Toolkit):
         self.memory_manager = memory_manager
         self.knowledge_manager = knowledge_manager
         
-        # Collect all tool methods (sync tools only for now)
+        # Collect ALL tool methods (both sync and async) in the proper Agno pattern
         tools = [
             # Knowledge tools (sync)
             self.ingest_knowledge_file,
@@ -40,21 +40,7 @@ class MemoryAndKnowledgeTools(Toolkit):
             self.ingest_knowledge_from_url,
             self.batch_ingest_directory,
             self.query_knowledge_base,
-        ]
-        
-        # Initialize the Toolkit with our tools
-        super().__init__(
-            name="memory_and_knowledge_tools",
-            tools=tools,
-            instructions="Unified tools for memory and knowledge operations",
-        )
-        
-        # Manually register async memory tools after initialization
-        self._register_async_memory_tools()
-    
-    def _register_async_memory_tools(self):
-        """Manually register async memory tools."""
-        async_tools = [
+            # Memory tools (async) - include them all in the initial tools list
             self.store_user_memory,
             self.query_memory,
             self.update_memory,
@@ -72,8 +58,12 @@ class MemoryAndKnowledgeTools(Toolkit):
             self.clear_all_memories,
         ]
         
-        for tool in async_tools:
-            self.register(tool)
+        # Initialize the Toolkit with ALL tools at once - this is the correct Agno pattern
+        super().__init__(
+            name="memory_and_knowledge_tools",
+            tools=tools,
+            instructions="Unified tools for memory and knowledge operations",
+        )
 
     def ingest_knowledge_file(self, file_path: str, title: str = None) -> str:
         """Ingest a file into the knowledge base.
@@ -382,7 +372,7 @@ class MemoryAndKnowledgeTools(Toolkit):
             return f"❌ Error in batch ingestion: {str(e)}"
 
     
-    def query_knowledge_base(self, query: str, mode: str = "auto", limit: int = 5) -> str:
+    def query_knowledge_base(self, query: str, mode: str = "auto", limit: Optional[int] = 5) -> str:
         """Query the unified knowledge base to retrieve stored factual information and documents.
         
         This tool is for SEARCHING existing knowledge, NOT for creative tasks like writing stories,
@@ -392,7 +382,7 @@ class MemoryAndKnowledgeTools(Toolkit):
         Args:
             query: The search query for finding existing knowledge/documents
             mode: Query mode - "local" (semantic), "global" (graph), "hybrid", "mix", "auto"
-            limit: Maximum number of results to return
+            limit: Maximum number of results to return (defaults to 5 if None)
 
         Returns:
             Search results from the knowledge base, or rejection message for inappropriate requests.
@@ -430,6 +420,10 @@ class MemoryAndKnowledgeTools(Toolkit):
             valid_modes = ["local", "global", "hybrid", "mix", "naive", "auto"]
             if mode not in valid_modes:
                 mode = "auto"
+
+            # Handle None limit
+            if limit is None:
+                limit = 5
 
             # Auto mode: intelligent routing based on query characteristics
             if mode == "auto":
