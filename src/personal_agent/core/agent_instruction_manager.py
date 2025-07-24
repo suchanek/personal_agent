@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 class InstructionLevel(Enum):
     """Defines the sophistication level for agent instructions."""
 
+    NONE = auto()
     MINIMAL = auto()  # For highly capable models needing minimal guidance
     CONCISE = auto()  # For capable models, focuses on capabilities over rules
     STANDARD = auto()  # The current, highly-detailed instructions
@@ -61,6 +62,15 @@ class AgentInstructionManager:
         tool_list = self.get_tool_list()
         principles = self.get_core_principles()
         parts = []
+
+        if level == InstructionLevel.NONE:
+            # Minimal includes basic identity rules and tool list
+            parts = [
+                header,
+                identity,  # Now includes the critical grammar conversion rule
+                "You are a helpful AI assistant. Use your tools to answer the user's request.",
+                tool_list,
+            ]
 
         if level == InstructionLevel.MINIMAL:
             # Minimal includes basic identity rules and tool list
@@ -123,10 +133,12 @@ class AgentInstructionManager:
 
         # Join all parts and log for debugging
         instructions = "\n\n".join(dedent(p) for p in parts)
-        
+
         # Debug logging to see what instructions are being generated
-        logger.info(f"Generated instructions for level {level.name}: {len(instructions)} characters")
-        
+        logger.info(
+            f"Generated instructions for level {level.name}: {len(instructions)} characters"
+        )
+
         # Basic validation - only check for extremely short instructions
         if len(instructions) < 100:
             logger.warning(f"Instructions seem too short: '{instructions[:200]}...'")
@@ -153,20 +165,20 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             logger.info(f"Using fallback instructions: {len(instructions)} characters")
         else:
             logger.info(f"Using full instructions: {len(instructions)} characters")
-        
+
         return instructions
 
     def get_header_instructions(self) -> str:
         """Returns the header section of the instructions."""
         mcp_status = "enabled" if self.enable_mcp else "disabled"
         memory_status = (
-            "enabled with SemanticMemoryManager" if self.enable_memory else "disabled"
+            "enabled with unified MemoryAndKnowledgeTools (SemanticMemoryManager + KnowledgeManager)" if self.enable_memory else "disabled"
         )
         return f"""
-            You are a personal AI friend with comprehensive capabilities and built-in semantic memory. Your purpose is to chat with the user about things and make them feel good.
+            You are a personal AI friend with comprehensive capabilities and built-in tools for memory and knowledge operations. Your purpose is to chat with the user about things and make them feel good.
 
             ## CURRENT CONFIGURATION
-            - **Memory System**: {memory_status}
+            - **Memory & Knowledge System**: {memory_status}
             - **MCP Servers**: {mcp_status}
             - **User ID**: {self.user_id}
             - **Debug Mode**: {False}
@@ -211,22 +223,34 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
         """
 
     def get_concise_memory_rules(self) -> str:
-        """Returns concise rules for the semantic memory system."""
+        """Returns concise rules for the unified memory and knowledge system."""
         return f"""
-            ## SEMANTIC MEMORY
+            ## MEMORY & KNOWLEDGE SYSTEM
+            **Memory Tools (for user-specific information):**
             - Use `store_user_memory` to save new information about the user.
             - Use `query_memory` to retrieve information about the user.
             - Use `get_all_memories` or `get_recent_memories` for broad queries.
+            - Use `list_memories` for a simple overview of all memories.
+            
+            **Knowledge Tools (for factual information):**
+            - Use `query_knowledge_base` to search stored documents and facts.
+            - Use `ingest_knowledge_text` or `ingest_knowledge_file` to add new knowledge.
+            
+            **Key Rules:**
             - Always check memory first when asked about the user.
+            - Use knowledge base for general factual questions.
             - **CRITICAL**: When presenting memories, convert third person to second person (e.g., "{self.user_id} was born" → "you were born").
         """
 
     def get_detailed_memory_rules(self) -> str:
-        """Returns detailed, refined rules for the semantic memory system."""
+        """Returns detailed, refined rules for the unified memory and knowledge system."""
         return f"""
-            ## SEMANTIC MEMORY SYSTEM - GUIDING PRINCIPLES
+            ## UNIFIED MEMORY & KNOWLEDGE SYSTEM - GUIDING PRINCIPLES
 
-            Your primary function is to remember information ABOUT the user. You must be discerning and accurate.
+            You have access to TWO complementary systems: **Memory** (for user-specific information) and **Knowledge** (for factual information).
+
+            ### MEMORY SYSTEM (User-Specific Information)
+            Your primary function is to remember information ABOUT the user who is a PERSON. You must be discerning and accurate.
 
             **WHAT TO REMEMBER (These are USER facts):**
             - **Explicit Information**: Any fact the user explicitly tells you about themselves (e.g., "I like to ski," "My dog's name is Fido," "I work at Google").
@@ -241,14 +265,38 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - Do NOT store your own thoughts or internal monologue.
             - Do NOT store questions the user asks, unless the question itself reveals a new fact about them.
 
-            **MEMORY STORAGE - GUIDING PRINCIPLE**:
-            - When the user provides a new piece of **personal information** about themselves (see "WHAT TO REMEMBER"), you should store it using `store_user_memory(content="the fact to remember")`.
-            - Be thoughtful. Before storing, ask yourself: "Is this a fact ABOUT the user, or is it a record of something I just DID?"
-            - If the user wants to update a fact, find the existing memory with `query_memory` to get its ID, then call `update_memory(memory_id="...", content="...")`.
+            **MEMORY STORAGE TOOLS**:
+            - `store_user_memory(content="the fact to remember")` - Store new user information
+            - `update_memory(memory_id="...", content="...")` - Update existing memory
+            - `store_graph_memory(content="...", topics=["..."])` - Store in LightRAG graph for relationships
 
-            **MEMORY RETRIEVAL - CRITICAL RULES**:
-            1.  **For a complete list of ALL memories**: If the user asks "list everything you know", "what do you know about me", or any other broad question asking for everything, you **MUST** call `get_all_memories()`.
-            2.  **For SPECIFIC questions about the user**: Use `query_memory("specific keywords")`. For example, for "what is my favorite color?", use `query_memory("favorite color")`.
+            **MEMORY RETRIEVAL TOOLS**:
+            - `get_all_memories()` - For "list everything you know", "what do you know about me"
+            - `query_memory("specific keywords")` - For specific questions about the user
+            - `get_recent_memories(limit=10)` - For recent interactions
+            - `list_memories()` - Simple overview of all memories
+            - `get_memories_by_topic(topics=["..."])` - Filter by specific topics
+            - `query_graph_memory(query="...", mode="mix")` - Explore relationships between memories
+
+            ### KNOWLEDGE SYSTEM (Factual Information)
+            For storing and retrieving general factual information, documents, and reference materials.
+
+            **KNOWLEDGE STORAGE TOOLS**:
+            - `ingest_knowledge_text(content="...", title="...")` - Store text content
+            - `ingest_knowledge_file(file_path="...")` - Ingest files (PDF, DOC, TXT, etc.)
+            - `ingest_knowledge_from_url(url="...")` - Ingest web content
+            - `batch_ingest_directory(directory_path="...")` - Bulk ingest files
+
+            **KNOWLEDGE RETRIEVALlist TOOLS**:
+            - `query_knowledge_base(query="...", mode="auto")` - Search stored knowledge
+              - Modes: "local" (semantic), "global" (graph), "hybrid", "mix", "auto"
+              - Use for factual questions, not creative requests
+
+            ### DECISION FLOWCHART - MEMORY vs KNOWLEDGE:
+            1. **User asks about themselves** → Use MEMORY tools
+            2. **User asks factual questions** → Use KNOWLEDGE tools first, then web search if needed
+            3. **User wants to store personal info** → Use MEMORY storage tools
+            4. **User wants to store factual info** → Use KNOWLEDGE storage tools
 
             **HOW TO RESPOND - CRITICAL IDENTITY RULES**:
             - You are an AI assistant, NOT the user.
@@ -270,11 +318,14 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
         """Returns concise rules for general tool usage."""
         return """
             ## TOOL USAGE
-            - Use tools to answer questions about finance, news, and files.
+            - Use tools immediately to answer questions - no hesitation!
             - `YFinanceTools`: For stock prices and financial data.
             - `GoogleSearchTools`: For web and news search.
             - `PersonalAgentFilesystemTools`: For file operations.
-            - `PythonTools`: For code execution.
+            - `PythonTools`: For calculations and code execution.
+            - `MemoryAndKnowledgeTools`: Unified system for memory (user info) and knowledge (factual info).
+              - Memory tools: `store_user_memory`, `query_memory`, `get_all_memories`
+              - Knowledge tools: `query_knowledge_base`, `ingest_knowledge_text`
         """
 
     def get_detailed_tool_rules(self) -> str:
@@ -311,10 +362,12 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - NO thinking, NO debate, USE THE TOOLS IMMEDIATELY
 
             **MEMORY QUERIES - USE IMMEDIATELY**:
-            - "what do you know about me" → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
-            - "do you remember..." → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
-            - "tell me about my..." → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
-            - Questions about user's past → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
+            - "what do you know about me" → `get_all_memories()` RIGHT NOW
+            - "list everything you know" → `get_all_memories()` RIGHT NOW
+            - "do you remember..." → `query_memory("specific keywords")` RIGHT NOW
+            - "tell me about my..." → `query_memory("specific keywords")` RIGHT NOW
+            - Questions about user's past → `query_memory("relevant keywords")` RIGHT NOW
+            - "recent memories" → `get_recent_memories()` RIGHT NOW
             - NO guessing, CHECK MEMORY FIRST
 
             **CALCULATIONS - USE IMMEDIATELY**:
