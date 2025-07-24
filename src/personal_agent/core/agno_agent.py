@@ -46,6 +46,7 @@ from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
+from ..tools.memory_and_knowledge_tools import MemoryAndKnowledgeTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -150,6 +151,10 @@ class AgnoPersonalAgent:
 
         self.tool_manager: AgentToolManager = AgentToolManager(
             user_id, self.storage_dir
+        )
+
+        self.memory_and_knowledge_tools = MemoryAndKnowledgeTools(
+            self.memory_manager, self.knowledge_manager
         )
 
         # Storage components
@@ -393,13 +398,9 @@ class AgnoPersonalAgent:
                 logger.info("Added %d MCP tools to agent", len(mcp_tool_functions))
 
             # Get memory tools from the memory manager
-            memory_tool_functions = []
-            if self.enable_memory:
-                memory_tool_functions = await self.memory_manager.get_memory_tools()
-                tools.extend(memory_tool_functions)
-                logger.info(
-                    "Added %d memory tools to agent", len(memory_tool_functions)
-                )
+                if self.enable_memory:
+                    tools.append(self.memory_and_knowledge_tools)
+                    logger.info("Added MemoryAndKnowledgeTools to agent")
 
             # Create the agno agent with direct parameter passing for visibility
             self.agent = Agent(
@@ -435,7 +436,7 @@ class AgnoPersonalAgent:
 
             # Calculate tool counts for logging using already-created tool lists
             mcp_tool_count = len(mcp_tool_functions)
-            memory_tool_count = len(memory_tool_functions)
+            memory_tool_count = 1 # Since we are using a single tool class now
 
             logger.info(
                 "Successfully initialized agno agent with native storage: %d total tools (%d MCP, %d memory)",
@@ -504,7 +505,7 @@ class AgnoPersonalAgent:
                         content_preview = str(chunk_content)[:100] if chunk_content else 'Empty'
                     else:
                         content_preview = 'No content'
-                    logger.debug(f"Received chunk: {type(chunk)}, content: {content_preview}")
+                    #logger.debug(f"Received chunk: {type(chunk)}, content: {content_preview}")
                     
                     # Collect tool calls from streaming events
                     if hasattr(chunk, 'event') and chunk.event == 'ToolCallCompleted':

@@ -311,10 +311,10 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - NO thinking, NO debate, USE THE TOOLS IMMEDIATELY
 
             **MEMORY QUERIES - USE IMMEDIATELY**:
-            - "what do you know about me" → get_all_memories() RIGHT NOW
-            - "do you remember..." → query_memory() RIGHT NOW
-            - "tell me about my..." → query_memory() RIGHT NOW
-            - Questions about user's past → query_memory() RIGHT NOW
+            - "what do you know about me" → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
+            - "do you remember..." → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
+            - "tell me about my..." → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
+            - Questions about user's past → Use the appropriate tool from `MemoryAndKnowledgeTools` RIGHT NOW
             - NO guessing, CHECK MEMORY FIRST
 
             **CALCULATIONS - USE IMMEDIATELY**:
@@ -407,27 +407,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             "- **PythonTools**: Calculations, data analysis, code execution.",
             "- **ShellTools**: System operations and command execution.",
             "- **PersonalAgentFilesystemTools**: File reading, writing, and management.",
-            "- **Local Memory Tools (SQLite)**:",
-            "  - `store_user_memory`: Store a simple fact in your local semantic memory.",
-            "  - `query_memory`: Quickly search your local semantic memory for a specific fact.",
-            "  - `get_recent_memories`: Get recent memories from local storage.",
-            "  - `get_all_memories`: Get all stored memories.",
-            "  - `get_memories_by_topic`: Get memories filtered by topic, without similarity search.",
-            "  - `list_memories`: List all memories in a simple, user-friendly format.",
-            "  - `update_memory`: Update an existing memory.",
-            "  - `delete_memory`: Delete a specific memory by its ID.",
-            "  - `delete_memories_by_topic`: Delete all memories for a given topic.",
-            "  - `clear_memories`: Clear all memories for the user from local storage.",
-            "  - `clear_all_memories`: Clear all memories from BOTH local SQLite and LightRAG graph systems.",
-            "  - `get_memory_stats`: Get statistics for the local memory.",
-            "- **Graph Memory Tools (LightRAG)**:",
-            "  - `store_graph_memory`: Store a complex memory in your knowledge graph to capture relationships.",
-            "  - `query_graph_memory`: Explore your knowledge graph to answer complex questions about relationships.",
-            "  - `get_memory_graph_labels`: Get all entity and relation labels from the memory graph.",
-            "- **Knowledge Base Tools**:",
-            "  - `query_knowledge_base`: 🆕 UNIFIED knowledge coordinator with intelligent routing (mode=auto/local/global/hybrid/mix)",
-            "  - `query_lightrag_knowledge`: DEPRECATED - Use query_knowledge_base instead",
-            "  - `query_semantic_knowledge`: DEPRECATED - Use query_knowledge_base instead",
+            "- **MemoryAndKnowledgeTools**: A unified toolset for all memory and knowledge operations, including local semantic memory, LightRAG graph memory, and knowledge base interactions.",
         ]
 
         # Dynamically add MCP tools if they are enabled and configured

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Unified Tool Architecture**: Refactored the agent's architecture by consolidating all memory and knowledge-related tools into a single, cohesive `MemoryAndKnowledgeTools` class. This simplifies agent initialization, improves modularity, and aligns with `agno` framework best practices. See [ADR-035](./refs/adr/035-unified-memory-and-knowledge-tools.md) for details.
+
+### Fixed
+- **Model Compatibility**: Resolved a startup failure with `deepseek-r1` models by documenting that they lack required tool-calling support and recommending compatible alternatives like `qwen3:8b`.
+
+
 ### Fixed
 - **Instruction Override**: Removed a flawed optimization that replaced detailed instructions with a simplified version for prompts over 1000 characters. This ensures the agent always uses the full, intended instruction set, preserving its configured sophistication and performance. See [ADR-034](./refs/adr/034-smollm2-optimization-fix.md) for details.
 

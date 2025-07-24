@@ -5,9 +5,10 @@ This module contains the refactored CLI logic extracted from agno_main.py
 for better organization and maintainability.
 """
 
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 from rich.panel import Panel
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..core.agno_agent import AgnoPersonalAgent
@@ -16,9 +17,7 @@ from .command_parser import CommandParser
 
 
 async def run_agno_cli(
-    agent: "AgnoPersonalAgent", 
-    ollama_url: str,
-    console: Console = None
+    agent: "AgnoPersonalAgent", ollama_url: str, console: Console = None
 ):
     """
     Run agno agent in CLI mode with enhanced interface.
@@ -29,7 +28,7 @@ async def run_agno_cli(
     """
     if console is None:
         console = Console(force_terminal=True)
-    
+
     # Initialize command parser
     command_parser = CommandParser()
 
@@ -59,13 +58,19 @@ async def run_agno_cli(
                 continue
 
             # Parse the command
-            command_handler, remaining_text, kwargs = command_parser.parse_command(user_input)
-            
+            command_handler, remaining_text, kwargs = command_parser.parse_command(
+                user_input
+            )
+
             # Handle quit command specially
-            if command_handler and hasattr(command_handler, '__name__') and command_handler.__name__ == '_handle_quit':
+            if (
+                command_handler
+                and hasattr(command_handler, "__name__")
+                and command_handler.__name__ == "_handle_quit"
+            ):
                 console.print("👋 Goodbye!")
                 break
-            
+
             # If it's a command, execute it
             if command_handler:
                 try:
@@ -80,19 +85,17 @@ async def run_agno_cli(
 
             # If not a command, treat as regular chat
             try:
-                # Get response from agent
+                # Get response from agent using our custom run method
                 console.print("🤖 Assistant:")
-                response = await agent.agent.arun(
+                response_content = await agent.agent.arun(
                     user_input,
-                    stream=False,  # Disable streaming for cleaner CLI output
-                    show_tool_calls=agent.debug,  # Show tool calls in debug mode
+                    stream=False,  # Our run method handles streaming internally
+                    add_thought_callback=None,  # No callback needed for CLI
                 )
 
                 # Print the final response content
-                if response and hasattr(response, "content") and response.content:
-                    console.print(response.content)
-                elif response:
-                    console.print(f"Response received but no content: {response}")
+                if response_content and response_content.content:
+                    console.print(response_content.content)
                 else:
                     console.print("No response generated.")
 
