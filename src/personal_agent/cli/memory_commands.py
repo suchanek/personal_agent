@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 def find_tool_by_name(agent: "AgnoPersonalAgent", tool_name: str) -> Optional[Callable]:
     """
-    Find a tool function by name from the agent's tools.
+    Find a tool function by name from the agent's tools, including nested toolkits.
     
     Args:
         agent: The AgnoPersonalAgent instance
@@ -51,9 +51,16 @@ def find_tool_by_name(agent: "AgnoPersonalAgent", tool_name: str) -> Optional[Ca
     if not agent.agent or not hasattr(agent.agent, "tools"):
         return None
         
-    for tool in agent.agent.tools:
-        if getattr(tool, "__name__", "") == tool_name:
-            return tool
+    for toolkit in agent.agent.tools:
+        # Check if the toolkit itself is a callable tool (for standalone functions)
+        if getattr(toolkit, "__name__", "") == tool_name:
+            return toolkit
+
+        # Check for tools within the toolkit if it has a 'tools' attribute
+        if hasattr(toolkit, "tools") and isinstance(toolkit.tools, list):
+            for tool in toolkit.tools:
+                if hasattr(tool, "__name__") and tool.__name__ == tool_name:
+                    return tool
     
     return None
 
