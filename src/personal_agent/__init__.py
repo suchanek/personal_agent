@@ -79,7 +79,7 @@ from .utils.pag_logging import (
 from .web import create_app, create_smol_app, register_routes, register_smol_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.11.32dev"  # Defined once to avoid duplication
+__version__ = "0.11.33"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
