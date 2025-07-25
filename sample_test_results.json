@@ -1,0 +1,137 @@
+{
+  "qwen3:4b": {
+    "model_name": "qwen3:4b",
+    "test_timestamp": "2025-01-24T14:20:15.123456",
+    "queries": {
+      "query_1": {
+        "query": "hello",
+        "response": "Hello charlie!",
+        "duration": 1.23,
+        "success": true,
+        "error": null
+      },
+      "query_2": {
+        "query": "list your tools",
+        "response": "I have access to several tools including YFinanceTools for stock analysis, GoogleSearchTools for web searches, PythonTools for calculations, and more.",
+        "duration": 2.45,
+        "success": true,
+        "error": null
+      },
+      "query_3": {
+        "query": "give me an analysis of NVDA",
+        "response": "NVIDIA Corporation (NVDA) is a leading technology company specializing in graphics processing units (GPUs) and artificial intelligence computing. The stock has shown strong performance driven by AI demand and data center growth.",
+        "duration": 8.67,
+        "success": true,
+        "error": null
+      }
+    },
+    "total_duration": 14.69,
+    "initialization_time": 2.34,
+    "errors": []
+  },
+  "qwen2.5-coder:3b": {
+    "model_name": "qwen2.5-coder:3b",
+    "test_timestamp": "2025-01-24T14:21:30.456789",
+    "queries": {
+      "query_1": {
+        "query": "hello",
+        "response": "Hello charlie! How can I help you today?",
+        "duration": 1.45,
+        "success": true,
+        "error": null
+      },
+      "query_2": {
+        "query": "list your tools",
+        "response": "I have access to various tools for coding and analysis: YFinanceTools, GoogleSearchTools, PythonTools, PersonalAgentFilesystemTools, and more specialized development tools.",
+        "duration": 3.12,
+        "success": true,
+        "error": null
+      },
+      "query_3": {
+        "query": "give me an analysis of NVDA",
+        "response": "NVIDIA (NVDA) is currently trading at strong levels. The company benefits from AI boom, data center demand, and gaming market leadership. Recent earnings show consistent growth in AI-related revenue streams.",
+        "duration": 12.34,
+        "success": true,
+        "error": null
+      }
+    },
+    "total_duration": 18.23,
+    "initialization_time": 1.32,
+    "errors": []
+  },
+  "qwen2.5:latest": {
+    "model_name": "qwen2.5:latest",
+    "test_timestamp": "2025-01-24T14:22:45.789012",
+    "queries": {
+      "query_1": {
+        "query": "hello",
+        "response": "Hello charlie! Nice to meet you.",
+        "duration": 1.67,
+        "success": true,
+        "error": null
+      },
+      "query_2": {
+        "query": "list your tools",
+        "response": "I can use YFinanceTools for financial data, GoogleSearchTools for web searches, PythonTools for computations, and several other specialized tools to assist you.",
+        "duration": 2.89,
+        "success": true,
+        "error": null
+      },
+      "query_3": {
+        "query": "give me an analysis of NVDA",
+        "response": null,
+        "duration": 15.23,
+        "success": false,
+        "error": "Request timeout after 15 seconds"
+      }
+    },
+    "total_duration": 22.15,
+    "initialization_time": 2.36,
+    "errors": [
+      "Query 'give me an analysis of NVDA': Request timeout after 15 seconds"
+    ]
+  },
+  "qwen3:8b": {
+    "model_name": "qwen3:8b",
+    "test_timestamp": "2025-01-24T14:24:00.345678",
+    "queries": {
+      "query_1": {
+        "query": "hello",
+        "response": "Hello charlie! I'm here to help you with any questions or tasks you might have.",
+        "duration": 2.12,
+        "success": true,
+        "error": null
+      },
+      "query_2": {
+        "query": "list your tools",
+        "response": "I have access to a comprehensive set of tools including YFinanceTools for financial analysis, GoogleSearchTools for web research, PythonTools for calculations and data processing, PersonalAgentFilesystemTools for file operations, and various other specialized tools.",
+        "duration": 3.45,
+        "success": true,
+        "error": null
+      },
+      "query_3": {
+        "query": "give me an analysis of NVDA",
+        "response": "NVIDIA Corporation (NVDA) is a semiconductor company that has become a dominant force in AI and data center markets. Key analysis points: 1) Strong AI demand driving data center revenue growth, 2) Gaming segment remains stable, 3) Automotive and professional visualization showing steady growth, 4) High profit margins due to technological leadership, 5) Strong balance sheet and cash flow generation. The stock has seen significant appreciation due to AI market positioning.",
+        "duration": 22.77,
+        "success": true,
+        "error": null
+      }
+    },
+    "total_duration": 28.34,
+    "initialization_time": 0.00,
+    "errors": []
+  },
+  "_summary": {
+    "total_models_tested": 4,
+    "total_queries_per_model": 3,
+    "overall_duration": 83.41,
+    "test_completed": "2025-01-24T14:25:15.123456",
+    "successful_models": [
+      "qwen3:4b",
+      "qwen2.5-coder:3b",
+      "qwen2.5:latest",
+      "qwen3:8b"
+    ],
+    "failed_models": []
+  }
+}

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Separation of Concerns**: Refactored the unified `MemoryAndKnowledgeTools` class into two distinct, focused toolkits: `KnowledgeTools` for factual data and `AgnoMemoryTools` for personal user information. This improves architectural clarity, enhances agent guidance through descriptive docstrings, and provides clearer boundaries between knowledge and memory operations. See [ADR-037](./refs/adr/037-knowledge-memory-tool-separation.md) for details.
+
+### Changed
 - **Decisive Tool Usage**: Overhauled the agent's instructions to be more decisive and accurate. The new prompts establish a clear distinction between "Memory" (user-specific info) and "Knowledge" (factual info), provide an explicit decision-making flowchart, and map common queries directly to specific tool calls (e.g., "what do you know about me" -> `get_all_memories()`). This resolves issues of tool hesitation and incorrect tool selection. See [ADR-036](./refs/adr/036-tool-use-hesitation-fix.md) for details.
 
 ### Fixed

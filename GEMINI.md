@@ -306,7 +306,7 @@ WEAVIATE_URL="http://localhost:8080"  # Weaviate (if using)
 
 The agent supports dynamic model switching through the web interface:
 
-*   **qwen2.5:7b-instruct** (recommended)
+*   **qwen3:4b** (recommended)
 *   **llama3.1:8b**
 *   **llama3.2:3b**
 *   **Any Ollama-compatible model**

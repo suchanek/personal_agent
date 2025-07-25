@@ -54,7 +54,12 @@ if USE_MCP:
         mcp_client = None
 
 # Import utilities
-from .utils import cleanup, inject_dependencies, register_cleanup_handlers, store_fact_in_knowledge_base
+from .utils import (
+    cleanup,
+    inject_dependencies,
+    register_cleanup_handlers,
+    store_fact_in_knowledge_base,
+)
 from .utils.pag_logging import (
     configure_all_rich_logging,
     configure_master_logger,
@@ -71,10 +76,10 @@ from .utils.pag_logging import (
 )
 
 # Import web interface
-from .web import create_app, register_routes, create_smol_app, register_smol_routes
+from .web import create_app, create_smol_app, register_routes, register_smol_routes
 
 # Package version (matches pyproject.toml)
-__version__ = "0.11.0dev"  # Defined once to avoid duplication
+__version__ = "0.11.32dev"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
