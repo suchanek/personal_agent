@@ -42,7 +42,8 @@ from ..config.settings import (
     USER_ID,
 )
 from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
-from ..tools.memory_and_knowledge_tools import MemoryAndKnowledgeTools
+from ..tools.knowledge_tools import KnowledgeTools
+from ..tools.refactored_memory_tools import AgnoMemoryTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
@@ -157,9 +158,9 @@ class AgnoPersonalAgent:
             user_id, self.storage_dir
         )
 
-        self.memory_and_knowledge_tools = MemoryAndKnowledgeTools(
-            self.memory_manager, self.knowledge_manager
-        )
+        # Initialize separate tool classes
+        self.knowledge_tools = None
+        self.memory_tools = None
 
         # Storage components
         self.agno_storage = None
@@ -401,10 +402,15 @@ class AgnoPersonalAgent:
                 tools.extend(mcp_tool_functions)
                 logger.info("Added %d MCP tools to agent", len(mcp_tool_functions))
 
-                # Get memory tools from the memory manager
-                if self.enable_memory:
-                    tools.append(self.memory_and_knowledge_tools)
-                    logger.info("Added MemoryAndKnowledgeTools to agent")
+            # Add memory and knowledge tools if memory is enabled
+            if self.enable_memory:
+                # Create and add separate knowledge and memory tools
+                self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
+                self.memory_tools = AgnoMemoryTools(self.memory_manager)
+                
+                tools.append(self.knowledge_tools)
+                tools.append(self.memory_tools)
+                logger.info("Added separate KnowledgeTools and AgnoMemoryTools to agent")
 
             # Create the agno agent with direct parameter passing for visibility
             self.agent = Agent(

@@ -172,7 +172,9 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
         """Returns the header section of the instructions."""
         mcp_status = "enabled" if self.enable_mcp else "disabled"
         memory_status = (
-            "enabled with unified MemoryAndKnowledgeTools (SemanticMemoryManager + KnowledgeManager)" if self.enable_memory else "disabled"
+            "enabled with unified MemoryAndKnowledgeTools: store_user_memory, query_memory, get_all_memories, query_knowledge_base, ingest_knowledge_text, etc."
+            if self.enable_memory
+            else "disabled"
         )
         return f"""
             You are a personal AI friend with comprehensive capabilities and built-in tools for memory and knowledge operations. Your purpose is to chat with the user about things and make them feel good.
@@ -225,7 +227,6 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
     def get_concise_memory_rules(self) -> str:
         """Returns concise rules for the unified memory and knowledge system."""
         return f"""
-            ## MEMORY & KNOWLEDGE SYSTEM
             **Memory Tools (for user-specific information):**
             - Use `store_user_memory` to save new information about the user.
             - Use `query_memory` to retrieve information about the user.
@@ -323,9 +324,9 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - `GoogleSearchTools`: For web and news search.
             - `PersonalAgentFilesystemTools`: For file operations.
             - `PythonTools`: For calculations and code execution.
-            - `MemoryAndKnowledgeTools`: Unified system for memory (user info) and knowledge (factual info).
-              - Memory tools: `store_user_memory`, `query_memory`, `get_all_memories`
-              - Knowledge tools: `query_knowledge_base`, `ingest_knowledge_text`
+            - `MemoryAndKnowledgeTools`: Unified system with specific functions:
+              - Memory: `store_user_memory`, `query_memory`, `get_all_memories`, `get_recent_memories`, `list_memories`, `get_memories_by_topic`, `query_graph_memory`
+              - Knowledge: `query_knowledge_base`, `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`
         """
 
     def get_detailed_tool_rules(self) -> str:
@@ -460,7 +461,10 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             "- **PythonTools**: Calculations, data analysis, code execution.",
             "- **ShellTools**: System operations and command execution.",
             "- **PersonalAgentFilesystemTools**: File reading, writing, and management.",
-            "- **MemoryAndKnowledgeTools**: A unified toolset for all memory and knowledge operations, including local semantic memory, LightRAG graph memory, and knowledge base interactions.",
+            "- **KnowledgeTools**: Knowledge base operations including:",
+            "  - `query_knowledge_base`, `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`, `batch_ingest_directory`",
+            "- **AgnoMemoryTools**: Memory operations including:",
+            "  - `store_user_memory`, `query_memory`, `get_all_memories`, `get_recent_memories`, `list_memories`, `get_memories_by_topic`, `query_graph_memory`, `update_memory`, `store_graph_memory`",
         ]
 
         # Dynamically add MCP tools if they are enabled and configured
