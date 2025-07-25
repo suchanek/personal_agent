@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Topic Classification**: Enhanced the topic classification system by adding a comprehensive `relationships` category. This resolves a bug where statements about social connections were misclassified as `unknown` and improves the agent's ability to understand and organize memories about personal and professional relationships. See [ADR-040](./refs/adr/040-enhanced-topic-classification-for-relationships.md) for details.
+
+### Changed
+- **Topic Classification**: Enhanced the topic classification system by adding a comprehensive `relationships` category. This resolves a bug where statements about social connections were misclassified as `unknown` and improves the agent's ability to understand and organize memories about personal and professional relationships. See [ADR-039](./refs/adr/039-enhanced-topic-classification-for-relationships.md) for details.
+
+### Fixed
+- **Memory Clearing**: Resolved a critical bug where clearing memories via scripts did not consistently update the agent's state. The fix standardizes database connection handling and ensures all components are properly synchronized. See [ADR-038](./refs/adr/038-standardized-memory-clearing.md).
+
+### Changed
 - **Separation of Concerns**: Refactored the unified `MemoryAndKnowledgeTools` class into two distinct, focused toolkits: `KnowledgeTools` for factual data and `AgnoMemoryTools` for personal user information. This improves architectural clarity, enhances agent guidance through descriptive docstrings, and provides clearer boundaries between knowledge and memory operations. See [ADR-037](./refs/adr/037-knowledge-memory-tool-separation.md) for details.
 
 ### Changed

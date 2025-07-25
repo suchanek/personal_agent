@@ -171,36 +171,8 @@ class AgnoMemoryTools(Toolkit):
             return f"❌ Error clearing memories: {str(e)}"
 
     async def delete_memories_by_topic(self, topics: Union[List[str], str]) -> str:
-        """Delete all memories associated with a specific topic or list of topics."""
-        try:
-            if isinstance(topics, str):
-                topics = [t.strip() for t in topics.split(",")]
-
-            (
-                success,
-                message,
-            ) = self.memory_manager.agno_memory.memory_manager.delete_memories_by_topic(
-                topics=topics, db=self.memory_manager.agno_memory.db, user_id=self.memory_manager.user_id
-            )
-
-            if success:
-                logger.info(
-                    "Deleted memories for topics '%s' for user %s",
-                    ", ".join(topics),
-                    self.memory_manager.user_id,
-                )
-                return f"✅ {message}"
-            else:
-                logger.error(
-                    "Failed to delete memories for topics %s: %s",
-                    ", ".join(topics),
-                    message,
-                )
-                return f"❌ Error deleting memories by topic: {message}"
-
-        except Exception as e:
-            logger.error("Error deleting memories by topic: %s", e)
-            return f"❌ Error deleting memories by topic: {str(e)}"
+        """Delete all memories associated with a specific topic or list of topics from both local and graph memory."""
+        return await self.memory_manager.delete_memories_by_topic(topics)
 
     async def clear_all_memories(self) -> str:
         """Clear all memories from both SQLite and LightRAG systems."""

@@ -379,6 +379,42 @@ categories:
     - disappointed
     - feel
     - feeling
+  relationships:
+    - friend
+    - friends
+    - enemy
+    - enemies
+    - acquaintance
+    - acquaintances
+    - colleague
+    - colleagues
+    - neighbor
+    - neighbors
+    - buddy
+    - pal
+    - companion
+    - partner
+    - roommate
+    - classmate
+    - teammate
+    - mentor
+    - mentee
+    - rival
+    - opponent
+    - ally
+    - allies
+    - contact
+    - contacts
+    - social
+    - relationship
+    - relationships
+    - know
+    - knows
+    - knew
+    - meet
+    - met
+    - introduce
+    - introduced
 
 phrases:
   academic:
@@ -494,3 +530,21 @@ phrases:
     - am excited
     - am anxious
     - am stressed
+  relationships:
+    - have a friend
+    - my friend
+    - my enemy
+    - is my friend
+    - is my enemy
+    - friend named
+    - enemy named
+    - know someone
+    - met someone
+    - social circle
+    - close friend
+    - best friend
+    - good friend
+    - old friend
+    - childhood friend
+    - work colleague
+    - school friend

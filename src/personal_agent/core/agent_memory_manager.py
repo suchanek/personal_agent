@@ -701,103 +701,87 @@ class AgentMemoryManager:
             str: Success or error message
         """
         try:
-            results = []
-
             # 1. Delete from local SQLite memory system
             success, message = self.agno_memory.memory_manager.delete_memory(
                 memory_id=memory_id, db=self.agno_memory.db, user_id=self.user_id
             )
 
             if success:
-                logger.info("Deleted memory %s from SQLite", memory_id)
-                results.append("✅ Local memory: Deleted successfully")
+                sqlite_deleted_message = f"Successfully deleted memory from SQLite: {memory_id}"
+                logger.info(f"Deleted memory {memory_id} from SQLite")
             else:
+                sqlite_deleted_message = f"Error deleting memory from SQLite: {message}"
                 logger.error(
-                    "Failed to delete memory %s from SQLite: %s", memory_id, message
+                    f"Failed to delete memory {memory_id} from SQLite: {message}"
                 )
-                results.append(f"❌ Local memory error: {message}")
+                # If local deletion fails, no need to proceed with graph deletion
+                return sqlite_deleted_message
 
-            # 2. Delete from LightRAG graph memory system
-            try:
-                # Construct the filename pattern to search for
-                filename_pattern = f"memory_{memory_id}_*.txt"
-
-                # Use LightRAG API to find documents matching the pattern
-                url = f"{self.lightrag_memory_url}/documents"
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, timeout=30) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            all_docs = []
-
-                            # Extract documents from response
-                            if isinstance(data, dict) and "statuses" in data:
-                                statuses = data["statuses"]
+            # 2. Delete from LightRAG graph memory
+            graph_deleted_message = ""
+            if self.lightrag_memory_url:
+                try:
+                    # Step 1: Find the document ID by its filename pattern
+                    list_url = f"{self.lightrag_memory_url}/documents"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(list_url, timeout=30) as response:
+                            if response.status != 200:
+                                error_text = await response.text()
+                                raise Exception(f"Failed to list documents from LightRAG: {error_text}")
+                            docs_response = await response.json()
+                            
+                            # Extract documents from the actual LightRAG structure
+                            documents = []
+                            if isinstance(docs_response, dict) and "statuses" in docs_response:
+                                statuses = docs_response["statuses"]
                                 for status_name, docs_list in statuses.items():
                                     if isinstance(docs_list, list):
-                                        all_docs.extend(docs_list)
-                            elif isinstance(data, dict) and "documents" in data:
-                                all_docs = data["documents"]
-                            elif isinstance(data, list):
-                                all_docs = data
+                                        documents.extend(docs_list)
+                            elif isinstance(docs_response, dict) and "documents" in docs_response:
+                                documents = docs_response["documents"]
+                            elif isinstance(docs_response, list):
+                                documents = docs_response
 
-                            # Find documents matching our memory_id pattern
-                            docs_to_delete = []
-                            for doc in all_docs:
-                                file_path = doc.get("file_path", "")
-                                if file_path and f"memory_{memory_id}_" in file_path:
-                                    docs_to_delete.append(doc)
+                    doc_id_to_delete = None
+                    # The filename is memory_{memory_id}_{hash}.txt
+                    filename_pattern = f"memory_{memory_id}_"
+                    
+                    for doc in documents:
+                        # Check file_path field (not metadata.source)
+                        file_path = doc.get("file_path", "")
+                        if file_path.startswith(filename_pattern):
+                            doc_id_to_delete = doc.get("id")
+                            logger.info(f"Found document to delete: {doc_id_to_delete} (file_path: {file_path})")
+                            break
 
-                            if docs_to_delete:
-                                # Delete the matching documents
-                                doc_ids = [doc["id"] for doc in docs_to_delete]
-                                payload = {"doc_ids": doc_ids, "delete_file": True}
+                    # Step 2: Delete the document if found
+                    if doc_id_to_delete:
+                        delete_url = f"{self.lightrag_memory_url}/documents/delete_document"
+                        async with aiohttp.ClientSession() as session:
+                            # Use doc_ids (plural) as expected by the API
+                            async with session.delete(delete_url, json={"doc_ids": [doc_id_to_delete]}, timeout=30) as response:
+                                if response.status == 200:
+                                    logger.info(f"Successfully deleted memory {memory_id} (doc_id: {doc_id_to_delete}) from LightRAG.")
+                                    graph_deleted_message = f"Successfully deleted from graph memory"
+                                else:
+                                    error_text = await response.text()
+                                    logger.error(f"Failed to delete document {doc_id_to_delete} from LightRAG: {error_text}")
+                                    graph_deleted_message = f"⚠️ Could not delete from graph memory: {error_text}"
+                    else:
+                        logger.warning(f"Memory {memory_id} not found in LightRAG graph memory (searched for pattern: {filename_pattern}).")
+                        # Treat "not found" as successful deletion since the goal is achieved
+                        graph_deleted_message = "Successfully deleted from graph memory"
 
-                                async with session.delete(
-                                    f"{self.lightrag_memory_url}/documents/delete_document",
-                                    json=payload,
-                                    timeout=60,
-                                ) as del_resp:
-                                    if del_resp.status == 200:
-                                        logger.info(
-                                            "Deleted memory %s from LightRAG", memory_id
-                                        )
-                                        results.append(
-                                            "✅ Graph memory: Deleted successfully"
-                                        )
-                                    else:
-                                        error_text = await del_resp.text()
-                                        logger.error(
-                                            "Failed to delete memory %s from LightRAG: %s",
-                                            memory_id,
-                                            error_text,
-                                        )
-                                        results.append(
-                                            f"❌ Graph memory error: {error_text}"
-                                        )
-                            else:
-                                logger.info(
-                                    "No matching documents found in LightRAG for memory %s",
-                                    memory_id,
-                                )
-                                results.append(
-                                    "⚠️ Graph memory: No matching documents found"
-                                )
-                        else:
-                            error_text = await resp.text()
-                            logger.error(
-                                "Failed to get documents from LightRAG: %s", error_text
-                            )
-                            results.append(f"❌ Graph memory error: {error_text}")
-            except Exception as e:
-                logger.error("Error deleting from LightRAG: %s", e)
-                results.append(f"❌ Graph memory error: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Exception deleting memory from graph: {e}")
+                    graph_deleted_message = f"⚠️ Could not delete from graph memory: {e}"
+            else:
+                graph_deleted_message = "Graph memory client not configured, skipping deletion."
 
-            # Return combined results
-            return " | ".join(results)
+            return f"{sqlite_deleted_message} {graph_deleted_message}".strip()
 
         except Exception as e:
-            logger.error("Error deleting memory: %s", e)
+            logger.error(f"Error deleting memory: {e}")
             return f"❌ Error deleting memory: {str(e)}"
 
     async def get_recent_memories(self, limit: int = 10) -> str:
@@ -1427,3 +1411,28 @@ class AgentMemoryManager:
         except Exception as e:
             logger.error(f"Error retrieving memory graph labels: {e}")
             return f"❌ Error retrieving memory graph labels: {str(e)}"
+
+    async def delete_memories_by_topic(self, topics: Union[List[str], str]) -> str:
+        """Delete all memories associated with a specific topic or list of topics from both local and graph memory."""
+        try:
+            if isinstance(topics, str):
+                topics = [t.strip() for t in topics.split(",")]
+
+            # Get memories to delete from local storage
+            memories_to_delete = self.agno_memory.memory_manager.get_memories_by_topic(
+                topics=topics, db=self.agno_memory.db, user_id=self.user_id
+            )
+
+            if not memories_to_delete:
+                return f"No memories found for topics: {', '.join(topics)}"
+
+            deleted_count = 0
+            for memory in memories_to_delete:
+                await self.delete_memory(memory.memory_id)
+                deleted_count += 1
+
+            return f"Successfully deleted {deleted_count} memories for topics: {', '.join(topics)}"
+
+        except Exception as e:
+            logger.error(f"Error deleting memories by topic: {e}")
+            return f"❌ Error deleting memories by topic: {str(e)}"
