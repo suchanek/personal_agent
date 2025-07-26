@@ -192,14 +192,21 @@ class StreamlitKnowledgeHelper:
             return []
 
     def search_rag(self, query: str, params: dict):
-        if not self.agent or not (hasattr(self.agent, "lightrag_knowledge")):
-            st.error("LightRAG knowledge base not available")
+        # Check if agent exists and has the query method
+        if not self.agent or not hasattr(self.agent, "query_lightrag_knowledge_direct"):
+            st.error("LightRAG knowledge base not available - agent missing query method")
             return None
+        
+        # Check if LightRAG is enabled on the agent
+        if not getattr(self.agent, "lightrag_knowledge_enabled", False):
+            st.error("LightRAG knowledge base not enabled - server may not be running")
+            return None
+            
         try:
             result = asyncio.run(self.agent.query_lightrag_knowledge_direct(query, params=params))
             return result
         except Exception as e:
-            st.error(f"Error querying knowledge base: {e}")
+            st.error(f"Error querying LightRAG knowledge base: {e}")
             import traceback
             st.error(f"Full traceback: {traceback.format_exc()}")
             return None

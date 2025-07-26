@@ -99,9 +99,13 @@ class KnowledgeIngestionTools(Toolkit):
             # Check file type
             mime_type, _ = mimetypes.guess_type(file_path)
             supported_types = [
-                'text/plain', 'text/markdown', 'text/html', 'text/csv',
-                'application/pdf', 'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                "text/plain",
+                "text/markdown",
+                "text/html",
+                "text/csv",
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ]
 
             if mime_type and mime_type not in supported_types:
@@ -116,7 +120,7 @@ class KnowledgeIngestionTools(Toolkit):
             file_hash = hashlib.md5(f"{filename}_{timestamp}".encode()).hexdigest()[:8]
             base_name, ext = os.path.splitext(filename)
             unique_filename = f"{base_name}_{file_hash}{ext}"
-            
+
             dest_path = knowledge_dir / unique_filename
 
             # Copy the file
@@ -125,7 +129,7 @@ class KnowledgeIngestionTools(Toolkit):
 
             # Upload to LightRAG server
             upload_result = self._upload_to_lightrag(dest_path, unique_filename)
-            
+
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge file: {filename}")
                 return f"✅ Successfully ingested '{filename}' into knowledge base. {upload_result}"
@@ -141,7 +145,9 @@ class KnowledgeIngestionTools(Toolkit):
             logger.error(f"Error ingesting file {file_path}: {e}")
             return f"❌ Error ingesting file: {str(e)}"
 
-    def ingest_knowledge_text(self, content: str, title: str, file_type: str = "txt") -> str:
+    def ingest_knowledge_text(
+        self, content: str, title: str, file_type: str = "txt"
+    ) -> str:
         """Ingest text content directly into the knowledge base.
 
         Args:
@@ -160,12 +166,12 @@ class KnowledgeIngestionTools(Toolkit):
                 return "❌ Error: Title is required"
 
             # Validate file_type
-            if not file_type.startswith('.'):
+            if not file_type.startswith("."):
                 file_type = f".{file_type}"
-            
-            allowed_types = ['.txt', '.md', '.html', '.csv', '.json']
+
+            allowed_types = [".txt", ".md", ".html", ".csv", ".json"]
             if file_type not in allowed_types:
-                file_type = '.txt'  # Default to txt
+                file_type = ".txt"  # Default to txt
 
             # Create knowledge directory
             knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
@@ -173,22 +179,26 @@ class KnowledgeIngestionTools(Toolkit):
 
             # Create unique filename
             timestamp = int(time.time())
-            content_hash = hashlib.md5(f"{title}_{content[:100]}_{timestamp}".encode()).hexdigest()[:8]
-            safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_title = safe_title.replace(' ', '_')[:50]  # Limit length
+            content_hash = hashlib.md5(
+                f"{title}_{content[:100]}_{timestamp}".encode()
+            ).hexdigest()[:8]
+            safe_title = "".join(
+                c for c in title if c.isalnum() or c in (" ", "-", "_")
+            ).rstrip()
+            safe_title = safe_title.replace(" ", "_")[:50]  # Limit length
             filename = f"{safe_title}_{content_hash}{file_type}"
-            
+
             file_path = knowledge_dir / filename
 
             # Write content to file
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             log_debug(f"Created knowledge file: {file_path}")
 
             # Upload to LightRAG server
             upload_result = self._upload_to_lightrag(file_path, filename)
-            
+
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge text: {title}")
                 return f"✅ Successfully ingested '{title}' into knowledge base. {upload_result}"
@@ -222,51 +232,58 @@ class KnowledgeIngestionTools(Toolkit):
 
             # Fetch content
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
             }
-            
+
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
 
-            content_type = response.headers.get('content-type', '').lower()
-            
+            content_type = response.headers.get("content-type", "").lower()
+
             # Handle different content types
-            if 'text/html' in content_type:
+            if "text/html" in content_type:
                 # For HTML, try to extract text content
                 try:
                     from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    
+
+                    soup = BeautifulSoup(response.content, "html.parser")
+
                     # Remove script and style elements
                     for script in soup(["script", "style"]):
                         script.decompose()
-                    
+
                     # Get text content
                     content = soup.get_text()
-                    
+
                     # Get title if not provided
                     if not title:
-                        title_tag = soup.find('title')
-                        title = title_tag.get_text().strip() if title_tag else parsed_url.netloc
-                    
-                    file_type = 'html'
-                    
+                        title_tag = soup.find("title")
+                        title = (
+                            title_tag.get_text().strip()
+                            if title_tag
+                            else parsed_url.netloc
+                        )
+
+                    file_type = "html"
+
                 except ImportError:
                     # Fallback if BeautifulSoup not available
                     content = response.text
                     title = title or parsed_url.netloc
-                    file_type = 'html'
-                    
-            elif 'text/' in content_type or 'application/json' in content_type:
+                    file_type = "html"
+
+            elif "text/" in content_type or "application/json" in content_type:
                 content = response.text
                 title = title or parsed_url.netloc
-                file_type = 'txt' if 'text/' in content_type else 'json'
+                file_type = "txt" if "text/" in content_type else "json"
             else:
                 return f"❌ Error: Unsupported content type: {content_type}"
 
             # Clean up content
-            content = '\n'.join(line.strip() for line in content.splitlines() if line.strip())
-            
+            content = "\n".join(
+                line.strip() for line in content.splitlines() if line.strip()
+            )
+
             if not content:
                 return f"❌ Error: No content extracted from URL: {url}"
 
@@ -283,7 +300,9 @@ class KnowledgeIngestionTools(Toolkit):
             logger.error(f"Error ingesting from URL {url}: {e}")
             return f"❌ Error ingesting from URL: {str(e)}"
 
-    def batch_ingest_directory(self, directory_path: str, file_pattern: str = "*", recursive: bool = False) -> str:
+    def batch_ingest_directory(
+        self, directory_path: str, file_pattern: str = "*", recursive: bool = False
+    ) -> str:
         """Ingest multiple files from a directory into the knowledge base.
 
         Args:
@@ -326,41 +345,41 @@ class KnowledgeIngestionTools(Toolkit):
                 return f"❌ Too many files ({len(files)}). Please process in smaller batches (max 50 files)."
 
             # Process files
-            results = {
-                'success': 0,
-                'failed': 0,
-                'errors': []
-            }
+            results = {"success": 0, "failed": 0, "errors": []}
 
             for file_path in files:
                 try:
                     result = self.ingest_knowledge_file(str(file_path))
                     if "✅" in result:
-                        results['success'] += 1
+                        results["success"] += 1
                         log_debug(f"Successfully ingested: {file_path.name}")
                     else:
-                        results['failed'] += 1
-                        results['errors'].append(f"{file_path.name}: {result}")
+                        results["failed"] += 1
+                        results["errors"].append(f"{file_path.name}: {result}")
                         logger.warning(f"Failed to ingest {file_path.name}: {result}")
-                        
+
                     # Small delay to avoid overwhelming the server
                     time.sleep(0.5)
-                    
+
                 except Exception as e:
-                    results['failed'] += 1
+                    results["failed"] += 1
                     error_msg = f"{file_path.name}: {str(e)}"
-                    results['errors'].append(error_msg)
+                    results["errors"].append(error_msg)
                     logger.error(f"Error processing {file_path.name}: {e}")
 
             # Format results
             summary = f"📊 Batch ingestion complete: {results['success']} successful, {results['failed']} failed"
-            
-            if results['errors']:
-                summary += f"\n\nErrors:\n" + "\n".join(f"- {error}" for error in results['errors'][:10])
-                if len(results['errors']) > 10:
+
+            if results["errors"]:
+                summary += f"\n\nErrors:\n" + "\n".join(
+                    f"- {error}" for error in results["errors"][:10]
+                )
+                if len(results["errors"]) > 10:
                     summary += f"\n... and {len(results['errors']) - 10} more errors"
 
-            logger.info(f"Batch ingestion completed: {results['success']}/{len(files)} files successful")
+            logger.info(
+                f"Batch ingestion completed: {results['success']}/{len(files)} files successful"
+            )
             return summary
 
         except Exception as e:
@@ -482,21 +501,23 @@ class KnowledgeIngestionTools(Toolkit):
             Success message or error details.
         """
         try:
-            url = f"{settings.LIGHTRAG_URL}/documents/upload"
-            
-            with open(file_path, 'rb') as f:
-                files = {'file': (filename, f, 'application/octet-stream')}
-                response = requests.post(url, files=files, timeout=60)
-                
+            final_url = f"{url}/documents/upload"
+
+            with open(file_path, "rb") as f:
+                files = {"file": (filename, f, "application/octet-stream")}
+                response = requests.post(final_url, files=files, timeout=60)
+
                 if response.status_code in [200, 201]:
                     result = response.json()
-                    logger.info(f"Successfully uploaded to LightRAG: {filename}")
+                    logger.info(
+                        f"Successfully uploaded to LightRAG server {final_url}: {filename}"
+                    )
                     return f"✅ File uploaded and processing started"
                 else:
                     error_text = response.text
                     logger.error(f"LightRAG upload failed: {error_text}")
                     return f"Upload failed: {error_text}"
-                    
+
         except requests.RequestException as e:
             logger.error(f"Error uploading to LightRAG: {e}")
             return f"Upload error: {str(e)}"
