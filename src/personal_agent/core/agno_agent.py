@@ -43,11 +43,11 @@ from ..config.settings import (
 )
 from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..tools.knowledge_tools import KnowledgeTools
-from ..tools.refactored_memory_tools import AgnoMemoryTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
+from ..tools.refactored_memory_tools import AgnoMemoryTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -407,10 +407,12 @@ class AgnoPersonalAgent:
                 # Create and add separate knowledge and memory tools
                 self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
                 self.memory_tools = AgnoMemoryTools(self.memory_manager)
-                
+
                 tools.append(self.knowledge_tools)
                 tools.append(self.memory_tools)
-                logger.info("Added separate KnowledgeTools and AgnoMemoryTools to agent")
+                logger.info(
+                    "Added separate KnowledgeTools and AgnoMemoryTools to agent"
+                )
 
             # Create the agno agent with direct parameter passing for visibility
             self.agent = Agent(
@@ -729,7 +731,7 @@ class AgnoPersonalAgent:
         return await self.memory_manager.clear_all_memories()
 
     async def query_lightrag_knowledge_direct(
-        self, query: str, params: dict = None
+        self, query: str, params: dict = None, url: str = LIGHTRAG_URL
     ) -> str:
         """Directly query the LightRAG knowledge base and return the raw response.
 
@@ -777,15 +779,16 @@ class AgnoPersonalAgent:
             query_params["ids"] = params["ids"]
 
         try:
-            # Use the correct LightRAG URL and endpoint
-            from ..config.settings import LIGHTRAG_URL
+            # Use the correct LightRAG Memory URL and endpoint for RAG queries
 
-            url = f"{LIGHTRAG_URL}/query"
+            final_url = f"{url}/query"
 
-            logger.debug(f"Querying LightRAG at {url} with params: {query_params}")
+            logger.debug(f"Querying LightRAG at {full_url} with params: {query_params}")
 
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=query_params, timeout=60) as response:
+                async with session.post(
+                    final_url, json=query_params, timeout=60
+                ) as response:
                     if response.status == 200:
                         result = await response.json()
 

@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **Topic Classification**: Enhanced the topic classification system by adding a comprehensive `relationships` category. This resolves a bug where statements about social connections were misclassified as `unknown` and improves the agent's ability to understand and organize memories about personal and professional relationships. See [ADR-040](./refs/adr/040-enhanced-topic-classification-for-relationships.md) for details.
+### Fixed
+- **LightRAG URL Configuration**: Corrected the LightRAG URL configuration to ensure proper communication with the LightRAG server. The `query_lightrag_knowledge_direct` method in `agno_agent.py` now consistently uses `LIGHTRAG_URL` for knowledge queries. The `knowledge_coordinator.py` now correctly imports both `LIGHTRAG_URL` (for knowledge queries) and `LIGHTRAG_MEMORY_URL` (for memory queries) to ensure accurate routing between the knowledge and memory LightRAG instances. This resolves issues where the agent was attempting to query the wrong LightRAG instance.
 
 ### Changed
 - **Topic Classification**: Enhanced the topic classification system by adding a comprehensive `relationships` category. This resolves a bug where statements about social connections were misclassified as `unknown` and improves the agent's ability to understand and organize memories about personal and professional relationships. See [ADR-039](./refs/adr/039-enhanced-topic-classification-for-relationships.md) for details.
+
+
+
+
 
 ### Fixed
 - **Memory Clearing**: Resolved a critical bug where clearing memories via scripts did not consistently update the agent's state. The fix standardizes database connection handling and ensures all components are properly synchronized. See [ADR-038](./refs/adr/038-standardized-memory-clearing.md).

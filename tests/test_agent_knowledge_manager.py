@@ -21,8 +21,8 @@ class TestAgentKnowledgeManager(unittest.TestCase):
         """Set up test fixtures before each test method."""
         self.user_id = "test_user"
         self.storage_dir = "/tmp/test_storage"
-        self.lightrag_url = "http://localhost:8020"
-        self.lightrag_memory_url = "http://localhost:8021"
+        self.lightrag_url = "http://localhost:9620"
+        self.lightrag_memory_url = "http://localhost:9621"
         
         # Use a temporary directory for testing
         self.temp_dir = tempfile.mkdtemp()
