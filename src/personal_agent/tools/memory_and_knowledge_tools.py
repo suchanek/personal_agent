@@ -126,7 +126,7 @@ class MemoryAndKnowledgeTools(Toolkit):
             log_debug(f"Copied file to knowledge directory: {dest_path}")
 
             # Upload to LightRAG server
-            upload_result = self._upload_to_lightrag(dest_path, unique_filename)
+            upload_result = self._upload_to_lightrag(dest_path, unique_filename, settings.LIGHTRAG_URL)
             
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge file: {filename}")
@@ -189,7 +189,7 @@ class MemoryAndKnowledgeTools(Toolkit):
             log_debug(f"Created knowledge file: {file_path}")
 
             # Upload to LightRAG server
-            upload_result = self._upload_to_lightrag(file_path, filename)
+            upload_result = self._upload_to_lightrag(file_path, filename, settings.LIGHTRAG_URL)
             
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge text: {title}")
@@ -480,22 +480,23 @@ class MemoryAndKnowledgeTools(Toolkit):
             logger.error(f"Error querying knowledge base: {e}")
             return f"❌ Error querying knowledge base: {str(e)}"
 
-    def _upload_to_lightrag(self, file_path: Path, filename: str) -> str:
+    def _upload_to_lightrag(self, file_path: Path, filename: str, url: str = settings.LIGHTRAG_URL) -> str:
         """Upload a file to the LightRAG server.
 
         Args:
             file_path: Path to the file to upload
             filename: Name to use for the uploaded file
+            url: LightRAG server URL to upload to
 
         Returns:
             Success message or error details.
         """
         try:
-            url = f"{settings.LIGHTRAG_URL}/documents/upload"
+            final_url = f"{url}/documents/upload"
             
             with open(file_path, 'rb') as f:
                 files = {'file': (filename, f, 'application/octet-stream')}
-                response = requests.post(url, files=files, timeout=60)
+                response = requests.post(final_url, files=files, timeout=60)
                 
                 if response.status_code in [200, 201]:
                     result = response.json()

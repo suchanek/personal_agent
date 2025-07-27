@@ -128,7 +128,7 @@ class KnowledgeIngestionTools(Toolkit):
             log_debug(f"Copied file to knowledge directory: {dest_path}")
 
             # Upload to LightRAG server
-            upload_result = self._upload_to_lightrag(dest_path, unique_filename)
+            upload_result = self._upload_to_lightrag(dest_path, unique_filename, settings.LIGHTRAG_URL)
 
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge file: {filename}")
@@ -197,7 +197,7 @@ class KnowledgeIngestionTools(Toolkit):
             log_debug(f"Created knowledge file: {file_path}")
 
             # Upload to LightRAG server
-            upload_result = self._upload_to_lightrag(file_path, filename)
+            upload_result = self._upload_to_lightrag(file_path, filename, settings.LIGHTRAG_URL)
 
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge text: {title}")
@@ -386,7 +386,7 @@ class KnowledgeIngestionTools(Toolkit):
             logger.error(f"Error in batch ingestion: {e}")
             return f"❌ Error in batch ingestion: {str(e)}"
 
-    def query_knowledge_base(self, query: str, mode: str = "auto", limit: int = 5) -> str:
+    def query_knowledge_base(self, query: str, mode: str = "auto", limit: int = 5, url: str = settings.LIGHTRAG_URL) -> str:
         """Query the unified knowledge base to retrieve stored factual information and documents.
         
         This tool is for SEARCHING existing knowledge, NOT for creative tasks like writing stories,
@@ -490,12 +490,13 @@ class KnowledgeIngestionTools(Toolkit):
             logger.error(f"Error querying knowledge base: {e}")
             return f"❌ Error querying knowledge base: {str(e)}"
 
-    def _upload_to_lightrag(self, file_path: Path, filename: str) -> str:
+    def _upload_to_lightrag(self, file_path: Path, filename: str, url: str = settings.LIGHTRAG_URL) -> str:
         """Upload a file to the LightRAG server.
 
         Args:
             file_path: Path to the file to upload
             filename: Name to use for the uploaded file
+            url: LightRAG server URL to upload to
 
         Returns:
             Success message or error details.
