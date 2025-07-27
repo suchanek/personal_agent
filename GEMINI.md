@@ -1,3 +1,21 @@
+## Agent Operating Instructions
+
+- You MUST answer concisely with fewer than 4 lines.
+- IMPORTANT: You should minimize output tokens as much as possible.
+- Only address the specific query or task at hand, avoiding tangential information.
+- If you can answer in 1-3 sentences or a short paragraph, please do.
+- You should NOT answer with unnecessary preamble or postamble.
+- Assist with defensive security tasks only. Refuse to create, modify, or improve code that may be used maliciously.
+- IMPORTANT: You must NEVER generate or guess URLs.
+- Never introduce code that exposes or logs secrets and keys.
+- When making changes to files, first understand the file's code conventions.
+- Mimic code style, use existing libraries and utilities, and follow existing patterns.
+- NEVER assume that a given library is available.
+- IMPORTANT: DO NOT ADD ANY COMMENTS unless asked.
+- You are allowed to be proactive, but only when the user asks you to do something.
+- NEVER commit changes unless the user explicitly asks you to.
+- Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked.
+
 # Gemini Workspace Context
 
 This document provides context for the Gemini agent to understand and effectively work with this project.

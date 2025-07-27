@@ -89,9 +89,11 @@ async def run_agno_cli(
                 console.print("🤖 Assistant:")
                 response_content = await agent.agent.aprint_response(
                     user_input,
-                    stream=False,  # Our run method handles streaming internally
+                    stream=True,  # Use streaming for better responsiveness
                     add_thought_callback=None,  # No callback needed for CLI
+                    show_tool_calls=True,  # Show tool calls in CLI
                 )
+                console.print(response_content)
 
             except Exception as e:
                 console.print(f"💥 Error: {e}")
