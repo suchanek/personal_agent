@@ -113,9 +113,10 @@ class AgentModelManager:
                     )
                     model_options.update({
                         "num_predict": 32768,  # Set specific prediction length for qwen3
-                        "temperature": 0.7,
-                        "top_k": 40,
-                        "top_p": 0.9,
+                        "temperature": 0.6,
+                        "top_k": 20,
+                        "top_p": 0.95,
+                        "min_p": 0,
                         "repeat_penalty": 1.1,
                     })
 
