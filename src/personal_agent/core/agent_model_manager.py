@@ -9,7 +9,7 @@ extracted from the AgnoPersonalAgent class to improve modularity and maintainabi
 import logging
 from typing import Any, Dict, Optional, Union
 
-from agno.models.ollama import Ollama
+from agno.models.ollama.tools import OllamaTools
 from agno.models.openai import OpenAIChat
 
 from ..config.model_contexts import get_model_context_size_sync
@@ -40,11 +40,11 @@ class AgentModelManager:
         self.ollama_base_url = ollama_base_url
         self.seed = seed
 
-    def create_model(self) -> Union[OpenAIChat, Ollama]:
+    def create_model(self) -> Union[OpenAIChat, OllamaTools]:
         """Create the appropriate model instance based on provider.
 
         Returns:
-            Configured model instance
+            Configured model instance (uses OllamaTools for better response management)
 
         Raises:
             ValueError: If unsupported model provider is specified
@@ -74,8 +74,8 @@ class AgentModelManager:
                 # CRITICAL: Use the instruct model, not the base model
                 model_id = self.model_name
 
-                # Use the configuration optimized for SmolLM2 tool calling
-                return Ollama(
+                # Use OllamaTools with configuration optimized for SmolLM2 tool calling
+                return OllamaTools(
                     id=model_id,
                     host=self.ollama_base_url,
                     options={
@@ -162,9 +162,9 @@ class AgentModelManager:
                         self.model_name,
                     )
 
-                return Ollama(
+                return OllamaTools(
                     id=self.model_name,
-                    host=self.ollama_base_url,  # Use host parameter for Ollama
+                    host=self.ollama_base_url,  # Use host parameter for OllamaTools
                     options=model_options,
                 )
         else:

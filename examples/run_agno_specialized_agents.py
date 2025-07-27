@@ -253,7 +253,6 @@ async def main():
     agno_knowledge = create_combined_knowledge_base(
         storage_dir=AGNO_STORAGE_DIR,
         knowledge_dir=AGNO_KNOWLEDGE_DIR,
-        storage=None,  # Not needed for this setup
     )
     if agno_knowledge:
         await load_combined_knowledge_base(agno_knowledge, recreate=False)

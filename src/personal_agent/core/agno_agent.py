@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import aiohttp
 from agno.agent import Agent
-from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.googlesearch import GoogleSearchTools
@@ -783,7 +782,7 @@ class AgnoPersonalAgent:
 
             final_url = f"{url}/query"
 
-            logger.debug(f"Querying LightRAG at {full_url} with params: {query_params}")
+            logger.debug(f"Querying LightRAG at {final_url} with params: {query_params}")
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -1250,7 +1249,8 @@ def create_simple_personal_agent(
     if model_provider == "openai":
         model = OpenAIChat(id=model_name)
     elif model_provider == "ollama":
-        model = Ollama(id=model_name)
+        from agno.models.ollama.tools import OllamaTools
+        model = OllamaTools(id=model_name)
     else:
         raise ValueError(f"Unsupported model provider: {model_provider}")
 
