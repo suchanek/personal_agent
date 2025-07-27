@@ -186,12 +186,8 @@ def create_combined_knowledge_base(
     logger.info("Knowledge directory is ready at %s", knowledge_path)
 
     # Check for available knowledge files
-    text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md"))
+    text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md")) + list(knowledge_path.glob("*.html"))
     pdf_files = list(knowledge_path.glob("*.pdf"))
-
-    if not text_files and not pdf_files:
-        logger.info("No knowledge files found in %s", knowledge_path)
-        return None
 
     logger.info(
         "Found %d text files and %d PDF files in %s",
@@ -254,6 +250,10 @@ def create_combined_knowledge_base(
 
     knowledge_sources.append(arxive_kb)
     logger.info("Created Arxive KnowledgeBase")
+
+    # Log if no local knowledge files were found, but continue with ArXiv
+    if not text_files and not pdf_files:
+        logger.info("No local knowledge files found in %s, but ArXiv knowledge base will be available", knowledge_path)
 
     # Create combined knowledge base
     if knowledge_sources:

@@ -85,19 +85,13 @@ async def run_agno_cli(
 
             # If not a command, treat as regular chat
             try:
-                # Get response from agent using our custom run method
+                # Get response from agent using our improved run method that leverages OllamaTools
                 console.print("🤖 Assistant:")
-                response_content = await agent.agent.arun(
+                response_content = await agent.agent.aprint_response(
                     user_input,
                     stream=False,  # Our run method handles streaming internally
                     add_thought_callback=None,  # No callback needed for CLI
                 )
-
-                # Print the final response content
-                if response_content and response_content.content:
-                    console.print(response_content.content)
-                else:
-                    console.print("No response generated.")
 
             except Exception as e:
                 console.print(f"💥 Error: {e}")
