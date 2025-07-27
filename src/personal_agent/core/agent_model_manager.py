@@ -9,7 +9,7 @@ extracted from the AgnoPersonalAgent class to improve modularity and maintainabi
 import logging
 from typing import Any, Dict, Optional, Union
 
-from agno.models.ollama.tools import OllamaTools
+from agno.models.ollama import Ollama  # Use regular Ollama instead of OllamaTools
 from agno.models.openai import OpenAIChat
 
 from ..config.model_contexts import get_model_context_size_sync
@@ -40,11 +40,11 @@ class AgentModelManager:
         self.ollama_base_url = ollama_base_url
         self.seed = seed
 
-    def create_model(self) -> Union[OpenAIChat, OllamaTools]:
+    def create_model(self) -> Union[OpenAIChat, Ollama]:
         """Create the appropriate model instance based on provider.
 
         Returns:
-            Configured model instance (uses OllamaTools for better response management)
+            Configured model instance (uses regular Ollama for Qwen3 compatibility)
 
         Raises:
             ValueError: If unsupported model provider is specified
@@ -74,8 +74,8 @@ class AgentModelManager:
                 # CRITICAL: Use the instruct model, not the base model
                 model_id = self.model_name
 
-                # Use OllamaTools with configuration optimized for SmolLM2 tool calling
-                return OllamaTools(
+                # Use regular Ollama with configuration optimized for SmolLM2
+                return Ollama(
                     id=model_id,
                     host=self.ollama_base_url,
                     options={
@@ -86,7 +86,6 @@ class AgentModelManager:
                         "top_k": -1,  # Disable top-k sampling for deterministic results
                         "repeat_penalty": 1.0,  # Disable repeat penalty
                         "seed": self.seed,
-                        "stop": ["</tool_call>", "<|im_end|>"],  # Stop tokens for SmolLM2
                         # SmolLM2 specific options
                         "mirostat": 0,  # Disable mirostat sampling
                         "mirostat_eta": 0.1,
@@ -111,14 +110,16 @@ class AgentModelManager:
                         "Using optimized configuration for Qwen3 model: %s",
                         self.model_name,
                     )
-                    model_options.update({
-                        "num_predict": 32768,  # Set specific prediction length for qwen3
-                        "temperature": 0.6,
-                        "top_k": 20,
-                        "top_p": 0.95,
-                        "min_p": 0,
-                        "repeat_penalty": 1.1,
-                    })
+                    model_options.update(
+                        {
+                            "num_predict": 32768,  # Set specific prediction length for qwen3
+                            "temperature": 0.6,
+                            "top_k": 20,
+                            "top_p": 0.95,
+                            "min_p": 0,
+                            "repeat_penalty": 1.1,
+                        }
+                    )
 
                 # Add reasoning support for compatible models
                 reasoning_models = [
@@ -143,17 +144,8 @@ class AgentModelManager:
                 )
 
                 if model_supports_reasoning:
-                    # Enable reasoning-specific options
-                    model_options.update(
-                        {
-                            "use_reasoning": True,  # Enable reasoning mode if supported
-                            "reasoning_effort": "medium",  # Set reasoning effort level
-                            "show_reasoning": True,  # Show reasoning process in debug mode
-                            "max_reasoning_tokens": 2048,  # Limit reasoning tokens
-                        }
-                    )
                     logger.info(
-                        "Enabled reasoning support for model %s with reasoning options",
+                        "Model %s supports reasoning - using standard Ollama configuration",
                         self.model_name,
                     )
                 else:
@@ -162,9 +154,9 @@ class AgentModelManager:
                         self.model_name,
                     )
 
-                return OllamaTools(
+                return Ollama(
                     id=self.model_name,
-                    host=self.ollama_base_url,  # Use host parameter for OllamaTools
+                    host=self.ollama_base_url,  # Use host parameter for Ollama
                     options=model_options,
                 )
         else:

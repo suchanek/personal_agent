@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Qwen3 Tool Calling**: Resolved a critical issue where the `qwen3` model failed to execute tool calls. The `AgentModelManager` has been reverted to use the standard `agno.models.ollama.Ollama` class instead of the unreliable `OllamaTools` wrapper, restoring reliable tool-calling functionality. See [ADR-041](./refs/adr/041-qwen3-tool-calling-fix.md) for details.
+
+### Added
+- **Ollama Reasoning Team**: Added a new, fully-featured multi-agent reasoning team that runs entirely on local Ollama models. This team includes agents for web search, finance, writing, and calculations, and is fully integrated with the agent's memory and knowledge systems.
+
+
+### Fixed
 - **LightRAG URL Specificity**: Corrected an issue where tools could ambiguously target the wrong LightRAG server. All LightRAG-interacting methods now require an explicit `url` parameter, ensuring that requests for knowledge and memory are always sent to the correct server instance. See [ADR-040](./refs/adr/040-explicit-lightrag-url-parameterization.md) for details.
 
 ### Changed
