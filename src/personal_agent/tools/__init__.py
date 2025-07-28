@@ -19,7 +19,11 @@ from .memory_tools import (
     store_interaction,
 )
 from .knowledge_ingestion_tools import KnowledgeIngestionTools
+from .knowledge_tools import KnowledgeTools
+from .lightrag_document_manager import LightRAGDocumentManager
+from .memory_cleaner import MemoryClearingManager
 from .research import comprehensive_research
+from .show_config import show_config
 from .system import mcp_shell_command
 from .web import mcp_brave_search, mcp_fetch_url, mcp_github_search
 
@@ -28,8 +32,11 @@ __all__ = [
     "store_interaction",
     "query_knowledge_base",
     "clear_knowledge_base",
+    "create_memory_tools",
     # Knowledge ingestion tools
     "KnowledgeIngestionTools",
+    # Knowledge tools
+    "KnowledgeTools",
     # Filesystem tools
     "mcp_read_file",
     "mcp_write_file",
@@ -44,6 +51,12 @@ __all__ = [
     "mcp_shell_command",
     # Research tools
     "comprehensive_research",
+    # Document management tools
+    "LightRAGDocumentManager",
+    # Memory management tools
+    "MemoryClearingManager",
+    # Configuration tools
+    "show_config",
     # Tool collection
     "get_all_tools",
 ]

@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Standalone Ollama Reasoning Team**: Introduced a new, lightweight, standalone multi-agent team that uses local Ollama models for reasoning tasks. This team is defined in `src/personal_agent/team/ollama_reasoning_multi_purpose_team.py` and can be run via the `paga_team_cli` command. It provides a flexible way to perform tasks like web search, financial analysis, and calculations without the full overhead of the `AgnoPersonalAgent`. See [ADR-042](./refs/adr/042-ollama-reasoning-team.md) for more details.
+- **Direct Knowledge Query Tool**: Added a new `query_lightrag_knowledge_direct` tool to the `KnowledgeTools` toolkit. This tool allows for direct, unfiltered queries to the LightRAG knowledge base, providing more control for specific use cases like the new reasoning team.
+
 ### Fixed
 - **Qwen3 Tool Calling**: Resolved a critical issue where the `qwen3` model failed to execute tool calls. The `AgentModelManager` has been reverted to use the standard `agno.models.ollama.Ollama` class instead of the unreliable `OllamaTools` wrapper, restoring reliable tool-calling functionality. See [ADR-041](./refs/adr/041-qwen3-tool-calling-fix.md) for details.
-
-### Added
-- **Ollama Reasoning Team**: Added a new, fully-featured multi-agent reasoning team that runs entirely on local Ollama models. This team includes agents for web search, finance, writing, and calculations, and is fully integrated with the agent's memory and knowledge systems.
 
 
 ### Fixed
