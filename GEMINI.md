@@ -166,9 +166,13 @@ The project includes several entry points for running different agent configurat
         poetry run paga_cli --recreate
         ```
 
-### Initialization with `--recreate` flag
+### Agent Initialization
 
-When the `--recreate` flag is used during agent initialization (e.g., `poetry run paga_cli --recreate` or `poetry run paga_streamlit --recreate`), the system will now automatically clear all existing memories from both the local SQLite database and the LightRAG graph memory server. This ensures a clean slate for the knowledge base and memory system, which is particularly useful for development and testing scenarios.
+The `AgnoPersonalAgent` now uses a **lazy initialization** pattern. This means the agent is created instantly without waiting for heavy components like models and memory systems to load. The actual initialization happens automatically and transparently the first time the agent is used (e.g., when `run()` is called).
+
+- **Simplified Creation**: You no longer need to call an `async initialize()` method. Just instantiate the class directly: `agent = AgnoPersonalAgent(...)`.
+- **Backward Compatibility**: The old `create_agno_agent()` factory function is still available but is now deprecated.
+- **`--recreate` flag**: When the `--recreate` flag is used, the agent will clear all existing memories from both the local SQLite database and the LightRAG graph memory server upon its first use. This ensures a clean slate for the knowledge base and memory system.
 
 ## Testing
 

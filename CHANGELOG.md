@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Agent Initialization**: Refactored the `AgnoPersonalAgent` to use a lazy initialization pattern. The agent is now instantiated synchronously (`agent = AgnoPersonalAgent(...)`) and heavy initialization occurs automatically on first use. This simplifies agent creation, improves code clarity, and makes it easier to use agents within teams. The old `create_agno_agent()` factory is now deprecated but maintained for backward compatibility. See [ADR-043](./refs/adr/043-agno-agent-lazy-initialization.md) for details.
+
+### Fixed
+- **Team Memory Tools**: Resolved a validation issue in the `get_recent_memories` tool that occurred when the agent was used within a team context. The tool now correctly handles default parameter values.
+- **Team Agent Responses**: Fixed a bug where the `AgnoPersonalAgent`, when used as a team member, would incorrectly return raw JSON tool calls instead of executing them and returning a natural language response. The agent's internal instructions have been improved to ensure proper tool execution.
+
+
 ### Added
 - **Standalone Ollama Reasoning Team**: Introduced a new, lightweight, standalone multi-agent team that uses local Ollama models for reasoning tasks. This team is defined in `src/personal_agent/team/ollama_reasoning_multi_purpose_team.py` and can be run via the `paga_team_cli` command. It provides a flexible way to perform tasks like web search, financial analysis, and calculations without the full overhead of the `AgnoPersonalAgent`. See [ADR-042](./refs/adr/042-ollama-reasoning-team.md) for more details.
 - **Direct Knowledge Query Tool**: Added a new `query_lightrag_knowledge_direct` tool to the `KnowledgeTools` toolkit. This tool allows for direct, unfiltered queries to the LightRAG knowledge base, providing more control for specific use cases like the new reasoning team.
