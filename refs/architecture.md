@@ -49,6 +49,7 @@ This layer is the primary entry point for user interaction.
 The heart of the system, powered by the **Agno Framework**. This layer is responsible for:
 
 - **Orchestration**: Managing the overall workflow of the agent, from receiving user input to generating a response.
+- **Lazy Initialization**: The core `AgnoPersonalAgent` uses a lazy initialization pattern. This means that the agent can be instantiated quickly and efficiently, with the more resource-intensive components (like the LLM model and memory systems) being loaded only when they are first needed. This improves startup time and simplifies the creation of agents, especially in team-based scenarios.
 - **Task Management**: Decomposing complex tasks into smaller, manageable steps.
 - **Tool Routing**: Intelligently selecting and invoking the appropriate tools to fulfill user requests.
 - **State Management**: Maintaining the agent's internal state and conversation history.
@@ -91,6 +92,7 @@ The architecture has been shaped by a series of key decisions, documented in Arc
 - **ADR-013: Dynamic Multi-User Management**: Implements a full-stack, dynamic multi-user system.
 - **ADR-015: Persistent User Context**: Ensures that the user context persists across sessions.
 - **ADR-030: Knowledge Ingestion System**: Defines the architecture for the new knowledge ingestion system.
+- **ADR-043: AgnoPersonalAgent Lazy Initialization**: Implements a lazy initialization pattern for the core agent, simplifying its creation and use.
 
 ## 5. Deployment and Configuration
 

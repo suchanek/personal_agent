@@ -32,8 +32,10 @@ async def run_agno_cli(
     # Initialize command parser
     command_parser = CommandParser()
 
-    # Print formatted agent info first
+    # Ensure agent is initialized before showing info
     console.print("✅ [bold green]Agent Successfully Initialized![/bold green]")
+    # Trigger lazy initialization by calling a simple method
+    await agent._ensure_initialized()
     agent.print_agent_info(console)
 
     # Display the welcome panel
@@ -85,15 +87,13 @@ async def run_agno_cli(
 
             # If not a command, treat as regular chat
             try:
-                # Get response from agent using our improved run method that leverages OllamaTools
+                # Get response from agent using streaming aprint_response
                 console.print("🤖 Assistant:")
-                response_content = await agent.agent.aprint_response(
+                await agent.aprint_response(
                     user_input,
                     stream=True,  # Use streaming for better responsiveness
-                    add_thought_callback=None,  # No callback needed for CLI
                     show_tool_calls=True,  # Show tool calls in CLI
                 )
-                console.print(response_content)
 
             except Exception as e:
                 console.print(f"💥 Error: {e}")
