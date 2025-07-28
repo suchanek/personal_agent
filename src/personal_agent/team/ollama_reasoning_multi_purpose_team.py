@@ -12,6 +12,7 @@ The team consists of:
 - A memory agent that can store and retrieve personal information and knowledge
 """
 
+import argparse
 import asyncio
 from pathlib import Path
 from textwrap import dedent
@@ -36,6 +37,7 @@ try:
         AGNO_STORAGE_DIR,
         LLM_MODEL,
         OLLAMA_URL,
+        REMOTE_OLLAMA_URL,
         USER_ID,
     )
     from ..core.agent_model_manager import AgentModelManager
@@ -50,6 +52,7 @@ except ImportError:
         AGNO_STORAGE_DIR,
         LLM_MODEL,
         OLLAMA_URL,
+        REMOTE_OLLAMA_URL,
         USER_ID,
     )
     from personal_agent.core.agent_model_manager import AgentModelManager
@@ -60,12 +63,13 @@ load_dotenv()
 cwd = Path(__file__).parent.resolve()
 
 
-def create_ollama_model(model_name: str = LLM_MODEL) -> OllamaTools:
+def create_ollama_model(model_name: str = LLM_MODEL, use_remote: bool = False) -> OllamaTools:
     """Create an Ollama model using your AgentModelManager."""
+    ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
     model_manager = AgentModelManager(
         model_provider="ollama",
         model_name=model_name,
-        ollama_base_url=OLLAMA_URL,
+        ollama_base_url=ollama_url,
         seed=None,
     )
     return model_manager.create_model()
@@ -142,6 +146,7 @@ async def create_shared_memory_system(
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
     user_id: str = USER_ID,
     debug: bool = False,
+    use_remote: bool = False,
 ):
     """Create a shared memory system that integrates with your existing managers."""
     try:
@@ -193,7 +198,7 @@ async def create_shared_memory_system(
         )
         
         shared_memory = Memory(
-            model=create_ollama_model(),
+            model=create_ollama_model(use_remote=use_remote),
             db=memory_db
         )
         
@@ -221,7 +226,7 @@ async def create_shared_memory_system(
         )
         
         shared_memory = Memory(
-            model=create_ollama_model(),
+            model=create_ollama_model(use_remote=use_remote),
             db=memory_db
         )
         
@@ -239,6 +244,7 @@ async def create_memory_agent_with_shared_context(
     knowledge_manager: "AgentKnowledgeManager",
     user_id: str = USER_ID,
     debug: bool = False,
+    use_remote: bool = False,
 ) -> Agent:
     """Create a memory agent that uses the shared memory system."""
     try:
@@ -256,7 +262,7 @@ async def create_memory_agent_with_shared_context(
     memory_agent = Agent(
         name="Personal AI Agent",
         role="Store and retrieve personal information and factual knowledge",
-        model=create_ollama_model(),
+        model=create_ollama_model(use_remote=use_remote),
         memory=shared_memory,  # Use the shared memory
         tools=[memory_tools, knowledge_tools],
         instructions=[
@@ -282,7 +288,7 @@ async def create_memory_agent_with_shared_context(
 
 
 # Create the team
-async def create_team():
+async def create_team(use_remote: bool = False):
     """Create the team with shared memory context and your existing managers."""
     
     # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
@@ -307,11 +313,11 @@ async def create_team():
         print("Proceeding with team creation, but Docker services may be inconsistent")
 
     # Create shared memory system with your existing managers
-    shared_memory, memory_manager, knowledge_manager, agno_memory, agno_knowledge = await create_shared_memory_system()
+    shared_memory, memory_manager, knowledge_manager, agno_memory, agno_knowledge = await create_shared_memory_system(use_remote=use_remote)
     
     # Create memory agent that uses shared context
     memory_agent = await create_memory_agent_with_shared_context(
-        shared_memory, memory_manager, knowledge_manager, debug=True
+        shared_memory, memory_manager, knowledge_manager, debug=True, use_remote=use_remote
     )
     
     # Update other agents to use shared memory (declare as global to modify)
@@ -325,7 +331,7 @@ async def create_team():
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
-        model=create_ollama_model(),
+        model=create_ollama_model(use_remote=use_remote),
         memory=shared_memory,  # CRITICAL: Team uses shared memory
         tools=[
             ReasoningTools(add_instructions=True, add_few_shot=True),
@@ -399,7 +405,7 @@ async def cleanup_team(team):
 
 
 # Main execution
-async def main():
+async def main(use_remote: bool = False):
     """Main function to run the team with an interactive chat loop."""
     
     print("🤖 Ollama Multi-Purpose Reasoning Team")
@@ -409,7 +415,7 @@ async def main():
     
     try:
         # Create the team
-        team = await create_team()
+        team = await create_team(use_remote=use_remote)
         
         print("\n✅ Team initialized successfully!")
         print("\nTeam Members:")
@@ -515,7 +521,16 @@ async def main():
 
 def cli_main():
     """Entry point for the paga_team_cli command."""
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(
+        description="Run the Ollama Multi-Purpose Reasoning Team"
+    )
+    parser.add_argument(
+        "--remote", action="store_true", help="Use remote Ollama server"
+    )
+    args = parser.parse_args()
+
+    print("Starting Ollama Multi-Purpose Reasoning Team...")
+    asyncio.run(main(use_remote=args.remote))
 
 
 if __name__ == "__main__":
