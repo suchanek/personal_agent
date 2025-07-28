@@ -148,6 +148,23 @@ async def create_memory_agent(
 # Create the team
 async def create_team():
     """Create the team with all agents including the memory agent."""
+    
+    # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
+    from ..core.docker_integration import ensure_docker_user_consistency
+    from ..config.settings import USER_ID
+    
+    print("🐳 Ensuring Docker and user synchronization...")
+    docker_ready, docker_message = ensure_docker_user_consistency(
+        user_id=USER_ID,
+        auto_fix=True,
+        force_restart=False
+    )
+    
+    if docker_ready:
+        print(f"✅ Docker synchronization successful: {docker_message}")
+    else:
+        print(f"⚠️ Docker synchronization failed: {docker_message}")
+        print("Proceeding with team creation, but Docker services may be inconsistent")
 
     # Create memory agent (must be async)
     memory_agent = await create_memory_agent()

@@ -29,11 +29,26 @@ async def initialize_agno_system(
     """
     from ..utils.pag_logging import configure_all_rich_logging
     from .agno_agent import create_agno_agent
+    from .docker_integration import ensure_docker_user_consistency
 
     # Set up Rich logging for all components including agno
     configure_all_rich_logging()
     logger = setup_logging(level=settings.LOG_LEVEL)
     logger.info("Starting Personal AI Agent with agno framework...")
+
+    # CRITICAL: Ensure Docker and user synchronization BEFORE any agent creation
+    logger.info("🐳 Performing system-level Docker and user synchronization...")
+    docker_ready, docker_message = ensure_docker_user_consistency(
+        user_id=settings.USER_ID, auto_fix=True, force_restart=False
+    )
+
+    if docker_ready:
+        logger.info("✅ Docker synchronization successful: %s", docker_message)
+    else:
+        logger.warning("⚠️ Docker synchronization failed: %s", docker_message)
+        logger.warning(
+            "Proceeding with agent initialization, but Docker services may be inconsistent"
+        )
 
     # Update Ollama URL if requested
     ollama_url = settings.OLLAMA_URL
