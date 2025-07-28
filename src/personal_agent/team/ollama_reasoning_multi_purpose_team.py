@@ -26,26 +26,15 @@ from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
 from dotenv import load_dotenv
 
-from ..tools.knowledge_tools import KnowledgeTools
-from ..tools.refactored_memory_tools import AgnoMemoryTools
-
 # Import your personal agent components
 from ..config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
-    LIGHTRAG_MEMORY_URL,
-    LIGHTRAG_URL,
     LLM_MODEL,
     OLLAMA_URL,
     USER_ID,
 )
-from ..core import AgentKnowledgeManager, AgentMemoryManager, AgentModelManager
-from ..core.agno_storage import (
-    create_agno_memory,
-    create_agno_storage,
-    create_combined_knowledge_base,
-    load_combined_knowledge_base,
-)
+from ..core.agent_model_manager import AgentModelManager
 
 # Load environment variables
 load_dotenv()
@@ -135,81 +124,24 @@ async def create_memory_agent(
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
     user_id: str = USER_ID,
     debug: bool = False,
-) -> Agent:
-    """Create a memory agent following the exact AgnoPersonalAgent initialization pattern."""
-
-    # 1. Create Agno storage (CRITICAL: Must be done first)
-    agno_storage = create_agno_storage(storage_dir)
-
-    # 2. Create combined knowledge base (CRITICAL: Must be done before loading)
-    agno_knowledge = create_combined_knowledge_base(
-        storage_dir, knowledge_dir, agno_storage
-    )
-
-    # 3. Load knowledge base content (CRITICAL: Must be async)
-    if agno_knowledge:
-        await load_combined_knowledge_base(agno_knowledge, recreate=False)
-
-    # 4. Create memory with SemanticMemoryManager (CRITICAL: Must be done after storage)
-    agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-
-    # 5. Initialize managers (CRITICAL: Must be done after agno_memory creation)
-    memory_manager = AgentMemoryManager(
-        user_id=user_id,
-        storage_dir=storage_dir,
-        agno_memory=agno_memory,
-        lightrag_url=LIGHTRAG_URL,
-        lightrag_memory_url=LIGHTRAG_MEMORY_URL,
+) -> "AgnoPersonalAgent":
+    """Create a memory agent using the refactored AgnoPersonalAgent."""
+    from ..core.agno_agent import AgnoPersonalAgent
+    
+    # Create the refactored AgnoPersonalAgent (which IS an Agent)
+    agent = AgnoPersonalAgent(
+        model_provider="ollama",
+        model_name=LLM_MODEL,
         enable_memory=True,
-    )
-
-    # Initialize the memory manager with the created agno_memory
-    memory_manager.initialize(agno_memory)
-
-    knowledge_manager = AgentKnowledgeManager(
-        user_id=user_id,
         storage_dir=storage_dir,
-        lightrag_url=LIGHTRAG_URL,
-        lightrag_memory_url=LIGHTRAG_MEMORY_URL,
-    )
-
-    # 6. Create tool instances (CRITICAL: Must be done after managers)
-    knowledge_tools = KnowledgeTools(knowledge_manager)
-    memory_tools = AgnoMemoryTools(memory_manager)
-
-    # 7. Create the Agent (CRITICAL: Must be done last)
-    agent = Agent(
-        name="Memory Agent",
-        role="Store and retrieve personal information and knowledge",
-        model=create_ollama_model(),
-        tools=[knowledge_tools, memory_tools],
-        instructions=[
-            """## BEHAVIOR RULES:
-        1. **Memory Operations ONLY**: EXECUTE memory functions directly, don't show code
-           - 'What do you remember about me?' → CALL get_recent_memories() and return results
-           - 'Do you know my preferences?' → CALL query_memory('preferences') and return results
-           - 'Remember that I...' → CALL store_user_memory(content, topics) and confirm
-           - NEVER show function names or code tags - EXECUTE the functions
-           - NEVER delegate memory tasks to team members"
-
-            "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
-            "Use memory tools for personal information about the user.",
-            "Use knowledge tools for factual information and documents.",
-            "Always search your memory when asked about the user.",
-            "Always search your knowledge base when asked about factual information.",
-            "Store new personal information in memory and new factual information in knowledge.""",
-        ],
-        markdown=True,
-        show_tool_calls=True,
+        knowledge_dir=knowledge_dir,
+        debug=debug,
         user_id=user_id,
-        enable_agentic_memory=False,  # Disable to avoid conflicts
-        enable_user_memories=False,  # Use our custom tools instead
-        storage=agno_storage,
-        knowledge=agno_knowledge,
-        memory=agno_memory,
-        search_knowledge=True,
     )
-
+    
+    # Initialize using the proven pattern
+    await agent.initialize(recreate=False)
+    
     return agent
 
 

@@ -1,19 +1,15 @@
 """
 Refactored Agno-based agent implementation for the Personal AI Agent.
 
-This module provides a cleaner, more modular implementation of the AgnoPersonalAgent
-that leverages specialized manager classes for different responsibilities:
-- AgentModelManager: Handles model creation and configuration
-- AgentInstructionManager: Manages instruction creation and customization
-- AgentMemoryManager: Handles memory operations including storage and retrieval
-- AgentKnowledgeManager: Manages knowledge base operations
-- AgentToolManager: Handles tool registration and execution
+This module provides a cleaner implementation of the AgnoPersonalAgent
+that inherits directly from agno.agent.Agent and uses the proven initialization
+pattern from the working team implementation.
 """
 
 import asyncio
 import os
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 import aiohttp
 from agno.agent import Agent
@@ -74,12 +70,38 @@ from .smollm2_parser import (
 logger = setup_logging(__name__, level=LOG_LEVEL)
 
 
-class AgnoPersonalAgent:
-    """
-    Refactored Agno-based Personal AI Agent with MCP integration and native storage.
+@dataclass
+class AgnoPersonalAgentConfig:
+    """Configuration data for AgnoPersonalAgent."""
+    model_provider: str = "ollama"
+    model_name: str = LLM_MODEL
+    enable_memory: bool = True
+    storage_dir: str = AGNO_STORAGE_DIR
+    knowledge_dir: str = AGNO_KNOWLEDGE_DIR
+    debug: bool = False
+    ollama_base_url: str = OLLAMA_URL
+    user_id: str = USER_ID
+    recreate: bool = False
+    seed: Optional[int] = None
 
-    This class coordinates the different components of the agent system,
-    delegating specific responsibilities to specialized manager classes.
+
+def create_ollama_model(model_name: str = LLM_MODEL) -> Any:
+    """Create an Ollama model using AgentModelManager."""
+    model_manager = AgentModelManager(
+        model_provider="ollama",
+        model_name=model_name,
+        ollama_base_url=OLLAMA_URL,
+        seed=None,
+    )
+    return model_manager.create_model()
+
+
+class AgnoPersonalAgent(Agent):
+    """
+    Refactored Agno-based Personal AI Agent that inherits directly from Agent.
+
+    This class uses the proven initialization pattern from the working team
+    implementation while maintaining backward compatibility with existing code.
     """
 
     def __init__(
@@ -87,7 +109,7 @@ class AgnoPersonalAgent:
         model_provider: str = "ollama",
         model_name: str = LLM_MODEL,
         enable_memory: bool = True,
-        enable_mcp: bool = True,
+        enable_mcp: bool = False,  # Simplified: disable MCP by default
         storage_dir: str = AGNO_STORAGE_DIR,
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
@@ -96,6 +118,7 @@ class AgnoPersonalAgent:
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.CONCISE,
         seed: Optional[int] = None,
+        **kwargs  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
 
@@ -103,21 +126,35 @@ class AgnoPersonalAgent:
             model_provider: LLM provider ('ollama' or 'openai')
             model_name: Model name to use
             enable_memory: Whether to enable memory and knowledge features
-            enable_mcp: Whether to enable MCP tool integration
+            enable_mcp: Whether to enable MCP tool integration (simplified)
             storage_dir: Directory for Agno storage files
             knowledge_dir: Directory containing knowledge files to load
             debug: Enable debug logging and tool call visibility
             ollama_base_url: Base URL for Ollama API
             user_id: User identifier for memory operations
             recreate: Whether to recreate knowledge bases
-            instruction_level: The sophistication level for agent instructions
+            instruction_level: The sophistication level for agent instructions (kept for compatibility)
             seed: Optional seed for model reproducibility
         """
-        # Basic configuration
+        # Store configuration
+        self.config = AgnoPersonalAgentConfig(
+            model_provider=model_provider,
+            model_name=model_name,
+            enable_memory=enable_memory,
+            storage_dir=storage_dir,
+            knowledge_dir=knowledge_dir,
+            debug=debug,
+            ollama_base_url=ollama_base_url,
+            user_id=user_id,
+            recreate=recreate,
+            seed=seed,
+        )
+
+        # Legacy compatibility fields
         self.model_provider = model_provider
         self.model_name = model_name
         self.enable_memory = enable_memory
-        self.enable_mcp = enable_mcp and USE_MCP
+        self.enable_mcp = enable_mcp and USE_MCP  # Keep for compatibility but simplified
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
@@ -128,40 +165,18 @@ class AgnoPersonalAgent:
         # Set up storage paths
         self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
 
-        # MCP configuration
-        self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
-
-        # Initialize component managers
-        self.model_manager: AgentModelManager = AgentModelManager(
-            model_provider, model_name, ollama_base_url, seed
-        )
-
-        self.instruction_manager: AgentInstructionManager = AgentInstructionManager(
-            instruction_level, user_id, enable_memory, self.enable_mcp, self.mcp_servers
-        )
-
-        self.memory_manager: AgentMemoryManager = AgentMemoryManager(
-            user_id,
-            self.storage_dir,
-            None,  # agno_memory will be set during initialization
-            LIGHTRAG_URL,
-            LIGHTRAG_MEMORY_URL,
-            enable_memory,
-        )
-
-        self.knowledge_manager: AgentKnowledgeManager = AgentKnowledgeManager(
-            user_id, self.storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
-        )
-
-        self.tool_manager: AgentToolManager = AgentToolManager(
-            user_id, self.storage_dir
-        )
+        # Initialize component managers (will be set in initialize())
+        self.model_manager: Optional[AgentModelManager] = None
+        self.instruction_manager: Optional[AgentInstructionManager] = None
+        self.memory_manager: Optional[AgentMemoryManager] = None
+        self.knowledge_manager: Optional[AgentKnowledgeManager] = None
+        self.tool_manager: Optional[AgentToolManager] = None
 
         # Initialize separate tool classes
         self.knowledge_tools = None
         self.memory_tools = None
 
-        # Storage components
+        # Storage components (will be set in initialize())
         self.agno_storage = None
         self.agno_knowledge = None
         self.lightrag_knowledge = None
@@ -169,16 +184,34 @@ class AgnoPersonalAgent:
         self.agno_memory = None
         self.knowledge_coordinator = None
 
-        # Agent instance
-        self.agent = None
+        # Legacy compatibility fields
         self._last_response = None
         self._collected_tool_calls = []
+        self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
+
+        # Initialize base Agent with minimal setup - will be updated in initialize()
+        super().__init__(
+            name="Personal AI Agent",
+            model=None,  # Will be set in initialize()
+            tools=[],    # Will be set in initialize()
+            instructions=[],  # Will be set in initialize()
+            markdown=True,
+            show_tool_calls=debug,
+            agent_id="personal_agent",
+            user_id=user_id,
+            enable_agentic_memory=False,  # Disable to avoid conflicts
+            enable_user_memories=False,   # Use our custom tools instead
+            add_history_to_messages=True,
+            num_history_responses=3,
+            debug_mode=debug,
+            stream_intermediate_steps=True,
+            stream=True,
+        )
 
         logger.info(
-            "Initialized AgnoPersonalAgent with model=%s, memory=%s, mcp=%s, user_id=%s",
+            "Initialized AgnoPersonalAgent with model=%s, memory=%s, user_id=%s",
             f"{model_provider}:{model_name}",
             self.enable_memory,
-            self.enable_mcp,
             self.user_id,
         )
 
@@ -205,8 +238,12 @@ class AgnoPersonalAgent:
             self.storage_dir = storage_dir
             self.knowledge_dir = knowledge_dir
 
+        # Update config with resolved paths
+        self.config.storage_dir = self.storage_dir
+        self.config.knowledge_dir = self.knowledge_dir
+
     async def initialize(self, recreate: bool = False) -> bool:
-        """Initialize the agno agent with all components.
+        """Initialize the agent using the proven create_memory_agent() pattern.
 
         Args:
             recreate: Whether to recreate the agent knowledge bases
@@ -218,242 +255,131 @@ class AgnoPersonalAgent:
             "🚀 AgnoPersonalAgent.initialize() called with recreate=%s", recreate
         )
 
-        # CRITICAL: Synchronize the agent's user_id with the persistent user setting
         try:
-            from ..config import get_current_user_id
-            from .user_manager import UserManager
+            # 1. Create Agno storage (CRITICAL: Must be done first)
+            self.agno_storage = create_agno_storage(self.storage_dir)
+            logger.info("Created Agno storage at: %s", self.storage_dir)
 
-            user_manager = UserManager()
-            persistent_user_id = (
-                get_current_user_id()
-            )  # This is loaded from env.userid at startup
-
-            if self.user_id != persistent_user_id:
-                logger.warning(
-                    "Agent initialized with user '%s', but persistent user is '%s'. Switching context...",
-                    self.user_id,
-                    persistent_user_id,
-                )
-                # This is a formal user switch. Update the persistent user file.
-                switch_result = user_manager.switch_user(
-                    self.user_id, restart_lightrag=True, update_global_config=True
-                )
-                if not switch_result.get(
-                    "success"
-                ) and "Already logged in" not in switch_result.get("error", ""):
-                    raise RuntimeError(
-                        f"Failed to switch user context to '{self.user_id}': {switch_result.get('error')}"
-                    )
-                else:
-                    logger.info(
-                        "Successfully switched user context to '%s'", self.user_id
-                    )
-
-        except Exception as e:
-            logger.error("🚨 Critical error during user context synchronization: %s", e)
-            # This is a critical step, so we raise an exception if it fails.
-            raise RuntimeError(f"User context synchronization failed: {e}") from e
-
-        # CRITICAL: Ensure user is registered in the user registry
-        logger.info("📝 Ensuring user %s is registered in user registry", self.user_id)
-        try:
-            from .user_registry import UserRegistry
-
-            user_registry = UserRegistry()
-            user_registry.ensure_current_user_registered()
-            logger.info("✅ User registration check completed")
-        except Exception as e:
-            logger.warning("⚠️ User registry check failed: %s", e)
-            # Don't fail initialization for user registry issues
-
-        # CRITICAL: Ensure Docker USER_ID consistency with smart restart capability
-        logger.info("🔍 Checking Docker USER_ID consistency for user: %s", self.user_id)
-        try:
-            ready_to_proceed, consistency_message = ensure_docker_user_consistency(
-                user_id=self.user_id, auto_fix=True, force_restart=False
+            # 2. Create combined knowledge base (CRITICAL: Must be done before loading)
+            self.agno_knowledge = create_combined_knowledge_base(
+                self.storage_dir, self.knowledge_dir, self.agno_storage
             )
 
-            if ready_to_proceed:
+            # 3. Load knowledge base content (CRITICAL: Must be async)
+            if self.agno_knowledge:
+                await load_combined_knowledge_base(self.agno_knowledge, recreate=recreate)
+                logger.info("Loaded Agno combined knowledge base content")
+
+            # 4. Create memory with SemanticMemoryManager (CRITICAL: Must be done after storage)
+            self.agno_memory = create_agno_memory(
+                self.storage_dir, debug_mode=self.debug
+            )
+
+            if self.agno_memory:
                 logger.info(
-                    "✅ Docker consistency check passed: %s", consistency_message
+                    "Created Agno memory with SemanticMemoryManager at: %s",
+                    self.storage_dir,
                 )
             else:
-                logger.error(
-                    "❌ Docker consistency check failed: %s", consistency_message
-                )
-                raise RuntimeError(
-                    f"Docker USER_ID consistency check failed: {consistency_message}"
-                )
+                logger.error("Failed to create memory system")
+                return False
 
-        except Exception as e:
-            logger.error("🚨 Critical error during Docker consistency check: %s", e)
-            # Don't fail initialization for Docker consistency issues in case Docker is not available
-            logger.warning(
-                "⚠️ Continuing initialization despite Docker consistency check failure"
+            # 5. Initialize managers (CRITICAL: Must be done after agno_memory creation)
+            self.model_manager = AgentModelManager(
+                self.model_provider, self.model_name, self.ollama_base_url, self.seed
             )
 
-        try:
-            # Create model using the model manager
+            self.instruction_manager = AgentInstructionManager(
+                self.instruction_level, self.user_id, self.enable_memory, False, {}
+            )
+
+            self.memory_manager = AgentMemoryManager(
+                self.user_id,
+                self.storage_dir,
+                self.agno_memory,
+                LIGHTRAG_URL,
+                LIGHTRAG_MEMORY_URL,
+                self.enable_memory,
+            )
+
+            # Initialize the memory manager with the created agno_memory
+            self.memory_manager.initialize(self.agno_memory)
+
+            self.knowledge_manager = AgentKnowledgeManager(
+                self.user_id, self.storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
+            )
+
+            self.tool_manager = AgentToolManager(
+                self.user_id, self.storage_dir
+            )
+
+            # 6. Create tool instances (CRITICAL: Must be done after managers)
+            if self.enable_memory:
+                self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
+                self.memory_tools = AgnoMemoryTools(self.memory_manager)
+
+            # 7. Create the model
             model = self.model_manager.create_model()
             logger.info("Created model: %s", self.model_name)
 
-            # Prepare tools list - reduce tools for SmolLM2 to prevent confusion
-            if is_smollm2_model(self.model_name):
-                # Minimal tool set for SmolLM2 to reduce confusion
-                tools = [
-                    GoogleSearchTools(),  # For web search
-                    YFinanceTools(stock_price=True),  # Just basic stock prices
-                    CalculatorTools(enable_all=False),  # Basic calculator only
-                ]
-                logger.info("Using minimal tool set for SmolLM2 model")
-            else:
-                # Full tool set for other models
-                tools = [
-                    # Add GoogleSearch tools directly for web search functionality
-                    GoogleSearchTools(),  # Web search functionality
-                    YFinanceTools(
-                        stock_price=True,
-                        company_info=True,
-                        stock_fundamentals=True,
-                        key_financial_ratios=True,
-                        analyst_recommendations=True,
-                    ),
-                    PythonTools(),
-                    PersonalAgentFilesystemTools(),  # @todo: modify to pass a proper starting dir
-                    PersonalAgentSystemTools(),
-                    KnowledgeIngestionTools(),  # Add knowledge ingestion capabilities
-                    CalculatorTools(enable_all=True),
-                ]
-
-            # Initialize Agno native storage and knowledge following the working example pattern
+            # 8. Prepare tools list - MEMORY AGENT ONLY: Just memory and knowledge tools
+            tools = []
+            
             if self.enable_memory:
-                self.agno_storage = create_agno_storage(self.storage_dir)
-                logger.info("Created Agno storage at: %s", self.storage_dir)
+                tools.extend([self.knowledge_tools, self.memory_tools])
+                logger.info("Added KnowledgeTools and AgnoMemoryTools to memory agent")
+            else:
+                logger.warning("Memory disabled - memory agent will have no tools!")
 
-                # Create knowledge base (sync creation)
-                self.agno_knowledge = create_combined_knowledge_base(
-                    self.storage_dir, self.knowledge_dir, self.agno_storage
-                )
+            # 9. Create instructions using the proven memory agent pattern
+            instructions = [
+                """## BEHAVIOR RULES:
+            1. **Memory Operations ONLY**: EXECUTE memory functions directly, don't show code
+               - 'What do you remember about me?' → CALL get_recent_memories() and return results
+               - 'Do you know my preferences?' → CALL query_memory('preferences') and return results
+               - 'Remember that I...' → CALL store_user_memory(content, topics) and confirm
+               - NEVER show function names or code tags - EXECUTE the functions
+               - NEVER delegate memory tasks to team members""",
+                "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
+                "Use memory tools for personal information about the user.",
+                "Use knowledge tools for factual information and documents.",
+                "Always search your memory when asked about the user.",
+                "Always search your knowledge base when asked about factual information.",
+                "Store new personal information in memory and new factual information in knowledge.",
+            ]
 
-                # Load knowledge base content (async loading) - matches working example
-                if self.agno_knowledge:
-                    await load_combined_knowledge_base(
-                        self.agno_knowledge, recreate=recreate
-                    )
-                    logger.info("Loaded Agno combined knowledge base content")
+            # 10. Update the Agent's components (KEY: Update inherited Agent properties)
+            self.model = model
+            self.tools = tools
+            self.instructions = instructions
 
-                # Create memory with SemanticMemoryManager (debug mode passed through)
-                self.agno_memory = create_agno_memory(
-                    self.storage_dir, debug_mode=self.debug
-                )
+            # Update Agent's storage components
+            if self.enable_memory:
+                self.storage = self.agno_storage
+                self.knowledge = self.agno_knowledge
+                self.memory = self.agno_memory
+                self.search_knowledge = True
 
-                if self.agno_memory:
-                    # Initialize the memory manager with the created agno_memory
-                    self.memory_manager.initialize(self.agno_memory)
-                    logger.info(
-                        "Created Agno memory with SemanticMemoryManager at: %s",
-                        self.storage_dir,
-                    )
-                else:
-                    logger.error("Failed to create memory system")
-
-                # Add Lightrag knowledge if enabled
-                if self.enable_memory:
-                    try:
-                        self.lightrag_knowledge = await load_lightrag_knowledge_base()
-                        self.lightrag_knowledge_enabled = (
-                            self.lightrag_knowledge is not None
-                        )
-                        logger.info("Loaded Lightrag knowledge base metadata")
-                    except Exception as e:
-                        logger.warning("Failed to load Lightrag knowledge base: %s", e)
-                        self.lightrag_knowledge = None
-                        self.lightrag_knowledge_enabled = False
-
-                # Create Knowledge Coordinator
+            # Create Knowledge Coordinator
+            if self.enable_memory:
                 self.knowledge_coordinator = create_knowledge_coordinator(
                     agno_knowledge=self.agno_knowledge,
                     lightrag_url=LIGHTRAG_URL,
                     debug=self.debug,
                 )
+                logger.info("Created Knowledge Coordinator for unified knowledge queries")
+
+            # If recreate is True, clear all memories AFTER memory system is initialized
+            if recreate and self.enable_memory:
                 logger.info(
-                    "Created Knowledge Coordinator for unified knowledge queries"
+                    "Recreate flag is True, clearing all memories after memory system initialization"
                 )
-
-                # If recreate is True, clear all memories AFTER memory system is initialized
-                if recreate and self.enable_memory:
-                    logger.info(
-                        "Recreate flag is True, clearing all memories after memory system initialization"
-                    )
-                    clear_result = await self.memory_manager.clear_all_memories()
-                    logger.info("Memory clear result: %s", clear_result)
-
-                logger.info("Initialized Agno storage and knowledge backend")
-            else:
-                logger.info(
-                    "Memory disabled, skipping storage and knowledge initialization"
-                )
-
-            # Get MCP tools as function wrappers (no pre-initialization)
-            mcp_tool_functions = []
-            if self.enable_mcp:
-                mcp_tool_functions = await self._get_mcp_tools()
-                tools.extend(mcp_tool_functions)
-                logger.info("Added %d MCP tools to agent", len(mcp_tool_functions))
-
-            # Add memory and knowledge tools if memory is enabled
-            if self.enable_memory:
-                # Create and add separate knowledge and memory tools
-                self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
-                self.memory_tools = AgnoMemoryTools(self.memory_manager)
-
-                tools.append(self.knowledge_tools)
-                tools.append(self.memory_tools)
-                logger.info(
-                    "Added separate KnowledgeTools and AgnoMemoryTools to agent"
-                )
-
-            # Create the agno agent with direct parameter passing for visibility
-            self.agent = Agent(
-                model=model,
-                tools=tools,
-                instructions=self.instruction_manager.create_instructions(),
-                markdown=True,
-                show_tool_calls=self.debug,
-                name="Personal AI Agent",
-                agent_id="personal_agent",
-                user_id=self.user_id,
-                enable_agentic_memory=False,  # Disable agno's native memory to avoid saving everything!
-                enable_user_memories=True,  # Enable agno's native memory
-                add_history_to_messages=True,  # Add conversation history to context
-                num_history_responses=3,
-                knowledge=self.agno_knowledge if self.enable_memory else None,
-                search_knowledge=(
-                    True if self.enable_memory and self.agno_knowledge else False
-                ),  # Enable automatic knowledge search
-                storage=(self.agno_storage if self.enable_memory else None),
-                memory=(
-                    self.agno_memory if self.enable_memory else None
-                ),  # Don't pass memory to avoid auto-storage conflicts
-                # Enable telemetry and verbose logging
-                debug_mode=self.debug,
-                # Enable streaming for intermediate steps
-                stream_intermediate_steps=True,  # Required for aprint_response to work correctly
-                stream=True,
-            )
-
-            if self.enable_memory and self.agno_knowledge:
-                logger.info("Agent configured with knowledge base search")
-
-            # Calculate tool counts for logging using already-created tool lists
-            mcp_tool_count = len(mcp_tool_functions)
-            memory_tool_count = 1  # Since we are using a single tool class now
+                clear_result = await self.memory_manager.clear_all_memories()
+                logger.info("Memory clear result: %s", clear_result)
 
             logger.info(
-                "Successfully initialized agno agent with native storage: %d total tools (%d MCP, %d memory)",
+                "Successfully initialized AgnoPersonalAgent with %d tools",
                 len(tools),
-                mcp_tool_count,
-                memory_tool_count,
             )
 
             # Display splash screen if enabled
@@ -467,13 +393,15 @@ class AgnoPersonalAgent:
             return True
 
         except Exception as e:
-            logger.error("Failed to initialize agno agent: %s", e)
+            logger.error("Failed to initialize AgnoPersonalAgent: %s", e, exc_info=True)
             return False
+
+    # Keep ALL existing methods for backward compatibility
 
     async def run(
         self, query: str, stream: bool = False, add_thought_callback=None
     ) -> str:
-        """Run a query through the agno agent, allowing for native tool execution.
+        """Run a query through the agent.
 
         Args:
             query: User query to process
@@ -486,21 +414,15 @@ class AgnoPersonalAgent:
         Raises:
             RuntimeError: If agent is not initialized
         """
-        if not self.agent:
+        if not self.model:
             raise RuntimeError("Agent not initialized. Call initialize() first.")
 
         try:
             if add_thought_callback:
-                add_thought_callback("🚀 Executing agno agent...")
+                add_thought_callback("🚀 Executing agent...")
 
-            # Get the streaming response from agno
-            response_stream = await self.agent.arun(query, user_id=self.user_id)
-
-            # Debug logging for response stream
-            logger.debug(f"Response stream type: {type(response_stream)}")
-            logger.debug(
-                f"Response stream has __aiter__: {hasattr(response_stream, '__aiter__')}"
-            )
+            # Use the inherited Agent's arun method
+            response_stream = await self.arun(query, user_id=self.user_id)
 
             # Initialize variables
             self._collected_tool_calls = []
@@ -512,31 +434,11 @@ class AgnoPersonalAgent:
                 chunks = []
                 async for chunk in response_stream:
                     chunks.append(chunk)
-                    # Safe debug logging for chunk content
-                    chunk_content = getattr(chunk, "content", "No content attr")
-                    if chunk_content and chunk_content != "No content attr":
-                        content_preview = (
-                            str(chunk_content)[:100] if chunk_content else "Empty"
-                        )
-                    else:
-                        content_preview = "No content"
-                    # logger.debug(f"Received chunk: {type(chunk)}, content: {content_preview}")
 
                     # Collect tool calls from streaming events
                     if hasattr(chunk, "event") and chunk.event == "ToolCallCompleted":
                         if hasattr(chunk, "tool"):
                             self._collected_tool_calls.append(chunk.tool)
-                            if self.debug:
-                                tool_name = "unknown"
-                                if hasattr(chunk.tool, "tool_name"):
-                                    tool_name = chunk.tool.tool_name
-                                elif hasattr(chunk.tool, "function") and hasattr(
-                                    chunk.tool.function, "name"
-                                ):
-                                    tool_name = chunk.tool.function.name
-                                logger.debug(f"Collected tool call: {tool_name}")
-
-                logger.debug(f"Total chunks received: {len(chunks)}")
 
                 # Process final response from chunks
                 if chunks:
@@ -545,19 +447,10 @@ class AgnoPersonalAgent:
 
                     # If no content in final chunk, try to extract from all chunks
                     if not final_content or not final_content.strip():
-                        logger.debug(
-                            "Final chunk has no content, searching all chunks..."
-                        )
                         for i, chunk in enumerate(reversed(chunks)):
                             chunk_content = getattr(chunk, "content", "")
-                            logger.debug(
-                                f"Chunk {len(chunks)-i-1} content: {repr(chunk_content[:100]) if chunk_content else 'Empty'}"
-                            )
                             if chunk_content and chunk_content.strip():
                                 final_content = chunk_content
-                                logger.debug(
-                                    f"Found content in chunk {len(chunks)-i-1}"
-                                )
                                 break
 
                     self._last_response = final_response
@@ -566,13 +459,9 @@ class AgnoPersonalAgent:
                     self._last_response = None
             else:
                 # Direct response object
-                logger.debug("Direct response object received")
                 self._last_response = response_stream
                 final_content = getattr(
                     response_stream, "content", str(response_stream)
-                )
-                logger.debug(
-                    f"Direct response content: {repr(final_content[:100]) if final_content else 'Empty'}"
                 )
 
             # Validate and clean content
@@ -580,16 +469,7 @@ class AgnoPersonalAgent:
 
             # SmolLM2 cleanup if needed
             if is_smollm2_model(self.model_name) and final_content:
-                logger.debug("Processing SmolLM2 response format")
                 final_content = extract_content_from_smollm2_response(final_content)
-                logger.debug(f"SmolLM2 cleaned response: {final_content[:100]}...")
-
-            logger.debug(
-                f"Final content length: {len(final_content) if final_content else 0}"
-            )
-            logger.debug(
-                f"Final content preview: {repr(final_content[:200]) if final_content else 'None'}"
-            )
 
             if add_thought_callback:
                 add_thought_callback("✅ Agent execution complete.")
@@ -601,7 +481,7 @@ class AgnoPersonalAgent:
             )
 
         except Exception as e:
-            logger.error("Error running agno agent: %s", e, exc_info=True)
+            logger.error("Error running agent: %s", e, exc_info=True)
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
@@ -677,6 +557,8 @@ class AgnoPersonalAgent:
         Returns:
             MemoryStorageResult: Structured result with detailed status information
         """
+        if not self.memory_manager:
+            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
         return await self.memory_manager.store_user_memory(content, topics)
 
     async def _restate_user_fact(self, content: str) -> str:
@@ -690,6 +572,8 @@ class AgnoPersonalAgent:
         Returns:
             The restated fact
         """
+        if not self.memory_manager:
+            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
         return self.memory_manager.restate_user_fact(content)
 
     async def seed_entity_in_graph(self, entity_name: str, entity_type: str) -> bool:
@@ -704,6 +588,8 @@ class AgnoPersonalAgent:
         Returns:
             True if entity was successfully seeded
         """
+        if not self.memory_manager:
+            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
         return await self.memory_manager.seed_entity_in_graph(entity_name, entity_type)
 
     async def check_entity_exists(self, entity_name: str) -> bool:
@@ -717,6 +603,8 @@ class AgnoPersonalAgent:
         Returns:
             True if entity exists
         """
+        if not self.memory_manager:
+            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
         return await self.memory_manager.check_entity_exists(entity_name)
 
     async def clear_all_memories(self) -> str:
@@ -727,6 +615,8 @@ class AgnoPersonalAgent:
         Returns:
             str: Success or error message
         """
+        if not self.memory_manager:
+            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
         return await self.memory_manager.clear_all_memories()
 
     async def query_lightrag_knowledge_direct(
@@ -778,8 +668,6 @@ class AgnoPersonalAgent:
             query_params["ids"] = params["ids"]
 
         try:
-            # Use the correct LightRAG Memory URL and endpoint for RAG queries
-
             final_url = f"{url}/query"
 
             logger.debug(f"Querying LightRAG at {final_url} with params: {query_params}")
@@ -818,146 +706,6 @@ class AgnoPersonalAgent:
             logger.error(f"Error querying LightRAG knowledge base: {e}")
             return f"❌ Error querying knowledge base: {str(e)}"
 
-    async def _get_mcp_tools(self) -> List:
-        """Create MCP tools as native async functions compatible with Agno.
-
-        Returns:
-            List of MCP tool functions
-        """
-        logger.info(
-            "_get_mcp_tools called - enable_mcp: %s, mcp_servers: %s",
-            self.enable_mcp,
-            self.mcp_servers,
-        )
-
-        if not self.enable_mcp:
-            logger.info("MCP disabled - enable_mcp is False")
-            return []
-
-        if not self.mcp_servers:
-            logger.info(
-                "No MCP servers configured - mcp_servers is empty: %s", self.mcp_servers
-            )
-            return []
-
-        # This method is complex and specific to MCP integration
-        # For now, we'll keep the original implementation
-        # In the future, this could be moved to the tool_manager
-        tools = []
-
-        for server_name, config in self.mcp_servers.items():
-            logger.info("Setting up MCP tool for server: %s", server_name)
-
-            command = config.get("command", "npx")
-            args = config.get("args", [])
-            env = config.get("env", {})
-            description = config.get(
-                "description", f"Access to {server_name} MCP server"
-            )
-
-            # Create the actual tool function with closure
-            def make_mcp_tool(
-                name: str,
-                cmd: str,
-                tool_args: List[str],
-                tool_env: Dict[str, str],
-                desc: str,
-            ) -> Any:
-                """Create MCP tool function with proper closure."""
-
-                from textwrap import dedent
-
-                from agno.tools.mcp import MCPTools
-                from mcp import ClientSession, StdioServerParameters
-                from mcp.client.stdio import stdio_client
-
-                async def mcp_tool(query: str) -> str:
-                    """MCP tool function that creates session on-demand."""
-                    try:
-                        # Prepare environment - convert GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN if needed
-                        server_env = tool_env.copy() if tool_env else {}
-                        if (
-                            name == "github"
-                            and "GITHUB_PERSONAL_ACCESS_TOKEN" in server_env
-                        ):
-                            # The GitHub MCP server expects GITHUB_TOKEN
-                            server_env["GITHUB_TOKEN"] = server_env[
-                                "GITHUB_PERSONAL_ACCESS_TOKEN"
-                            ]
-                            logger.info(
-                                "Converted GITHUB_PERSONAL_ACCESS_TOKEN to GITHUB_TOKEN for GitHub MCP server"
-                            )
-
-                        server_params = StdioServerParameters(
-                            command=cmd,
-                            args=tool_args,
-                            env=server_env,
-                        )
-
-                        # Create client session using async context manager
-                        async with stdio_client(server_params) as (read, write):
-                            async with ClientSession(read, write) as session:
-                                # Initialize MCP toolkit with session
-                                mcp_tools = MCPTools(session=session)
-                                await mcp_tools.initialize()
-
-                                # Create specialized instructions based on server type
-                                if name == "github":
-                                    instructions = dedent(
-                                        """\
-                                        You are a GitHub assistant. Help users explore repositories and their activity.
-                                        - Provide organized, concise insights about the repository
-                                        - Focus on facts and data from the GitHub API
-                                        - Use markdown formatting for better readability
-                                        - Present numerical data in tables when appropriate
-                                        - Include links to relevant GitHub pages when helpful
-                                    """
-                                    )
-                                elif name.startswith("filesystem"):
-                                    instructions = f"You are a filesystem assistant for {name}. Help with file and directory operations."
-                                elif name == "brave-search":
-                                    instructions = "You are a web search assistant. Help users find information on the web."
-                                elif name == "puppeteer":
-                                    instructions = "You are a browser automation assistant. Help with web scraping and automation tasks."
-                                else:
-                                    instructions = f"You are an assistant using {name} MCP server. Help with the user's request."
-
-                                # Create a temporary agent for this MCP server
-                                temp_agent = Agent(
-                                    model=self.model_manager.create_model(),
-                                    tools=[mcp_tools],
-                                    instructions=instructions,
-                                    markdown=True,
-                                    show_tool_calls=self.debug,
-                                )
-
-                                # Run the query
-                                response = await temp_agent.arun(query)
-                                return response.content
-
-                    except Exception as e:
-                        logger.error("Error running %s MCP server: %s", name, e)
-                        return f"Error using {name}: {str(e)}"
-
-                # Set function metadata
-                mcp_tool.__name__ = f"use_{name.replace('-', '_')}_server"
-                mcp_tool.__doc__ = f"""Use {name} MCP server for: {desc}
-
-Args:
-    query: The query or task to execute using {name}
-
-Returns:
-    str: Result from the MCP server
-"""
-
-                return mcp_tool
-
-            tool_func = make_mcp_tool(server_name, command, args, env, description)
-            tools.append(tool_func)
-            logger.info("Created MCP tool function for: %s", server_name)
-
-        return tools
-
     def get_agent_info(self) -> Dict[str, Any]:
         """Get comprehensive information about the agent configuration and tools.
 
@@ -968,8 +716,8 @@ Returns:
         built_in_tools = []
         mcp_tools = []
 
-        if self.agent and hasattr(self.agent, "tools"):
-            for tool in self.agent.tools:
+        if hasattr(self, "tools") and self.tools:
+            for tool in self.tools:
                 tool_name = getattr(tool, "__name__", str(type(tool).__name__))
                 tool_doc = getattr(tool, "__doc__", "No description available")
 
@@ -994,19 +742,6 @@ Returns:
                         }
                     )
 
-        # MCP server details
-        mcp_server_details = {}
-        if self.enable_mcp and self.mcp_servers:
-            for server_name, config in self.mcp_servers.items():
-                mcp_server_details[server_name] = {
-                    "command": config.get("command", "N/A"),
-                    "description": config.get(
-                        "description", f"Access to {server_name} MCP server"
-                    ),
-                    "args_count": len(config.get("args", [])),
-                    "env_vars": len(config.get("env", {})),
-                }
-
         return {
             "framework": "agno",
             "model_provider": self.model_provider,
@@ -1017,7 +752,7 @@ Returns:
             "mcp_enabled": self.enable_mcp,
             "debug_mode": self.debug,
             "user_id": self.user_id,
-            "initialized": self.agent is not None,
+            "initialized": self.model is not None,
             "storage_dir": self.storage_dir,
             "knowledge_dir": self.knowledge_dir,
             "lightrag_url": LIGHTRAG_URL,
@@ -1030,7 +765,7 @@ Returns:
             },
             "built_in_tools": built_in_tools,
             "mcp_tools": mcp_tools,
-            "mcp_servers": mcp_server_details,
+            "mcp_servers": {},  # Simplified for now
         }
 
     def print_agent_info(self, console: Optional[Console] = None) -> None:
@@ -1058,10 +793,6 @@ Returns:
         main_table.add_row("Model Name", info["model_name"])
         main_table.add_row("Memory Enabled", str(info["memory_enabled"]))
         main_table.add_row("Knowledge Enabled", str(info["knowledge_enabled"]))
-        main_table.add_row(
-            "LightRAG Knowledge", str(info["lightrag_knowledge_enabled"])
-        )
-        main_table.add_row("MCP Enabled", str(info["mcp_enabled"]))
         main_table.add_row("Debug Mode", str(info["debug_mode"]))
         main_table.add_row("User ID", info["user_id"])
         main_table.add_row("Storage Directory", info["storage_dir"])
@@ -1094,30 +825,6 @@ Returns:
 
         console.print(tools_table)
 
-        # MCP servers table if enabled
-        if info["mcp_enabled"] and info["mcp_servers"]:
-            mcp_table = Table(
-                title="🔌 MCP Servers",
-                show_header=True,
-                header_style="bold magenta",
-            )
-            mcp_table.add_column("Server Name", style="cyan")
-            mcp_table.add_column("Command", style="yellow")
-            mcp_table.add_column("Description", style="green")
-            mcp_table.add_column("Args Count", style="blue")
-            mcp_table.add_column("Env Vars", style="blue")
-
-            for server_name, server_info in info["mcp_servers"].items():
-                mcp_table.add_row(
-                    server_name,
-                    server_info["command"],
-                    server_info["description"],
-                    str(server_info["args_count"]),
-                    str(server_info["env_vars"]),
-                )
-
-            console.print(mcp_table)
-
     async def cleanup(self) -> None:
         """Clean up resources when the agent is being shut down.
 
@@ -1126,12 +833,6 @@ Returns:
         """
         try:
             logger.info("Cleaning up AgnoPersonalAgent resources...")
-
-            # Clean up agent resources
-            if self.agent:
-                # Clear the agent reference
-                self.agent = None
-                logger.debug("Cleared agent reference")
 
             # Clean up storage references
             if self.agno_storage:
@@ -1185,11 +886,6 @@ Returns:
         try:
             logger.info("Running synchronous cleanup...")
 
-            # Clean up agent resources without async calls
-            if self.agent:
-                self.agent = None
-                logger.debug("Cleared agent reference")
-
             # Clean up storage references
             if self.agno_storage:
                 self.agno_storage = None
@@ -1218,6 +914,12 @@ Returns:
 
         except Exception as e:
             logger.warning("Error during synchronous cleanup: %s", e)
+
+    # Legacy property for backward compatibility
+    @property
+    def agent(self):
+        """Backward compatibility property - returns self since we ARE the agent now."""
+        return self
 
 
 def create_simple_personal_agent(
@@ -1304,7 +1006,7 @@ async def create_agno_agent(
     model_provider: str = "ollama",
     model_name: str = LLM_MODEL,
     enable_memory: bool = True,
-    enable_mcp: bool = True,
+    enable_mcp: bool = False,  # Simplified: disable MCP by default
     storage_dir: str = AGNO_STORAGE_DIR,
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
     debug: bool = False,
@@ -1319,7 +1021,7 @@ async def create_agno_agent(
         model_provider: LLM provider ('ollama' or 'openai')
         model_name: Model name to use
         enable_memory: Whether to enable memory and knowledge features
-        enable_mcp: Whether to enable MCP tool integration
+        enable_mcp: Whether to enable MCP tool integration (simplified)
         storage_dir: Directory for Agno storage files
         knowledge_dir: Directory containing knowledge files to load
         debug: Enable debug mode
