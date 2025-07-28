@@ -1,17 +1,116 @@
 # src/personal_agent/tools/knowledge_tools.py
+# pylint: disable=C0301, W1203
+"""Knowledge Base Management Tools Module.
 
+This module provides comprehensive tools for managing a persistent knowledge base system
+built on top of LightRAG (Light Retrieval-Augmented Generation). It enables intelligent
+storage, processing, and retrieval of factual information, documents, and reference
+materials through advanced semantic search and knowledge graph capabilities.
+
+Key Components:
+    KnowledgeTools: Main toolkit class providing knowledge base operations
+
+Core Functionality:
+    - Document ingestion from multiple sources (files, URLs, direct text)
+    - Intelligent content processing and metadata extraction
+    - Multi-modal search with semantic and graph-based retrieval
+    - Batch processing capabilities for large document collections
+    - Automatic content validation and error handling
+
+Architecture:
+    The module integrates with a LightRAG server backend that handles:
+    - Document parsing and text extraction
+    - Knowledge graph construction from ingested content
+    - Vector embeddings for semantic similarity search
+    - Entity relationship mapping for graph-based queries
+    - Hybrid search combining multiple retrieval strategies
+
+Supported Content Types:
+    - Text documents (.txt, .md, .csv)
+    - PDF documents (.pdf)
+    - Microsoft Word documents (.doc, .docx)
+    - HTML content (.html)
+    - JSON structured data (.json)
+    - Web pages and APIs via URL ingestion
+
+Search Capabilities:
+    - Local Search: Semantic similarity within document chunks
+    - Global Search: Graph-based entity relationship queries
+    - Hybrid Search: Combined semantic and graph approaches
+    - Auto-routing: Intelligent query mode selection
+    - Custom parameters: Fine-tuned search control
+
+Usage Patterns:
+    This module is designed for storing and retrieving static factual information
+    that doesn't change frequently. It's ideal for:
+    - Research document repositories
+    - Technical documentation systems
+    - Reference material collections
+    - Knowledge base construction from multiple sources
+
+    It should NOT be used for:
+    - Personal user information (use memory tools instead)
+    - Temporary or frequently changing data
+    - Creative content generation
+    - General conversational AI without knowledge context
+
+Integration:
+    - Requires LightRAG server running at configured endpoint
+    - Integrates with personal agent configuration system
+    - Coordinates with KnowledgeManager for system-wide operations
+    - Supports both synchronous and asynchronous operations
+    - Provides comprehensive logging and error reporting
+
+Performance Considerations:
+    - File size limits: 50MB per individual file
+    - Batch processing: Maximum 50 files per operation
+    - Rate limiting: Built-in delays to prevent server overload
+    - Timeout handling: 60-second limits for network operations
+    - Unique naming: Automatic conflict resolution for duplicate files
+
+Dependencies:
+    - LightRAG server for backend processing
+    - requests/aiohttp for HTTP communication
+    - BeautifulSoup for HTML content extraction
+    - Standard library modules for file handling and validation
+
+Example Usage:
+    ```python
+    from personal_agent.tools.knowledge_tools import KnowledgeTools
+    from personal_agent.core.knowledge_manager import KnowledgeManager
+
+    # Initialize the tools
+    km = KnowledgeManager()
+    tools = KnowledgeTools(km)
+
+    # Ingest a document
+    result = tools.ingest_knowledge_file("research_paper.pdf", "AI Research")
+
+    # Query the knowledge base
+    answer = tools.query_knowledge_base("What is machine learning?")
+
+    # Batch process a directory
+    summary = tools.batch_ingest_directory("./docs", "*.pdf")
+    ```
+
+Author: Personal Agent Development Team
+Version: Compatible with LightRAG backend
+License: See project LICENSE file
+"""
 import hashlib
 import mimetypes
 import os
 import shutil
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 from urllib.parse import urlparse
 
+import aiohttp
 import requests
 from agno.tools import Toolkit
 from agno.utils.log import log_debug
+from bs4 import BeautifulSoup
 
 from ..config import settings
 from ..core.knowledge_manager import KnowledgeManager
@@ -21,26 +120,26 @@ logger = setup_logging(__name__)
 
 
 class KnowledgeTools(Toolkit):
-    """Knowledge Base Management Tools - For storing and retrieving factual information, documents, and reference materials.
-    
+    """Knowledge Base Management Tools for Factual Information Storage and Retrieval.
     Use these tools when you need to:
     - Store factual information, documents, or reference materials for future retrieval
     - Search for previously stored knowledge, facts, or documents
     - Ingest content from files, URLs, or text into the knowledge base
     - Find information that was previously added to the knowledge base
-    
+
     DO NOT use these tools for:
     - Storing personal information about the user (use memory tools instead)
     - Creative requests like writing stories or poems
     - General questions that don't require stored knowledge
-    
+
     The knowledge base is separate from memory - it's for factual information that doesn't change,
     while memory is for personal information about the user that evolves over time.
+
     """
 
     def __init__(self, knowledge_manager: KnowledgeManager):
         self.knowledge_manager = knowledge_manager
-        
+
         # Collect knowledge tool methods
         tools = [
             self.ingest_knowledge_file,
@@ -48,13 +147,14 @@ class KnowledgeTools(Toolkit):
             self.ingest_knowledge_from_url,
             self.batch_ingest_directory,
             self.query_knowledge_base,
+            self.query_lightrag_knowledge_direct,
         ]
-        
+
         # Initialize the Toolkit
         super().__init__(
             name="knowledge_tools",
             tools=tools,
-            instructions="""Use these tools to manage factual information and documents in the knowledge base. 
+            instructions="""Use these tools to manage factual information and documents in the knowledge base.
             Store reference materials, facts, and documents that don't change. 
             Query when you need to find previously stored factual information.
             Do NOT use for personal user information - use memory tools for that.""",
@@ -96,9 +196,13 @@ class KnowledgeTools(Toolkit):
             # Check file type
             mime_type, _ = mimetypes.guess_type(file_path)
             supported_types = [
-                'text/plain', 'text/markdown', 'text/html', 'text/csv',
-                'application/pdf', 'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                "text/plain",
+                "text/markdown",
+                "text/html",
+                "text/csv",
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ]
 
             if mime_type and mime_type not in supported_types:
@@ -113,7 +217,7 @@ class KnowledgeTools(Toolkit):
             file_hash = hashlib.md5(f"{filename}_{timestamp}".encode()).hexdigest()[:8]
             base_name, ext = os.path.splitext(filename)
             unique_filename = f"{base_name}_{file_hash}{ext}"
-            
+
             dest_path = knowledge_dir / unique_filename
 
             # Copy the file
@@ -121,8 +225,10 @@ class KnowledgeTools(Toolkit):
             log_debug(f"Copied file to knowledge directory: {dest_path}")
 
             # Upload to LightRAG server
-            upload_result = self._upload_to_lightrag(dest_path, unique_filename, settings.LIGHTRAG_URL)
-            
+            upload_result = self._upload_to_lightrag(
+                dest_path, unique_filename, settings.LIGHTRAG_URL
+            )
+
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge file: {filename}")
                 return f"✅ Successfully ingested '{filename}' into knowledge base. {upload_result}"
@@ -138,7 +244,9 @@ class KnowledgeTools(Toolkit):
             logger.error(f"Error ingesting file {file_path}: {e}")
             return f"❌ Error ingesting file: {str(e)}"
 
-    def ingest_knowledge_text(self, content: str, title: str, file_type: str = "txt") -> str:
+    def ingest_knowledge_text(
+        self, content: str, title: str, file_type: str = "txt"
+    ) -> str:
         """Ingest text content directly into the knowledge base.
 
         Args:
@@ -157,12 +265,12 @@ class KnowledgeTools(Toolkit):
                 return "❌ Error: Title is required"
 
             # Validate file_type
-            if not file_type.startswith('.'):
+            if not file_type.startswith("."):
                 file_type = f".{file_type}"
-            
-            allowed_types = ['.txt', '.md', '.html', '.csv', '.json']
+
+            allowed_types = [".txt", ".md", ".html", ".csv", ".json"]
             if file_type not in allowed_types:
-                file_type = '.txt'  # Default to txt
+                file_type = ".txt"  # Default to txt
 
             # Create knowledge directory
             knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
@@ -170,22 +278,28 @@ class KnowledgeTools(Toolkit):
 
             # Create unique filename
             timestamp = int(time.time())
-            content_hash = hashlib.md5(f"{title}_{content[:100]}_{timestamp}".encode()).hexdigest()[:8]
-            safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_title = safe_title.replace(' ', '_')[:50]  # Limit length
+            content_hash = hashlib.md5(
+                f"{title}_{content[:100]}_{timestamp}".encode()
+            ).hexdigest()[:8]
+            safe_title = "".join(
+                c for c in title if c.isalnum() or c in (" ", "-", "_")
+            ).rstrip()
+            safe_title = safe_title.replace(" ", "_")[:50]  # Limit length
             filename = f"{safe_title}_{content_hash}{file_type}"
-            
+
             file_path = knowledge_dir / filename
 
             # Write content to file
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             log_debug(f"Created knowledge file: {file_path}")
 
             # Upload to LightRAG server
-            upload_result = self._upload_to_lightrag(file_path, filename, settings.LIGHTRAG_URL)
-            
+            upload_result = self._upload_to_lightrag(
+                file_path, filename, settings.LIGHTRAG_URL
+            )
+
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge text: {title}")
                 return f"✅ Successfully ingested '{title}' into knowledge base. {upload_result}"
@@ -219,51 +333,57 @@ class KnowledgeTools(Toolkit):
 
             # Fetch content
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
             }
-            
+
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
 
-            content_type = response.headers.get('content-type', '').lower()
-            
+            content_type = response.headers.get("content-type", "").lower()
+
             # Handle different content types
-            if 'text/html' in content_type:
+            if "text/html" in content_type:
                 # For HTML, try to extract text content
                 try:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    
+
+                    soup = BeautifulSoup(response.content, "html.parser")
+
                     # Remove script and style elements
                     for script in soup(["script", "style"]):
                         script.decompose()
-                    
+
                     # Get text content
                     content = soup.get_text()
-                    
+
                     # Get title if not provided
                     if not title:
-                        title_tag = soup.find('title')
-                        title = title_tag.get_text().strip() if title_tag else parsed_url.netloc
-                    
-                    file_type = 'html'
-                    
+                        title_tag = soup.find("title")
+                        title = (
+                            title_tag.get_text().strip()
+                            if title_tag
+                            else parsed_url.netloc
+                        )
+
+                    file_type = "html"
+
                 except ImportError:
                     # Fallback if BeautifulSoup not available
                     content = response.text
                     title = title or parsed_url.netloc
-                    file_type = 'html'
-                    
-            elif 'text/' in content_type or 'application/json' in content_type:
+                    file_type = "html"
+
+            elif "text/" in content_type or "application/json" in content_type:
                 content = response.text
                 title = title or parsed_url.netloc
-                file_type = 'txt' if 'text/' in content_type else 'json'
+                file_type = "txt" if "text/" in content_type else "json"
             else:
                 return f"❌ Error: Unsupported content type: {content_type}"
 
             # Clean up content
-            content = '\n'.join(line.strip() for line in content.splitlines() if line.strip())
-            
+            content = "\n".join(
+                line.strip() for line in content.splitlines() if line.strip()
+            )
+
             if not content:
                 return f"❌ Error: No content extracted from URL: {url}"
 
@@ -280,7 +400,9 @@ class KnowledgeTools(Toolkit):
             logger.error(f"Error ingesting from URL {url}: {e}")
             return f"❌ Error ingesting from URL: {str(e)}"
 
-    def batch_ingest_directory(self, directory_path: str, file_pattern: str = "*", recursive: bool = False) -> str:
+    def batch_ingest_directory(
+        self, directory_path: str, file_pattern: str = "*", recursive: bool = False
+    ) -> str:
         """Ingest multiple files from a directory into the knowledge base.
 
         Args:
@@ -323,50 +445,52 @@ class KnowledgeTools(Toolkit):
                 return f"❌ Too many files ({len(files)}). Please process in smaller batches (max 50 files)."
 
             # Process files
-            results = {
-                'success': 0,
-                'failed': 0,
-                'errors': []
-            }
+            results = {"success": 0, "failed": 0, "errors": []}
 
             for file_path in files:
                 try:
                     result = self.ingest_knowledge_file(str(file_path))
                     if "✅" in result:
-                        results['success'] += 1
+                        results["success"] += 1
                         log_debug(f"Successfully ingested: {file_path.name}")
                     else:
-                        results['failed'] += 1
-                        results['errors'].append(f"{file_path.name}: {result}")
+                        results["failed"] += 1
+                        results["errors"].append(f"{file_path.name}: {result}")
                         logger.warning(f"Failed to ingest {file_path.name}: {result}")
-                        
+
                     # Small delay to avoid overwhelming the server
                     time.sleep(0.5)
-                    
+
                 except Exception as e:
-                    results['failed'] += 1
+                    results["failed"] += 1
                     error_msg = f"{file_path.name}: {str(e)}"
-                    results['errors'].append(error_msg)
+                    results["errors"].append(error_msg)
                     logger.error(f"Error processing {file_path.name}: {e}")
 
             # Format results
             summary = f"📊 Batch ingestion complete: {results['success']} successful, {results['failed']} failed"
-            
-            if results['errors']:
-                summary += f"\n\nErrors:\n" + "\n".join(f"- {error}" for error in results['errors'][:10])
-                if len(results['errors']) > 10:
+
+            if results["errors"]:
+                summary += "\n\nErrors:\n" + "\n".join(
+                    f"- {error}" for error in results["errors"][:10]
+                )
+                if len(results["errors"]) > 10:
                     summary += f"\n... and {len(results['errors']) - 10} more errors"
 
-            logger.info(f"Batch ingestion completed: {results['success']}/{len(files)} files successful")
+            logger.info(
+                f"Batch ingestion completed: {results['success']}/{len(files)} files successful"
+            )
             return summary
 
         except Exception as e:
             logger.error(f"Error in batch ingestion: {e}")
             return f"❌ Error in batch ingestion: {str(e)}"
 
-    def query_knowledge_base(self, query: str, mode: str = "auto", limit: Optional[int] = 5) -> str:
+    def query_knowledge_base(
+        self, query: str, mode: str = "auto", limit: Optional[int] = 5
+    ) -> str:
         """Query the unified knowledge base to retrieve stored factual information and documents.
-        
+
         This tool is for SEARCHING existing knowledge, NOT for creative tasks like writing stories,
         generating content, or answering general questions. Use this only when you need to find
         specific information that was previously stored in the knowledge base.
@@ -385,27 +509,53 @@ class KnowledgeTools(Toolkit):
 
             # Filter out inappropriate creative requests
             query_lower = query.lower().strip()
-            
+
             # Creative/generative request patterns that should NOT use knowledge search
             creative_patterns = [
-                "write", "create", "generate", "make", "compose", "draft",
-                "tell me a", "give me a", "come up with", "think of",
-                "story", "poem", "joke", "song", "essay", "article",
-                "funny", "creative", "imagine", "pretend"
+                "write",
+                "create",
+                "generate",
+                "make",
+                "compose",
+                "draft",
+                "tell me a",
+                "give me a",
+                "come up with",
+                "think of",
+                "story",
+                "poem",
+                "joke",
+                "song",
+                "essay",
+                "article",
+                "funny",
+                "creative",
+                "imagine",
+                "pretend",
             ]
-            
+
             # Check if this looks like a creative request
             if any(pattern in query_lower for pattern in creative_patterns):
                 # Additional check: if it's asking for factual info WITH creative words, allow it
                 factual_patterns = [
-                    "what is", "who is", "when did", "where is", "how does",
-                    "definition of", "information about", "facts about",
-                    "details about", "explain", "describe"
+                    "what is",
+                    "who is",
+                    "when did",
+                    "where is",
+                    "how does",
+                    "definition of",
+                    "information about",
+                    "facts about",
+                    "details about",
+                    "explain",
+                    "describe",
                 ]
-                
+
                 # If it has factual patterns, it might be legitimate
                 if not any(factual in query_lower for factual in factual_patterns):
-                    logger.info(f"Rejected creative request for knowledge search: {query[:50]}...")
+                    logger.info(
+                        f"Rejected creative request for knowledge search: {query[:50]}..."
+                    )
                     return f"❌ This appears to be a creative request ('{query}'). The knowledge base is for searching existing stored information, not for generating new content. Please rephrase as a search for existing knowledge, or ask me to create content directly without using knowledge tools."
 
             # Validate mode
@@ -420,13 +570,24 @@ class KnowledgeTools(Toolkit):
             # Auto mode: intelligent routing based on query characteristics
             if mode == "auto":
                 query_lower = query.lower()
-                
+
                 # Use global mode for relationship queries
-                relationship_keywords = ["relationship", "connection", "related", "link", "between", "how", "why"]
+                relationship_keywords = [
+                    "relationship",
+                    "connection",
+                    "related",
+                    "link",
+                    "between",
+                    "how",
+                    "why",
+                ]
                 if any(keyword in query_lower for keyword in relationship_keywords):
                     mode = "global"
                 # Use local mode for specific fact queries
-                elif any(keyword in query_lower for keyword in ["what", "when", "where", "who", "define"]):
+                elif any(
+                    keyword in query_lower
+                    for keyword in ["what", "when", "where", "who", "define"]
+                ):
                     mode = "local"
                 # Use hybrid for complex queries
                 else:
@@ -439,40 +600,142 @@ class KnowledgeTools(Toolkit):
                     "query": query.strip(),
                     "mode": mode,
                     "top_k": limit,
-                    "response_type": "Multiple Paragraphs"
+                    "response_type": "Multiple Paragraphs",
                 }
 
                 response = requests.post(url, json=params, timeout=60)
-                
+
                 if response.status_code == 200:
                     result = response.json()
-                    
+
                     # Extract the response content
                     if isinstance(result, dict):
-                        content = result.get('response', result.get('content', str(result)))
+                        content = result.get(
+                            "response", result.get("content", str(result))
+                        )
                     else:
                         content = str(result)
-                    
+
                     if content and content.strip():
                         logger.info(f"Knowledge query successful: {query[:50]}...")
                         return f"🧠 KNOWLEDGE BASE QUERY (mode: {mode}):\n\n{content}"
                     else:
                         return f"🔍 No relevant knowledge found for '{query}'. Try different keywords or add more knowledge to your base."
-                        
+
                 else:
                     error_text = response.text
-                    logger.warning(f"LightRAG query failed: {error_text}")
+                    logger.warning(f"KnowledgeBase query failed: {error_text}")
                     return f"❌ Error querying knowledge base: {error_text}"
-                    
+
             except requests.RequestException as e:
-                logger.error(f"Error connecting to LightRAG server: {e}")
+                logger.error(f"Error connecting to KnowledgeBase server: {e}")
                 return f"❌ Error connecting to knowledge base server: {str(e)}"
 
         except Exception as e:
             logger.error(f"Error querying knowledge base: {e}")
             return f"❌ Error querying knowledge base: {str(e)}"
 
-    def _upload_to_lightrag(self, file_path: Path, filename: str, url: str = settings.LIGHTRAG_URL) -> str:
+    async def query_lightrag_knowledge_direct(
+        self,
+        query: str,
+        params: Optional[Dict] = None,
+        url: str = settings.LIGHTRAG_URL,
+    ) -> str:
+        """Directly query the LightRAG knowledge base and return the raw response.
+
+        This method provides direct, unfiltered access to the LightRAG knowledge base,
+        bypassing the intelligent filtering and processing of query_knowledge_base().
+        Use this when you need raw access to the knowledge base with custom parameters.
+
+        Args:
+            query: The query string to search in the knowledge base
+            params: A dictionary of query parameters (mode, response_type, top_k, etc.)
+            url: LightRAG server URL (defaults to settings.LIGHTRAG_URL)
+
+        Returns:
+            String with query results exactly as LightRAG returns them
+        """
+        if not query or not query.strip():
+            return "❌ Error: Query cannot be empty"
+
+        # Use default parameters if none provided
+        if params is None:
+            params = {}
+
+        # Set up the query parameters with defaults
+        query_params = {
+            "query": query.strip(),
+            "mode": params.get("mode", "global"),
+            "response_type": params.get("response_type", "Multiple Paragraphs"),
+            "top_k": params.get("top_k", 10),
+            "only_need_context": params.get("only_need_context", False),
+            "only_need_prompt": params.get("only_need_prompt", False),
+            "stream": params.get("stream", False),
+        }
+
+        # Add optional parameters if provided
+        if "max_token_for_text_unit" in params:
+            query_params["max_token_for_text_unit"] = params["max_token_for_text_unit"]
+        if "max_token_for_global_context" in params:
+            query_params["max_token_for_global_context"] = params[
+                "max_token_for_global_context"
+            ]
+        if "max_token_for_local_context" in params:
+            query_params["max_token_for_local_context"] = params[
+                "max_token_for_local_context"
+            ]
+        if "conversation_history" in params:
+            query_params["conversation_history"] = params["conversation_history"]
+        if "history_turns" in params:
+            query_params["history_turns"] = params["history_turns"]
+        if "ids" in params:
+            query_params["ids"] = params["ids"]
+
+        try:
+            # Use the correct LightRAG URL and endpoint for RAG queries
+            final_url = f"{url}/query"
+
+            logger.debug(
+                f"Querying KnowledgeBase at {final_url} with params: {query_params}"
+            )
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    final_url, json=query_params, timeout=60
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+
+                        # Extract the response content
+                        if isinstance(result, dict):
+                            content = result.get(
+                                "response", result.get("content", str(result))
+                            )
+                        else:
+                            content = str(result)
+
+                        if content and content.strip():
+                            logger.info(f"KB direct query successful: {query[:50]}...")
+                            return content
+                        else:
+                            return f"🔍 No relevant knowledge found for '{query}'. Try different keywords or add more knowledge to your base."
+                    else:
+                        error_text = await response.text()
+                        logger.warning(
+                            f"KnowledgeBase direct query failed with status {response.status}: {error_text}"
+                        )
+                        return f"❌ Error querying knowledge base (status {response.status}): {error_text}"
+
+        except aiohttp.ClientError as e:
+            logger.error(f"Error connecting to KnowledgeBase server: {e}")
+            return f"❌ Error connecting to knowledge base server: {str(e)}"
+        except Exception as e:
+            logger.error(f"Error querying KnowledgeBase knowledge base: {e}")
+            return f"❌ Error querying knowledge base: {str(e)}"
+
+    def _upload_to_lightrag(
+        self, file_path: Path, filename: str, url: str = settings.LIGHTRAG_URL
+    ) -> str:
         """Upload a file to the LightRAG server.
 
         Args:
@@ -485,22 +748,22 @@ class KnowledgeTools(Toolkit):
         """
         try:
             final_url = f"{url}/documents/upload"
-            
-            with open(file_path, 'rb') as f:
-                files = {'file': (filename, f, 'application/octet-stream')}
+
+            with open(file_path, "rb") as f:
+                files = {"file": (filename, f, "application/octet-stream")}
                 response = requests.post(final_url, files=files, timeout=60)
-                
+
                 if response.status_code in [200, 201]:
                     result = response.json()
-                    logger.info(f"Successfully uploaded to LightRAG: {filename}")
-                    return f"✅ File uploaded and processing started"
+                    logger.info(f"Successfully uploaded to KnowledgeBase: {filename}")
+                    return "✅ File uploaded and processing started"
                 else:
                     error_text = response.text
-                    logger.error(f"LightRAG upload failed: {error_text}")
+                    logger.error(f"KnowledgeBase upload failed: {error_text}")
                     return f"Upload failed: {error_text}"
-                    
+
         except requests.RequestException as e:
-            logger.error(f"Error uploading to LightRAG: {e}")
+            logger.error(f"Error uploading to KnowledgeBase: {e}")
             return f"Upload error: {str(e)}"
         except Exception as e:
             logger.error(f"Unexpected error during upload: {e}")
