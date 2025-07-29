@@ -26,6 +26,7 @@ from agno.models.ollama.tools import OllamaTools
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.file import FileTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
@@ -184,6 +185,77 @@ _code_instructions = dedent(
     - Best practices and common patterns"""
 )
 
+_file_instructions = dedent(
+    """\
+    Your mission is to provide comprehensive file system management and operations support. Follow these guidelines to ensure safe and effective file handling:
+
+    1. **File Operations Safety**
+        - Always validate file paths before performing operations
+        - Check if files exist before attempting to read them
+        - Confirm overwrite operations when modifying existing files
+        - Use relative paths when possible to maintain portability
+        - Respect file permissions and system limitations
+
+    2. **File Reading Operations**
+        - When reading files, provide clear summaries of content structure
+        - For large files, offer to read specific sections or provide previews
+        - Identify file types and suggest appropriate handling methods
+        - Handle encoding issues gracefully (UTF-8, ASCII, etc.)
+        - Report file sizes and modification dates when relevant
+
+    3. **File Writing and Creation**
+        - Always confirm the target location before writing files
+        - Create necessary directory structures when needed
+        - Use appropriate file extensions based on content type
+        - Implement backup strategies for important file modifications
+        - Provide clear success/failure feedback with specific details
+
+    4. **File Search and Discovery**
+        - Use efficient search patterns and filters
+        - Provide organized results with file paths, sizes, and dates
+        - Support both filename and content-based searches
+        - Respect system performance by limiting search scope when appropriate
+        - Offer to refine searches if results are too broad or narrow
+
+    5. **File Organization and Management**
+        - Suggest logical directory structures for file organization
+        - Help identify duplicate files and cleanup opportunities
+        - Provide file type analysis and categorization
+        - Support batch operations for multiple files
+        - Maintain file metadata and preserve important attributes
+
+    6. **Content Analysis and Processing**
+        - Analyze file content to determine structure and format
+        - Extract key information from documents, logs, and data files
+        - Identify patterns, errors, or anomalies in file content
+        - Suggest improvements for file organization and naming
+        - Support conversion between different file formats when possible
+
+    7. **Error Handling and Recovery**
+        - Provide clear error messages with actionable solutions
+        - Suggest alternative approaches when operations fail
+        - Implement graceful fallbacks for permission or access issues
+        - Log important operations for troubleshooting
+        - Offer recovery options for failed or interrupted operations
+
+    8. **Best Practices and Security**
+        - Never modify system files without explicit confirmation
+        - Warn about potentially dangerous operations
+        - Respect privacy and confidentiality of file contents
+        - Use secure temporary files for intermediate operations
+        - Follow platform-specific file system conventions
+
+    Key capabilities to leverage:
+    - File reading with content analysis and summarization
+    - File writing with validation and backup options
+    - Directory listing with filtering and organization
+    - File search with pattern matching and content scanning
+    - Batch operations for efficiency and consistency
+    - Integration with other team agents for comprehensive solutions
+
+    Remember: Always prioritize data safety and user intent. When in doubt, ask for clarification before performing potentially destructive operations."""
+)
+
 
 def create_ollama_model(
     model_name: str = LLM_MODEL, use_remote: bool = False
@@ -220,9 +292,15 @@ finance_agent = Agent(
             analyst_recommendations=True,
             company_info=True,
             company_news=True,
-        )
+        ),
+        FileTools(
+            base_dir=cwd,  # Use current directory as base
+            save_files=True,
+            list_files=True,
+            search_files=True,
+        ),
     ],
-    instructions=["Use tables to display data"],
+    instructions=["Use tables to display data. You can save files and list files."],
     show_tool_calls=True,
 )
 
@@ -239,6 +317,16 @@ writer_agent = Agent(
         "Ensure your writing is clear, accurate and tailored to the specific request.",
         "Maintain a natural, engaging tone while being factually precise.",
         "Write something that would be good enough to be published in a newspaper like the New York Times.",
+        "You can use markdown to format your content.",
+        "You can use your file tools to save files when requested",
+    ],
+    tools=[
+        FileTools(
+            base_dir=cwd,  # Use current directory as base
+            save_files=True,
+            list_files=True,
+            search_files=True,
+        ),
     ],
     show_tool_calls=True,
 )
@@ -276,6 +364,22 @@ python_agent = Agent(
         ),
     ],
     instructions=dedent(_code_instructions),
+    show_tool_calls=True,
+)
+
+file_agent = Agent(
+    name="File System Agent",
+    model=create_ollama_model(),
+    role="Read and write files in the system",
+    tools=[
+        FileTools(
+            base_dir=cwd,  # Use current directory as base
+            save_files=True,
+            list_files=True,
+            search_files=True,
+        )
+    ],
+    instructions=dedent(_file_instructions),
     show_tool_calls=True,
 )
 
@@ -479,6 +583,7 @@ async def create_team(use_remote: bool = False):
     )
 
     # Create memory agent that uses shared context
+    # @todo: refactor to use our refactored Personal Agent
     memory_agent = await create_memory_agent_with_shared_context(
         shared_memory,
         memory_manager,
