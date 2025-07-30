@@ -50,7 +50,25 @@ class AgentModelManager:
             ValueError: If unsupported model provider is specified
         """
         if self.model_provider == "openai":
-            return OpenAIChat(id=self.model_name)
+            # Check if we're using LMStudio (non-standard OpenAI endpoint)
+            if "localhost:1234" in self.ollama_base_url or "1234" in self.ollama_base_url:
+                # Use LMStudio with OpenAI-compatible API
+                # Ensure the base URL has the correct /v1 endpoint for LMStudio
+                base_url = self.ollama_base_url
+                if not base_url.endswith('/v1'):
+                    base_url = base_url.rstrip('/') + '/v1'
+                
+                # Remove response_format constraint to allow native OpenAI tool calling
+                # LMStudio should support OpenAI's standard tool calling via the tools parameter
+                return OpenAIChat(
+                    id=self.model_name,
+                    base_url=base_url,  # Use corrected base URL with /v1 endpoint
+                    api_key="lm-studio",  # LMStudio doesn't require a real API key
+                    # No request_params with response_format - let OpenAI handle tool calling natively
+                )
+            else:
+                # Standard OpenAI API
+                return OpenAIChat(id=self.model_name)
         elif self.model_provider == "ollama":
             # Get dynamic context size for this model
             context_size, detection_method = get_model_context_size_sync(

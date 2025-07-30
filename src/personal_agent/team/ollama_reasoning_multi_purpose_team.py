@@ -23,6 +23,7 @@ from agno.agent import Agent
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 from agno.memory.v2.memory import Memory
 from agno.models.ollama.tools import OllamaTools
+from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
 from agno.tools.duckduckgo import DuckDuckGoTools
@@ -39,7 +40,9 @@ try:
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
         LLM_MODEL,
+        LMSTUDIO_URL,
         OLLAMA_URL,
+        REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
         USER_ID,
     )
@@ -65,6 +68,8 @@ except ImportError:
 load_dotenv()
 
 cwd = Path(__file__).parent.resolve()
+
+PROVIDER = "openai"
 
 _instructions = dedent(
     """\
@@ -135,7 +140,7 @@ _instructions = dedent(
 
 _code_instructions = dedent(
     """\
-    Your mission is to provide comprehensive code development support for developers. Follow these steps to ensure the best possible response:
+    Your mission is to provide comprehensive code support. Follow these steps to ensure the best possible response:
 
     1. **Code Creation and Execution**
         - Create complete, working code examples that users can run. For example:
@@ -261,21 +266,90 @@ def create_ollama_model(
     model_name: str = LLM_MODEL, use_remote: bool = False
 ) -> OllamaTools:
     """Create an Ollama model using your AgentModelManager."""
-    ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+    # Use LMStudio URL when provider is 'openai', otherwise use Ollama URL
+    if PROVIDER == "openai":
+        url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+    else:
+        url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+
     model_manager = AgentModelManager(
-        model_provider="ollama",
+        model_provider=PROVIDER,
         model_name=model_name,
-        ollama_base_url=ollama_url,
+        ollama_base_url=url,
         seed=None,
     )
     return model_manager.create_model()
+
+
+def create_model(
+    provider: str = "ollama", model_name: str = LLM_MODEL, use_remote: bool = False
+) -> Agent:
+    """Create an Agent using AgentModelManager."""
+    if provider == "ollama":
+        url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+    else:
+        url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+
+    model_manager = AgentModelManager(
+        model_provider=provider,
+        model_name=model_name,
+        ollama_base_url=url,
+        seed=None,
+    )
+    model = model_manager.create_model()
+
+    # WORKAROUND: Fix incorrect role mapping in Agno framework
+    # The default_role_map incorrectly maps "system" -> "developer"
+    # but OpenAI API only accepts: user, assistant, system, tool
+    if hasattr(model, "role_map"):
+        # Always override the role mapping to fix the bug
+        model.role_map = {
+            "system": "system",  # Fix: should be "system", not "developer"
+            "user": "user",
+            "assistant": "assistant",
+            "tool": "tool",
+            "model": "assistant",
+        }
+        print(f"🔧 Applied role mapping fix to model: {model_name}")
+
+    return model
+
+
+def create_openai_model(
+    model_name: str = LLM_MODEL, use_remote: bool = False
+) -> OpenAIChat:
+    """Create an OpenAI model using AgentModelManager."""
+    openai_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+    model_manager = AgentModelManager(
+        model_provider=PROVIDER,
+        model_name=model_name,
+        ollama_base_url=openai_url,
+        seed=None,
+    )
+    model = model_manager.create_model()
+
+    # WORKAROUND: Fix incorrect role mapping in Agno framework
+    # The default_role_map incorrectly maps "system" -> "developer"
+    # but OpenAI API only accepts: user, assistant, system, tool
+    if hasattr(model, "role_map"):
+        # Always override the role mapping to fix the bug
+        model.role_map = {
+            "system": "system",  # Fix: should be "system", not "developer"
+            "user": "user",
+            "assistant": "assistant",
+            "tool": "tool",
+            "model": "assistant",
+        }
+        print(f"🔧 Applied role mapping fix to model: {model_name}")
+
+    return model
 
 
 # Web search agent using Ollama
 web_agent = Agent(
     name="Web Agent",
     role="Search the web for information",
-    model=create_ollama_model(),
+    model=create_model(provider=PROVIDER),
     tools=[DuckDuckGoTools(cache_results=True)],
     instructions=["Always include sources"],
     show_tool_calls=True,
@@ -285,7 +359,7 @@ web_agent = Agent(
 finance_agent = Agent(
     name="Finance Agent",
     role="Get financial data",
-    model=create_ollama_model(),
+    model=create_model(provider=PROVIDER),
     tools=[
         YFinanceTools(
             stock_price=True,
@@ -308,7 +382,7 @@ finance_agent = Agent(
 writer_agent = Agent(
     name="Writer Agent",
     role="Write content",
-    model=create_ollama_model(),
+    model=create_model(provider=PROVIDER),
     description="You are an AI agent that can write content.",
     instructions=[
         "You are a versatile writer who can create content on any topic.",
@@ -334,7 +408,7 @@ writer_agent = Agent(
 # Calculator agent using Ollama
 calculator_agent = Agent(
     name="Calculator Agent",
-    model=create_ollama_model(),
+    model=create_model(provider=PROVIDER),
     role="Calculate mathematical expressions",
     tools=[
         CalculatorTools(
@@ -353,7 +427,7 @@ calculator_agent = Agent(
 
 python_agent = Agent(
     name="Python Agent",
-    model=create_ollama_model(),
+    model=create_model(provider=PROVIDER),
     role="Execute Python code",
     tools=[
         PythonTools(
@@ -369,7 +443,7 @@ python_agent = Agent(
 
 file_agent = Agent(
     name="File System Agent",
-    model=create_ollama_model(),
+    model=create_model(provider=PROVIDER),
     role="Read and write files in the system",
     tools=[
         FileTools(
@@ -449,7 +523,7 @@ async def create_shared_memory_system(
         )
 
         shared_memory = Memory(
-            model=create_ollama_model(use_remote=use_remote), db=memory_db
+            model=create_model(provider=PROVIDER, use_remote=use_remote), db=memory_db
         )
 
         print("✅ Shared memory system created successfully")
@@ -482,7 +556,7 @@ async def create_shared_memory_system(
         )
 
         shared_memory = Memory(
-            model=create_ollama_model(use_remote=use_remote), db=memory_db
+            model=create_model(provider=PROVIDER, use_remote=use_remote), db=memory_db
         )
 
         print("✅ Shared memory system created (minimal mode)")
@@ -523,7 +597,7 @@ async def create_memory_agent_with_shared_context(
     memory_agent = Agent(
         name="Personal AI Agent",
         role="Store and retrieve personal information and factual knowledge",
-        model=create_ollama_model(use_remote=use_remote),
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
         memory=shared_memory,  # Use the shared memory
         tools=[memory_tools, knowledge_tools],
         instructions=[
@@ -603,7 +677,7 @@ async def create_team(use_remote: bool = False):
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
-        model=create_ollama_model(use_remote=use_remote),
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
         memory=shared_memory,  # CRITICAL: Team uses shared memory
         tools=[
             ReasoningTools(add_instructions=True, add_few_shot=True),
