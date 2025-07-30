@@ -97,6 +97,9 @@ LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEP
 LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
 LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9622")
 
+LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")
+REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://tesla.local:1234/v1")
+
 # Docker port configurations
 PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server (internal)
 LIGHTRAG_PORT = get_env_var(
@@ -165,7 +168,7 @@ LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3-4b-mlx")
 
 # Docker environment variables for LightRAG containers
 # HTTP timeout configurations
@@ -308,6 +311,7 @@ def print_config():
                 ("Weaviate URL", WEAVIATE_URL),
                 ("Ollama URL", OLLAMA_URL),
                 ("Remote Ollama URL", REMOTE_OLLAMA_URL),
+                ("LMSTUDIO URL", LMSTUDIO_URL),
             ],
         },
         {

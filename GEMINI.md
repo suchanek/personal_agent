@@ -45,6 +45,7 @@ Files specific to the user, such as `eric_facts.json` and `eric_structured_facts
 *   **Poetry**: For dependency management
 *   **Docker**: For optional Weaviate database (if using vector storage) and LightRAG server
 *   **Ollama**: For local LLM inference
+*   **LMStudio**: For running MLX and other local models.
 *   **Node.js**: For MCP servers
 
 ### LightRAG Server
@@ -131,6 +132,7 @@ This is a Python project managed with `Poetry`.
     # Required: Ollama Configuration
     OLLAMA_URL=http://localhost:11434
     OLLAMA_DOCKER_URL=http://host.docker.internal:11434
+    LMSTUDIO_URL="http://localhost:1234/v1" # LMStudio server
 
     # LightRAG Storage Directories (USER_ID is injected dynamically)
     LIGHTRAG_SERVER_PORT=9621
@@ -210,11 +212,20 @@ The project uses a custom testing setup.
 
 *   **agno**: Core framework for building the agent.
 *   **Ollama**: For running local language models.
+*   **LMStudio**: For running local MLX and other OpenAI-compatible models.
 *   **LanceDB and SQLite**: For vector storage and memory.
 *   **LightRAG**: RAG-enhanced KB tool.
 *   **Poetry**: For dependency management.
 *   **Streamlit**: For the agent's user interface.
 *   **MCP (Model Context Protocol)**: For integrated servers and tools.
+
+## LMStudio and MLX Model Integration
+
+To broaden local model support, especially for Apple Silicon users, the agent now integrates with LMStudio to run MLX-optimized models. This is achieved by treating LMStudio as an OpenAI-compatible endpoint. See [ADR-029](./refs/adr/029-lmstudio-mlx-integration.md) for more details.
+
+### Agno Framework Bug Workaround
+
+During the LMStudio integration, a critical bug was found in the `agno` framework where the `system` role was incorrectly mapped to `developer`, causing API errors. A workaround has been implemented to patch the model's role mapping at runtime. See [ADR-030](./refs/adr/030-agno-role-mapping-bug-workaround.md) for details.
 
 ## LightRAG Integration
 
@@ -328,10 +339,10 @@ WEAVIATE_URL="http://localhost:8080"  # Weaviate (if using)
 
 The agent supports dynamic model switching through the web interface:
 
-*   **qwen3:4b** (recommended)
-*   **llama3.1:8b**
-*   **llama3.2:3b**
-*   **Any Ollama-compatible model**
+*   **qwen3-4b-mlx** (recommended, via LMStudio)
+*   **qwen3:8b** (via Ollama)
+*   **llama3.1:8b** (via Ollama)
+*   **Any Ollama or LMStudio compatible model**
 
 ## Troubleshooting
 
