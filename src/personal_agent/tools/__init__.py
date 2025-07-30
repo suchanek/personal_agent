@@ -20,6 +20,7 @@ from .memory_tools import (
 )
 from .knowledge_ingestion_tools import KnowledgeIngestionTools
 from .knowledge_tools import KnowledgeTools
+from .semantic_knowledge_ingestion_tools import SemanticKnowledgeIngestionTools
 from .lightrag_document_manager import LightRAGDocumentManager
 from .memory_cleaner import MemoryClearingManager
 from .research import comprehensive_research
@@ -35,6 +36,8 @@ __all__ = [
     "create_memory_tools",
     # Knowledge ingestion tools
     "KnowledgeIngestionTools",
+    # Semantic knowledge ingestion tools
+    "SemanticKnowledgeIngestionTools",
     # Knowledge tools
     "KnowledgeTools",
     # Filesystem tools

@@ -94,8 +94,6 @@ class AgentMemoryManager:
             logger.warning("Direct semantic search failed: %s", e)
             return []
 
-    
-
     async def store_user_memory(
         self, content: str = "", topics: Union[List[str], str, None] = None
     ) -> MemoryStorageResult:
@@ -120,7 +118,7 @@ class AgentMemoryManager:
         try:
             # Restate the user fact from first-person to third-person
             restated_content = self.restate_user_fact(content)
-            
+
             # SIMPLIFIED TOPIC HANDLING: Handle the common cases simply
             if topics is None:
                 # Leave as None - let memory manager auto-classify
@@ -707,7 +705,9 @@ class AgentMemoryManager:
             )
 
             if success:
-                sqlite_deleted_message = f"Successfully deleted memory from SQLite: {memory_id}"
+                sqlite_deleted_message = (
+                    f"Successfully deleted memory from SQLite: {memory_id}"
+                )
                 logger.info(f"Deleted memory {memory_id} from SQLite")
             else:
                 sqlite_deleted_message = f"Error deleting memory from SQLite: {message}"
@@ -727,17 +727,25 @@ class AgentMemoryManager:
                         async with session.get(list_url, timeout=30) as response:
                             if response.status != 200:
                                 error_text = await response.text()
-                                raise Exception(f"Failed to list documents from LightRAG: {error_text}")
+                                raise Exception(
+                                    f"Failed to list documents from LightRAG: {error_text}"
+                                )
                             docs_response = await response.json()
-                            
+
                             # Extract documents from the actual LightRAG structure
                             documents = []
-                            if isinstance(docs_response, dict) and "statuses" in docs_response:
+                            if (
+                                isinstance(docs_response, dict)
+                                and "statuses" in docs_response
+                            ):
                                 statuses = docs_response["statuses"]
                                 for status_name, docs_list in statuses.items():
                                     if isinstance(docs_list, list):
                                         documents.extend(docs_list)
-                            elif isinstance(docs_response, dict) and "documents" in docs_response:
+                            elif (
+                                isinstance(docs_response, dict)
+                                and "documents" in docs_response
+                            ):
                                 documents = docs_response["documents"]
                             elif isinstance(docs_response, list):
                                 documents = docs_response
@@ -745,30 +753,46 @@ class AgentMemoryManager:
                     doc_id_to_delete = None
                     # The filename is memory_{memory_id}_{hash}.txt
                     filename_pattern = f"memory_{memory_id}_"
-                    
+
                     for doc in documents:
                         # Check file_path field (not metadata.source)
                         file_path = doc.get("file_path", "")
                         if file_path.startswith(filename_pattern):
                             doc_id_to_delete = doc.get("id")
-                            logger.info(f"Found document to delete: {doc_id_to_delete} (file_path: {file_path})")
+                            logger.info(
+                                f"Found document to delete: {doc_id_to_delete} (file_path: {file_path})"
+                            )
                             break
 
                     # Step 2: Delete the document if found
                     if doc_id_to_delete:
-                        delete_url = f"{self.lightrag_memory_url}/documents/delete_document"
+                        delete_url = (
+                            f"{self.lightrag_memory_url}/documents/delete_document"
+                        )
                         async with aiohttp.ClientSession() as session:
                             # Use doc_ids (plural) as expected by the API
-                            async with session.delete(delete_url, json={"doc_ids": [doc_id_to_delete]}, timeout=30) as response:
+                            async with session.delete(
+                                delete_url,
+                                json={"doc_ids": [doc_id_to_delete]},
+                                timeout=30,
+                            ) as response:
                                 if response.status == 200:
-                                    logger.info(f"Successfully deleted memory {memory_id} (doc_id: {doc_id_to_delete}) from LightRAG.")
-                                    graph_deleted_message = f"Successfully deleted from graph memory"
+                                    logger.info(
+                                        f"Successfully deleted memory {memory_id} (doc_id: {doc_id_to_delete}) from LightRAG."
+                                    )
+                                    graph_deleted_message = (
+                                        f"Successfully deleted from graph memory"
+                                    )
                                 else:
                                     error_text = await response.text()
-                                    logger.error(f"Failed to delete document {doc_id_to_delete} from LightRAG: {error_text}")
+                                    logger.error(
+                                        f"Failed to delete document {doc_id_to_delete} from LightRAG: {error_text}"
+                                    )
                                     graph_deleted_message = f"⚠️ Could not delete from graph memory: {error_text}"
                     else:
-                        logger.warning(f"Memory {memory_id} not found in LightRAG graph memory (searched for pattern: {filename_pattern}).")
+                        logger.warning(
+                            f"Memory {memory_id} not found in LightRAG graph memory (searched for pattern: {filename_pattern})."
+                        )
                         # Treat "not found" as successful deletion since the goal is achieved
                         graph_deleted_message = "Successfully deleted from graph memory"
 
@@ -776,7 +800,9 @@ class AgentMemoryManager:
                     logger.error(f"Exception deleting memory from graph: {e}")
                     graph_deleted_message = f"⚠️ Could not delete from graph memory: {e}"
             else:
-                graph_deleted_message = "Graph memory client not configured, skipping deletion."
+                graph_deleted_message = (
+                    "Graph memory client not configured, skipping deletion."
+                )
 
             return f"{sqlite_deleted_message} {graph_deleted_message}".strip()
 
@@ -1283,7 +1309,7 @@ class AgentMemoryManager:
                 return {"error": "Query cannot be empty. Please provide a search term."}
 
             # Validate mode
-            valid_modes = ["semantic", "graph", "mix"]
+            valid_modes = ["local", "global", "hybrid"]
             if mode not in valid_modes:
                 logger.warning(f"Invalid mode '{mode}' provided to query_graph_memory")
                 mode = "mix"  # Default to mix mode

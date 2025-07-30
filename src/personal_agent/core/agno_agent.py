@@ -17,6 +17,7 @@ from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.python import PythonTools
+from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
 from rich.console import Console
 from rich.table import Table
@@ -38,6 +39,7 @@ from ..config.settings import (
 )
 from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..tools.knowledge_tools import KnowledgeTools
+from ..tools.semantic_knowledge_ingestion_tools import SemanticKnowledgeIngestionTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
@@ -73,6 +75,7 @@ logger = setup_logging(__name__, level=LOG_LEVEL)
 @dataclass
 class AgnoPersonalAgentConfig:
     """Configuration data for AgnoPersonalAgent."""
+
     model_provider: str = "ollama"
     model_name: str = LLM_MODEL
     enable_memory: bool = True
@@ -118,7 +121,7 @@ class AgnoPersonalAgent(Agent):
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.CONCISE,
         seed: Optional[int] = None,
-        **kwargs  # Accept additional kwargs for backward compatibility
+        **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
 
@@ -154,7 +157,9 @@ class AgnoPersonalAgent(Agent):
         self.model_provider = model_provider
         self.model_name = model_name
         self.enable_memory = enable_memory
-        self.enable_mcp = enable_mcp and USE_MCP  # Keep for compatibility but simplified
+        self.enable_mcp = (
+            enable_mcp and USE_MCP
+        )  # Keep for compatibility but simplified
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
@@ -197,14 +202,14 @@ class AgnoPersonalAgent(Agent):
         super().__init__(
             name="Personal AI Agent",
             model=None,  # Will be set in _do_initialization()
-            tools=[],    # Will be set in _do_initialization()
+            tools=[],  # Will be set in _do_initialization()
             instructions=[],  # Will be set in _do_initialization()
             markdown=True,
             show_tool_calls=debug,
             agent_id="personal-agent",  # Use hyphen to match team expectations
             user_id=user_id,
             enable_agentic_memory=False,  # Disable to avoid conflicts
-            enable_user_memories=False,   # Use our custom tools instead
+            enable_user_memories=False,  # Use our custom tools instead
             add_history_to_messages=True,
             num_history_responses=3,
             debug_mode=debug,
@@ -250,12 +255,12 @@ class AgnoPersonalAgent(Agent):
         """Ensure the agent is initialized, performing lazy initialization if needed."""
         if self._initialized:
             return
-            
+
         async with self._initialization_lock:
             # Double-check pattern to avoid race conditions
             if self._initialized:
                 return
-                
+
             logger.info("🚀 Performing lazy initialization of AgnoPersonalAgent")
             success = await self._do_initialization(self.recreate)
             if not success:
@@ -265,7 +270,7 @@ class AgnoPersonalAgent(Agent):
 
     async def initialize(self, recreate: bool = False) -> bool:
         """Initialize the agent using the proven create_memory_agent() pattern.
-        
+
         DEPRECATED: This method is kept for backward compatibility.
         Initialization now happens automatically when needed.
 
@@ -276,14 +281,15 @@ class AgnoPersonalAgent(Agent):
             True if initialization successful, False otherwise
         """
         logger.info(
-            "🚀 AgnoPersonalAgent.initialize() called with recreate=%s (deprecated - use constructor directly)", recreate
+            "🚀 AgnoPersonalAgent.initialize() called with recreate=%s (deprecated - use constructor directly)",
+            recreate,
         )
-        
+
         # Update recreate flag if different from constructor
         if recreate != self.recreate:
             self.recreate = recreate
             self.config.recreate = recreate
-        
+
         try:
             await self._ensure_initialized()
             return True
@@ -301,7 +307,8 @@ class AgnoPersonalAgent(Agent):
             True if initialization successful, False otherwise
         """
         logger.info(
-            "🚀 AgnoPersonalAgent._do_initialization() called with recreate=%s", recreate
+            "🚀 AgnoPersonalAgent._do_initialization() called with recreate=%s",
+            recreate,
         )
 
         try:
@@ -316,7 +323,9 @@ class AgnoPersonalAgent(Agent):
 
             # 3. Load knowledge base content (CRITICAL: Must be async)
             if self.agno_knowledge:
-                await load_combined_knowledge_base(self.agno_knowledge, recreate=recreate)
+                await load_combined_knowledge_base(
+                    self.agno_knowledge, recreate=recreate
+                )
                 logger.info("Loaded Agno combined knowledge base content")
 
             # 4. Create memory with SemanticMemoryManager (CRITICAL: Must be done after storage)
@@ -358,13 +367,13 @@ class AgnoPersonalAgent(Agent):
                 self.user_id, self.storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
             )
 
-            self.tool_manager = AgentToolManager(
-                self.user_id, self.storage_dir
-            )
+            self.tool_manager = AgentToolManager(self.user_id, self.storage_dir)
 
             # 6. Create tool instances (CRITICAL: Must be done after managers)
             if self.enable_memory:
                 self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
+                self.knowledge_ingestion_tools = KnowledgeIngestionTools()
+                self.semantic_knowledge_ingestion_tools = SemanticKnowledgeIngestionTools()
                 self.memory_tools = AgnoMemoryTools(self.memory_manager)
 
             # 7. Create the model
@@ -372,11 +381,30 @@ class AgnoPersonalAgent(Agent):
             logger.info("Created model: %s", self.model_name)
 
             # 8. Prepare tools list - MEMORY AGENT ONLY: Just memory and knowledge tools
-            tools = []
-            
+            tools = [  # Add GoogleSearch tools directly for web search functionality
+                GoogleSearchTools(),
+                YFinanceTools(
+                    stock_price=True,
+                    company_info=True,
+                    stock_fundamentals=True,
+                    key_financial_ratios=True,
+                    analyst_recommendations=True,
+                ),
+                PythonTools(),
+                ShellTools(
+                    base_dir="."
+                ),  # Match Streamlit configuration for consistency
+                PersonalAgentFilesystemTools(),
+            ]
+
             if self.enable_memory:
-                tools.extend([self.knowledge_tools, self.memory_tools])
-                logger.info("Added KnowledgeTools and AgnoMemoryTools to memory agent")
+                tools.extend([
+                    self.knowledge_tools, 
+                    self.knowledge_ingestion_tools,
+                    self.semantic_knowledge_ingestion_tools,
+                    self.memory_tools
+                ])
+                logger.info("Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools to memory agent")
             else:
                 logger.warning("Memory disabled - memory agent will have no tools!")
 
@@ -413,7 +441,9 @@ class AgnoPersonalAgent(Agent):
                     lightrag_url=LIGHTRAG_URL,
                     debug=self.debug,
                 )
-                logger.info("Created Knowledge Coordinator for unified knowledge queries")
+                logger.info(
+                    "Created Knowledge Coordinator for unified knowledge queries"
+                )
 
             # If recreate is True, clear all memories AFTER memory system is initialized
             if recreate and self.enable_memory:
@@ -456,12 +486,14 @@ class AgnoPersonalAgent(Agent):
         """
         # Ensure agent is initialized before running
         await self._ensure_initialized()
-        
+
         # Use the inherited Agent's aprint_response method
         await super().aprint_response(
-            query, 
-            stream=stream, 
-            show_tool_calls=show_tool_calls if show_tool_calls is not None else self.debug
+            query,
+            stream=stream,
+            show_tool_calls=(
+                show_tool_calls if show_tool_calls is not None else self.debug
+            ),
         )
 
     async def run(
@@ -638,7 +670,9 @@ class AgnoPersonalAgent(Agent):
             The restated fact
         """
         if not self.memory_manager:
-            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Memory manager not initialized. Call initialize() first."
+            )
         return self.memory_manager.restate_user_fact(content)
 
     async def seed_entity_in_graph(self, entity_name: str, entity_type: str) -> bool:
@@ -654,7 +688,9 @@ class AgnoPersonalAgent(Agent):
             True if entity was successfully seeded
         """
         if not self.memory_manager:
-            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Memory manager not initialized. Call initialize() first."
+            )
         return await self.memory_manager.seed_entity_in_graph(entity_name, entity_type)
 
     async def check_entity_exists(self, entity_name: str) -> bool:
@@ -669,7 +705,9 @@ class AgnoPersonalAgent(Agent):
             True if entity exists
         """
         if not self.memory_manager:
-            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Memory manager not initialized. Call initialize() first."
+            )
         return await self.memory_manager.check_entity_exists(entity_name)
 
     async def clear_all_memories(self) -> str:
@@ -681,7 +719,9 @@ class AgnoPersonalAgent(Agent):
             str: Success or error message
         """
         if not self.memory_manager:
-            raise RuntimeError("Memory manager not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Memory manager not initialized. Call initialize() first."
+            )
         return await self.memory_manager.clear_all_memories()
 
     async def query_lightrag_knowledge_direct(
@@ -735,7 +775,9 @@ class AgnoPersonalAgent(Agent):
         try:
             final_url = f"{url}/query"
 
-            logger.debug(f"Querying LightRAG at {final_url} with params: {query_params}")
+            logger.debug(
+                f"Querying LightRAG at {final_url} with params: {query_params}"
+            )
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -1023,6 +1065,7 @@ def create_simple_personal_agent(
         model = OpenAIChat(id=model_name)
     elif model_provider == "ollama":
         from agno.models.ollama.tools import OllamaTools
+
         model = OllamaTools(id=model_name)
     else:
         raise ValueError(f"Unsupported model provider: {model_provider}")
@@ -1087,7 +1130,7 @@ async def create_agno_agent(
     instruction_level: InstructionLevel = InstructionLevel.STANDARD,
 ) -> AgnoPersonalAgent:
     """Create an agno-based personal agent.
-    
+
     DEPRECATED: Use AgnoPersonalAgent() constructor directly.
     This function is kept for backward compatibility.
 
@@ -1107,8 +1150,10 @@ async def create_agno_agent(
     Returns:
         Agent instance (initialization happens automatically on first use)
     """
-    logger.info("create_agno_agent() called (deprecated - use AgnoPersonalAgent() constructor directly)")
-    
+    logger.info(
+        "create_agno_agent() called (deprecated - use AgnoPersonalAgent() constructor directly)"
+    )
+
     # Just create the agent - initialization happens automatically when needed
     return AgnoPersonalAgent(
         model_provider=model_provider,

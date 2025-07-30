@@ -688,10 +688,39 @@ def render_knowledge_status(knowledge_helper):
             # Show the knowledge directory path
             st.caption(f"**Path:** {AGNO_KNOWLEDGE_DIR}")
 
-            if knowledge_helper.knowledge_manager:
-                st.success("✅ Ready")
-            else:
-                st.warning("⚠️ Offline")
+            # FORCE AGENT INITIALIZATION TO CHECK REAL STATUS
+            try:
+                # Trigger lazy initialization by accessing agent properties
+                agent = st.session_state[SESSION_KEY_AGENT]
+                
+                # Show initialization status
+                if not getattr(agent, '_initialized', False):
+                    with st.spinner("Initializing knowledge system..."):
+                        if hasattr(agent, '_ensure_initialized'):
+                            # This will trigger initialization if not already done
+                            asyncio.run(agent._ensure_initialized())
+                else:
+                    # Agent already initialized, just ensure knowledge helper is updated
+                    if hasattr(agent, '_ensure_initialized'):
+                        asyncio.run(agent._ensure_initialized())
+                
+                # Now check the real status after ensuring initialization
+                km = knowledge_helper.knowledge_manager  # This will trigger fresh check
+                if km:
+                    st.success("✅ Ready")
+                    # Show additional info if available
+                    if hasattr(km, 'vector_db') and km.vector_db:
+                        st.caption("Vector DB: Connected")
+                    elif hasattr(km, 'search'):
+                        st.caption("Knowledge base loaded")
+                else:
+                    st.warning("⚠️ Offline")
+                    st.caption("Knowledge manager not available")
+                    
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                st.caption("Failed to initialize knowledge system")
+                
         with col2:
             st.markdown("**RAG**")
 
@@ -737,14 +766,14 @@ def render_knowledge_status(knowledge_helper):
             else:  # tesla.local
                 rag_url = "http://tesla.local:9621"
             
-            # Check RAG server status with detailed pipeline information
+            # Check RAG server status with improved reliability and error handling
             try:
-                # First check basic health
-                health_response = requests.get(f"{rag_url}/health", timeout=3)
+                # Increase timeout and add better error handling
+                health_response = requests.get(f"{rag_url}/health", timeout=10)  # Increased from 3 to 10
                 if health_response.status_code == 200:
                     # Get pipeline status for more detailed information
                     try:
-                        pipeline_response = requests.get(f"{rag_url}/documents/pipeline_status", timeout=3)
+                        pipeline_response = requests.get(f"{rag_url}/documents/pipeline_status", timeout=10)
                         if pipeline_response.status_code == 200:
                             pipeline_data = pipeline_response.json()
                             
@@ -764,18 +793,41 @@ def render_knowledge_status(knowledge_helper):
                         else:
                             # Fallback to basic ready status if pipeline endpoint fails
                             st.success("✅ Ready")
+                            st.caption("(Pipeline status unavailable)")
                     except requests.exceptions.RequestException:
                         # Pipeline status failed, but health passed
                         st.success("✅ Ready")
+                        st.caption("(Basic health check passed)")
                 else:
                     st.error(f"❌ Error ({health_response.status_code})")
-            except requests.exceptions.RequestException as e:
+                    st.caption(f"Server responded with error: {health_response.status_code}")
+            except requests.exceptions.ConnectTimeout:
+                st.warning("⚠️ Timeout")
+                st.caption(f"Connection timeout to {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+            except requests.exceptions.ConnectionError:
                 st.warning("⚠️ Offline")
-                st.caption(f"({st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]})" )
+                st.caption(f"Cannot connect to {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+            except requests.exceptions.RequestException as e:
+                st.warning("⚠️ Error")
+                st.caption(f"Request failed: {str(e)}")
             
             # Show current server info
             if not location_changed:
                 st.caption(f"Current: {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+
+        # Add debug information in an expander if debug mode is enabled
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
+            with st.expander("🔍 Debug Status Info"):
+                agent = st.session_state[SESSION_KEY_AGENT]
+                st.write(f"**Agent Initialized:** {getattr(agent, '_initialized', False)}")
+                st.write(f"**Agent Type:** {type(agent).__name__}")
+                st.write(f"**Knowledge Manager:** {knowledge_helper.knowledge_manager is not None}")
+                st.write(f"**RAG URL:** {rag_url}")
+                st.write(f"**RAG Location:** {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+                if hasattr(agent, 'agno_knowledge'):
+                    st.write(f"**Agent Knowledge:** {agent.agno_knowledge is not None}")
+                if hasattr(agent, 'agno_memory'):
+                    st.write(f"**Agent Memory:** {agent.agno_memory is not None}")
 
 
 def render_knowledge_tab():

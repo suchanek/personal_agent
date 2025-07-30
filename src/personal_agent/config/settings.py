@@ -92,6 +92,9 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
     return value.lower() in ("true", "1", "yes", "on")
 
 
+PROVIDER = "openai"
+PROVIDER = get_env_var("PROVIDER", "ollama")  # DEPRECATED
+
 # LighRAG server
 LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEPRECATED
 LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")

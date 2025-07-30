@@ -13,6 +13,7 @@ from agno.models.ollama import Ollama  # Use regular Ollama instead of OllamaToo
 from agno.models.openai import OpenAIChat
 
 from ..config.model_contexts import get_model_context_size_sync
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,25 +51,63 @@ class AgentModelManager:
             ValueError: If unsupported model provider is specified
         """
         if self.model_provider == "openai":
-            # Check if we're using LMStudio (non-standard OpenAI endpoint)
-            if "localhost:1234" in self.ollama_base_url or "1234" in self.ollama_base_url:
+            # Use LMStudio URL from settings when provider is openai
+            lmstudio_url = settings.LMSTUDIO_URL
+            
+            # Check if we're using LMStudio (localhost:1234 indicates LMStudio)
+            if "localhost:1234" in lmstudio_url or "1234" in lmstudio_url:
                 # Use LMStudio with OpenAI-compatible API
                 # Ensure the base URL has the correct /v1 endpoint for LMStudio
-                base_url = self.ollama_base_url
+                base_url = lmstudio_url
                 if not base_url.endswith('/v1'):
                     base_url = base_url.rstrip('/') + '/v1'
                 
+                logger.info(f"Using LMStudio with OpenAI-compatible API at: {base_url}")
+                logger.info(f"Model: {self.model_name}")
+                logger.info("This will use /v1/chat/completions endpoint (OpenAI format)")
+                
                 # Remove response_format constraint to allow native OpenAI tool calling
                 # LMStudio should support OpenAI's standard tool calling via the tools parameter
-                return OpenAIChat(
+                model = OpenAIChat(
                     id=self.model_name,
                     base_url=base_url,  # Use corrected base URL with /v1 endpoint
                     api_key="lm-studio",  # LMStudio doesn't require a real API key
                     # No request_params with response_format - let OpenAI handle tool calling natively
                 )
+                
+                # WORKAROUND: Fix incorrect role mapping in Agno framework
+                # The default_role_map incorrectly maps "system" -> "developer"
+                # but OpenAI API only accepts: user, assistant, system, tool
+                if hasattr(model, "role_map"):
+                    model.role_map = {
+                        "system": "system",  # Fix: should be "system", not "developer"
+                        "user": "user",
+                        "assistant": "assistant",
+                        "tool": "tool",
+                        "model": "assistant",
+                    }
+                    logger.info(f"🔧 Applied role mapping fix to LMStudio model: {self.model_name}")
+                
+                return model
             else:
                 # Standard OpenAI API
-                return OpenAIChat(id=self.model_name)
+                logger.info(f"Using standard OpenAI API with model: {self.model_name}")
+                model = OpenAIChat(id=self.model_name)
+                
+                # WORKAROUND: Fix incorrect role mapping in Agno framework
+                # The default_role_map incorrectly maps "system" -> "developer"
+                # but OpenAI API only accepts: user, assistant, system, tool
+                if hasattr(model, "role_map"):
+                    model.role_map = {
+                        "system": "system",  # Fix: should be "system", not "developer"
+                        "user": "user",
+                        "assistant": "assistant",
+                        "tool": "tool",
+                        "model": "assistant",
+                    }
+                    logger.info(f"🔧 Applied role mapping fix to OpenAI model: {self.model_name}")
+                
+                return model
         elif self.model_provider == "ollama":
             # Get dynamic context size for this model
             context_size, detection_method = get_model_context_size_sync(
@@ -93,7 +132,7 @@ class AgentModelManager:
                 model_id = self.model_name
 
                 # Use regular Ollama with configuration optimized for SmolLM2
-                return Ollama(
+                model = Ollama(
                     id=model_id,
                     host=self.ollama_base_url,
                     options={
@@ -110,6 +149,21 @@ class AgentModelManager:
                         "mirostat_tau": 5.0,
                     },
                 )
+                
+                # WORKAROUND: Fix incorrect role mapping in Agno framework
+                # The default_role_map incorrectly maps "system" -> "developer"
+                # but OpenAI API only accepts: user, assistant, system, tool
+                if hasattr(model, "role_map"):
+                    model.role_map = {
+                        "system": "system",  # Fix: should be "system", not "developer"
+                        "user": "user",
+                        "assistant": "assistant",
+                        "tool": "tool",
+                        "model": "assistant",
+                    }
+                    logger.info(f"🔧 Applied role mapping fix to SmolLM2 model: {self.model_name}")
+                
+                return model
             else:
                 # Use standard configuration for other models
                 model_options = {
@@ -172,10 +226,25 @@ class AgentModelManager:
                         self.model_name,
                     )
 
-                return Ollama(
+                model = Ollama(
                     id=self.model_name,
                     host=self.ollama_base_url,  # Use host parameter for Ollama
                     options=model_options,
                 )
+                
+                # WORKAROUND: Fix incorrect role mapping in Agno framework
+                # The default_role_map incorrectly maps "system" -> "developer"
+                # but OpenAI API only accepts: user, assistant, system, tool
+                if hasattr(model, "role_map"):
+                    model.role_map = {
+                        "system": "system",  # Fix: should be "system", not "developer"
+                        "user": "user",
+                        "assistant": "assistant",
+                        "tool": "tool",
+                        "model": "assistant",
+                    }
+                    logger.info(f"🔧 Applied role mapping fix to Ollama model: {self.model_name}")
+                
+                return model
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
