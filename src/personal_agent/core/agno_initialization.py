@@ -73,7 +73,7 @@ async def initialize_agno_system(
         instruction_level_enum = InstructionLevel.STANDARD
 
     agno_agent = await create_agno_agent(
-        model_provider="ollama",  # Default to Ollama
+        model_provider=settings.PROVIDER,  # Use configured provider from .env
         model_name=settings.LLM_MODEL,  # Use configured model
         enable_memory=True,  # Enable native Agno memory
         enable_mcp=settings.USE_MCP,  # Use configured MCP setting

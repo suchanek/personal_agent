@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Semantic Knowledge Ingestion Tools**: Introduced a new `SemanticKnowledgeIngestionTools` toolkit to provide a complete suite of ingestion tools (`ingest_semantic_file`, `ingest_semantic_text`, etc.) for the local LanceDB-based semantic knowledge base. This achieves feature parity with the LightRAG ingestion tools and allows users to easily populate the local vector store. See [ADR-044](./refs/adr/044-semantic-knowledge-ingestion-and-unified-querying.md) for details.
+
+### Fixed
+- **Unified Knowledge Querying**: Refactored the `query_knowledge_base` tool to use the central `KnowledgeCoordinator`. This resolves a bug where `mode="local"` failed to query the semantic knowledge base and ensures all knowledge queries are intelligently and reliably routed to the correct backend (local semantic or LightRAG). See [ADR-044](./refs/adr/044-semantic-knowledge-ingestion-and-unified-querying.md) for details.
+- **Agno Role Mapping Bug**: Applied a workaround to fix a critical bug in the `agno` framework where the `system` role was incorrectly mapped to `developer`, causing errors with OpenAI-compatible APIs like LMStudio. The role mapping is now corrected at runtime for all model providers. See [ADR-030](./refs/adr/030-agno-role-mapping-bug-workaround.md) for details.
+
+
 ### Changed
 - **Agent Initialization**: Refactored the `AgnoPersonalAgent` to use a lazy initialization pattern. The agent is now instantiated synchronously (`agent = AgnoPersonalAgent(...)`) and heavy initialization occurs automatically on first use. This simplifies agent creation, improves code clarity, and makes it easier to use agents within teams. The old `create_agno_agent()` factory is now deprecated but maintained for backward compatibility. See [ADR-043](./refs/adr/043-agno-agent-lazy-initialization.md) for details.
 

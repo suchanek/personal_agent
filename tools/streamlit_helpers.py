@@ -6,20 +6,49 @@ import time
 class StreamlitMemoryHelper:
     def __init__(self, agent):
         self.agent = agent
-        self.memory_manager, self.db = self._get_memory_manager_and_db()
+        # Don't cache memory components - get them fresh each time
+        self._memory_manager = None
+        self._db = None
 
     def _get_memory_manager_and_db(self):
-        if not self.agent or not (hasattr(self.agent, "agno_memory") and self.agent.agno_memory):
+        """Get memory manager and db, ensuring agent is initialized first."""
+        if not self.agent:
             return None, None
-        return self.agent.agno_memory.memory_manager, self.agent.agno_memory.db
+            
+        # Force agent initialization if needed
+        try:
+            if hasattr(self.agent, '_ensure_initialized'):
+                asyncio.run(self.agent._ensure_initialized())
+        except Exception as e:
+            print(f"Failed to initialize agent: {e}")
+            return None, None
+            
+        # Now check for memory components
+        if hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
+            return self.agent.agno_memory.memory_manager, self.agent.agno_memory.db
+        return None, None
+
+    @property
+    def memory_manager(self):
+        """Dynamic property that always gets fresh memory manager."""
+        mm, _ = self._get_memory_manager_and_db()
+        return mm
+
+    @property
+    def db(self):
+        """Dynamic property that always gets fresh db."""
+        _, db = self._get_memory_manager_and_db()
+        return db
 
     def search_memories(self, query: str, limit: int = 10, similarity_threshold: float = 0.3):
-        if not self.memory_manager or not self.db:
+        mm = self.memory_manager  # This will trigger initialization
+        db = self.db
+        if not mm or not db:
             return []
         try:
-            return self.memory_manager.search_memories(
+            return mm.search_memories(
                 query=query,
-                db=self.db,
+                db=db,
                 user_id=self.agent.user_id,
                 limit=limit,
                 similarity_threshold=similarity_threshold,
@@ -175,18 +204,38 @@ class StreamlitMemoryHelper:
 class StreamlitKnowledgeHelper:
     def __init__(self, agent):
         self.agent = agent
-        self.knowledge_manager = self._get_knowledge_manager()
+        # Don't cache knowledge_manager - get it fresh each time
+        self._knowledge_manager = None
 
     def _get_knowledge_manager(self):
-        if not self.agent or not (hasattr(self.agent, "agno_knowledge") and self.agent.agno_knowledge):
+        """Get knowledge manager, ensuring agent is initialized first."""
+        if not self.agent:
             return None
-        return self.agent.agno_knowledge
+            
+        # Force agent initialization if needed
+        try:
+            if hasattr(self.agent, '_ensure_initialized'):
+                asyncio.run(self.agent._ensure_initialized())
+        except Exception as e:
+            print(f"Failed to initialize agent: {e}")
+            return None
+            
+        # Now check for knowledge manager
+        if hasattr(self.agent, "agno_knowledge") and self.agent.agno_knowledge:
+            return self.agent.agno_knowledge
+        return None
+
+    @property
+    def knowledge_manager(self):
+        """Dynamic property that always gets fresh knowledge manager."""
+        return self._get_knowledge_manager()
 
     def search_knowledge(self, query: str, limit: int = 10):
-        if not self.knowledge_manager:
+        km = self.knowledge_manager  # This will trigger initialization
+        if not km:
             return []
         try:
-            return self.knowledge_manager.search(query=query, num_documents=limit)
+            return km.search(query=query, num_documents=limit)
         except Exception as e:
             st.error(f"Error in knowledge search: {e}")
             return []
@@ -197,10 +246,16 @@ class StreamlitKnowledgeHelper:
             st.error("LightRAG knowledge base not available - agent missing query method")
             return None
         
-        # Check if LightRAG is enabled on the agent
-        if not getattr(self.agent, "lightrag_knowledge_enabled", False):
-            st.error("LightRAG knowledge base not enabled - server may not be running")
+        # Force agent initialization if needed
+        try:
+            if hasattr(self.agent, '_ensure_initialized'):
+                asyncio.run(self.agent._ensure_initialized())
+        except Exception as e:
+            st.error(f"Failed to initialize agent: {e}")
             return None
+        
+        # LightRAG is available if the agent has the query method - no need for additional checks
+        # The agent initialization ensures all components are properly set up
             
         try:
             result = asyncio.run(self.agent.query_lightrag_knowledge_direct(query, params=params))

@@ -290,7 +290,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
 
             **KNOWLEDGE RETRIEVALlist TOOLS**:
             - `query_knowledge_base(query="...", mode="auto")` - Search stored knowledge
-              - Modes: "local" (semantic), "global" (graph), "hybrid", "mix", "auto"
+              - Modes: "local" (semantic), "global", "hybrid",
               - Use for factual questions, not creative requests
 
             ### DECISION FLOWCHART - MEMORY vs KNOWLEDGE:

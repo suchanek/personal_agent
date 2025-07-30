@@ -114,6 +114,7 @@ from bs4 import BeautifulSoup
 
 from ..config import settings
 from ..core.knowledge_manager import KnowledgeManager
+from ..core.knowledge_coordinator import create_knowledge_coordinator
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -139,6 +140,9 @@ class KnowledgeTools(Toolkit):
 
     def __init__(self, knowledge_manager: KnowledgeManager):
         self.knowledge_manager = knowledge_manager
+        
+        # Initialize knowledge coordinator for unified querying
+        self.knowledge_coordinator = None
 
         # Collect knowledge tool methods
         tools = [
@@ -155,7 +159,7 @@ class KnowledgeTools(Toolkit):
             name="knowledge_tools",
             tools=tools,
             instructions="""Use these tools to manage factual information and documents in the knowledge base.
-            Store reference materials, facts, and documents that don't change. 
+            Store reference materials, facts, and documents that don't change.
             Query when you need to find previously stored factual information.
             Do NOT use for personal user information - use memory tools for that.""",
         )
@@ -559,7 +563,7 @@ class KnowledgeTools(Toolkit):
                     return f"❌ This appears to be a creative request ('{query}'). The knowledge base is for searching existing stored information, not for generating new content. Please rephrase as a search for existing knowledge, or ask me to create content directly without using knowledge tools."
 
             # Validate mode
-            valid_modes = ["local", "global", "hybrid", "mix", "naive", "auto"]
+            valid_modes = ["local", "global", "hybrid", "naive"]
             if mode not in valid_modes:
                 mode = "auto"
 
@@ -567,69 +571,37 @@ class KnowledgeTools(Toolkit):
             if limit is None:
                 limit = 5
 
-            # Auto mode: intelligent routing based on query characteristics
-            if mode == "auto":
-                query_lower = query.lower()
+            # Initialize knowledge coordinator if not already done
+            if self.knowledge_coordinator is None:
+                # Try to get agno_knowledge from the knowledge manager if available
+                agno_knowledge = getattr(self.knowledge_manager, 'agno_knowledge', None)
+                self.knowledge_coordinator = create_knowledge_coordinator(
+                    agno_knowledge=agno_knowledge,
+                    lightrag_url=settings.LIGHTRAG_URL,
+                    debug=False
+                )
 
-                # Use global mode for relationship queries
-                relationship_keywords = [
-                    "relationship",
-                    "connection",
-                    "related",
-                    "link",
-                    "between",
-                    "how",
-                    "why",
-                ]
-                if any(keyword in query_lower for keyword in relationship_keywords):
-                    mode = "global"
-                # Use local mode for specific fact queries
-                elif any(
-                    keyword in query_lower
-                    for keyword in ["what", "when", "where", "who", "define"]
-                ):
-                    mode = "local"
-                # Use hybrid for complex queries
-                else:
-                    mode = "hybrid"
-
-            # Query LightRAG server
+            # Use the knowledge coordinator for unified querying
+            import asyncio
+            
+            # Run the async query in a sync context
             try:
-                url = f"{settings.LIGHTRAG_URL}/query"
-                params = {
-                    "query": query.strip(),
-                    "mode": mode,
-                    "top_k": limit,
-                    "response_type": "Multiple Paragraphs",
-                }
-
-                response = requests.post(url, json=params, timeout=60)
-
-                if response.status_code == 200:
-                    result = response.json()
-
-                    # Extract the response content
-                    if isinstance(result, dict):
-                        content = result.get(
-                            "response", result.get("content", str(result))
-                        )
-                    else:
-                        content = str(result)
-
-                    if content and content.strip():
-                        logger.info(f"Knowledge query successful: {query[:50]}...")
-                        return f"🧠 KNOWLEDGE BASE QUERY (mode: {mode}):\n\n{content}"
-                    else:
-                        return f"🔍 No relevant knowledge found for '{query}'. Try different keywords or add more knowledge to your base."
-
-                else:
-                    error_text = response.text
-                    logger.warning(f"KnowledgeBase query failed: {error_text}")
-                    return f"❌ Error querying knowledge base: {error_text}"
-
-            except requests.RequestException as e:
-                logger.error(f"Error connecting to KnowledgeBase server: {e}")
-                return f"❌ Error connecting to knowledge base server: {str(e)}"
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            result = loop.run_until_complete(
+                self.knowledge_coordinator.query_knowledge_base(
+                    query=query.strip(),
+                    mode=mode,
+                    limit=limit,
+                    response_type="Multiple Paragraphs"
+                )
+            )
+            
+            logger.info(f"Knowledge query completed: {query[:50]}...")
+            return result
 
         except Exception as e:
             logger.error(f"Error querying knowledge base: {e}")
