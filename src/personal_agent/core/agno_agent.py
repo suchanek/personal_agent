@@ -39,12 +39,12 @@ from ..config.settings import (
 )
 from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..tools.knowledge_tools import KnowledgeTools
-from ..tools.semantic_knowledge_ingestion_tools import SemanticKnowledgeIngestionTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
 from ..tools.refactored_memory_tools import AgnoMemoryTools
+from ..tools.semantic_knowledge_ingestion_tools import SemanticKnowledgeIngestionTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -348,7 +348,7 @@ class AgnoPersonalAgent(Agent):
             )
 
             self.instruction_manager = AgentInstructionManager(
-                self.instruction_level, self.user_id, self.enable_memory, False, {}
+                self.instruction_level, self.user_id, self.enable_memory, self.enable_mcp, self.mcp_servers
             )
 
             self.memory_manager = AgentMemoryManager(
@@ -373,7 +373,9 @@ class AgnoPersonalAgent(Agent):
             if self.enable_memory:
                 self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
                 self.knowledge_ingestion_tools = KnowledgeIngestionTools()
-                self.semantic_knowledge_ingestion_tools = SemanticKnowledgeIngestionTools()
+                self.semantic_knowledge_ingestion_tools = (
+                    SemanticKnowledgeIngestionTools()
+                )
                 self.memory_tools = AgnoMemoryTools(self.memory_manager)
 
             # 7. Create the model
@@ -383,6 +385,9 @@ class AgnoPersonalAgent(Agent):
             # 8. Prepare tools list - MEMORY AGENT ONLY: Just memory and knowledge tools
             tools = [  # Add GoogleSearch tools directly for web search functionality
                 GoogleSearchTools(),
+                CalculatorTools(
+                    enable_all=True
+                ),  # Add calculator tools for mathematical operations
                 YFinanceTools(
                     stock_price=True,
                     company_info=True,
@@ -390,7 +395,14 @@ class AgnoPersonalAgent(Agent):
                     key_financial_ratios=True,
                     analyst_recommendations=True,
                 ),
-                PythonTools(),
+                PythonTools(
+                    base_dir="/tmp",
+                    run_code=True,
+                    list_files=True,
+                    run_files=True,
+                    read_files=True,
+                    uv_pip_install=True,
+                ),
                 ShellTools(
                     base_dir="."
                 ),  # Match Streamlit configuration for consistency
@@ -398,29 +410,23 @@ class AgnoPersonalAgent(Agent):
             ]
 
             if self.enable_memory:
-                tools.extend([
-                    self.knowledge_tools, 
-                    self.knowledge_ingestion_tools,
-                    self.semantic_knowledge_ingestion_tools,
-                    self.memory_tools
-                ])
-                logger.info("Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools to memory agent")
+                tools.extend(
+                    [
+                        self.knowledge_tools,
+                        self.knowledge_ingestion_tools,
+                        self.semantic_knowledge_ingestion_tools,
+                        self.memory_tools,
+                    ]
+                )
+                logger.info(
+                    "Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools to memory agent"
+                )
             else:
                 logger.warning("Memory disabled - memory agent will have no tools!")
 
-            # 9. Create instructions using the proven memory agent pattern
-            instructions = [
-                "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
-                "Use memory tools for personal information about the user.",
-                "Use knowledge tools for factual information and documents.",
-                "Always search your memory when asked about the user.",
-                "Always search your knowledge base when asked about factual information.",
-                "Store new personal information in memory and new factual information in knowledge.",
-                "When the user asks you to remember something, use the store_user_memory tool.",
-                "When the user asks what you remember, use the get_recent_memories or query_memory tools.",
-                "Always execute the tools - do not show JSON or function calls to the user.",
-                "Provide natural responses based on the tool results.",
-            ]
+            # 9. Create instructions using the AgentInstructionManager
+            instructions = self.instruction_manager.create_instructions()
+            logger.info("Generated dynamic instructions using AgentInstructionManager with level: %s", self.instruction_level.name)
 
             # 10. Update the Agent's components (KEY: Update inherited Agent properties)
             self.model = model

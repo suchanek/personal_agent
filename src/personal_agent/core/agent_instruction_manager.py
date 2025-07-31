@@ -283,14 +283,12 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             For storing and retrieving general factual information, documents, and reference materials.
 
             **KNOWLEDGE STORAGE TOOLS**:
-            - `ingest_knowledge_text(content="...", title="...")` - Store text content
-            - `ingest_knowledge_file(file_path="...")` - Ingest files (PDF, DOC, TXT, etc.)
-            - `ingest_knowledge_from_url(url="...")` - Ingest web content
-            - `batch_ingest_directory(directory_path="...")` - Bulk ingest files
+            - **KnowledgeIngestionTools**: `ingest_knowledge_text(content="...", title="...")`, `ingest_knowledge_file(file_path="...")`, `ingest_knowledge_from_url(url="...")`, `batch_ingest_directory(directory_path="...")`
+            - **SemanticKnowledgeIngestionTools**: Advanced semantic ingestion with enhanced processing
 
-            **KNOWLEDGE RETRIEVALlist TOOLS**:
-            - `query_knowledge_base(query="...", mode="auto")` - Search stored knowledge
-              - Modes: "local" (semantic), "global", "hybrid",
+            **KNOWLEDGE RETRIEVAL TOOLS**:
+            - **KnowledgeTools**: `query_knowledge_base(query="...", mode="auto")` - Search stored knowledge
+              - Modes: "local" (semantic), "global", "hybrid"
               - Use for factual questions, not creative requests
 
             ### DECISION FLOWCHART - MEMORY vs KNOWLEDGE:
@@ -324,9 +322,13 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - `GoogleSearchTools`: For web and news search.
             - `PersonalAgentFilesystemTools`: For file operations.
             - `PythonTools`: For calculations and code execution.
-            - `MemoryAndKnowledgeTools`: Unified system with specific functions:
-              - Memory: `store_user_memory`, `query_memory`, `get_all_memories`, `get_recent_memories`, `list_memories`, `get_memories_by_topic`, `query_graph_memory`
-              - Knowledge: `query_knowledge_base`, `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`
+            - `ShellTools`: For system operations and command execution.
+            - **Knowledge Tools**:
+              - `KnowledgeTools`: `query_knowledge_base` for searching stored knowledge
+              - `KnowledgeIngestionTools`: `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`, `batch_ingest_directory`
+              - `SemanticKnowledgeIngestionTools`: Advanced semantic knowledge ingestion
+            - **Memory Tools**:
+              - `AgnoMemoryTools`: `store_user_memory`, `query_memory`, `get_all_memories`, `get_recent_memories`, `list_memories`, `get_memories_by_topic`, `query_graph_memory`
         """
 
     def get_detailed_tool_rules(self) -> str:
@@ -461,8 +463,11 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             "- **PythonTools**: Calculations, data analysis, code execution.",
             "- **ShellTools**: System operations and command execution.",
             "- **PersonalAgentFilesystemTools**: File reading, writing, and management.",
-            "- **KnowledgeTools**: Knowledge base operations including:",
-            "  - `query_knowledge_base`, `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`, `batch_ingest_directory`",
+            "- **KnowledgeTools**: Knowledge base querying operations including:",
+            "  - `query_knowledge_base` - Search stored knowledge with various modes (local, global, hybrid)",
+            "- **KnowledgeIngestionTools**: Basic knowledge ingestion operations including:",
+            "  - `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`, `batch_ingest_directory`",
+            "- **SemanticKnowledgeIngestionTools**: Advanced semantic knowledge ingestion operations",
             "- **AgnoMemoryTools**: Memory operations including:",
             "  - `store_user_memory`, `query_memory`, `get_all_memories`, `get_recent_memories`, `list_memories`, `get_memories_by_topic`, `query_graph_memory`, `update_memory`, `store_graph_memory`",
         ]
