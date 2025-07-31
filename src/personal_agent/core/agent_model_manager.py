@@ -193,6 +193,17 @@ class AgentModelManager:
                         }
                     )
 
+                if "llama3.1" in self.model_name.lower():
+                    logger.info(
+                        "Using optimized configuration for Llama 3.1 model: %s",
+                        self.model_name,
+                    )
+                    model_options.update(
+                        {
+                            "stop": ["<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>"],
+                        }
+                    )
+
                 # Add reasoning support for compatible models
                 reasoning_models = [
                     "o1",
