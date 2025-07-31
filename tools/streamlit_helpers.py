@@ -1,7 +1,55 @@
+"""
+Streamlit Helper Classes for Agent Memory and Knowledge Management
+
+This module provides helper classes that bridge agent-based memory and knowledge systems
+with Streamlit user interfaces. It enables seamless integration of complex agent operations
+within Streamlit applications by handling async operations, error management, and UI feedback.
+
+Classes:
+    StreamlitMemoryHelper: Manages memory operations including search, storage, updates,
+                          deletion, and synchronization with graph-based memory systems.
+    StreamlitKnowledgeHelper: Manages knowledge operations including document search
+                             and RAG (Retrieval-Augmented Generation) queries.
+
+Key Features:
+    - Dynamic property access to agent components with lazy initialization
+    - Async operation handling within Streamlit's synchronous context
+    - Comprehensive error handling with user-friendly Streamlit error messages
+    - Memory-graph synchronization capabilities
+    - Support for both semantic memory and knowledge base operations
+
+Usage:
+    # Memory operations
+    memory_helper = StreamlitMemoryHelper(agent)
+    memories = memory_helper.search_memories("query", limit=10)
+    success, msg, id, topics = memory_helper.add_memory("content", ["topic1"])
+
+    # Knowledge operations
+    knowledge_helper = StreamlitKnowledgeHelper(agent)
+    results = knowledge_helper.search_knowledge("query", limit=5)
+    rag_result = knowledge_helper.search_rag("query", params={})
+
+Dependencies:
+    - asyncio: For handling async agent operations
+    - streamlit: For UI integration and error display
+    - Agent system with memory and knowledge management capabilities
+
+Note:
+    These helpers are designed to work with agents that have agno_memory and
+    agno_knowledge components, providing a consistent interface for Streamlit
+    applications to interact with complex agent architectures.
+
+Author:
+    Eric G. Suchanek, PhD.
+    Last Revision: 2025-07-30 19:31:54
+"""
+
 import asyncio
-import streamlit as st
-from datetime import datetime
 import time
+from datetime import datetime
+
+import streamlit as st
+
 
 class StreamlitMemoryHelper:
     def __init__(self, agent):
@@ -14,15 +62,15 @@ class StreamlitMemoryHelper:
         """Get memory manager and db, ensuring agent is initialized first."""
         if not self.agent:
             return None, None
-            
+
         # Force agent initialization if needed
         try:
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 asyncio.run(self.agent._ensure_initialized())
         except Exception as e:
             print(f"Failed to initialize agent: {e}")
             return None, None
-            
+
         # Now check for memory components
         if hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
             return self.agent.agno_memory.memory_manager, self.agent.agno_memory.db
@@ -40,7 +88,9 @@ class StreamlitMemoryHelper:
         _, db = self._get_memory_manager_and_db()
         return db
 
-    def search_memories(self, query: str, limit: int = 10, similarity_threshold: float = 0.3):
+    def search_memories(
+        self, query: str, limit: int = 10, similarity_threshold: float = 0.3
+    ):
         mm = self.memory_manager  # This will trigger initialization
         db = self.db
         if not mm or not db:
@@ -82,7 +132,12 @@ class StreamlitMemoryHelper:
     def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
         """Adds a memory by calling the agent's public store_user_memory method."""
         if not self.agent or not hasattr(self.agent, "store_user_memory"):
-            return False, "Memory storage function not available on the agent.", None, None
+            return (
+                False,
+                "Memory storage function not available on the agent.",
+                None,
+                None,
+            )
 
         try:
             # Call the async method from the agent
@@ -115,7 +170,9 @@ class StreamlitMemoryHelper:
         if not self.memory_manager or not self.db:
             return False, "Memory system not available"
         try:
-            return self.memory_manager.clear_memories(db=self.db, user_id=self.agent.user_id)
+            return self.memory_manager.clear_memories(
+                db=self.db, user_id=self.agent.user_id
+            )
         except Exception as e:
             return False, f"Error clearing memories: {e}"
 
@@ -131,11 +188,19 @@ class StreamlitMemoryHelper:
         if not self.memory_manager or not self.db:
             return False, "Memory system not available"
         try:
-            return self.memory_manager.delete_memory(memory_id, self.db, self.agent.user_id)
+            return self.memory_manager.delete_memory(
+                memory_id, self.db, self.agent.user_id
+            )
         except Exception as e:
             return False, f"Error deleting memory: {e}"
 
-    def update_memory(self, memory_id: str, memory_text: str, topics: list = None, input_text: str = None):
+    def update_memory(
+        self,
+        memory_id: str,
+        memory_text: str,
+        topics: list = None,
+        input_text: str = None,
+    ):
         if not self.memory_manager or not self.db:
             return False, "Memory system not available"
         try:
@@ -154,7 +219,7 @@ class StreamlitMemoryHelper:
         """Sync a memory to the LightRAG graph system to maintain consistency"""
         if not self.agent or not hasattr(self.agent, "store_user_memory"):
             return False, "Graph memory sync not available"
-        
+
         try:
             # Find the store_graph_memory tool from the agent
             store_graph_memory_func = None
@@ -163,13 +228,13 @@ class StreamlitMemoryHelper:
                     if getattr(tool, "__name__", "") == "store_graph_memory":
                         store_graph_memory_func = tool
                         break
-            
+
             if store_graph_memory_func:
                 result = asyncio.run(store_graph_memory_func(memory_text, topics))
                 return True, result
             else:
                 return False, "Graph memory tool not found"
-                
+
         except Exception as e:
             return False, f"Error syncing to graph: {e}"
 
@@ -179,27 +244,28 @@ class StreamlitMemoryHelper:
             # Get local memory count
             local_memories = self.get_all_memories()
             local_count = len(local_memories)
-            
+
             # For sync status, we'll use a simpler approach that doesn't require async calls
             # Since the main issue (memory count mismatch) is now fixed, we can provide
             # a basic sync status based on local memory count
             graph_count = local_count  # Assume synced for now
-            
+
             return {
                 "local_memory_count": local_count,
                 "graph_entity_count": graph_count,
                 "sync_ratio": 1.0 if local_count > 0 else 0,
-                "status": "synced"
+                "status": "synced",
             }
-            
+
         except Exception as e:
             return {
                 "error": f"Error checking sync status: {e}",
                 "local_memory_count": 0,
                 "graph_entity_count": 0,
                 "sync_ratio": 0,
-                "status": "error"
+                "status": "error",
             }
+
 
 class StreamlitKnowledgeHelper:
     def __init__(self, agent):
@@ -211,15 +277,15 @@ class StreamlitKnowledgeHelper:
         """Get knowledge manager, ensuring agent is initialized first."""
         if not self.agent:
             return None
-            
+
         # Force agent initialization if needed
         try:
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 asyncio.run(self.agent._ensure_initialized())
         except Exception as e:
             print(f"Failed to initialize agent: {e}")
             return None
-            
+
         # Now check for knowledge manager
         if hasattr(self.agent, "agno_knowledge") and self.agent.agno_knowledge:
             return self.agent.agno_knowledge
@@ -243,25 +309,30 @@ class StreamlitKnowledgeHelper:
     def search_rag(self, query: str, params: dict):
         # Check if agent exists and has the query method
         if not self.agent or not hasattr(self.agent, "query_lightrag_knowledge_direct"):
-            st.error("LightRAG knowledge base not available - agent missing query method")
+            st.error(
+                "LightRAG knowledge base not available - agent missing query method"
+            )
             return None
-        
+
         # Force agent initialization if needed
         try:
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 asyncio.run(self.agent._ensure_initialized())
         except Exception as e:
             st.error(f"Failed to initialize agent: {e}")
             return None
-        
+
         # LightRAG is available if the agent has the query method - no need for additional checks
         # The agent initialization ensures all components are properly set up
-            
+
         try:
-            result = asyncio.run(self.agent.query_lightrag_knowledge_direct(query, params=params))
+            result = asyncio.run(
+                self.agent.query_lightrag_knowledge_direct(query, params=params)
+            )
             return result
         except Exception as e:
             st.error(f"Error querying LightRAG knowledge base: {e}")
             import traceback
+
             st.error(f"Full traceback: {traceback.format_exc()}")
             return None

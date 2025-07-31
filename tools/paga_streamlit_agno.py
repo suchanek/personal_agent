@@ -1,3 +1,98 @@
+"""
+Personal Agent Streamlit Web UI (PAGA)
+=====================================
+
+This module provides the main web-based user interface for the Personal Agent system,
+built using Streamlit. It serves as a comprehensive dashboard for interacting with
+an AI personal assistant that features memory, knowledge management, and advanced
+conversational capabilities.
+
+Key Features
+-----------
+🤖 **Conversational AI Interface**
+    - Real-time chat with AgnoPersonalAgent
+    - Streaming responses with tool call visualization
+    - Support for multiple LLM models via Ollama
+    - Advanced debugging and performance metrics
+
+🧠 **Memory Management System**
+    - Store, search, and manage personal facts and memories
+    - Semantic similarity search with configurable thresholds
+    - Topic-based categorization and organization
+    - Synchronization between local SQLite and graph-based storage
+    - Comprehensive memory statistics and analytics
+
+📚 **Knowledge Base Management**
+    - Multi-format file upload support (PDF, DOCX, TXT, MD, HTML, etc.)
+    - Direct text content ingestion with format selection
+    - Web content extraction from URLs
+    - Dual search capabilities: SQLite/LanceDB and RAG-based
+    - Advanced RAG query modes (naive, hybrid, local, global, mix, bypass)
+
+⚙️ **System Configuration**
+    - Dynamic model selection and switching
+    - Ollama server configuration (local/remote)
+    - RAG server location management (localhost/tesla.local)
+    - Theme switching (light/dark mode)
+    - Debug mode with detailed performance analytics
+
+🔧 **Advanced Features**
+    - Real-time tool call monitoring and visualization
+    - Performance metrics tracking (response times, token usage)
+    - Memory-knowledge synchronization status monitoring
+    - Comprehensive error handling and logging
+    - Session state management for persistent user experience
+
+Architecture
+-----------
+The application is built around three main components:
+
+1. **AgnoPersonalAgent**: Core AI agent with memory and knowledge capabilities
+2. **Streamlit Interface**: Multi-tab web UI with chat, memory, and knowledge sections
+3. **Helper Classes**: StreamlitMemoryHelper and StreamlitKnowledgeHelper for data operations
+
+Technical Stack
+--------------
+- **Frontend**: Streamlit with custom CSS theming
+- **AI Agent**: AgnoPersonalAgent with tool calling capabilities
+- **Memory Storage**: SQLite with semantic search via embeddings
+- **Knowledge Storage**: SQLite/LanceDB + RAG server integration
+- **LLM Integration**: Ollama with support for multiple models
+- **Visualization**: Altair charts for performance metrics
+
+Usage
+-----
+Run the application with:
+    ```bash
+    streamlit run tools/paga_streamlit_agno.py [--remote] [--recreate]
+    ```
+
+Command Line Arguments:
+    --remote: Use remote Ollama URL instead of local
+    --recreate: Recreate knowledge base and clear all memories
+
+Environment Variables:
+    - AGNO_STORAGE_DIR: Directory for agent storage
+    - AGNO_KNOWLEDGE_DIR: Directory for knowledge files
+    - LLM_MODEL: Default language model to use
+    - OLLAMA_URL: Local Ollama server URL
+    - REMOTE_OLLAMA_URL: Remote Ollama server URL
+    - USER_ID: Current user identifier
+
+Session Management
+-----------------
+The application maintains persistent session state across interactions:
+- Chat message history
+- Agent configuration and initialization
+- Performance metrics and debug information
+- User preferences (theme, model selection)
+- Memory and knowledge helper instances
+
+Author: Personal Agent Development Team
+Version: v0.11.35
+Last Revision:2025-07-30 19:58:34
+"""
+
 import argparse
 import asyncio
 import json
@@ -17,11 +112,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
+    LIGHTRAG_URL,
     LLM_MODEL,
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
     USER_ID,
-    LIGHTRAG_URL,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent, create_agno_agent
 from tools.streamlit_helpers import StreamlitKnowledgeHelper, StreamlitMemoryHelper
@@ -58,8 +153,11 @@ def parse_args():
     parser.add_argument(
         "--remote", action="store_true", help="Use remote Ollama URL instead of local"
     )
+    parser.add_argument("--debug", action="store_true", help="Set debug mode")
     parser.add_argument(
-        "--recreate", action="store_true", help="Recreate the knowledge base and clear all memories"
+        "--recreate",
+        action="store_true",
+        help="Recreate the knowledge base and clear all memories",
     )
     return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
 
@@ -68,6 +166,7 @@ def parse_args():
 args, unknown = parse_args()
 EFFECTIVE_OLLAMA_URL = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
 RECREATE_FLAG = args.recreate
+DEBUG_FLAG = args.debug
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
@@ -92,27 +191,20 @@ async def initialize_agent_async(
     model_name, ollama_url, existing_agent=None, recreate=False
 ):
     """Initialize AgnoPersonalAgent with proper async handling."""
-    if existing_agent and isinstance(existing_agent, AgnoPersonalAgent):
-        # Update existing agent's configuration
-        existing_agent.model_name = model_name
-        existing_agent.ollama_base_url = ollama_url
-        # Reinitialize with new settings
-        await existing_agent.initialize()
-        return existing_agent
-    else:
-        # Create new AgnoPersonalAgent using the factory
-        return await create_agno_agent(
-            model_provider="ollama",
-            model_name=model_name,
-            ollama_base_url=ollama_url,
-            user_id=USER_ID,
-            debug=True,
-            enable_memory=True,
-            enable_mcp=True,
-            storage_dir=AGNO_STORAGE_DIR,
-            knowledge_dir=AGNO_KNOWLEDGE_DIR,
-            recreate=recreate,
-        )
+    # Always create a new agent when URL or model changes to ensure proper configuration
+    # This is more reliable than trying to update existing agent configuration
+    return await create_agno_agent(
+        model_provider="ollama",
+        model_name=model_name,
+        ollama_base_url=ollama_url,
+        user_id=USER_ID,
+        debug=True,
+        enable_memory=True,
+        enable_mcp=True,
+        storage_dir=AGNO_STORAGE_DIR,
+        knowledge_dir=AGNO_KNOWLEDGE_DIR,
+        recreate=recreate,
+    )
 
 
 def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False):
@@ -183,18 +275,22 @@ def initialize_session_state():
     if SESSION_KEY_RAG_SERVER_LOCATION not in st.session_state:
         st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = "localhost"
 
+    # Initialize debug mode based on command line flag
+    if SESSION_KEY_SHOW_DEBUG not in st.session_state:
+        st.session_state[SESSION_KEY_SHOW_DEBUG] = DEBUG_FLAG
+
 
 def display_tool_calls(container, tools):
     """Display tool calls in real-time during streaming."""
     if not tools:
         return
-    
+
     with container.container():
         st.markdown("**🔧 Tool Calls:**")
         for i, tool in enumerate(tools, 1):
-            tool_name = getattr(tool, 'name', 'Unknown Tool')
-            tool_args = getattr(tool, 'arguments', {})
-            
+            tool_name = getattr(tool, "name", "Unknown Tool")
+            tool_args = getattr(tool, "arguments", {})
+
             with st.expander(f"Tool {i}: {tool_name}", expanded=False):
                 if tool_args:
                     st.json(tool_args)
@@ -204,21 +300,21 @@ def display_tool_calls(container, tools):
 
 def format_tool_call_for_debug(tool_call):
     """Standardize tool call format for consistent storage and display."""
-    if hasattr(tool_call, 'name'):
+    if hasattr(tool_call, "name"):
         # Direct tool object
         return {
-            "name": getattr(tool_call, 'name', 'Unknown'),
-            "arguments": getattr(tool_call, 'arguments', {}),
-            "result": getattr(tool_call, 'result', None),
-            "status": "success"
+            "name": getattr(tool_call, "name", "Unknown"),
+            "arguments": getattr(tool_call, "arguments", {}),
+            "result": getattr(tool_call, "result", None),
+            "status": "success",
         }
-    elif hasattr(tool_call, 'function'):
+    elif hasattr(tool_call, "function"):
         # Tool call with function attribute
         return {
-            "name": getattr(tool_call.function, 'name', 'Unknown'),
-            "arguments": getattr(tool_call.function, 'arguments', {}),
-            "result": getattr(tool_call, 'result', None),
-            "status": "success"
+            "name": getattr(tool_call.function, "name", "Unknown"),
+            "arguments": getattr(tool_call.function, "arguments", {}),
+            "result": getattr(tool_call, "result", None),
+            "status": "success",
         }
     else:
         # Fallback for unknown format
@@ -226,7 +322,7 @@ def format_tool_call_for_debug(tool_call):
             "name": str(type(tool_call).__name__),
             "arguments": {},
             "result": str(tool_call),
-            "status": "unknown"
+            "status": "unknown",
         }
 
 
@@ -248,7 +344,7 @@ def render_chat_tab():
             # Create containers for tool calls and response
             tool_calls_container = st.empty()
             resp_container = st.empty()
-            
+
             with st.spinner("🤔 Thinking..."):
                 start_time = time.time()
                 start_timestamp = datetime.now()
@@ -259,39 +355,50 @@ def render_chat_tab():
 
                 try:
                     agent = st.session_state[SESSION_KEY_AGENT]
-                    
+
                     # Handle AgnoPersonalAgent with simplified response handling
                     if isinstance(agent, AgnoPersonalAgent):
+
                         async def run_agent_with_streaming():
                             nonlocal response, tool_calls_made, tool_call_details, all_tools_used
-                            
+
                             try:
                                 # Use the simplified agent.run() method
-                                response_content = await agent.run(prompt, add_thought_callback=None)
-                                
+                                response_content = await agent.run(
+                                    prompt, add_thought_callback=None
+                                )
+
                                 # Get tool calls using the new method that collects from streaming events
                                 tools_used = agent.get_last_tool_calls()
-                                
+
                                 # Process and display tool calls
                                 if tools_used:
-                                    print(f"DEBUG: Processing {len(tools_used)} tool calls from streaming events")
+                                    print(
+                                        f"DEBUG: Processing {len(tools_used)} tool calls from streaming events"
+                                    )
                                     for i, tool_call in enumerate(tools_used):
                                         print(f"DEBUG: Tool call {i}: {tool_call}")
-                                        formatted_tool = format_tool_call_for_debug(tool_call)
+                                        formatted_tool = format_tool_call_for_debug(
+                                            tool_call
+                                        )
                                         tool_call_details.append(formatted_tool)
                                         all_tools_used.append(tool_call)
                                         tool_calls_made += 1
-                                    
+
                                     # Display tool calls
-                                    display_tool_calls(tool_calls_container, all_tools_used)
+                                    display_tool_calls(
+                                        tool_calls_container, all_tools_used
+                                    )
                                 else:
-                                    print("DEBUG: No tool calls collected from streaming events")
-                                
+                                    print(
+                                        "DEBUG: No tool calls collected from streaming events"
+                                    )
+
                                 return response_content
-                                    
+
                             except Exception as e:
                                 raise Exception(f"Error in agent execution: {e}") from e
-                        
+
                         response_content = asyncio.run(run_agent_with_streaming())
                         response = response_content if response_content else ""
                     else:
@@ -311,9 +418,7 @@ def render_chat_tab():
 
                     # Calculate token estimates
                     input_tokens = len(prompt.split()) * 1.3
-                    output_tokens = (
-                        len(response.split()) * 1.3 if response else 0
-                    )
+                    output_tokens = len(response.split()) * 1.3 if response else 0
                     total_tokens = input_tokens + output_tokens
 
                     response_metadata = {}
@@ -612,7 +717,9 @@ def render_memory_tab():
     # Memory Sync Status Section
     st.markdown("---")
     st.subheader("🔄 Memory Sync Status")
-    st.markdown("*Monitor synchronization between local SQLite and LightRAG graph memories*")
+    st.markdown(
+        "*Monitor synchronization between local SQLite and LightRAG graph memories*"
+    )
     if st.button("🔍 Check Sync Status", key="check_sync_btn"):
         sync_status = memory_helper.get_memory_sync_status()
         if "error" not in sync_status:
@@ -624,10 +731,12 @@ def render_memory_tab():
             with col3:
                 sync_ratio = sync_status.get("sync_ratio", 0)
                 st.metric("Sync Ratio", f"{sync_ratio:.2f}")
-            
+
             status = sync_status.get("status", "unknown")
             if status == "synced":
-                st.success("✅ Memories are synchronized between local and graph systems")
+                st.success(
+                    "✅ Memories are synchronized between local and graph systems"
+                )
             elif status == "out_of_sync":
                 st.warning("⚠️ Memories may be out of sync between systems")
                 if st.button("🔄 Sync Missing Memories", key="sync_missing_btn"):
@@ -637,13 +746,13 @@ def render_memory_tab():
                     for memory in local_memories:
                         try:
                             success, result = memory_helper.sync_memory_to_graph(
-                                memory.memory, getattr(memory, 'topics', None)
+                                memory.memory, getattr(memory, "topics", None)
                             )
                             if success:
                                 synced_count += 1
                         except Exception as e:
                             st.error(f"Error syncing memory: {e}")
-                    
+
                     if synced_count > 0:
                         st.success(f"✅ Synced {synced_count} memories to graph system")
                     else:
@@ -651,7 +760,9 @@ def render_memory_tab():
             else:
                 st.error(f"❌ Sync status unknown: {status}")
         else:
-            st.error(f"Error checking sync status: {sync_status.get('error', 'Unknown error')}")
+            st.error(
+                f"Error checking sync status: {sync_status.get('error', 'Unknown error')}"
+            )
 
     # Memory Settings Section
     st.markdown("---")
@@ -692,35 +803,35 @@ def render_knowledge_status(knowledge_helper):
             try:
                 # Trigger lazy initialization by accessing agent properties
                 agent = st.session_state[SESSION_KEY_AGENT]
-                
+
                 # Show initialization status
-                if not getattr(agent, '_initialized', False):
+                if not getattr(agent, "_initialized", False):
                     with st.spinner("Initializing knowledge system..."):
-                        if hasattr(agent, '_ensure_initialized'):
+                        if hasattr(agent, "_ensure_initialized"):
                             # This will trigger initialization if not already done
                             asyncio.run(agent._ensure_initialized())
                 else:
                     # Agent already initialized, just ensure knowledge helper is updated
-                    if hasattr(agent, '_ensure_initialized'):
+                    if hasattr(agent, "_ensure_initialized"):
                         asyncio.run(agent._ensure_initialized())
-                
+
                 # Now check the real status after ensuring initialization
                 km = knowledge_helper.knowledge_manager  # This will trigger fresh check
                 if km:
                     st.success("✅ Ready")
                     # Show additional info if available
-                    if hasattr(km, 'vector_db') and km.vector_db:
+                    if hasattr(km, "vector_db") and km.vector_db:
                         st.caption("Vector DB: Connected")
-                    elif hasattr(km, 'search'):
+                    elif hasattr(km, "search"):
                         st.caption("Knowledge base loaded")
                 else:
                     st.warning("⚠️ Offline")
                     st.caption("Knowledge manager not available")
-                    
+
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
                 st.caption("Failed to initialize knowledge system")
-                
+
         with col2:
             st.markdown("**RAG**")
 
@@ -728,65 +839,89 @@ def render_knowledge_status(knowledge_helper):
             rag_location = st.selectbox(
                 "RAG Server:",
                 ["localhost", "tesla.local"],
-                index=0 if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost" else 1,
-                key="rag_server_dropdown"
+                index=(
+                    0
+                    if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost"
+                    else 1
+                ),
+                key="rag_server_dropdown",
             )
 
             # Check if location changed and show apply button
-            location_changed = rag_location != st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]
-            
+            location_changed = (
+                rag_location != st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]
+            )
+
             if location_changed:
-                if st.button("🔄 Apply & Rescan", key="apply_rag_server", type="primary"):
+                if st.button(
+                    "🔄 Apply & Rescan", key="apply_rag_server", type="primary"
+                ):
                     # Update session state
                     st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = rag_location
-                    
+
                     # Determine the new RAG URL
                     if rag_location == "localhost":
                         new_rag_url = "http://localhost:9621"
                     else:  # tesla.local
                         new_rag_url = "http://tesla.local:9621"
-                    
+
                     # Trigger rescan on the new server
-                    with st.spinner(f"Switching to {rag_location} and triggering rescan..."):
+                    with st.spinner(
+                        f"Switching to {rag_location} and triggering rescan..."
+                    ):
                         try:
-                            rescan_response = requests.post(f"{new_rag_url}/documents/scan", timeout=10)
+                            rescan_response = requests.post(
+                                f"{new_rag_url}/documents/scan", timeout=10
+                            )
                             if rescan_response.status_code == 200:
-                                st.success(f"✅ Switched to {rag_location} and rescan initiated!")
+                                st.success(
+                                    f"✅ Switched to {rag_location} and rescan initiated!"
+                                )
                             else:
-                                st.warning(f"⚠️ Switched to {rag_location} but rescan failed (status: {rescan_response.status_code})")
+                                st.warning(
+                                    f"⚠️ Switched to {rag_location} but rescan failed (status: {rescan_response.status_code})"
+                                )
                         except requests.exceptions.RequestException as e:
-                            st.error(f"❌ Failed to connect to {rag_location}: {str(e)}")
-                    
+                            st.error(
+                                f"❌ Failed to connect to {rag_location}: {str(e)}"
+                            )
+
                     # Force a rerun to update the status display
                     st.rerun()
-            
+
             # Determine the RAG URL based on current session state
             if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost":
                 rag_url = "http://localhost:9621"
             else:  # tesla.local
                 rag_url = "http://tesla.local:9621"
-            
+
             # Check RAG server status with improved reliability and error handling
             try:
                 # Increase timeout and add better error handling
-                health_response = requests.get(f"{rag_url}/health", timeout=10)  # Increased from 3 to 10
+                health_response = requests.get(
+                    f"{rag_url}/health", timeout=10
+                )  # Increased from 3 to 10
                 if health_response.status_code == 200:
                     # Get pipeline status for more detailed information
                     try:
-                        pipeline_response = requests.get(f"{rag_url}/documents/pipeline_status", timeout=10)
+                        pipeline_response = requests.get(
+                            f"{rag_url}/documents/pipeline_status", timeout=10
+                        )
                         if pipeline_response.status_code == 200:
                             pipeline_data = pipeline_response.json()
-                            
+
                             # Check if pipeline is processing
                             if pipeline_data.get("is_processing", False):
                                 st.warning("🔄 Processing")
                                 if pipeline_data.get("current_task"):
                                     st.caption(f"Task: {pipeline_data['current_task']}")
                             elif pipeline_data.get("queue_size", 0) > 0:
-                                st.info(f"📋 Queued ({pipeline_data['queue_size']} items)")
+                                st.info(
+                                    f"📋 Queued ({pipeline_data['queue_size']} items)"
+                                )
                             else:
                                 st.success("✅ Ready")
-                                
+
                             # Show additional pipeline info if available
                             if pipeline_data.get("last_processed"):
                                 st.caption(f"Last: {pipeline_data['last_processed']}")
@@ -800,33 +935,47 @@ def render_knowledge_status(knowledge_helper):
                         st.caption("(Basic health check passed)")
                 else:
                     st.error(f"❌ Error ({health_response.status_code})")
-                    st.caption(f"Server responded with error: {health_response.status_code}")
+                    st.caption(
+                        f"Server responded with error: {health_response.status_code}"
+                    )
             except requests.exceptions.ConnectTimeout:
                 st.warning("⚠️ Timeout")
-                st.caption(f"Connection timeout to {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+                st.caption(
+                    f"Connection timeout to {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
+                )
             except requests.exceptions.ConnectionError:
                 st.warning("⚠️ Offline")
-                st.caption(f"Cannot connect to {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+                st.caption(
+                    f"Cannot connect to {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
+                )
             except requests.exceptions.RequestException as e:
                 st.warning("⚠️ Error")
                 st.caption(f"Request failed: {str(e)}")
-            
+
             # Show current server info
             if not location_changed:
-                st.caption(f"Current: {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
+                st.caption(
+                    f"Current: {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
+                )
 
         # Add debug information in an expander if debug mode is enabled
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
             with st.expander("🔍 Debug Status Info"):
                 agent = st.session_state[SESSION_KEY_AGENT]
-                st.write(f"**Agent Initialized:** {getattr(agent, '_initialized', False)}")
+                st.write(
+                    f"**Agent Initialized:** {getattr(agent, '_initialized', False)}"
+                )
                 st.write(f"**Agent Type:** {type(agent).__name__}")
-                st.write(f"**Knowledge Manager:** {knowledge_helper.knowledge_manager is not None}")
+                st.write(
+                    f"**Knowledge Manager:** {knowledge_helper.knowledge_manager is not None}"
+                )
                 st.write(f"**RAG URL:** {rag_url}")
-                st.write(f"**RAG Location:** {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}")
-                if hasattr(agent, 'agno_knowledge'):
+                st.write(
+                    f"**RAG Location:** {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
+                )
+                if hasattr(agent, "agno_knowledge"):
                     st.write(f"**Agent Knowledge:** {agent.agno_knowledge is not None}")
-                if hasattr(agent, 'agno_memory'):
+                if hasattr(agent, "agno_memory"):
                     st.write(f"**Agent Memory:** {agent.agno_memory is not None}")
 
 
@@ -839,79 +988,88 @@ def render_knowledge_tab():
     st.markdown("---")
     st.subheader("📁 Add Knowledge Files")
     st.markdown("*Upload files directly to your knowledge base*")
-    
+
     # File uploader
     uploaded_files = st.file_uploader(
         "Choose files to add to your knowledge base",
         accept_multiple_files=True,
-        type=['txt', 'md', 'pdf', 'docx', 'doc', 'html', 'csv', 'json'],
-        key="knowledge_file_uploader"
+        type=["txt", "md", "pdf", "docx", "doc", "html", "csv", "json"],
+        key="knowledge_file_uploader",
     )
-    
+
     if uploaded_files:
         st.write(f"Selected {len(uploaded_files)} file(s):")
         for file in uploaded_files:
             st.write(f"- {file.name} ({file.size} bytes)")
-        
-        if st.button("🚀 Upload and Process Files", key="upload_files_btn", type="primary"):
+
+        if st.button(
+            "🚀 Upload and Process Files", key="upload_files_btn", type="primary"
+        ):
             progress_bar = st.progress(0)
             status_text = st.empty()
             results = []
-            
+
             for i, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Processing {uploaded_file.name}...")
-                
+
                 try:
                     # Save uploaded file temporarily
-                    import tempfile
                     import os
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{uploaded_file.name}") as tmp_file:
+                    import tempfile
+
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=f"_{uploaded_file.name}"
+                    ) as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_file_path = tmp_file.name
-                    
+
                     try:
                         # Use the knowledge ingestion tools from the agent
                         agent = st.session_state[SESSION_KEY_AGENT]
-                        if hasattr(agent, 'agent') and hasattr(agent.agent, 'tools'):
+                        if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
                             # Find the knowledge ingestion tools
                             knowledge_tools = None
                             for tool in agent.agent.tools:
-                                if hasattr(tool, '__class__') and 'KnowledgeIngestionTools' in str(tool.__class__):
+                                if hasattr(
+                                    tool, "__class__"
+                                ) and "KnowledgeIngestionTools" in str(tool.__class__):
                                     knowledge_tools = tool
                                     break
-                            
+
                             if knowledge_tools:
                                 # Use the ingest_knowledge_file method
                                 result = knowledge_tools.ingest_knowledge_file(
-                                    file_path=tmp_file_path,
-                                    title=uploaded_file.name
+                                    file_path=tmp_file_path, title=uploaded_file.name
                                 )
                                 results.append(f"**{uploaded_file.name}**: {result}")
                             else:
-                                results.append(f"**{uploaded_file.name}**: ❌ Knowledge ingestion tools not available")
+                                results.append(
+                                    f"**{uploaded_file.name}**: ❌ Knowledge ingestion tools not available"
+                                )
                         else:
-                            results.append(f"**{uploaded_file.name}**: ❌ Agent tools not accessible")
-                    
+                            results.append(
+                                f"**{uploaded_file.name}**: ❌ Agent tools not accessible"
+                            )
+
                     finally:
                         # Clean up temporary file
                         try:
                             os.unlink(tmp_file_path)
                         except OSError:
                             pass
-                
+
                 except Exception as e:
                     results.append(f"**{uploaded_file.name}**: ❌ Error: {str(e)}")
-                
+
                 # Update progress
                 progress_bar.progress((i + 1) / len(uploaded_files))
-            
+
             # Show results
             status_text.text("Upload complete!")
             st.markdown("### Upload Results:")
             for result in results:
                 st.markdown(result)
-            
+
             # Clear the file uploader
             st.rerun()
 
@@ -919,42 +1077,48 @@ def render_knowledge_tab():
     st.markdown("---")
     st.subheader("📝 Add Text Knowledge")
     st.markdown("*Add text content directly to your knowledge base*")
-    
+
     col1, col2 = st.columns([3, 1])
     with col1:
-        knowledge_title = st.text_input("Title for your knowledge entry:", key="knowledge_title")
+        knowledge_title = st.text_input(
+            "Title for your knowledge entry:", key="knowledge_title"
+        )
     with col2:
-        file_type = st.selectbox("Format:", ["txt", "md", "html", "json"], key="knowledge_format")
-    
+        file_type = st.selectbox(
+            "Format:", ["txt", "md", "html", "json"], key="knowledge_format"
+        )
+
     knowledge_content = st.text_area(
         "Enter your knowledge content:",
         height=200,
         key="knowledge_content",
-        placeholder="Enter the text content you want to add to your knowledge base..."
+        placeholder="Enter the text content you want to add to your knowledge base...",
     )
-    
+
     if st.button("💾 Save Text Knowledge", key="save_text_knowledge", type="primary"):
         if knowledge_title and knowledge_content:
             try:
                 # Use the knowledge ingestion tools from the agent
                 agent = st.session_state[SESSION_KEY_AGENT]
-                if hasattr(agent, 'agent') and hasattr(agent.agent, 'tools'):
+                if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
                     # Find the knowledge ingestion tools
                     knowledge_tools = None
                     for tool in agent.agent.tools:
-                        if hasattr(tool, '__class__') and 'KnowledgeIngestionTools' in str(tool.__class__):
+                        if hasattr(
+                            tool, "__class__"
+                        ) and "KnowledgeIngestionTools" in str(tool.__class__):
                             knowledge_tools = tool
                             break
-                    
+
                     if knowledge_tools:
                         # Use the ingest_knowledge_text method
                         result = knowledge_tools.ingest_knowledge_text(
                             content=knowledge_content,
                             title=knowledge_title,
-                            file_type=file_type
+                            file_type=file_type,
                         )
                         st.success(result)
-                        
+
                         # Clear the form
                         st.session_state.knowledge_title = ""
                         st.session_state.knowledge_content = ""
@@ -972,35 +1136,41 @@ def render_knowledge_tab():
     st.markdown("---")
     st.subheader("🌐 Add Knowledge from URL")
     st.markdown("*Extract and add content from web pages*")
-    
+
     col1, col2 = st.columns([3, 1])
     with col1:
-        knowledge_url = st.text_input("URL to extract content from:", key="knowledge_url")
+        knowledge_url = st.text_input(
+            "URL to extract content from:", key="knowledge_url"
+        )
     with col2:
         url_title = st.text_input("Title (optional):", key="url_title")
-    
-    if st.button("🌐 Extract and Save from URL", key="save_url_knowledge", type="primary"):
+
+    if st.button(
+        "🌐 Extract and Save from URL", key="save_url_knowledge", type="primary"
+    ):
         if knowledge_url:
             try:
                 with st.spinner("Extracting content from URL..."):
                     # Use the knowledge ingestion tools from the agent
                     agent = st.session_state[SESSION_KEY_AGENT]
-                    if hasattr(agent, 'agent') and hasattr(agent.agent, 'tools'):
+                    if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
                         # Find the knowledge ingestion tools
                         knowledge_tools = None
                         for tool in agent.agent.tools:
-                            if hasattr(tool, '__class__') and 'KnowledgeIngestionTools' in str(tool.__class__):
+                            if hasattr(
+                                tool, "__class__"
+                            ) and "KnowledgeIngestionTools" in str(tool.__class__):
                                 knowledge_tools = tool
                                 break
-                        
+
                         if knowledge_tools:
                             # Use the ingest_knowledge_from_url method
                             result = knowledge_tools.ingest_knowledge_from_url(
                                 url=knowledge_url,
-                                title=url_title if url_title else None
+                                title=url_title if url_title else None,
                             )
                             st.success(result)
-                            
+
                             # Clear the form
                             st.session_state.knowledge_url = ""
                             st.session_state.url_title = ""
@@ -1063,44 +1233,50 @@ def render_knowledge_tab():
     # RAG Knowledge Search Section
     st.markdown("---")
     st.subheader("🤖 RAG Knowledge Search")
-    st.markdown("*Search through knowledge using direct RAG query with advanced options*")
+    st.markdown(
+        "*Search through knowledge using direct RAG query with advanced options*"
+    )
 
     # Create a dictionary to hold the query parameters
     query_params = {}
 
     # Query mode
-    query_params['mode'] = st.selectbox(
+    query_params["mode"] = st.selectbox(
         "Select RAG Search Type:",
-        ("naive", "hybrid", "local", "global", "mix", "bypass"),
+        ("naive", "hybrid", "local", "global"),
         key="rag_search_type",
     )
 
     # Response type
-    query_params['response_type'] = st.text_input(
+    query_params["response_type"] = st.text_input(
         "Response Format:",
         "Multiple Paragraphs",
         key="rag_response_type",
-        help="Examples: 'Single Paragraph', 'Bullet Points', 'JSON'"
+        help="Examples: 'Single Paragraph', 'Bullet Points', 'JSON'",
     )
 
     # Top K
-    query_params['top_k'] = st.slider(
+    query_params["top_k"] = st.slider(
         "Top K:",
         min_value=1,
         max_value=100,
         value=10,
         key="rag_top_k",
-        help="Number of items to retrieve"
+        help="Number of items to retrieve",
     )
 
     # Other boolean flags
     col1, col2, col3 = st.columns(3)
     with col1:
-        query_params['only_need_context'] = st.checkbox("Context Only", key="rag_context_only")
+        query_params["only_need_context"] = st.checkbox(
+            "Context Only", key="rag_context_only"
+        )
     with col2:
-        query_params['only_need_prompt'] = st.checkbox("Prompt Only", key="rag_prompt_only")
+        query_params["only_need_prompt"] = st.checkbox(
+            "Prompt Only", key="rag_prompt_only"
+        )
     with col3:
-        query_params['stream'] = st.checkbox("Stream", key="rag_stream")
+        query_params["stream"] = st.checkbox("Stream", key="rag_stream")
 
     if rag_search_query := st.chat_input(
         "Enter keywords to search the RAG knowledge base"
@@ -1111,9 +1287,7 @@ def render_knowledge_tab():
         )
         # Check if we have actual content (not just empty string or None)
         if search_results is not None and str(search_results).strip():
-            st.subheader(
-                f"🤖 RAG Knowledge Search Results for: '{rag_search_query}'"
-            )
+            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query}'")
             st.markdown(search_results)
         elif search_results is not None:
             st.warning(f"Query returned empty response. Raw result: '{search_results}'")
@@ -1183,6 +1357,15 @@ def render_sidebar():
                             new_ollama_url,
                             st.session_state[SESSION_KEY_AGENT],
                         )
+                        
+                        # Update helper classes with new agent
+                        st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
+                            st.session_state[SESSION_KEY_AGENT]
+                        )
+                        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(
+                            st.session_state[SESSION_KEY_AGENT]
+                        )
+                        
                         st.session_state[SESSION_KEY_MESSAGES] = []
                         st.success(f"Agent updated to use model: {selected_model}")
                         st.rerun()
@@ -1196,6 +1379,24 @@ def render_sidebar():
         st.write(
             f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
         )
+        
+        # Show debug info about URL configuration
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
+            with st.expander("🔍 URL Debug Info", expanded=False):
+                st.write(f"**--remote flag:** {args.remote}")
+                st.write(f"**OLLAMA_URL (local):** {OLLAMA_URL}")
+                st.write(f"**REMOTE_OLLAMA_URL:** {REMOTE_OLLAMA_URL}")
+                st.write(f"**EFFECTIVE_OLLAMA_URL (startup):** {EFFECTIVE_OLLAMA_URL}")
+                st.write(f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}")
+                
+                # Show agent's actual configuration if available
+                agent = st.session_state.get(SESSION_KEY_AGENT)
+                if agent and hasattr(agent, 'ollama_base_url'):
+                    st.write(f"**Agent's Ollama URL:** {agent.ollama_base_url}")
+                elif agent and hasattr(agent, 'model_manager') and hasattr(agent.model_manager, 'ollama_base_url'):
+                    st.write(f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}")
+                else:
+                    st.write("**Agent URL:** Not accessible")
 
         st.header("Controls")
         if st.button("Clear Chat History"):
@@ -1203,9 +1404,13 @@ def render_sidebar():
             st.rerun()
 
         st.header("Debug Info")
+        debug_label = "Enable Debug Mode"
+        if DEBUG_FLAG:
+            debug_label += " (CLI enabled)"
         st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox(
-            "Enable Debug Mode",
-            value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, False),
+            debug_label,
+            value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, DEBUG_FLAG),
+            help="Debug mode can be enabled via --debug flag or this checkbox"
         )
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
             st.subheader("📊 Performance Statistics")
@@ -1232,10 +1437,7 @@ def render_sidebar():
             else:
                 st.info("No requests made yet.")
 
-            if (
-                PANDAS_AVAILABLE
-                and len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 1
-            ):
+            if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 1:
                 st.subheader("📈 Response Time Trend")
                 df = pd.DataFrame(st.session_state[SESSION_KEY_DEBUG_METRICS])
                 df = df[df["success"]]
@@ -1280,34 +1482,52 @@ def render_sidebar():
                                 st.write("**Tool Call Details:**")
                                 for i, tool_call in enumerate(tool_call_details, 1):
                                     # Use standardized format - check for 'name' field first
-                                    tool_name = tool_call.get('name', tool_call.get('function_name', 'Unknown'))
-                                    tool_status = tool_call.get('status', 'unknown')
-                                    
+                                    tool_name = tool_call.get(
+                                        "name",
+                                        tool_call.get("function_name", "Unknown"),
+                                    )
+                                    tool_status = tool_call.get("status", "unknown")
+
                                     # Status indicator
-                                    status_icon = "✅" if tool_status == "success" else "❓" if tool_status == "unknown" else "❌"
-                                    
+                                    status_icon = (
+                                        "✅"
+                                        if tool_status == "success"
+                                        else "❓" if tool_status == "unknown" else "❌"
+                                    )
+
                                     st.write(f"**Tool {i}:** {status_icon} {tool_name}")
-                                    
+
                                     # Show arguments
-                                    tool_args = tool_call.get("arguments", tool_call.get("function_args", {}))
+                                    tool_args = tool_call.get(
+                                        "arguments", tool_call.get("function_args", {})
+                                    )
                                     if tool_args:
                                         st.write("**Arguments:**")
                                         st.json(tool_args)
-                                    
+
                                     # Show result if available
-                                    tool_result = tool_call.get("result", tool_call.get("content"))
+                                    tool_result = tool_call.get(
+                                        "result", tool_call.get("content")
+                                    )
                                     if tool_result:
                                         st.write("**Result:**")
-                                        if isinstance(tool_result, str) and len(tool_result) > 200:
+                                        if (
+                                            isinstance(tool_result, str)
+                                            and len(tool_result) > 200
+                                        ):
                                             st.write(f"{tool_result[:200]}...")
                                         else:
                                             st.write(str(tool_result))
-                                    
+
                                     # Show reasoning if available (legacy field)
                                     if tool_call.get("reasoning"):
-                                        st.write(f"**Reasoning:** {tool_call['reasoning']}")
-                                    
-                                    if i < len(tool_call_details):  # Add separator between tools
+                                        st.write(
+                                            f"**Reasoning:** {tool_call['reasoning']}"
+                                        )
+
+                                    if i < len(
+                                        tool_call_details
+                                    ):  # Add separator between tools
                                         st.markdown("---")
                 else:
                     st.info("No tool calls made yet.")
