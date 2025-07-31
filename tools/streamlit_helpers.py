@@ -50,6 +50,13 @@ from datetime import datetime
 
 import streamlit as st
 
+# Import MemoryStorageResult for type checking
+try:
+    from personal_agent.core.semantic_memory_manager import MemoryStorageResult
+except ImportError:
+    # Fallback if import fails
+    MemoryStorageResult = None
+
 
 class StreamlitMemoryHelper:
     def __init__(self, agent):
@@ -140,28 +147,40 @@ class StreamlitMemoryHelper:
             )
 
         try:
-            # Call the async method from the agent
-            result_str = asyncio.run(
+            # Call the async method from the agent - this returns a MemoryStorageResult object
+            result = asyncio.run(
                 self.agent.store_user_memory(content=memory_text, topics=topics)
             )
 
-            # Parse the result string to determine success and message
-            if "❌" in result_str:
-                success = False
-                message = result_str
-                memory_id = None
-                generated_topics = []
+            # Handle MemoryStorageResult object properly (like the CLI does)
+            if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or \
+               (hasattr(result, 'is_success') and hasattr(result, 'message')):
+                # This is a MemoryStorageResult object
+                success = result.is_success
+                message = result.message
+                memory_id = getattr(result, 'memory_id', None)
+                generated_topics = getattr(result, 'topics', topics)
+                
+                return success, message, memory_id, generated_topics
             else:
-                success = True
-                message = result_str
-                # Attempt to parse memory_id from the success message
-                try:
-                    memory_id = result_str.split("(ID: ")[1].split(")")[0]
-                except IndexError:
+                # Fallback: treat as string (legacy behavior)
+                result_str = str(result)
+                if "❌" in result_str:
+                    success = False
+                    message = result_str
                     memory_id = None
-                generated_topics = topics
+                    generated_topics = []
+                else:
+                    success = True
+                    message = result_str
+                    # Attempt to parse memory_id from the success message
+                    try:
+                        memory_id = result_str.split("(ID: ")[1].split(")")[0]
+                    except IndexError:
+                        memory_id = None
+                    generated_topics = topics
 
-            return success, message, memory_id, generated_topics
+                return success, message, memory_id, generated_topics
 
         except Exception as e:
             return False, f"Error adding memory via agent: {e}", None, None
