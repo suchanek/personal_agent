@@ -125,6 +125,20 @@ def setup_logging_filters() -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)
 
+    # Suppress markdown_it debug logging (causes excessive output)
+    logging.getLogger("markdown_it").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.code").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.fence").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.blockquote").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.hr").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.list").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.reference").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.html_block").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.heading").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.lheading").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.paragraph").setLevel(logging.WARNING)
+
     # Suppress LanceDB/Lance warnings (these come from Rust library)
     logging.getLogger("rust").setLevel(logging.WARNING)
 
