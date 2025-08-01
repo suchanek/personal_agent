@@ -168,6 +168,7 @@ class AgentModelManager:
             if (
                 "llama3.1" in self.model_name.lower()
                 or "llama3.2" in self.model_name.lower()
+                or "llama3.3" in self.model_name.lower()
             ):
                 logger.info(
                     "Using optimized configuration for Llama 3.x model: %s",

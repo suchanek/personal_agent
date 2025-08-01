@@ -33,25 +33,25 @@ Features:
 
 Usage:
     The module can be run directly as a CLI application or imported for programmatic use:
-    
+
     ```bash
     # Run as CLI
     python -m personal_agent.team.ollama_reasoning_multi_purpose_team
-    
+
     # Or use the installed command
     paga_team_cli
     ```
-    
+
     Programmatic usage:
     ```python
     import asyncio
     from personal_agent.team.ollama_reasoning_multi_purpose_team import create_team
-    
+
     async def main():
         team = await create_team()
         response = await team.arun("What's the weather like today?")
         print(response)
-    
+
     asyncio.run(main())
     ```
 
@@ -114,6 +114,7 @@ from rich.panel import Panel
 # Import your personal agent components
 try:
     # Try relative imports first (when used as a module)
+    from ..cli.command_parser import CommandParser
     from ..config.settings import (
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
@@ -126,7 +127,6 @@ try:
     )
     from ..core.agent_model_manager import AgentModelManager
     from ..core.agno_agent import AgnoPersonalAgent
-    from ..cli.command_parser import CommandParser
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import os
@@ -134,6 +134,7 @@ except ImportError:
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
+    from personal_agent.cli.command_parser import CommandParser
     from personal_agent.config.settings import (
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
@@ -143,7 +144,6 @@ except ImportError:
         USER_ID,
     )
     from personal_agent.core.agent_model_manager import AgentModelManager
-    from personal_agent.cli.command_parser import CommandParser
 
 # Load environment variables
 load_dotenv()
@@ -677,27 +677,27 @@ async def create_memory_agent_with_shared_context(
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
-        model_name=LLM_MODEL,     # Use the configured model
+        model_name=LLM_MODEL,  # Use the configured model
         enable_memory=True,
         debug=debug,
         user_id=user_id,
         # AgnoPersonalAgent will create its own model using AgentModelManager
     )
-    
+
     # After initialization, we need to set the shared memory and add the tools
     # Wait for initialization to complete
     await memory_agent._ensure_initialized()
-    
+
     # Override the memory with shared memory
     memory_agent.memory = shared_memory
-    
+
     # Add the memory and knowledge tools to the existing tools
-    if not hasattr(memory_agent, 'tools') or memory_agent.tools is None:
+    if not hasattr(memory_agent, "tools") or memory_agent.tools is None:
         memory_agent.tools = []
-    
+
     # Add our custom tools
     memory_agent.tools.extend([memory_tools, knowledge_tools])
-    
+
     # Update instructions to include memory-specific guidance
     memory_specific_instructions = [
         "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
@@ -735,7 +735,7 @@ async def create_memory_agent_with_shared_context(
         "Always execute the tools - do not show JSON or function calls to the user.",
         "Provide natural responses based on the tool results.",
     ]
-    
+
     # Set the instructions (AgnoPersonalAgent instructions might be a string or list)
     memory_agent.instructions = memory_specific_instructions
 
@@ -984,10 +984,10 @@ async def _cleanup_tool(tool, tool_name: str):
 # Main execution
 async def main(use_remote: bool = False):
     """Main function to run the team with an enhanced CLI interface."""
-    
+
     # Initialize Rich console for better formatting
     console = Console(force_terminal=True)
-    
+
     console.print("🤖 [bold blue]Ollama Multi-Purpose Reasoning Team[/bold blue]")
     console.print("=" * 50)
     console.print("Initializing team with memory and knowledge capabilities...")
@@ -996,18 +996,20 @@ async def main(use_remote: bool = False):
     try:
         # Create the team
         team = await create_team(use_remote=use_remote)
-        
+
         # Get the memory agent for CLI commands
         memory_agent = None
-        if hasattr(team, 'members') and team.members:
+        if hasattr(team, "members") and team.members:
             for member in team.members:
-                if hasattr(member, 'name') and 'Personal AI Agent' in member.name:
+                if hasattr(member, "name") and "Personal AI Agent" in member.name:
                     memory_agent = member
                     break
 
         console.print("\n✅ [bold green]Team initialized successfully![/bold green]")
         console.print("\n[bold cyan]Team Members:[/bold cyan]")
-        console.print("- 🧠 Memory Agent: Store and retrieve personal information and knowledge")
+        console.print(
+            "- 🧠 Memory Agent: Store and retrieve personal information and knowledge"
+        )
         console.print("- 🌐 Web Agent: Search the web for information")
         console.print("- 💰 Finance Agent: Get financial data and analysis")
         console.print("- ✍️  Writer Agent: Create content and written materials")
@@ -1044,7 +1046,9 @@ async def main(use_remote: bool = False):
                     continue
 
                 # Parse the command using the same system as agno_cli.py
-                command_handler, remaining_text, kwargs = command_parser.parse_command(user_input)
+                command_handler, remaining_text, kwargs = command_parser.parse_command(
+                    user_input
+                )
 
                 # Handle quit command specially
                 if (
@@ -1052,8 +1056,10 @@ async def main(use_remote: bool = False):
                     and hasattr(command_handler, "__name__")
                     and command_handler.__name__ == "_handle_quit"
                 ):
-                    console.print("👋 Goodbye! Thanks for using the Personal Agent Team!")
-                    await cleanup_team(team)
+                    console.print(
+                        "👋 Goodbye! Thanks for using the Personal Agent Team!"
+                    )
+                    # await cleanup_team(team)
                     break
 
                 # If it's a memory command, execute it with the memory agent
@@ -1081,6 +1087,7 @@ async def main(use_remote: bool = False):
 
                 elif user_input.lower() == "clear":
                     import os
+
                     os.system("clear" if os.name == "posix" else "cls")
                     console.print("🤖 Personal Agent Team")
                     console.print("💬 Chat cleared. How can I help you?")
@@ -1089,9 +1096,13 @@ async def main(use_remote: bool = False):
                 elif user_input.lower() == "examples":
                     console.print("\n💡 [bold cyan]Example Queries:[/bold cyan]")
                     console.print("  [yellow]Memory & Personal:[/yellow]")
-                    console.print("    - 'Remember that I love skiing and live in Colorado'")
+                    console.print(
+                        "    - 'Remember that I love skiing and live in Colorado'"
+                    )
                     console.print("    - 'What do you remember about me?'")
-                    console.print("    - '! I work as a software engineer' (immediate storage)")
+                    console.print(
+                        "    - '! I work as a software engineer' (immediate storage)"
+                    )
                     console.print("    - '? work' (query memories about work)")
                     console.print("\n  [yellow]Web Search:[/yellow]")
                     console.print("    - 'What's the latest news about AI?'")
@@ -1116,11 +1127,13 @@ async def main(use_remote: bool = False):
                     console.print(f"💥 Error: {e}")
 
             except KeyboardInterrupt:
-                console.print("\n\n⚠️  Interrupted by user. Type 'quit' to exit gracefully.")
+                console.print(
+                    "\n\n⚠️  Interrupted by user. Type 'quit' to exit gracefully."
+                )
                 continue
             except EOFError:
                 console.print("\n\n👋 Session ended. Goodbye!")
-                await cleanup_team(team)
+                # await cleanup_team(team)
                 break
             except Exception as e:
                 console.print(f"\n❌ Error processing your request: {str(e)}")
@@ -1134,8 +1147,9 @@ async def main(use_remote: bool = False):
         console.print("Please check your configuration and try again.")
     finally:
         try:
-            if 'team' in locals():
-                await cleanup_team(team)
+            if "team" in locals():
+                # await cleanup_team(team)
+                pass
         except Exception as e:
             console.print(f"Warning during cleanup: {e}")
 

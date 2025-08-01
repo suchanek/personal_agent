@@ -40,6 +40,9 @@ MODEL_CONTEXT_SIZES: Dict[str, int] = {
     "llama3.2:3b": 32768,
     "llama3.2:11b": 32768,
     "llama3.2:90b": 32768,
+    # Llama 3.3 models (131K context)
+    "llama3.3:latest": 131072,
+    "llama3.3:70b": 131072,
     # Llama 3 models (8K context)
     "llama3:8b": 32768,
     "llama3:70b": 32768,
