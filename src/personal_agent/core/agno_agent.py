@@ -112,7 +112,7 @@ class AgnoPersonalAgent(Agent):
         model_provider: str = "ollama",
         model_name: str = LLM_MODEL,
         enable_memory: bool = True,
-        enable_mcp: bool = False,  # Simplified: disable MCP by default
+        enable_mcp: bool = True,  # Simplified: disable MCP by default
         storage_dir: str = AGNO_STORAGE_DIR,
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
