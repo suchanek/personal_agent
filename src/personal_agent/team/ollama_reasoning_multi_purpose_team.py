@@ -1,15 +1,91 @@
 """
-Ollama-based Multi-Purpose Reasoning Team
+Ollama Multi-Purpose Reasoning Team Module
 
-This example demonstrates a team of agents using local Ollama models that can answer
-a variety of questions with memory and knowledge capabilities.
+This module implements a comprehensive multi-agent team system using Ollama models for various
+specialized tasks. The team coordinates between different agents with shared memory and knowledge
+management capabilities, providing a unified interface for complex reasoning and task execution.
 
-The team consists of:
-- A web agent that can search the web for information
-- A finance agent that can get financial data
-- A writer agent that can write content
-- A calculator agent that can calculate
-- A memory agent that can store and retrieve personal information and knowledge
+Key Components:
+    - **Multi-Agent Team**: Coordinates specialized agents for different domains
+    - **Shared Memory System**: Enables agents to share context and maintain conversation history
+    - **Knowledge Management**: Integrates with LightRAG for factual knowledge storage and retrieval
+    - **Memory Management**: Stores and retrieves personal user information and preferences
+    - **CLI Interface**: Interactive command-line interface with enhanced memory commands
+
+Specialized Agents:
+    - **Memory Agent**: Manages personal information and factual knowledge storage/retrieval
+    - **Web Agent**: Performs web searches using DuckDuckGo
+    - **Finance Agent**: Retrieves and analyzes financial data using YFinance
+    - **Writer Agent**: Creates content, articles, and creative writing
+    - **Calculator Agent**: Performs mathematical calculations and operations
+    - **Python Agent**: Executes Python code and scripts
+    - **File Agent**: Handles file system operations and management
+
+Features:
+    - Ollama model integration with configurable local/remote endpoints
+    - Docker service synchronization and management
+    - Comprehensive resource cleanup to prevent memory leaks
+    - Enhanced CLI with memory commands (!, ?, @, etc.)
+    - Shared context between team members for coherent conversations
+    - Automatic role mapping fixes for OpenAI API compatibility
+    - Timeout handling for knowledge base operations
+    - Rich console formatting for better user experience
+
+Usage:
+    The module can be run directly as a CLI application or imported for programmatic use:
+    
+    ```bash
+    # Run as CLI
+    python -m personal_agent.team.ollama_reasoning_multi_purpose_team
+    
+    # Or use the installed command
+    paga_team_cli
+    ```
+    
+    Programmatic usage:
+    ```python
+    import asyncio
+    from personal_agent.team.ollama_reasoning_multi_purpose_team import create_team
+    
+    async def main():
+        team = await create_team()
+        response = await team.arun("What's the weather like today?")
+        print(response)
+    
+    asyncio.run(main())
+    ```
+
+Memory Commands:
+    - `! <text>` - Store personal information immediately
+    - `? <query>` - Query stored memories
+    - `@ <topics>` - Get memories by topic
+    - `list` - List all stored memories
+    - `recent` - Show recent memories
+    - `clear` - Clear conversation (not memories)
+    - `help` - Show available commands
+
+Dependencies:
+    - agno: Core agent framework
+    - ollama: Local LLM inference
+    - rich: Enhanced console output
+    - asyncio: Asynchronous operations
+    - sqlite: Memory persistence
+    - docker: Service management (optional)
+
+Configuration:
+    The module uses settings from personal_agent.config.settings for:
+    - Model selection and endpoints
+    - Storage directories
+    - User identification
+    - Docker service URLs
+
+Note:
+    This module requires proper setup of Ollama services and optionally Docker containers
+    for LightRAG knowledge and memory services. See the project documentation for
+    complete setup instructions.
+
+Author: Personal Agent Team
+Version: 1.0.0
 """
 
 # pylint: disable=C0415,W0212,C0301,W0718
@@ -32,6 +108,8 @@ from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.panel import Panel
 
 # Import your personal agent components
 try:
@@ -47,6 +125,8 @@ try:
         USER_ID,
     )
     from ..core.agent_model_manager import AgentModelManager
+    from ..core.agno_agent import AgnoPersonalAgent
+    from ..cli.command_parser import CommandParser
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import os
@@ -63,6 +143,7 @@ except ImportError:
         USER_ID,
     )
     from personal_agent.core.agent_model_manager import AgentModelManager
+    from personal_agent.cli.command_parser import CommandParser
 
 # Load environment variables
 load_dotenv()
@@ -593,54 +674,70 @@ async def create_memory_agent_with_shared_context(
     memory_tools = AgnoMemoryTools(memory_manager)
     knowledge_tools = KnowledgeTools(knowledge_manager)
 
-    # Create a standard Agno Agent with shared memory and your tools
-    memory_agent = Agent(
-        name="Personal AI Agent",
-        role="Store and retrieve personal information and factual knowledge",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
-        memory=shared_memory,  # Use the shared memory
-        tools=[memory_tools, knowledge_tools],
-        instructions=[
-            "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
-            "CRITICAL TOOL SELECTION RULES:",
-            "- Use MEMORY TOOLS for personal information ABOUT THE USER",
-            "- Use KNOWLEDGE TOOLS for factual content, documents, poems, stories, articles",
-            "- When user says 'store this poem' or 'save this content' -> use ingest_knowledge_text",
-            "- When user says 'remember that I...' -> use store_user_memory",
-            "- When user asks 'what do you remember about me?' -> use get_all_memories",
-            "- When user asks about stored content/documents -> use query_knowledge_base",
-            "",
-            "MEMORY TOOLS - CORRECT USAGE:",
-            "- store_user_memory(content='fact about user', topics=['optional']) - Store new user info",
-            "- get_all_memories() - For 'what do you know about me' (NO PARAMETERS)",
-            "- query_memory(query='keywords', limit=10) - Search specific user information",
-            "- get_recent_memories(limit=10) - Recent interactions",
-            "- list_memories() - Simple overview (NO PARAMETERS)",
-            "- get_memories_by_topic(topics=['topic1'], limit=10) - Filter by topics",
-            "- update_memory(memory_id='id', content='new content', topics=['topics']) - Update existing",
-            "- delete_memory(memory_id='id') - Delete specific memory",
-            "- store_graph_memory(content='info', topics=['topics'], memory_id='optional') - Store with relationships",
-            "- query_graph_memory(query='terms', mode='mix', top_k=5) - Explore relationships",
-            "",
-            "KNOWLEDGE TOOLS - CORRECT USAGE:",
-            "- ingest_knowledge_text(content='text', title='title', file_type='txt') - Store factual content",
-            "- ingest_knowledge_file(file_path='path', title='optional') - Ingest file",
-            "- ingest_knowledge_from_url(url='url', title='optional') - Ingest from web",
-            "- query_knowledge_base(query='search terms', mode='auto', limit=5) - Search knowledge",
-            "",
-            "EXAMPLES:",
-            "- 'Store this poem: [poem text]' -> ingest_knowledge_text(content=poem, title='User Poem')",
-            "- 'Remember I like skiing' -> store_user_memory(content='User likes skiing')",
-            "- 'What do you know about me?' -> get_all_memories()",
-            "- 'Save this article about AI' -> ingest_knowledge_text(content=article, title='AI Article')",
-            "Always execute the tools - do not show JSON or function calls to the user.",
-            "Provide natural responses based on the tool results.",
-        ],
-        agent_id="personal-agent",  # Use hyphen to match team expectations
+    # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
+    memory_agent = AgnoPersonalAgent(
+        model_provider=PROVIDER,  # Use the correct provider
+        model_name=LLM_MODEL,     # Use the configured model
+        enable_memory=True,
+        debug=debug,
         user_id=user_id,
-        show_tool_calls=debug,
-        markdown=True,
+        # AgnoPersonalAgent will create its own model using AgentModelManager
     )
+    
+    # After initialization, we need to set the shared memory and add the tools
+    # Wait for initialization to complete
+    await memory_agent._ensure_initialized()
+    
+    # Override the memory with shared memory
+    memory_agent.memory = shared_memory
+    
+    # Add the memory and knowledge tools to the existing tools
+    if not hasattr(memory_agent, 'tools') or memory_agent.tools is None:
+        memory_agent.tools = []
+    
+    # Add our custom tools
+    memory_agent.tools.extend([memory_tools, knowledge_tools])
+    
+    # Update instructions to include memory-specific guidance
+    memory_specific_instructions = [
+        "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
+        "CRITICAL TOOL SELECTION RULES:",
+        "- Use MEMORY TOOLS for personal information ABOUT THE USER",
+        "- Use KNOWLEDGE TOOLS for factual content, documents, poems, stories, articles",
+        "- When user says 'store this poem' or 'save this content' -> use ingest_knowledge_text",
+        "- When user says 'remember that I...' -> use store_user_memory",
+        "- When user asks 'what do you remember about me?' -> use get_all_memories",
+        "- When user asks about stored content/documents -> use query_knowledge_base",
+        "",
+        "MEMORY TOOLS - CORRECT USAGE:",
+        "- store_user_memory(content='fact about user', topics=['optional']) - Store new user info",
+        "- get_all_memories() - For 'what do you know about me' (NO PARAMETERS)",
+        "- query_memory(query='keywords', limit=10) - Search specific user information",
+        "- get_recent_memories(limit=10) - Recent interactions",
+        "- list_memories() - Simple overview (NO PARAMETERS)",
+        "- get_memories_by_topic(topics=['topic1'], limit=10) - Filter by topics",
+        "- update_memory(memory_id='id', content='new content', topics=['topics']) - Update existing",
+        "- delete_memory(memory_id='id') - Delete specific memory",
+        "- store_graph_memory(content='info', topics=['topics'], memory_id='optional') - Store with relationships",
+        "- query_graph_memory(query='terms', mode='hybrid', top_k=5) - Explore relationships",
+        "",
+        "KNOWLEDGE TOOLS - CORRECT USAGE:",
+        "- ingest_knowledge_text(content='text', title='title', file_type='txt') - Store factual content",
+        "- ingest_knowledge_file(file_path='path', title='optional') - Ingest file",
+        "- ingest_knowledge_from_url(url='url', title='optional') - Ingest from web",
+        "- query_knowledge_base(query='search terms', mode='hybrid', limit=20) - Search knowledge",
+        "",
+        "EXAMPLES:",
+        "- 'Store this poem: [poem text]' -> ingest_knowledge_text(content=poem, title='User Poem')",
+        "- 'Remember I like skiing' -> store_user_memory(content='User likes skiing')",
+        "- 'What do you know about me?' -> get_all_memories()",
+        "- 'Save this article about AI' -> ingest_knowledge_text(content=article, title='AI Article')",
+        "Always execute the tools - do not show JSON or function calls to the user.",
+        "Provide natural responses based on the tool results.",
+    ]
+    
+    # Set the instructions (AgnoPersonalAgent instructions might be a string or list)
+    memory_agent.instructions = memory_specific_instructions
 
     print("✅ Memory agent created with shared context")
     return memory_agent
@@ -886,120 +983,161 @@ async def _cleanup_tool(tool, tool_name: str):
 
 # Main execution
 async def main(use_remote: bool = False):
-    """Main function to run the team with an interactive chat loop."""
-
-    print("🤖 Ollama Multi-Purpose Reasoning Team")
-    print("=" * 50)
-    print("Initializing team with memory and knowledge capabilities...")
-    print("This may take a moment on first run...")
+    """Main function to run the team with an enhanced CLI interface."""
+    
+    # Initialize Rich console for better formatting
+    console = Console(force_terminal=True)
+    
+    console.print("🤖 [bold blue]Ollama Multi-Purpose Reasoning Team[/bold blue]")
+    console.print("=" * 50)
+    console.print("Initializing team with memory and knowledge capabilities...")
+    console.print("This may take a moment on first run...")
 
     try:
         # Create the team
         team = await create_team(use_remote=use_remote)
+        
+        # Get the memory agent for CLI commands
+        memory_agent = None
+        if hasattr(team, 'members') and team.members:
+            for member in team.members:
+                if hasattr(member, 'name') and 'Personal AI Agent' in member.name:
+                    memory_agent = member
+                    break
 
-        print("\n✅ Team initialized successfully!")
-        print("\nTeam Members:")
-        print(
-            "- 🧠 Memory Agent: Store and retrieve personal information and knowledge"
+        console.print("\n✅ [bold green]Team initialized successfully![/bold green]")
+        console.print("\n[bold cyan]Team Members:[/bold cyan]")
+        console.print("- 🧠 Memory Agent: Store and retrieve personal information and knowledge")
+        console.print("- 🌐 Web Agent: Search the web for information")
+        console.print("- 💰 Finance Agent: Get financial data and analysis")
+        console.print("- ✍️  Writer Agent: Create content and written materials")
+        console.print("- 🧮 Calculator Agent: Perform calculations and math")
+
+        # Initialize command parser
+        command_parser = CommandParser()
+
+        # Display the enhanced welcome panel
+        console.print("\n")
+        console.print(
+            Panel.fit(
+                "🚀 Enhanced Personal AI Agent Team with Memory Commands\n\n"
+                "This CLI provides team coordination with direct memory management.\n\n"
+                f"{command_parser.get_help_text()}\n\n"
+                "[bold yellow]Team Commands:[/bold yellow]\n"
+                "• 'help' - Show team capabilities\n"
+                "• 'clear' - Clear the screen\n"
+                "• 'examples' - Show example queries\n"
+                "• 'quit' - Exit the team",
+                style="bold blue",
+            )
         )
-        print("- 🌐 Web Agent: Search the web for information")
-        print("- 💰 Finance Agent: Get financial data and analysis")
-        print("- ✍️  Writer Agent: Create content and written materials")
-        print("- 🧮 Calculator Agent: Perform calculations and math")
 
-        print("\n" + "=" * 50)
-        print("💬 Interactive Chat Mode")
-        print("=" * 50)
-        print("Type your questions or requests below.")
-        print("Commands:")
-        print("  - 'quit' or 'exit' to end the session")
-        print("  - 'help' to see this message again")
-        print("  - 'clear' to clear the screen")
-        print("  - 'examples' to see example queries")
-        print("\nTip: Try asking me to remember things about you, search the web,")
-        print("     get financial data, write content, or do calculations!")
-        print("-" * 50)
+        console.print(f"🖥️  Using Ollama at: {OLLAMA_URL}")
 
-        # Interactive chat loop
+        # Enhanced interactive chat loop with command parsing
         while True:
             try:
                 # Get user input
-                user_input = input("\n🗣️  You: ").strip()
+                user_input = input("\n💬 You: ").strip()
 
-                # Handle special commands
-                if user_input.lower() in ["quit", "exit", "q"]:
-                    print("\n👋 Goodbye! Thanks for using the Personal Agent Team!")
-                    # Cleanup team resources
+                if not user_input:
+                    continue
+
+                # Parse the command using the same system as agno_cli.py
+                command_handler, remaining_text, kwargs = command_parser.parse_command(user_input)
+
+                # Handle quit command specially
+                if (
+                    command_handler
+                    and hasattr(command_handler, "__name__")
+                    and command_handler.__name__ == "_handle_quit"
+                ):
+                    console.print("👋 Goodbye! Thanks for using the Personal Agent Team!")
                     await cleanup_team(team)
                     break
 
+                # If it's a memory command, execute it with the memory agent
+                if command_handler and memory_agent:
+                    try:
+                        if remaining_text is not None:
+                            await command_handler(memory_agent, remaining_text, console)
+                        else:
+                            await command_handler(memory_agent, console)
+                        continue
+                    except Exception as e:
+                        console.print(f"💥 Error executing memory command: {e}")
+                        continue
+
+                # Handle team-specific commands
                 elif user_input.lower() == "help":
-                    print("\n📋 Available Commands:")
-                    print("  - 'quit' or 'exit' to end the session")
-                    print("  - 'help' to see this message")
-                    print("  - 'clear' to clear the screen")
-                    print("  - 'examples' to see example queries")
-                    print("\n🤖 Team Capabilities:")
-                    print("  - Remember personal information and preferences")
-                    print("  - Search the web for current information")
-                    print("  - Analyze financial data and stocks")
-                    print("  - Write content, articles, and creative text")
-                    print("  - Perform mathematical calculations")
+                    console.print("\n📋 [bold cyan]Team Capabilities:[/bold cyan]")
+                    console.print("  - Remember personal information and preferences")
+                    console.print("  - Search the web for current information")
+                    console.print("  - Analyze financial data and stocks")
+                    console.print("  - Write content, articles, and creative text")
+                    console.print("  - Perform mathematical calculations")
+                    console.print(f"\n{command_parser.get_help_text()}")
                     continue
 
                 elif user_input.lower() == "clear":
                     import os
-
                     os.system("clear" if os.name == "posix" else "cls")
-                    print("🤖 Personal Agent Team")
-                    print("💬 Chat cleared. How can I help you?")
+                    console.print("🤖 Personal Agent Team")
+                    console.print("💬 Chat cleared. How can I help you?")
                     continue
 
                 elif user_input.lower() == "examples":
-                    print("\n💡 Example Queries:")
-                    print("  Memory & Personal:")
-                    print("    - 'Remember that I love skiing and live in Colorado'")
-                    print("    - 'What do you remember about me?'")
-                    print("    - 'Store this fact: I work as a software engineer'")
-                    print("\n  Web Search:")
-                    print("    - 'What's the latest news about AI?'")
-                    print("    - 'Search for information about climate change'")
-                    print("\n  Finance:")
-                    print("    - 'Give me a financial analysis of NVDA'")
-                    print("    - 'What's the current stock price of Apple?'")
-                    print("\n  Writing:")
-                    print("    - 'Write a short poem about AI agents'")
-                    print("    - 'Create a summary of machine learning'")
-                    print("\n  Math & Calculations:")
-                    print("    - 'Calculate the square root of 144'")
-                    print("    - 'What's 15% of 250?'")
+                    console.print("\n💡 [bold cyan]Example Queries:[/bold cyan]")
+                    console.print("  [yellow]Memory & Personal:[/yellow]")
+                    console.print("    - 'Remember that I love skiing and live in Colorado'")
+                    console.print("    - 'What do you remember about me?'")
+                    console.print("    - '! I work as a software engineer' (immediate storage)")
+                    console.print("    - '? work' (query memories about work)")
+                    console.print("\n  [yellow]Web Search:[/yellow]")
+                    console.print("    - 'What's the latest news about AI?'")
+                    console.print("    - 'Search for information about climate change'")
+                    console.print("\n  [yellow]Finance:[/yellow]")
+                    console.print("    - 'Give me a financial analysis of NVDA'")
+                    console.print("    - 'What's the current stock price of Apple?'")
+                    console.print("\n  [yellow]Writing:[/yellow]")
+                    console.print("    - 'Write a short poem about AI agents'")
+                    console.print("    - 'Create a summary of machine learning'")
+                    console.print("\n  [yellow]Math & Calculations:[/yellow]")
+                    console.print("    - 'Calculate the square root of 144'")
+                    console.print("    - 'What's 15% of 250?'")
                     continue
 
-                # Skip empty input
-                if not user_input:
-                    continue
+                # If not a command, treat as regular team chat
+                try:
+                    console.print("🤖 [bold green]Team:[/bold green]")
+                    await team.aprint_response(user_input, stream=True)
 
-                # Process the query with the team
-                print(f"\n🤖 Team: ", end="", flush=True)
-                await team.aprint_response(user_input, stream=True)
+                except Exception as e:
+                    console.print(f"💥 Error: {e}")
 
             except KeyboardInterrupt:
-                print("\n\n⚠️  Interrupted by user. Type 'quit' to exit gracefully.")
+                console.print("\n\n⚠️  Interrupted by user. Type 'quit' to exit gracefully.")
                 continue
             except EOFError:
-                print("\n\n👋 Session ended. Goodbye!")
+                console.print("\n\n👋 Session ended. Goodbye!")
                 await cleanup_team(team)
                 break
             except Exception as e:
-                print(f"\n❌ Error processing your request: {str(e)}")
-                print("Please try again or type 'help' for assistance.")
+                console.print(f"\n❌ Error processing your request: {str(e)}")
+                console.print("Please try again or type 'help' for assistance.")
                 continue
 
     except KeyboardInterrupt:
-        print("\n\n⚠️  Initialization interrupted by user.")
+        console.print("\n\n⚠️  Initialization interrupted by user.")
     except Exception as e:
-        print(f"\n❌ Error initializing team: {str(e)}")
-        print("Please check your configuration and try again.")
+        console.print(f"\n❌ Error initializing team: {str(e)}")
+        console.print("Please check your configuration and try again.")
+    finally:
+        try:
+            if 'team' in locals():
+                await cleanup_team(team)
+        except Exception as e:
+            console.print(f"Warning during cleanup: {e}")
 
 
 def cli_main():

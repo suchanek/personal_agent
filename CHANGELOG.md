@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Enhanced Ollama Reasoning Team**: The standalone Ollama Reasoning Team (`paga_team_cli`) has been significantly upgraded. It now integrates a full instance of the `AgnoPersonalAgent` as its memory and knowledge manager, providing feature parity with the main agent. The CLI has been rebuilt with `rich` and the `CommandParser` to support advanced memory commands (`!`, `?`, `@`) and deliver a more intuitive, consistent user experience. See [ADR-045](./refs/adr/045-enhanced-ollama-reasoning-team.md) for details.
+
 ### Added
 - **Semantic Knowledge Ingestion Tools**: Introduced a new `SemanticKnowledgeIngestionTools` toolkit to provide a complete suite of ingestion tools (`ingest_semantic_file`, `ingest_semantic_text`, etc.) for the local LanceDB-based semantic knowledge base. This achieves feature parity with the LightRAG ingestion tools and allows users to easily populate the local vector store. See [ADR-044](./refs/adr/044-semantic-knowledge-ingestion-and-unified-querying.md) for details.
 
