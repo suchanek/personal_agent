@@ -69,7 +69,7 @@ load_dotenv()
 
 cwd = Path(__file__).parent.resolve()
 
-PROVIDER = "openai"
+PROVIDER = "ollama"
 
 _instructions = dedent(
     """\
@@ -603,15 +603,35 @@ async def create_memory_agent_with_shared_context(
         instructions=[
             "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
             "CRITICAL TOOL SELECTION RULES:",
-            "- Use MEMORY TOOLS (store_user_memory, query_memory) for personal information ABOUT THE USER",
-            "- Use KNOWLEDGE TOOLS (ingest_knowledge_text, ingest_knowledge_file) for factual content, documents, poems, stories, articles",
+            "- Use MEMORY TOOLS for personal information ABOUT THE USER",
+            "- Use KNOWLEDGE TOOLS for factual content, documents, poems, stories, articles",
             "- When user says 'store this poem' or 'save this content' -> use ingest_knowledge_text",
             "- When user says 'remember that I...' -> use store_user_memory",
-            "- When user asks 'what do you remember about me?' -> use query_memory",
+            "- When user asks 'what do you remember about me?' -> use get_all_memories",
             "- When user asks about stored content/documents -> use query_knowledge_base",
+            "",
+            "MEMORY TOOLS - CORRECT USAGE:",
+            "- store_user_memory(content='fact about user', topics=['optional']) - Store new user info",
+            "- get_all_memories() - For 'what do you know about me' (NO PARAMETERS)",
+            "- query_memory(query='keywords', limit=10) - Search specific user information",
+            "- get_recent_memories(limit=10) - Recent interactions",
+            "- list_memories() - Simple overview (NO PARAMETERS)",
+            "- get_memories_by_topic(topics=['topic1'], limit=10) - Filter by topics",
+            "- update_memory(memory_id='id', content='new content', topics=['topics']) - Update existing",
+            "- delete_memory(memory_id='id') - Delete specific memory",
+            "- store_graph_memory(content='info', topics=['topics'], memory_id='optional') - Store with relationships",
+            "- query_graph_memory(query='terms', mode='mix', top_k=5) - Explore relationships",
+            "",
+            "KNOWLEDGE TOOLS - CORRECT USAGE:",
+            "- ingest_knowledge_text(content='text', title='title', file_type='txt') - Store factual content",
+            "- ingest_knowledge_file(file_path='path', title='optional') - Ingest file",
+            "- ingest_knowledge_from_url(url='url', title='optional') - Ingest from web",
+            "- query_knowledge_base(query='search terms', mode='auto', limit=5) - Search knowledge",
+            "",
             "EXAMPLES:",
             "- 'Store this poem: [poem text]' -> ingest_knowledge_text(content=poem, title='User Poem')",
-            "- 'Remember I like skiing' -> store_user_memory('User likes skiing')",
+            "- 'Remember I like skiing' -> store_user_memory(content='User likes skiing')",
+            "- 'What do you know about me?' -> get_all_memories()",
             "- 'Save this article about AI' -> ingest_knowledge_text(content=article, title='AI Article')",
             "Always execute the tools - do not show JSON or function calls to the user.",
             "Provide natural responses based on the tool results.",

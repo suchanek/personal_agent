@@ -92,7 +92,7 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
     return value.lower() in ("true", "1", "yes", "on")
 
 
-PROVIDER = "openai"
+PROVIDER = "ollama"
 PROVIDER = get_env_var("PROVIDER", "ollama")  # DEPRECATED
 
 # LighRAG server
