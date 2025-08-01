@@ -12,8 +12,8 @@ from typing import Any, Dict, Optional, Union
 from agno.models.ollama import Ollama  # Use regular Ollama instead of OllamaTools
 from agno.models.openai import OpenAIChat
 
-from ..config.model_contexts import get_model_context_size_sync
 from ..config import settings
+from ..config.model_contexts import get_model_context_size_sync
 
 logger = logging.getLogger(__name__)
 
@@ -53,19 +53,21 @@ class AgentModelManager:
         if self.model_provider == "openai":
             # Use LMStudio URL from settings when provider is openai
             lmstudio_url = settings.LMSTUDIO_URL
-            
+
             # Check if we're using LMStudio (localhost:1234 indicates LMStudio)
             if "localhost:1234" in lmstudio_url or "1234" in lmstudio_url:
                 # Use LMStudio with OpenAI-compatible API
                 # Ensure the base URL has the correct /v1 endpoint for LMStudio
                 base_url = lmstudio_url
-                if not base_url.endswith('/v1'):
-                    base_url = base_url.rstrip('/') + '/v1'
-                
+                if not base_url.endswith("/v1"):
+                    base_url = base_url.rstrip("/") + "/v1"
+
                 logger.info(f"Using LMStudio with OpenAI-compatible API at: {base_url}")
                 logger.info(f"Model: {self.model_name}")
-                logger.info("This will use /v1/chat/completions endpoint (OpenAI format)")
-                
+                logger.info(
+                    "This will use /v1/chat/completions endpoint (OpenAI format)"
+                )
+
                 # Remove response_format constraint to allow native OpenAI tool calling
                 # LMStudio should support OpenAI's standard tool calling via the tools parameter
                 model = OpenAIChat(
@@ -74,7 +76,7 @@ class AgentModelManager:
                     api_key="lm-studio",  # LMStudio doesn't require a real API key
                     # No request_params with response_format - let OpenAI handle tool calling natively
                 )
-                
+
                 # WORKAROUND: Fix incorrect role mapping in Agno framework
                 # The default_role_map incorrectly maps "system" -> "developer"
                 # but OpenAI API only accepts: user, assistant, system, tool
@@ -86,14 +88,16 @@ class AgentModelManager:
                         "tool": "tool",
                         "model": "assistant",
                     }
-                    logger.info(f"🔧 Applied role mapping fix to LMStudio model: {self.model_name}")
-                
+                    logger.info(
+                        f"🔧 Applied role mapping fix to LMStudio model: {self.model_name}"
+                    )
+
                 return model
             else:
                 # Standard OpenAI API
                 logger.info(f"Using standard OpenAI API with model: {self.model_name}")
                 model = OpenAIChat(id=self.model_name)
-                
+
                 # WORKAROUND: Fix incorrect role mapping in Agno framework
                 # The default_role_map incorrectly maps "system" -> "developer"
                 # but OpenAI API only accepts: user, assistant, system, tool
@@ -105,8 +109,10 @@ class AgentModelManager:
                         "tool": "tool",
                         "model": "assistant",
                     }
-                    logger.info(f"🔧 Applied role mapping fix to OpenAI model: {self.model_name}")
-                
+                    logger.warning(
+                        f"🔧 Applied role mapping fix to OpenAI model: {self.model_name}"
+                    )
+
                 return model
         elif self.model_provider == "ollama":
             # Get dynamic context size for this model
@@ -121,141 +127,117 @@ class AgentModelManager:
                 detection_method,
             )
 
-            # Special handling for smollm2 model using optimized configuration
-            if "smollm2" in self.model_name.lower():
+            # Use standard configuration for other models
+            model_options = {
+                "num_ctx": context_size,  # Use dynamically detected context window
+                "temperature": 0.3,  # Optional: set temperature for consistency
+                "num_predict": -1,  # Allow unlimited prediction length
+                "top_k": 40,
+                "top_p": 0.9,
+                "repeat_penalty": 1.1,
+                "seed": self.seed,
+            }
+
+            logger.info(
+                f"🔧 OLLAMA CONFIG: Model {self.model_name} using temperature={model_options['temperature']}"
+            )
+            logger.info(
+                f"🔧 OLLAMA CONFIG: top_k={model_options['top_k']}, top_p={model_options['top_p']}"
+            )
+
+            # Special handling for qwen models with optimized parameters
+            if "qwen" in self.model_name.lower():
                 logger.info(
-                    "Using optimized configuration for SmolLM2 model: %s",
+                    "Using optimized configuration for Qwen model: %s",
+                    self.model_name,
+                )
+                model_options.update(
+                    {
+                        "num_predict": 32768,  # Set specific prediction length for qwen
+                        "temperature": 0.3,  # Lower temperature for better instruction following
+                        "top_k": 20,
+                        "top_p": 0.95,
+                        "min_p": 0,
+                        "repeat_penalty": 1.1,
+                    }
+                )
+                logger.info(
+                    f"🔧 QWEN CONFIG: Using temperature={model_options['temperature']} for better instruction following"
+                )
+
+            if (
+                "llama3.1" in self.model_name.lower()
+                or "llama3.2" in self.model_name.lower()
+            ):
+                logger.info(
+                    "Using optimized configuration for Llama 3.x model: %s",
+                    self.model_name,
+                )
+                model_options.update(
+                    {
+                        "stop": [
+                            "<|start_header_id|>",
+                            "<|end_header_id|>",
+                            "<|eot_id|>",
+                        ],
+                    }
+                )
+
+            # Add reasoning support for compatible models
+            reasoning_models = [
+                "o1",
+                "o1-preview",
+                "o1-mini",  # OpenAI reasoning models
+                "qwen3:8b",
+                "qwen3:1.7B",
+                "qwen3:4b",
+                "qwq",  # Qwen reasoning models
+                "deepseek-r1",
+                "deepseek-reasoner",  # DeepSeek reasoning models
+                "llama3.2",
+                "llama3.3",  # Recent Llama models with reasoning
+                "mistral",
+                "mixtral",  # Mistral models with reasoning capabilities
+            ]
+
+            # Check if current model supports reasoning
+            model_supports_reasoning = any(
+                reasoning_model in self.model_name.lower()
+                for reasoning_model in reasoning_models
+            )
+
+            if model_supports_reasoning:
+                logger.info(
+                    "Model %s supports reasoning - using standard Ollama configuration",
+                    self.model_name,
+                )
+            else:
+                logger.info(
+                    "Model %s does not appear to support reasoning - using standard configuration",
                     self.model_name,
                 )
 
-                # CRITICAL: Use the instruct model, not the base model
-                model_id = self.model_name
+            model = Ollama(
+                id=self.model_name,
+                host=self.ollama_base_url,  # Use host parameter for Ollama
+                options=model_options,
+            )
 
-                # Use regular Ollama with configuration optimized for SmolLM2
-                model = Ollama(
-                    id=model_id,
-                    host=self.ollama_base_url,
-                    options={
-                        "temperature": 0.0,  # Use deterministic generation for tool calls
-                        "num_ctx": context_size,  # Use dynamically detected context window
-                        "num_predict": 512,  # Allow more tokens for tool call responses
-                        "top_p": 1.0,  # Use full probability distribution
-                        "top_k": -1,  # Disable top-k sampling for deterministic results
-                        "repeat_penalty": 1.0,  # Disable repeat penalty
-                        "seed": self.seed,
-                        # SmolLM2 specific options
-                        "mirostat": 0,  # Disable mirostat sampling
-                        "mirostat_eta": 0.1,
-                        "mirostat_tau": 5.0,
-                    },
-                )
-                
-                # WORKAROUND: Fix incorrect role mapping in Agno framework
-                # The default_role_map incorrectly maps "system" -> "developer"
-                # but OpenAI API only accepts: user, assistant, system, tool
-                if hasattr(model, "role_map"):
-                    model.role_map = {
-                        "system": "system",  # Fix: should be "system", not "developer"
-                        "user": "user",
-                        "assistant": "assistant",
-                        "tool": "tool",
-                        "model": "assistant",
-                    }
-                    logger.info(f"🔧 Applied role mapping fix to SmolLM2 model: {self.model_name}")
-                
-                return model
-            else:
-                # Use standard configuration for other models
-                model_options = {
-                    "num_ctx": context_size,  # Use dynamically detected context window
-                    "temperature": 0.7,  # Optional: set temperature for consistency
-                    "num_predict": -1,  # Allow unlimited prediction length
-                    "top_k": 40,
-                    "top_p": 0.9,
-                    "repeat_penalty": 1.1,
-                    "seed": self.seed,
+            # WORKAROUND: Fix incorrect role mapping in Agno framework
+            # The default_role_map incorrectly maps "system" -> "developer"
+            # but OpenAI API only accepts: user, assistant, system, tool
+            if hasattr(model, "role_map"):
+                model.role_map = {
+                    "system": "system",  # Fix: should be "system", not "developer"
+                    "user": "user",
+                    "assistant": "assistant",
+                    "tool": "tool",
+                    "model": "assistant",
                 }
-
-                # Special handling for qwen3 models with optimized parameters
-                if "qwen3" in self.model_name.lower():
-                    logger.info(
-                        "Using optimized configuration for Qwen3 model: %s",
-                        self.model_name,
-                    )
-                    model_options.update(
-                        {
-                            "num_predict": 32768,  # Set specific prediction length for qwen3
-                            "temperature": 0.6,
-                            "top_k": 20,
-                            "top_p": 0.95,
-                            "min_p": 0,
-                            "repeat_penalty": 1.1,
-                        }
-                    )
-
-                if "llama3.1" in self.model_name.lower():
-                    logger.info(
-                        "Using optimized configuration for Llama 3.1 model: %s",
-                        self.model_name,
-                    )
-                    model_options.update(
-                        {
-                            "stop": ["<|start_header_id|>", "<|end_header_id|>", "<|eot_id|>"],
-                        }
-                    )
-
-                # Add reasoning support for compatible models
-                reasoning_models = [
-                    "o1",
-                    "o1-preview",
-                    "o1-mini",  # OpenAI reasoning models
-                    "qwen",
-                    "qwq",  # Qwen reasoning models
-                    "deepseek-r1",
-                    "deepseek-reasoner",  # DeepSeek reasoning models
-                    "llama3.2",
-                    "llama3.3",  # Recent Llama models with reasoning
-                    "mistral",
-                    "mixtral",  # Mistral models with reasoning capabilities
-                    "smollm2",
-                ]
-
-                # Check if current model supports reasoning
-                model_supports_reasoning = any(
-                    reasoning_model in self.model_name.lower()
-                    for reasoning_model in reasoning_models
+                logger.info(
+                    f"🔧 Applied role mapping fix to Ollama model: {self.model_name}"
                 )
 
-                if model_supports_reasoning:
-                    logger.info(
-                        "Model %s supports reasoning - using standard Ollama configuration",
-                        self.model_name,
-                    )
-                else:
-                    logger.info(
-                        "Model %s does not appear to support reasoning - using standard configuration",
-                        self.model_name,
-                    )
-
-                model = Ollama(
-                    id=self.model_name,
-                    host=self.ollama_base_url,  # Use host parameter for Ollama
-                    options=model_options,
-                )
-                
-                # WORKAROUND: Fix incorrect role mapping in Agno framework
-                # The default_role_map incorrectly maps "system" -> "developer"
-                # but OpenAI API only accepts: user, assistant, system, tool
-                if hasattr(model, "role_map"):
-                    model.role_map = {
-                        "system": "system",  # Fix: should be "system", not "developer"
-                        "user": "user",
-                        "assistant": "assistant",
-                        "tool": "tool",
-                        "model": "assistant",
-                    }
-                    logger.info(f"🔧 Applied role mapping fix to Ollama model: {self.model_name}")
-                
-                return model
+            return model
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
