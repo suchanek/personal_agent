@@ -379,11 +379,9 @@ categories:
     - disappointed
     - feel
     - feeling
-  relationships:
+  friends:
     - friend
     - friends
-    - enemy
-    - enemies
     - acquaintance
     - acquaintances
     - colleague
@@ -399,8 +397,6 @@ categories:
     - teammate
     - mentor
     - mentee
-    - rival
-    - opponent
     - ally
     - allies
     - contact
@@ -415,6 +411,15 @@ categories:
     - met
     - introduce
     - introduced
+  enemies:
+    - enemy
+    - enemies
+    - rival
+    - opponent
+    - nemesis
+    - foe
+    - adversary
+    - antagonist
 
 phrases:
   academic:
@@ -530,14 +535,11 @@ phrases:
     - am excited
     - am anxious
     - am stressed
-  relationships:
+  friends:
     - have a friend
     - my friend
-    - my enemy
     - is my friend
-    - is my enemy
     - friend named
-    - enemy named
     - know someone
     - met someone
     - social circle
@@ -548,3 +550,13 @@ phrases:
     - childhood friend
     - work colleague
     - school friend
+  enemies:
+    - my enemy
+    - is my enemy
+    - enemy named
+    - my nemesis
+    - is my nemesis
+    - nemesis named
+    - my rival
+    - is my rival
+    - rival named

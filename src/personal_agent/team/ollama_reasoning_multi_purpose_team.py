@@ -104,6 +104,7 @@ from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.file import FileTools
+from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
@@ -139,18 +140,29 @@ except ImportError:
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
         LLM_MODEL,
+        LMSTUDIO_URL,
         OLLAMA_URL,
+        REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
         USER_ID,
     )
     from personal_agent.core.agent_model_manager import AgentModelManager
+    from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 # Load environment variables
 load_dotenv()
 
 cwd = Path(__file__).parent.resolve()
 
-PROVIDER = "ollama"
+PROVIDER = "openai"
+
+# Add diagnostic logging to validate configuration
+print(f"🔍 DEBUG: PROVIDER set to: {PROVIDER}")
+print(f"🔍 DEBUG: LMSTUDIO_URL from settings: {LMSTUDIO_URL}")
+print(f"🔍 DEBUG: REMOTE_LMSTUDIO_URL from settings: {REMOTE_LMSTUDIO_URL}")
+print(f"🔍 DEBUG: OLLAMA_URL from settings: {OLLAMA_URL}")
+print(f"🔍 DEBUG: REMOTE_OLLAMA_URL from settings: {REMOTE_OLLAMA_URL}")
+print(f"🔍 DEBUG: LLM_MODEL from settings: {LLM_MODEL}")
 
 _instructions = dedent(
     """\
@@ -459,6 +471,18 @@ finance_agent = Agent(
     show_tool_calls=True,
 )
 
+# Writer agent that can write content
+medical_agent = Agent(
+    name="Medical Agent",
+    role="Write content",
+    model=create_model(provider=PROVIDER),
+    description="You are an AI agent that can write content.",
+    tools=[PubmedTools()],
+    instructions=[
+        "You are a medical agent that can answer questions about medical topics.",
+    ],
+)
+
 # Writer agent using Ollama
 writer_agent = Agent(
     name="Writer Agent",
@@ -539,125 +563,7 @@ file_agent = Agent(
 )
 
 
-async def create_shared_memory_system(
-    storage_dir: str = AGNO_STORAGE_DIR,
-    knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
-    user_id: str = USER_ID,
-    debug: bool = False,
-    use_remote: bool = False,
-):
-    """Create a shared memory system that integrates with your existing managers."""
-    try:
-        from ..config.settings import LIGHTRAG_MEMORY_URL, LIGHTRAG_URL
-        from ..core.agent_knowledge_manager import AgentKnowledgeManager
-        from ..core.agent_memory_manager import AgentMemoryManager
-        from ..core.agno_storage import (
-            create_agno_memory,
-            create_combined_knowledge_base,
-            load_combined_knowledge_base,
-        )
-    except ImportError:
-        from personal_agent.config.settings import LIGHTRAG_MEMORY_URL, LIGHTRAG_URL
-        from personal_agent.core.agent_knowledge_manager import AgentKnowledgeManager
-        from personal_agent.core.agent_memory_manager import AgentMemoryManager
-        from personal_agent.core.agno_storage import (
-            create_agno_memory,
-            create_combined_knowledge_base,
-            load_combined_knowledge_base,
-        )
-
-    print("🧠 Creating shared memory system...")
-
-    try:
-        # 1. Create your existing memory system with timeout
-        print("  📝 Creating agno memory...")
-        agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-
-        # 2. Create your existing knowledge system with timeout
-        print("  📚 Creating knowledge base...")
-        agno_knowledge = create_combined_knowledge_base(storage_dir, knowledge_dir)
-        if agno_knowledge:
-            print("  📚 Loading knowledge base content...")
-            # Add timeout for knowledge loading
-            await asyncio.wait_for(
-                load_combined_knowledge_base(agno_knowledge, recreate=False),
-                timeout=30.0,  # 30 second timeout
-            )
-
-        # 3. Create your memory and knowledge managers
-        print("  🧠 Creating memory manager...")
-        memory_manager = AgentMemoryManager(
-            user_id, storage_dir, agno_memory, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL, True
-        )
-        memory_manager.initialize(agno_memory)
-
-        print("  📖 Creating knowledge manager...")
-        knowledge_manager = AgentKnowledgeManager(
-            user_id, storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
-        )
-
-        # 4. Create Agno's shared Memory object that will be used by the team
-        print("  🤝 Creating shared memory...")
-        memory_db = SqliteMemoryDb(
-            table_name="team_shared_memory",
-            db_file=f"{storage_dir}/team_shared_memory.db",
-        )
-
-        shared_memory = Memory(
-            model=create_model(provider=PROVIDER, use_remote=use_remote), db=memory_db
-        )
-
-        print("✅ Shared memory system created successfully")
-        return (
-            shared_memory,
-            memory_manager,
-            knowledge_manager,
-            agno_memory,
-            agno_knowledge,
-        )
-
-    except asyncio.TimeoutError:
-        print("⚠️ Knowledge loading timed out, proceeding with basic memory only")
-        # Fallback: create minimal system without full knowledge loading
-        agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-        agno_knowledge = None
-
-        memory_manager = AgentMemoryManager(
-            user_id, storage_dir, agno_memory, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL, True
-        )
-        memory_manager.initialize(agno_memory)
-
-        knowledge_manager = AgentKnowledgeManager(
-            user_id, storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
-        )
-
-        memory_db = SqliteMemoryDb(
-            table_name="team_shared_memory",
-            db_file=f"{storage_dir}/team_shared_memory.db",
-        )
-
-        shared_memory = Memory(
-            model=create_model(provider=PROVIDER, use_remote=use_remote), db=memory_db
-        )
-
-        print("✅ Shared memory system created (minimal mode)")
-        return (
-            shared_memory,
-            memory_manager,
-            knowledge_manager,
-            agno_memory,
-            agno_knowledge,
-        )
-
-    except Exception as e:
-        print(f"❌ Error creating shared memory system: {e}")
-        raise
-
-
-async def create_memory_agent_with_shared_context(
-    shared_memory: Memory,
-    memory_manager: "AgentMemoryManager",
-    knowledge_manager: "AgentKnowledgeManager",
+async def create_memory_agent(
     user_id: str = USER_ID,
     debug: bool = False,
     use_remote: bool = False,
@@ -670,33 +576,23 @@ async def create_memory_agent_with_shared_context(
         from personal_agent.tools.knowledge_tools import KnowledgeTools
         from personal_agent.tools.refactored_memory_tools import AgnoMemoryTools
 
-    # Create tools that use your existing managers
-    memory_tools = AgnoMemoryTools(memory_manager)
-    knowledge_tools = KnowledgeTools(knowledge_manager)
-
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
         model_name=LLM_MODEL,  # Use the configured model
         enable_memory=True,
+        enable_mcp=True,
         debug=debug,
         user_id=user_id,
+        recreate=False,  # Don't recreate memory database every time
+        use_remote=use_remote,
+        alltools=False,
         # AgnoPersonalAgent will create its own model using AgentModelManager
     )
 
     # After initialization, we need to set the shared memory and add the tools
     # Wait for initialization to complete
     await memory_agent._ensure_initialized()
-
-    # Override the memory with shared memory
-    memory_agent.memory = shared_memory
-
-    # Add the memory and knowledge tools to the existing tools
-    if not hasattr(memory_agent, "tools") or memory_agent.tools is None:
-        memory_agent.tools = []
-
-    # Add our custom tools
-    memory_agent.tools.extend([memory_tools, knowledge_tools])
 
     # Update instructions to include memory-specific guidance
     memory_specific_instructions = [
@@ -736,10 +632,7 @@ async def create_memory_agent_with_shared_context(
         "Provide natural responses based on the tool results.",
     ]
 
-    # Set the instructions (AgnoPersonalAgent instructions might be a string or list)
-    memory_agent.instructions = memory_specific_instructions
-
-    print("✅ Memory agent created with shared context")
+    print("✅ Memory agent created")
     return memory_agent
 
 
@@ -768,36 +661,23 @@ async def create_team(use_remote: bool = False):
         print(f"⚠️ Docker synchronization failed: {docker_message}")
         print("Proceeding with team creation, but Docker services may be inconsistent")
 
-    # Create shared memory system with your existing managers
-    shared_memory, memory_manager, knowledge_manager, agno_memory, agno_knowledge = (
-        await create_shared_memory_system(use_remote=use_remote)
-    )
-
-    # Create memory agent that uses shared context
-    # @todo: refactor to use our refactored Personal Agent
-    memory_agent = await create_memory_agent_with_shared_context(
-        shared_memory,
-        memory_manager,
-        knowledge_manager,
+    # Create memory agent directly using the create_memory_agent function
+    memory_agent = await create_memory_agent(
+        user_id=SETTINGS_USER_ID,
         debug=True,
         use_remote=use_remote,
     )
 
     # Update other agents to use shared memory (declare as global to modify)
     global web_agent, finance_agent, writer_agent, calculator_agent
-    web_agent.memory = shared_memory
-    finance_agent.memory = shared_memory
-    writer_agent.memory = shared_memory
-    calculator_agent.memory = shared_memory
-
-    # Create the team with shared memory
+    # Create the team without shared memory - only the memory agent handles memory
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
         model=create_model(provider=PROVIDER, use_remote=use_remote),
-        memory=shared_memory,  # CRITICAL: Team uses shared memory
+        memory=None,  # No team-level memory - only memory agent handles memory
         tools=[
-            ReasoningTools(add_instructions=True, add_few_shot=True),
+            # ReasoningTools(add_instructions=True, add_few_shot=True),
         ],
         members=[
             memory_agent,  # Memory agent with your managers
@@ -827,12 +707,12 @@ async def create_team(use_remote: bool = False):
         markdown=True,
         show_tool_calls=True,
         show_members_responses=True,
-        enable_agentic_context=True,  # Enable shared context
-        share_member_interactions=True,  # Share interactions between members
-        enable_user_memories=True,  # Enable user memory creation
+        enable_agentic_context=False,  # Disable shared context - memory agent handles this
+        share_member_interactions=False,  # Disable shared interactions - memory agent handles this
+        enable_user_memories=False,  # Disable team-level memory - memory agent handles this
     )
 
-    print("✅ Team created with shared memory context")
+    print("✅ Team created - memory handled by Personal AI Agent")
     return agent_team
 
 

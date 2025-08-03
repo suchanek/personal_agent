@@ -14,7 +14,7 @@ from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.reasoning import ReasoningTools
 
-from ..config import LLM_MODEL, OLLAMA_URL
+from ..config import LLM_MODEL, OLLAMA_URL, AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR
 from ..config.model_contexts import get_model_context_size_sync
 from ..utils import setup_logging
 from .specialized_agents import (
@@ -73,9 +73,9 @@ def create_personal_agent_team(
     model_provider: str = "ollama",
     model_name: str = LLM_MODEL,
     ollama_base_url: str = OLLAMA_URL,
-    storage_dir: str = "./data/agno",
-    user_id: str = "default_user",
-    debug: bool = False,
+    storage_dir: str = AGNO_STORAGE_DIR,
+    user_id: str = "test_user",
+    debug: bool = True,
 ) -> Team:
     """Create a team of specialized personal agents.
 
@@ -126,7 +126,7 @@ def create_personal_agent_team(
     # Create memory system for direct access
     from ..core.agno_storage import create_agno_memory
     agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-    
+
     # Get memory tools directly for the coordinator
     def get_memory_tools():
         """Get memory tools as native async functions for direct coordinator access."""
