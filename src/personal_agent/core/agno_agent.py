@@ -119,8 +119,9 @@ class AgnoPersonalAgent(Agent):
         ollama_base_url: str = OLLAMA_URL,
         user_id: str = USER_ID,
         recreate: bool = False,
-        instruction_level: InstructionLevel = InstructionLevel.CONCISE,
+        instruction_level: InstructionLevel = InstructionLevel.STANDARD,
         seed: Optional[int] = None,
+        alltools: Optional[bool] = True,
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -166,6 +167,7 @@ class AgnoPersonalAgent(Agent):
         self.recreate = recreate
         self.instruction_level = instruction_level
         self.seed = seed
+        self.alltools = alltools
 
         # Lazy initialization flag
         self._initialized = False
@@ -348,7 +350,11 @@ class AgnoPersonalAgent(Agent):
             )
 
             self.instruction_manager = AgentInstructionManager(
-                self.instruction_level, self.user_id, self.enable_memory, self.enable_mcp, self.mcp_servers
+                self.instruction_level,
+                self.user_id,
+                self.enable_memory,
+                self.enable_mcp,
+                self.mcp_servers,
             )
 
             self.memory_manager = AgentMemoryManager(
@@ -381,33 +387,36 @@ class AgnoPersonalAgent(Agent):
             # 7. Create the model
             model = self.model_manager.create_model()
             logger.info("Created model: %s", self.model_name)
-
+            tools = []
             # 8. Prepare tools list - MEMORY AGENT ONLY: Just memory and knowledge tools
-            tools = [  # Add GoogleSearch tools directly for web search functionality
-                GoogleSearchTools(),
-                CalculatorTools(
-                    enable_all=True
-                ),  # Add calculator tools for mathematical operations
-                YFinanceTools(
-                    stock_price=True,
-                    company_info=True,
-                    stock_fundamentals=True,
-                    key_financial_ratios=True,
-                    analyst_recommendations=True,
-                ),
-                PythonTools(
-                    base_dir="/tmp",
-                    run_code=True,
-                    list_files=True,
-                    run_files=True,
-                    read_files=True,
-                    uv_pip_install=True,
-                ),
-                ShellTools(
-                    base_dir="."
-                ),  # Match Streamlit configuration for consistency
-                PersonalAgentFilesystemTools(),
-            ]
+            if self.alltools:
+                tools = (
+                    [  # Add GoogleSearch tools directly for web search functionality
+                        GoogleSearchTools(),
+                        CalculatorTools(
+                            enable_all=True
+                        ),  # Add calculator tools for mathematical operations
+                        YFinanceTools(
+                            stock_price=True,
+                            company_info=True,
+                            stock_fundamentals=True,
+                            key_financial_ratios=True,
+                            analyst_recommendations=True,
+                        ),
+                        PythonTools(
+                            base_dir="/tmp",
+                            run_code=True,
+                            list_files=True,
+                            run_files=True,
+                            read_files=True,
+                            uv_pip_install=True,
+                        ),
+                        ShellTools(
+                            base_dir="."
+                        ),  # Match Streamlit configuration for consistency
+                        PersonalAgentFilesystemTools(),
+                    ]
+                )
 
             if self.enable_memory:
                 tools.extend(
@@ -426,7 +435,10 @@ class AgnoPersonalAgent(Agent):
 
             # 9. Create instructions using the AgentInstructionManager
             instructions = self.instruction_manager.create_instructions()
-            logger.info("Generated dynamic instructions using AgentInstructionManager with level: %s", self.instruction_level.name)
+            logger.info(
+                "Generated dynamic instructions using AgentInstructionManager with level: %s",
+                self.instruction_level.name,
+            )
 
             # 10. Update the Agent's components (KEY: Update inherited Agent properties)
             self.model = model

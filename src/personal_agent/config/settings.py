@@ -100,7 +100,8 @@ LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEP
 LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
 LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9622")
 
-LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")
+# LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")
+LMSTUDIO_URL = "https://api.openai.com/v1"
 REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://tesla.local:1234/v1")
 
 # Docker port configurations
