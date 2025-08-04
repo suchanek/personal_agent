@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Non-Blocking Background Tool**: Introduced a new `run_in_background` tool to allow the agent to execute long-running shell commands without blocking the main execution thread. This enhances the agent's ability to manage background processes and improves overall responsiveness. See [ADR-046](./refs/adr/046-background-tool-execution.md) for details.
+
 ### Changed
 - **Enhanced Ollama Reasoning Team**: The standalone Ollama Reasoning Team (`paga_team_cli`) has been significantly upgraded. It now integrates a full instance of the `AgnoPersonalAgent` as its memory and knowledge manager, providing feature parity with the main agent. The CLI has been rebuilt with `rich` and the `CommandParser` to support advanced memory commands (`!`, `?`, `@`) and deliver a more intuitive, consistent user experience. See [ADR-045](./refs/adr/045-enhanced-ollama-reasoning-team.md) for details.
 

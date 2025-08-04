@@ -673,7 +673,7 @@ async def create_team(use_remote: bool = False):
     # Create the team without shared memory - only the memory agent handles memory
     agent_team = Team(
         name="Personal Agent Team",
-        mode="coordinate",
+        mode="route",
         model=create_model(provider=PROVIDER, use_remote=use_remote),
         memory=None,  # No team-level memory - only memory agent handles memory
         tools=[

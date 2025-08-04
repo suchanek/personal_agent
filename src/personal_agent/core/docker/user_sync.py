@@ -41,7 +41,7 @@ class DockerUserSync:
             base_dir: Base directory of the project (auto-detected if None)
             dry_run: If True, show what would be done without making changes
         """
-        self.base_dir = base_dir or Path(__file__).parent.parent.parent.parent
+        self.base_dir = base_dir or Path(__file__).parent.parent.parent.parent.parent
         self.dry_run = dry_run
         
         # Import USER_ID from settings
