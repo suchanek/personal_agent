@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Decoupled User and Docker Configuration**: Refactored the entire configuration system to centralize all user-specific and Docker-related files into a `~/.persag` directory in the user's home directory. This decouples the agent's configuration from the project repository, establishes a single source of truth, and enables true multi-user isolation. The new `PersagManager` class handles automatic migration, validation, and provides a dynamic `get_userid()` function to ensure the correct user context is always used. See [ADR-048](./refs/adr/048-decoupled-user-docker-config.md) for details.
+
+### Changed
 - **Robust Docker User Synchronization**: The `DockerUserSync` class has been significantly refactored to improve stability and data integrity. The update introduces comprehensive input validation, robust error handling for file and subprocess operations, atomic file writes to prevent corruption, and more secure, reliable path detection. This ensures the user synchronization process is resilient and predictable. See [ADR-047](./refs/adr/047-robust-docker-user-synchronization.md) for details.
 
 ### Added
