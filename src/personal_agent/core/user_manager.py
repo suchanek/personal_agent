@@ -37,8 +37,8 @@ class UserManager:
         users = self.registry.get_all_users()
         
         # Mark current user
-        from personal_agent.config import USER_ID
-        current_user_id = USER_ID
+        from personal_agent.config import get_current_user_id
+        current_user_id = get_current_user_id()
         
         for user in users:
             user["is_current"] = (user["user_id"] == current_user_id)
@@ -140,15 +140,17 @@ class UserManager:
                 os.environ["USER_ID"] = user_id
                 results["actions_performed"].append("Updated global USER_ID environment variable")
 
-                # Write to env.userid to persist the change
+                # Write to ~/.persag/env.userid to persist the change
                 try:
-                    from personal_agent.config.settings import BASE_DIR
-                    userid_file = BASE_DIR / "env.userid"
-                    with open(userid_file, 'w') as f:
-                        f.write(f'USER_ID="{user_id}"\n')
-                    results["actions_performed"].append(f"Persisted current user to {userid_file}")
+                    from ..core.persag_manager import get_persag_manager
+                    persag_manager = get_persag_manager()
+                    success = persag_manager.set_userid(user_id)
+                    if success:
+                        results["actions_performed"].append(f"Persisted current user to ~/.persag/env.userid")
+                    else:
+                        results["warnings"].append("Could not write to ~/.persag/env.userid")
                 except Exception as e:
-                    results["warnings"].append(f"Could not write to env.userid: {e}")
+                    results["warnings"].append(f"Could not write to ~/.persag/env.userid: {e}")
 
                 # Refresh user-dependent configuration settings
                 from personal_agent.config import refresh_user_dependent_settings
@@ -202,8 +204,8 @@ class UserManager:
                 return {"success": False, "error": f"User '{user_id}' does not exist"}
             
             # Get current user
-            from personal_agent.config import USER_ID
-            current_user = USER_ID
+            from personal_agent.config import get_current_user_id
+            current_user = get_current_user_id()
             
             # Don't delete the current user
             if user_id == current_user:
@@ -235,8 +237,8 @@ class UserManager:
             Dictionary containing result information
         """
         try:
-            from personal_agent.config import USER_ID
-            current_user = USER_ID
+            from personal_agent.config import get_current_user_id
+            current_user = get_current_user_id()
             
             # Ensure current user is registered
             self.registry.ensure_current_user_registered()
@@ -325,8 +327,8 @@ class UserManager:
         user_details = user.copy()
         
         # Add current user status
-        from personal_agent.config import USER_ID
-        user_details["is_current"] = (user_id == USER_ID)
+        from personal_agent.config import get_current_user_id
+        user_details["is_current"] = (user_id == get_current_user_id())
         
         # Add LightRAG status if this is the current user
         if user_details["is_current"]:

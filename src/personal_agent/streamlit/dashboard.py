@@ -60,8 +60,8 @@ def main():
     
     # Display current user
     try:
-        from personal_agent.config.settings import USER_ID
-        st.sidebar.caption(f"Current User: {USER_ID}")
+        from personal_agent.config.settings import get_userid
+        st.sidebar.caption(f"Current User: {get_userid()}")
     except ImportError:
         st.sidebar.caption("Current User: Unknown")
     

@@ -26,12 +26,12 @@ except ImportError:
 
 # Handle relative imports when running as script vs module
 try:
-    from ..config.settings import USER_ID
+    from ..config.settings import get_userid
     from ..utils.pag_logging import setup_logging
 except ImportError:
     # Running as script, use absolute imports
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from personal_agent.config.settings import USER_ID
+    from personal_agent.config.settings import get_userid
     from personal_agent.utils.pag_logging import setup_logging
 
 logger = setup_logging()
@@ -45,7 +45,7 @@ class DockerIntegrationManager:
         Args:
             user_id: User ID to ensure consistency for (defaults to system USER_ID)
         """
-        self.user_id = user_id or USER_ID
+        self.user_id = user_id or get_userid()
         
         # Fix: Use the same robust project root detection as DockerUserSync
         current_path = Path(__file__).resolve()
@@ -72,7 +72,7 @@ class DockerIntegrationManager:
         self.docker_sync = None
         if DockerUserSync:
             try:
-                self.docker_sync = DockerUserSync(base_dir=self.base_dir, dry_run=False)
+                self.docker_sync = DockerUserSync(dry_run=False)
                 logger.debug("Docker sync manager initialized successfully")
             except Exception as e:
                 logger.warning(f"Failed to initialize Docker sync manager: {e}")
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     parser.add_argument('--check-only', action='store_true', help='Only check, do not fix')
     args = parser.parse_args()
     
-    user_id = args.user_id or USER_ID
+    user_id = args.user_id or get_userid()
     
     if args.check_only:
         is_consistent, message = check_docker_user_consistency(user_id)

@@ -20,7 +20,7 @@ import aiohttp
 from ..config.settings import (
     AGNO_STORAGE_DIR,
     LIGHTRAG_MEMORY_URL,
-    USER_ID,
+    get_userid,
 )
 from ..core.semantic_memory_manager import create_semantic_memory_manager
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
@@ -31,7 +31,7 @@ class MemoryClearingManager:
 
     def __init__(
         self,
-        user_id: str = USER_ID,
+        user_id: str = None,
         storage_dir: str = AGNO_STORAGE_DIR,
         lightrag_memory_url: str = LIGHTRAG_MEMORY_URL,
         verbose: bool = False,
@@ -46,6 +46,10 @@ class MemoryClearingManager:
         self.memory_db = None
         self.memory_manager = None
 
+        if user_id is None:
+            user_id = get_userid()
+        self.user_id = user_id
+        
         print("🧠 Memory Clearing Manager initialized")
         print(f"   User ID: {self.user_id}")
         print(f"   Storage Directory: {self.storage_dir}")
@@ -584,7 +588,7 @@ async def main():
         return 1
 
     # Determine user ID
-    user_id = args.user_id if args.user_id else USER_ID
+    user_id = args.user_id if args.user_id else get_userid()
 
     # Create memory clearing manager
     manager = MemoryClearingManager(

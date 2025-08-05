@@ -41,58 +41,37 @@ class Colors:
 class DockerUserSync:
     """Manages USER_ID synchronization between system and Docker containers."""
 
-    def __init__(self, base_dir: Optional[Union[str, Path]] = None, dry_run: bool = False):
+    def __init__(self, dry_run: bool = False):
         """Initialize the Docker User Sync manager.
 
         Args:
-            base_dir: Base directory of the project (auto-detected if None)
             dry_run: If True, show what would be done without making changes
             
         Raises:
-            ValueError: If base_dir is invalid or system_user_id cannot be determined
+            ValueError: If system_user_id cannot be determined
         """
-        # Validate and set base directory
-        if base_dir is not None:
-            self.base_dir = Path(base_dir).resolve()
-            if not self.base_dir.exists():
-                raise ValueError(f"Base directory does not exist: {self.base_dir}")
-            logger.debug("🔧 DockerUserSync: Using provided base_dir: %s", self.base_dir)
-        else:
-            self.base_dir = Path(__file__).parent.parent.parent.parent.resolve()
-            logger.debug("🔧 DockerUserSync: Auto-detected base_dir: %s", self.base_dir)
+        from ..persag_manager import get_persag_manager
         
         self.dry_run = dry_run
-
-        # Import USER_ID from settings with robust fallback
-        self.system_user_id = self._get_system_user_id()
+        self.persag_manager = get_persag_manager()
+        
+        # Get system user ID from ~/.persag
+        self.system_user_id = self.persag_manager.get_userid()
         if not self.system_user_id:
-            raise ValueError("Could not determine system USER_ID from any source")
+            raise ValueError("Could not determine system USER_ID from ~/.persag")
 
-        # Docker server configurations
-        self.docker_configs = {
-            "lightrag_server": {
-                "dir": self.base_dir / "lightrag_server",
-                "env_file": "env.server",
-                "container_name": "lightrag_pagent",
-                "compose_file": "docker-compose.yml",
-            },
-            "lightrag_memory_server": {
-                "dir": self.base_dir / "lightrag_memory_server",
-                "env_file": "env.memory_server",
-                "container_name": "lightrag_memory",
-                "compose_file": "docker-compose.yml",
-            },
-        }
+        # Docker server configurations - now using ~/.persag paths
+        self.docker_configs = self.persag_manager.get_docker_config()
 
-        # Backup directory
-        self.backup_dir = self.base_dir / "backups" / "docker_env_backups"
+        # Backup directory in ~/.persag
+        self.backup_dir = self.persag_manager.persag_dir / "backups" / "docker_env_backups"
         try:
             self.backup_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             logger.error("Failed to create backup directory %s: %s", self.backup_dir, e)
             raise ValueError(f"Cannot create backup directory: {e}")
 
-        logger.info("Initialized DockerUserSync with base_dir: %s", self.base_dir)
+        logger.info("Initialized DockerUserSync with ~/.persag")
         logger.info("System USER_ID: %s", self.system_user_id)
         logger.info("Dry run mode: %s", self.dry_run)
 
@@ -107,27 +86,8 @@ class DockerUserSync:
             )
 
     def _get_system_user_id(self) -> Optional[str]:
-        """Get system USER_ID with proper fallback chain."""
-        # Try imported value first
-        try:
-            from ...config.settings import USER_ID as SYSTEM_USER_ID
-            if SYSTEM_USER_ID:
-                return SYSTEM_USER_ID
-        except ImportError:
-            pass
-        
-        # Try environment variable
-        env_user_id = os.getenv("USER_ID")
-        if env_user_id:
-            return env_user_id
-        
-        # Try system username as last resort
-        system_user = os.getenv("USER") or os.getenv("USERNAME")
-        if system_user:
-            logger.warning("Using system username as USER_ID fallback: %s", system_user)
-            return system_user
-        
-        return None
+        """Get system USER_ID from ~/.persag (override parent method)"""
+        return self.persag_manager.get_userid()
 
     def _is_valid_user_id(self, user_id: str) -> bool:
         """Validate USER_ID format.

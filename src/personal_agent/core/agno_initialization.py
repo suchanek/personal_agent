@@ -39,7 +39,7 @@ async def initialize_agno_system(
     # CRITICAL: Ensure Docker and user synchronization BEFORE any agent creation
     logger.info("🐳 Performing system-level Docker and user synchronization...")
     docker_ready, docker_message = ensure_docker_user_consistency(
-        user_id=settings.USER_ID, auto_fix=True, force_restart=False
+        user_id=settings.get_userid(), auto_fix=True, force_restart=False
     )
 
     if docker_ready:
@@ -80,7 +80,7 @@ async def initialize_agno_system(
         storage_dir=settings.AGNO_STORAGE_DIR,  # Pass the user-specific path
         knowledge_dir=settings.AGNO_KNOWLEDGE_DIR,  # Pass the user-specific path
         debug=True,
-        user_id=settings.USER_ID,
+        user_id=settings.get_userid(),
         ollama_base_url=ollama_url,  # Pass the selected Ollama URL
         recreate=recreate,
         instruction_level=instruction_level_enum,

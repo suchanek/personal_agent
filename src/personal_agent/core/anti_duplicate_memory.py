@@ -45,7 +45,7 @@ from agno.memory.v2.schema import UserMemory
 from agno.models.base import Model
 from agno.models.message import Message
 
-from personal_agent.config import USER_ID
+from personal_agent.config import get_current_user_id
 from personal_agent.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -457,7 +457,7 @@ class AntiDuplicateMemory(Memory):
         """
         # Default user_id if not provided
         if user_id is None:
-            user_id = USER_ID
+            user_id = get_current_user_id()
         # Handle case where topics comes in as string representation of list
         if memory.topics and isinstance(memory.topics, str):
             try:
@@ -521,7 +521,7 @@ class AntiDuplicateMemory(Memory):
         """
         # Default user_id if not provided
         if user_id is None:
-            user_id = USER_ID
+            user_id = get_current_user_id()
             
         logger.info("Creating memories for user %s", user_id)
         created_memories = []
@@ -619,7 +619,7 @@ class AntiDuplicateMemory(Memory):
         """
         # Default user_id if not provided
         if user_id is None:
-            user_id = USER_ID
+            user_id = get_current_user_id()
             
         # First, check if the memory exists by getting all memories and looking for the ID
         try:
@@ -646,7 +646,9 @@ class AntiDuplicateMemory(Memory):
             # Re-raise the exception to match parent class behavior
             raise
 
-    def get_memory_stats(self, user_id: str = USER_ID) -> dict:
+    def get_memory_stats(self, user_id: str = None) -> dict:
+        if user_id is None:
+            user_id = get_current_user_id()
         """
         Get statistics about memory quality and duplicates.
 
@@ -694,7 +696,9 @@ class AntiDuplicateMemory(Memory):
             "combined_memory_indices": combined_memories,
         }
 
-    def print_memory_analysis(self, user_id: str = USER_ID):
+    def print_memory_analysis(self, user_id: str = None):
+        if user_id is None:
+            user_id = get_current_user_id()
         """
         Print a detailed analysis of memory quality.
 
