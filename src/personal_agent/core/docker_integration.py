@@ -46,7 +46,27 @@ class DockerIntegrationManager:
             user_id: User ID to ensure consistency for (defaults to system USER_ID)
         """
         self.user_id = user_id or USER_ID
-        self.base_dir = Path(__file__).parent.parent.parent.parent
+        
+        # Fix: Use the same robust project root detection as DockerUserSync
+        current_path = Path(__file__).resolve()
+        project_root = None
+        
+        # Walk up the directory tree looking for project markers
+        for parent in current_path.parents:
+            # Look for common project root indicators
+            if any((parent / marker).exists() for marker in [
+                'pyproject.toml', 'setup.py', '.git',
+                'lightrag_server', 'lightrag_memory_server'
+            ]):
+                project_root = parent
+                break
+        
+        if project_root is None:
+            # Fallback to the old method if no markers found
+            project_root = Path(__file__).parent.parent.parent.parent.resolve()
+            logger.warning("DockerIntegrationManager: Using fallback path detection")
+        
+        self.base_dir = project_root
         
         # Initialize Docker sync manager if available
         self.docker_sync = None
