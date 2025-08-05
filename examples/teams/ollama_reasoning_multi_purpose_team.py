@@ -268,6 +268,10 @@ async def main():
         await team.aprint_response(query, stream=True)
         print("\n")
 
+def cli_main():
+    """Synchronous entrypoint for Poetry scripts."""
+    asyncio.run(main())
+
 if __name__ == "__main__":
     # Run the main function
-    asyncio.run(main())
+    cli_main()

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Robust Docker User Synchronization**: The `DockerUserSync` class has been significantly refactored to improve stability and data integrity. The update introduces comprehensive input validation, robust error handling for file and subprocess operations, atomic file writes to prevent corruption, and more secure, reliable path detection. This ensures the user synchronization process is resilient and predictable. See [ADR-047](./refs/adr/047-robust-docker-user-synchronization.md) for details.
+
 ### Added
 - **Non-Blocking Background Tool**: Introduced a new `run_in_background` tool to allow the agent to execute long-running shell commands without blocking the main execution thread. This enhances the agent's ability to manage background processes and improves overall responsiveness. See [ADR-046](./refs/adr/046-background-tool-execution.md) for details.
 

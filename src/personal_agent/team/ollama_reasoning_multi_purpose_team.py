@@ -92,6 +92,7 @@ Version: 1.0.0
 
 import argparse
 import asyncio
+import logging
 from pathlib import Path
 from textwrap import dedent
 
@@ -154,7 +155,7 @@ load_dotenv()
 
 cwd = Path(__file__).parent.resolve()
 
-PROVIDER = "openai"
+PROVIDER = "ollama"
 
 # Add diagnostic logging to validate configuration
 print(f"🔍 DEBUG: PROVIDER set to: {PROVIDER}")
@@ -718,7 +719,7 @@ async def create_team(use_remote: bool = False):
 
 async def cleanup_team(team):
     """Comprehensive cleanup of team resources to prevent ResourceWarnings."""
-    print("\n🧹 Cleaning up team resources...")
+    logging.info("🧹 Cleaning up team resources...")
 
     try:
         # 1. Close team-level resources
@@ -726,37 +727,37 @@ async def cleanup_team(team):
             try:
                 await _cleanup_model(team.model, "Team")
             except Exception as e:
-                print(f"  ⚠️ Error cleaning up team model: {e}")
+                logging.info(f"⚠️ Error cleaning up team model: {e}")
 
         if hasattr(team, "memory") and hasattr(team.memory, "db"):
             try:
                 if hasattr(team.memory.db, "close"):
                     await team.memory.db.close()
-                print("  ✅ Team memory database closed")
+                logging.info("✅ Team memory database closed")
             except Exception as e:
-                print(f"  ⚠️ Error closing team memory database: {e}")
+                logging.info(f"⚠️ Error closing team memory database: {e}")
 
         # 2. Close member-level resources
         if hasattr(team, "members") and team.members:
             for i, member in enumerate(team.members):
                 member_name = getattr(member, "name", f"Member-{i}")
-                print(f"  🔧 Cleaning up {member_name}...")
+                logging.info(f"🔧 Cleaning up {member_name}...")
 
                 # Close member's model
                 if hasattr(member, "model") and member.model:
                     try:
                         await _cleanup_model(member.model, member_name)
                     except Exception as e:
-                        print(f"    ⚠️ Error cleaning up {member_name} model: {e}")
+                        logging.info(f"⚠️ Error cleaning up {member_name} model: {e}")
 
                 # Close member's memory
                 if hasattr(member, "memory") and hasattr(member.memory, "db"):
                     try:
                         if hasattr(member.memory.db, "close"):
                             await member.memory.db.close()
-                        print(f"    ✅ {member_name} memory database closed")
+                        logging.info(f"✅ {member_name} memory database closed")
                     except Exception as e:
-                        print(f"    ⚠️ Error closing {member_name} memory database: {e}")
+                        logging.info(f"⚠️ Error closing {member_name} memory database: {e}")
 
                 # Close member's tools
                 if hasattr(member, "tools") and member.tools:
@@ -766,8 +767,8 @@ async def cleanup_team(team):
                             try:
                                 await _cleanup_tool(tool, f"{member_name}-{tool_name}")
                             except Exception as e:
-                                print(
-                                    f"    ⚠️ Error cleaning up {member_name}-{tool_name}: {e}"
+                                logging.info(
+                                    f"⚠️ Error cleaning up {member_name}-{tool_name}: {e}"
                                 )
 
         # 3. Force garbage collection to help with cleanup
@@ -778,10 +779,10 @@ async def cleanup_team(team):
         # 4. Give asyncio time to close remaining connections
         await asyncio.sleep(0.5)
 
-        print("  ✅ Team cleanup completed")
+        logging.info("✅ Team cleanup completed")
 
     except Exception as e:
-        print(f"  ❌ Error during team cleanup: {e}")
+        logging.info(f"❌ Error during team cleanup: {e}")
 
 
 async def _cleanup_model(model, model_name: str):
@@ -791,12 +792,12 @@ async def _cleanup_model(model, model_name: str):
         if hasattr(model, "_session") and model._session:
             if not model._session.closed:
                 await model._session.close()
-            print(f"    ✅ {model_name} model HTTP session closed")
+            logging.info(f"✅ {model_name} model HTTP session closed")
 
         if hasattr(model, "session") and model.session:
             if not model.session.closed:
                 await model.session.close()
-            print(f"    ✅ {model_name} model session closed")
+            logging.info(f"✅ {model_name} model session closed")
 
         # Close any client connections
         if hasattr(model, "client"):
@@ -805,16 +806,16 @@ async def _cleanup_model(model, model_name: str):
             elif hasattr(model.client, "_session") and model.client._session:
                 if not model.client._session.closed:
                     await model.client._session.close()
-            print(f"    ✅ {model_name} model client closed")
+            logging.info(f"✅ {model_name} model client closed")
 
         # Handle OllamaTools specific cleanup
         if hasattr(model, "_client") and model._client:
             if hasattr(model._client, "close"):
                 await model._client.close()
-            print(f"    ✅ {model_name} Ollama client closed")
+            logging.info(f"✅ {model_name} Ollama client closed")
 
     except Exception as e:
-        print(f"    ⚠️ Error cleaning up {model_name} model: {e}")
+        logging.info(f"⚠️ Error cleaning up {model_name} model: {e}")
 
 
 async def _cleanup_tool(tool, tool_name: str):
@@ -824,29 +825,29 @@ async def _cleanup_tool(tool, tool_name: str):
         if hasattr(tool, "_session") and tool._session:
             if not tool._session.closed:
                 await tool._session.close()
-            print(f"    ✅ {tool_name} tool HTTP session closed")
+            logging.info(f"✅ {tool_name} tool HTTP session closed")
 
         if hasattr(tool, "session") and tool.session:
             if not tool.session.closed:
                 await tool.session.close()
-            print(f"    ✅ {tool_name} tool session closed")
+            logging.info(f"✅ {tool_name} tool session closed")
 
         # Handle DuckDuckGo tools specifically
         if hasattr(tool, "ddgs"):
             if hasattr(tool.ddgs, "_session") and tool.ddgs._session:
                 if not tool.ddgs._session.closed:
                     await tool.ddgs._session.close()
-                print(f"    ✅ {tool_name} DuckDuckGo session closed")
+                logging.info(f"✅ {tool_name} DuckDuckGo session closed")
 
             if hasattr(tool.ddgs, "close"):
                 await tool.ddgs.close()
-                print(f"    ✅ {tool_name} DuckDuckGo client closed")
+                logging.info(f"✅ {tool_name} DuckDuckGo client closed")
 
         # Handle YFinance tools
         if hasattr(tool, "_session") and "yfinance" in str(type(tool)).lower():
             if tool._session and not tool._session.closed:
                 await tool._session.close()
-                print(f"    ✅ {tool_name} YFinance session closed")
+                logging.info(f"✅ {tool_name} YFinance session closed")
 
         # Close any other client connections
         if hasattr(tool, "client"):
@@ -855,10 +856,10 @@ async def _cleanup_tool(tool, tool_name: str):
             elif hasattr(tool.client, "_session") and tool.client._session:
                 if not tool.client._session.closed:
                     await tool.client._session.close()
-            print(f"    ✅ {tool_name} tool client closed")
+            logging.info(f"✅ {tool_name} tool client closed")
 
     except Exception as e:
-        print(f"    ⚠️ Error cleaning up {tool_name} tool: {e}")
+        logging.info(f"⚠️ Error cleaning up {tool_name} tool: {e}")
 
 
 # Main execution
@@ -939,7 +940,7 @@ async def main(use_remote: bool = False):
                     console.print(
                         "👋 Goodbye! Thanks for using the Personal Agent Team!"
                     )
-                    # await cleanup_team(team)
+                    await cleanup_team(team)
                     break
 
                 # If it's a memory command, execute it with the memory agent
@@ -1013,7 +1014,7 @@ async def main(use_remote: bool = False):
                 continue
             except EOFError:
                 console.print("\n\n👋 Session ended. Goodbye!")
-                # await cleanup_team(team)
+                await cleanup_team(team)
                 break
             except Exception as e:
                 console.print(f"\n❌ Error processing your request: {str(e)}")
@@ -1028,7 +1029,7 @@ async def main(use_remote: bool = False):
     finally:
         try:
             if "team" in locals():
-                # await cleanup_team(team)
+                await cleanup_team(team)
                 pass
         except Exception as e:
             console.print(f"Warning during cleanup: {e}")
