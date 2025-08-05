@@ -19,11 +19,11 @@ from .settings import (
     STORAGE_BACKEND,
     USE_MCP,
     USE_WEAVIATE,
-    USER_ID,
     WEAVIATE_URL,
     get_env_bool,
     get_env_var,
     get_current_user_id,
+    get_userid,
     refresh_user_dependent_settings,
 )
 
@@ -32,7 +32,7 @@ from .settings import (
 def get_settings():
     """Get configuration settings as a dictionary."""
     return {
-        "USER_ID": USER_ID,
+        "USER_ID": get_userid(),
         "ROOT_DIR": ROOT_DIR,
         "HOME_DIR": HOME_DIR,
         "DATA_DIR": DATA_DIR,
@@ -76,7 +76,7 @@ __all__ = [
     "STORAGE_BACKEND",
     "USE_MCP",
     "USE_WEAVIATE",
-    "USER_ID",
+    "get_userid",
     "WEAVIATE_URL",
     "get_env_bool",
     "get_env_var",

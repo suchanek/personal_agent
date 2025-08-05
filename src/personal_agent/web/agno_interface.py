@@ -25,12 +25,12 @@ if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
 try:
-    from personal_agent.config.settings import USER_ID
+    from personal_agent.config.settings import get_userid
     from personal_agent.core.memory import is_memory_connected
     from personal_agent.utils.pag_logging import setup_logging
 except ImportError:
     # Fallback for relative imports
-    from ..config.settings import USER_ID
+    from ..config.settings import get_userid
     from ..core.memory import is_memory_connected
     from ..utils.pag_logging import setup_logging
 
@@ -164,7 +164,7 @@ async def create_agno_agent_with_params(model_name, ollama_url):
         storage_dir=AGNO_STORAGE_DIR,
         knowledge_dir=AGNO_KNOWLEDGE_DIR,
         debug=True,
-        user_id=USER_ID,
+        user_id=get_userid(),
         ollama_base_url=ollama_url,
     )
     return agent
@@ -351,7 +351,7 @@ def main():
                         storage_dir=AGNO_STORAGE_DIR,
                         knowledge_dir=AGNO_KNOWLEDGE_DIR,
                         debug=True,
-                        user_id=USER_ID,
+                        user_id=get_userid(),
                         ollama_base_url=st.session_state.current_ollama_url,
                     )
                     return agent
@@ -548,7 +548,7 @@ def main():
         st.markdown(
             f"""
         <div style="margin-top: 0.5rem;">
-            <strong>User ID:</strong> {USER_ID}
+            <strong>User ID:</strong> {get_userid()}
         </div>
         """,
             unsafe_allow_html=True,
@@ -597,7 +597,7 @@ def main():
                     with st.spinner("Retrieving memories..."):
                         # Get memories for the specific user using the native memory manager
                         memories = current_agent.agno_memory.get_user_memories(
-                            user_id=USER_ID
+                            user_id=get_userid()
                         )
 
                     if memories:

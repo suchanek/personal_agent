@@ -35,7 +35,7 @@ from ..config.settings import (
     SHOW_SPLASH_SCREEN,
     STORAGE_BACKEND,
     USE_MCP,
-    USER_ID,
+    get_userid,
 )
 from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..tools.knowledge_tools import KnowledgeTools
@@ -83,7 +83,7 @@ class AgnoPersonalAgentConfig:
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR
     debug: bool = False
     ollama_base_url: str = OLLAMA_URL
-    user_id: str = USER_ID
+    user_id: str = None
     recreate: bool = False
     seed: Optional[int] = None
 
@@ -117,7 +117,7 @@ class AgnoPersonalAgent(Agent):
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
-        user_id: str = USER_ID,
+        user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
         seed: Optional[int] = None,
@@ -173,6 +173,11 @@ class AgnoPersonalAgent(Agent):
         self._initialized = False
         self._initialization_lock = asyncio.Lock()
 
+        # Set user_id with fallback
+        if user_id is None:
+            user_id = get_userid()
+        self.user_id = user_id
+        
         # Set up storage paths
         self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
 
@@ -237,7 +242,7 @@ class AgnoPersonalAgent(Agent):
             user_id: User identifier
         """
         # If user_id differs from default, create user-specific paths
-        if user_id != USER_ID:
+        if user_id != get_userid():
             # Replace the default user ID in the paths with the custom user ID
             self.storage_dir = os.path.expandvars(
                 f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}"
@@ -1143,7 +1148,7 @@ async def create_agno_agent(
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
     debug: bool = False,
     ollama_base_url: str = OLLAMA_URL,
-    user_id: str = USER_ID,
+    user_id: str = None,
     recreate: bool = False,
     instruction_level: InstructionLevel = InstructionLevel.STANDARD,
 ) -> AgnoPersonalAgent:
@@ -1172,6 +1177,10 @@ async def create_agno_agent(
         "create_agno_agent() called (deprecated - use AgnoPersonalAgent() constructor directly)"
     )
 
+    # Set user_id with fallback
+    if user_id is None:
+        user_id = get_userid()
+    
     # Just create the agent - initialization happens automatically when needed
     return AgnoPersonalAgent(
         model_provider=model_provider,

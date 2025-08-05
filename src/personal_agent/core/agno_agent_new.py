@@ -39,7 +39,7 @@ from ..config.settings import (
     SHOW_SPLASH_SCREEN,
     STORAGE_BACKEND,
     USE_MCP,
-    USER_ID,
+    get_userid,
 )
 from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
 from ..utils import setup_logging
@@ -82,7 +82,7 @@ class AgnoPersonalAgent:
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
-        user_id: str = USER_ID,
+        user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
         seed: Optional[int] = None,
@@ -115,6 +115,11 @@ class AgnoPersonalAgent:
         self.instruction_level = instruction_level
         self.seed = seed
 
+        # Set user_id with fallback
+        if user_id is None:
+            user_id = get_userid()
+        self.user_id = user_id
+        
         # Set up storage paths
         self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
         
@@ -187,7 +192,7 @@ class AgnoPersonalAgent:
             user_id: User identifier
         """
         # If user_id differs from default, create user-specific paths
-        if user_id != USER_ID:
+        if user_id != get_userid():
             # Replace the default user ID in the paths with the custom user ID
             self.storage_dir = os.path.expandvars(
                 f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}"

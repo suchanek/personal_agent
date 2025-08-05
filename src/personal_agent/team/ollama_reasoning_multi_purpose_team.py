@@ -125,7 +125,7 @@ try:
         OLLAMA_URL,
         REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
-        USER_ID,
+        get_userid,
     )
     from ..core.agent_model_manager import AgentModelManager
     from ..core.agno_agent import AgnoPersonalAgent
@@ -145,7 +145,7 @@ except ImportError:
         OLLAMA_URL,
         REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
-        USER_ID,
+        get_userid,
     )
     from personal_agent.core.agent_model_manager import AgentModelManager
     from personal_agent.core.agno_agent import AgnoPersonalAgent
@@ -565,11 +565,15 @@ file_agent = Agent(
 
 
 async def create_memory_agent(
-    user_id: str = USER_ID,
+    user_id: str = None,
     debug: bool = False,
     use_remote: bool = False,
 ) -> Agent:
     """Create a memory agent that uses the shared memory system."""
+    # Get user_id dynamically if not provided
+    if user_id is None:
+        user_id = get_userid()
+    
     try:
         from ..tools.knowledge_tools import KnowledgeTools
         from ..tools.refactored_memory_tools import AgnoMemoryTools
@@ -643,17 +647,19 @@ async def create_team(use_remote: bool = False):
 
     # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
     try:
-        from ..config.settings import USER_ID as SETTINGS_USER_ID
+        from ..config.settings import get_userid
         from ..core.docker_integration import ensure_docker_user_consistency
     except ImportError:
-        from personal_agent.config.settings import USER_ID as SETTINGS_USER_ID
+        from personal_agent.config.settings import get_userid
         from personal_agent.core.docker_integration import (
             ensure_docker_user_consistency,
         )
 
+    # Get the current user ID dynamically
+    current_user_id = get_userid()
     print("🐳 Ensuring Docker and user synchronization...")
     docker_ready, docker_message = ensure_docker_user_consistency(
-        user_id=SETTINGS_USER_ID, auto_fix=True, force_restart=False
+        user_id=current_user_id, auto_fix=True, force_restart=False
     )
 
     if docker_ready:
@@ -664,7 +670,7 @@ async def create_team(use_remote: bool = False):
 
     # Create memory agent directly using the create_memory_agent function
     memory_agent = await create_memory_agent(
-        user_id=SETTINGS_USER_ID,
+        user_id=current_user_id,
         debug=True,
         use_remote=use_remote,
     )
