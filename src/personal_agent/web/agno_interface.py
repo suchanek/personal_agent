@@ -7,15 +7,15 @@ straightforward design focused on query input and response display.
 """
 
 import asyncio
+import json
 import logging
 import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-import requests
-import json
+from typing import TYPE_CHECKING, Iterator, Optional
 
+import requests
 import streamlit as st
 
 # Add the src directory to the path for imports
@@ -26,6 +26,7 @@ if str(src_dir) not in sys.path:
 
 try:
     from personal_agent.config.settings import get_userid
+    from personal_agent.core.agno_agent import AgnoPersonalAgent
     from personal_agent.core.memory import is_memory_connected
     from personal_agent.utils.pag_logging import setup_logging
 except ImportError:
@@ -139,6 +140,7 @@ def get_ollama_models(ollama_url):
         st.error(f"Error connecting to Ollama at {ollama_url}: {str(e)}")
         return []
 
+
 async def create_agno_agent_with_params(model_name, ollama_url):
     """Create an agno agent with specific model and URL parameters."""
     try:
@@ -149,11 +151,7 @@ async def create_agno_agent_with_params(model_name, ollama_url):
         )
         from personal_agent.core.agno_agent import create_agno_agent
     except ImportError:
-        from ..config.settings import (
-            AGNO_KNOWLEDGE_DIR,
-            AGNO_STORAGE_DIR,
-            USE_MCP,
-        )
+        from ..config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, USE_MCP
         from ..core.agno_agent import create_agno_agent
 
     agent = await create_agno_agent(
@@ -169,67 +167,80 @@ async def create_agno_agent_with_params(model_name, ollama_url):
     )
     return agent
 
-def clean_response_content(response: str) -> str:
+
+def handle_agno_response(run_stream: Iterator, display_metrics: bool = False) -> str:
     """
-    Clean the response content by removing thinking tags and other unwanted elements.
+    Handle agno RunResponse stream and extract the content properly.
 
-    :param response: Raw response from the agent
-    :return: Cleaned response content
+    :param run_stream: Iterator of RunResponse objects from agno
+    :param display_metrics: Whether to display metrics in Streamlit
+    :return: The response content as string
     """
-    import re
+    try:
+        # Import agno utilities for response handling
+        from agno.utils.pprint import pprint_run_response
 
-    if not response:
-        return response
+        # Process the stream - this will handle the response properly
+        # For now, we'll collect the stream and extract content
+        response_content = ""
 
-    # Convert to string if it's not already
-    if not isinstance(response, str):
-        response = str(response)
+        # Collect all responses from the stream
+        for response in run_stream:
+            if hasattr(response, "content") and response.content:
+                response_content += response.content
 
-    # Check if response is ONLY thinking content
-    response_stripped = response.strip()
+        # If we have an agent with run_response, get the final content
+        # This is where the actual response content will be after streaming
+        return response_content.strip() if response_content else "No response generated"
 
-    if response_stripped.startswith("<think>") or response_stripped.startswith(
-        "<think"
-    ):
-        think_close_match = re.search(
-            r"</think\s*>", response, re.IGNORECASE | re.DOTALL
-        )
+    except Exception as e:
+        logger.error(f"Error handling agno response: {e}")
+        return f"Error processing response: {str(e)}"
 
-        if not think_close_match:
-            return "I'm processing your request, but my response was incomplete. Please try asking again."
 
-        content_after_think = response[think_close_match.end() :].strip()
-        if not content_after_think:
-            return "I was thinking about your request but didn't provide a complete answer. Please try asking again."
+def extract_response_content(agent, display_metrics: bool = False) -> tuple[str, dict]:
+    """
+    Extract response content and metrics from agno agent after run.
 
-    # Remove <think>...</think> tags and their content
-    think_pattern = r"<think\s*>.*?</think\s*>"
-    cleaned = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE)
+    :param agent: The agno agent instance
+    :param display_metrics: Whether to return metrics
+    :return: Tuple of (response_content, metrics)
+    """
+    response_content = ""
+    metrics = {}
 
-    # Remove any standalone opening or closing think tags
-    cleaned = re.sub(r"</?think\s*>", "", cleaned, flags=re.IGNORECASE)
+    try:
+        # Get the response from the agent's run_response
+        if hasattr(agent, "run_response") and agent.run_response:
+            if hasattr(agent.run_response, "messages") and agent.run_response.messages:
+                # Get the last assistant message
+                for message in reversed(agent.run_response.messages):
+                    if message.role == "assistant":
+                        if hasattr(message, "content") and message.content:
+                            response_content = message.content
+                            break
+                        elif hasattr(message, "tool_calls") and message.tool_calls:
+                            response_content = f"Tool calls: {message.tool_calls}"
+                            break
 
-    # Clean up extra whitespace
-    cleaned = re.sub(r"\n\s*\n\s*\n+", "\n\n", cleaned)
-    cleaned = cleaned.strip()
+            # Get metrics if requested
+            if display_metrics and hasattr(agent.run_response, "metrics"):
+                metrics = agent.run_response.metrics
 
-    # If cleaning removed everything, return a helpful message
-    if not cleaned and response:
-        if "<think>" in response.lower():
-            return "I was processing your request but only generated thinking content. Please try asking again."
-        else:
-            return (
-                "I generated an empty response. Please try asking your question again."
-            )
+        return (
+            response_content.strip() if response_content else "No response generated"
+        ), metrics
 
-    return cleaned
+    except Exception as e:
+        logger.error(f"Error extracting response content: {e}")
+        return f"Error extracting response: {str(e)}", {}
 
 
 def main():
     """Main Streamlit application."""
     # Page configuration
     st.set_page_config(
-        page_title="Personal AI Agent",
+        page_title="Personal Agent",
         page_icon="🤖",
         layout="wide",
         initial_sidebar_state="expanded",
@@ -408,14 +419,14 @@ def main():
     # Sidebar
     with st.sidebar:
         st.header("🤖 Model Selection")
-        
+
         # Ollama URL input
         new_ollama_url = st.text_input(
-            "Ollama URL:", 
+            "Ollama URL:",
             value=st.session_state.current_ollama_url,
-            help="Enter the Ollama server URL (e.g., http://localhost:11434)"
+            help="Enter the Ollama server URL (e.g., http://localhost:11434)",
         )
-        
+
         # Button to fetch models
         if st.button("🔄 Fetch Available Models", use_container_width=True):
             with st.spinner("Fetching models..."):
@@ -426,51 +437,60 @@ def main():
                     st.success(f"Found {len(available_models)} models!")
                 else:
                     st.error("No models found or connection failed")
-        
+
         # Model selection dropdown
         if "available_models" in st.session_state and st.session_state.available_models:
             current_model_index = 0
             if st.session_state.current_model in st.session_state.available_models:
-                current_model_index = st.session_state.available_models.index(st.session_state.current_model)
-            
+                current_model_index = st.session_state.available_models.index(
+                    st.session_state.current_model
+                )
+
             selected_model = st.selectbox(
                 "Select Model:",
                 st.session_state.available_models,
                 index=current_model_index,
-                help="Choose an Ollama model to use for the agent"
+                help="Choose an Ollama model to use for the agent",
             )
-            
+
             # Button to apply model selection
             if st.button("🚀 Apply Model Selection", use_container_width=True):
-                if selected_model != st.session_state.current_model or new_ollama_url != st.session_state.current_ollama_url:
+                if (
+                    selected_model != st.session_state.current_model
+                    or new_ollama_url != st.session_state.current_ollama_url
+                ):
                     with st.spinner("Reinitializing agent with new model..."):
                         try:
                             # Update session state
                             st.session_state.current_model = selected_model
                             st.session_state.current_ollama_url = new_ollama_url
-                            
+
                             # Reinitialize agent asynchronously
                             loop = asyncio.new_event_loop()
                             asyncio.set_event_loop(loop)
                             try:
                                 new_agent = loop.run_until_complete(
-                                    create_agno_agent_with_params(selected_model, new_ollama_url)
+                                    create_agno_agent_with_params(
+                                        selected_model, new_ollama_url
+                                    )
                                 )
                             finally:
                                 loop.close()
-                            
+
                             # Update session state and globals
                             st.session_state.agno_agent = new_agent
                             agno_agent = new_agent
-                            
+
                             # Update current_agent reference
                             current_agent = new_agent
-                            
+
                             # Create dummy memory functions for compatibility
                             async def dummy_query_kb(query: str) -> str:
                                 return "Memory handled by Agno"
 
-                            async def dummy_store_interaction(query: str, response: str) -> bool:
+                            async def dummy_store_interaction(
+                                query: str, response: str
+                            ) -> bool:
                                 return True
 
                             async def dummy_clear_kb() -> bool:
@@ -478,12 +498,14 @@ def main():
 
                             # Store memory functions
                             st.session_state.query_knowledge_base_func = dummy_query_kb
-                            st.session_state.store_interaction_func = dummy_store_interaction
+                            st.session_state.store_interaction_func = (
+                                dummy_store_interaction
+                            )
                             st.session_state.clear_knowledge_base_func = dummy_clear_kb
-                            
+
                             # Clear chat history for new model
                             st.session_state.messages = []
-                            
+
                             st.success(f"Agent updated to use model: {selected_model}")
                             st.rerun()
                         except Exception as e:
@@ -648,6 +670,25 @@ def main():
                     "⚠️ Agno memory system not available or agent not properly initialized"
                 )
 
+        # Metrics toggle
+        if st.button("📊 Toggle Response Metrics", use_container_width=True):
+            st.session_state.show_metrics = not st.session_state.get(
+                "show_metrics", False
+            )
+
+        if st.session_state.get("show_metrics", False):
+            st.success("✅ Metrics display enabled")
+
+            # Display last response metrics if available
+            if "last_response_metrics" in st.session_state:
+                st.subheader("📊 Last Response Metrics")
+                with st.expander("View Metrics Details", expanded=True):
+                    st.json(st.session_state.last_response_metrics)
+            else:
+                st.info("No metrics available yet. Send a message to see metrics.")
+        else:
+            st.info("📊 Metrics display disabled")
+
         st.divider()
 
         # Agent Information
@@ -701,33 +742,55 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("🤔 Thinking..."):
                 try:
-                    # Run the agent asynchronously
+                    # Run the agent asynchronously with streaming
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
 
                     try:
-                        response = loop.run_until_complete(current_agent.run(prompt))
+                        # Use streaming for better response handling
+                        run_stream = loop.run_until_complete(
+                            current_agent.run(prompt, stream=True)
+                        )
+
+                        # Process the stream properly
+                        response_content = ""
+                        if hasattr(run_stream, "__iter__"):
+                            # Handle streaming response
+                            for response in run_stream:
+                                if hasattr(response, "content") and response.content:
+                                    response_content += response.content
+                        else:
+                            # Fallback for non-streaming
+                            response_content = str(run_stream) if run_stream else ""
+
+                        # Extract final response and metrics from agent
+                        final_response, metrics = extract_response_content(
+                            current_agent, display_metrics=True
+                        )
+
+                        # Use the extracted response if available, otherwise use streamed content
+                        if final_response and final_response != "No response generated":
+                            response_content = final_response
+                        elif not response_content:
+                            response_content = "No response generated by agent"
+
                     finally:
                         loop.close()
 
-                    # Clean the response
-                    if response is None:
-                        response = "No response generated by agent"
-                    elif not isinstance(response, str):
-                        response = str(response)
-
-                    cleaned_response = clean_response_content(response)
-
                     # Display response
-                    st.markdown(cleaned_response)
+                    st.markdown(response_content)
                     response_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     st.caption(f"*{response_timestamp}*")
+
+                    # Store metrics in session state for sidebar display
+                    if metrics and st.session_state.get("show_metrics", False):
+                        st.session_state.last_response_metrics = metrics
 
                     # Add to chat history
                     st.session_state.messages.append(
                         {
                             "role": "assistant",
-                            "content": cleaned_response,
+                            "content": response_content,
                             "timestamp": response_timestamp,
                         }
                     )
@@ -738,7 +801,7 @@ def main():
                     )
                     if store_func:
                         try:
-                            run_async_in_thread(store_func(prompt, response))
+                            run_async_in_thread(store_func(prompt, response_content))
                             if logger:
                                 logger.info("Interaction stored in memory")
                         except Exception as e:

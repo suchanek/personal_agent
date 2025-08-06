@@ -43,6 +43,7 @@ if USE_MCP:
         mcp_servers = get_mcp_servers()
         if mcp_servers:
             from .core import SimpleMCPClient
+
             mcp_client = SimpleMCPClient(mcp_servers)
     except Exception as e:
         _logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ from .utils.pag_logging import (
 )
 
 # Package version (matches pyproject.toml)
-__version__ = "0.11.33"  # Defined once to avoid duplication
+__version__ = "0.11.37"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
