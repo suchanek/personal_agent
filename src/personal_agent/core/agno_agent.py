@@ -465,14 +465,6 @@ class AgnoPersonalAgent(Agent):
                     "Created Knowledge Coordinator for unified knowledge queries"
                 )
 
-            # If recreate is True, clear all memories AFTER memory system is initialized
-            if recreate and self.enable_memory:
-                logger.info(
-                    "Recreate flag is True, clearing all memories after memory system initialization"
-                )
-                clear_result = await self.memory_manager.clear_all_memories()
-                logger.info("Memory clear result: %s", clear_result)
-
             logger.info(
                 "Successfully initialized AgnoPersonalAgent with %d tools",
                 len(tools),
@@ -585,10 +577,6 @@ class AgnoPersonalAgent(Agent):
             # Validate and clean content
             final_content = self._validate_response_content(final_content, query)
 
-            # SmolLM2 cleanup if needed
-            if is_smollm2_model(self.model_name) and final_content:
-                final_content = extract_content_from_smollm2_response(final_content)
-
             if add_thought_callback:
                 add_thought_callback("✅ Agent execution complete.")
 
@@ -641,23 +629,6 @@ class AgnoPersonalAgent(Agent):
                 return f"Hello {self.user_id}!"
             else:
                 return "I'm here to help! What would you like to know?"
-
-        # Check for common SmolLM2 issues
-        if is_smollm2_model(self.model_name):
-            # Remove any XML artifacts that might remain
-            cleaned_content = re.sub(r"<[^>]+>", "", content).strip()
-
-            # If still empty after cleanup
-            if not cleaned_content:
-                # Generate a simple fallback based on query
-                if any(
-                    greeting in query.lower() for greeting in ["hello", "hi", "hey"]
-                ):
-                    return f"Hello {self.user_id}!"
-                else:
-                    return "I'm here to help! What would you like to know?"
-
-            return cleaned_content
 
         return content
 
