@@ -15,7 +15,7 @@ from datetime import datetime
 
 # Import project modules
 from personal_agent.core.agno_agent import AgnoPersonalAgent
-from personal_agent.config import USER_ID
+from personal_agent.config import get_userid
 from personal_agent.streamlit.utils.agent_utils import get_agent_instance, get_agent_memory, check_agent_status
 
 
@@ -51,7 +51,7 @@ def get_all_memories(
             return []
         
         # Get memories from the agent's memory system
-        raw_memories = memory_system.get_user_memories(user_id=USER_ID)
+        raw_memories = memory_system.get_user_memories(user_id=get_userid())
         
         if not raw_memories:
             st.info("No memories found in the system.")

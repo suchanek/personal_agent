@@ -53,7 +53,8 @@ class DockerUserSync:
 
         # Import USER_ID from settings
         try:
-            from ...config.settings import USER_ID as SYSTEM_USER_ID
+            from ...config.settings import get_userid
+            SYSTEM_USER_ID = get_userid()
         except ImportError:
             # Fallback if import fails
             SYSTEM_USER_ID = os.getenv("USER_ID", "default_user")

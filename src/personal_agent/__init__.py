@@ -17,8 +17,8 @@ The package supports three main frameworks:
 3. Agno (modern async agent framework) - primary interface
 
 Author: Personal Agent Development Team
-Last modified: 2025-07-10 15:12:58
-Version: 0.8.7.dev
+Last modified: 2025-08-06 09:21:29
+Version: 0.11.37
 """
 
 # pylint: disable=C0413
@@ -30,16 +30,11 @@ import os
 if "RUST_LOG" not in os.environ:
     os.environ["RUST_LOG"] = "error"
 
-# Import core components
-from .config import USE_MCP, USE_WEAVIATE, get_mcp_servers
-from .config.settings import ROOT_DIR
-from .core import SimpleMCPClient, create_agent_executor, setup_weaviate
-from .core.memory import is_weaviate_connected, vector_store, weaviate_client
+# Import submodules as modules (for pdoc discovery)
+from . import cli, config, core, readers, streamlit, team, tools, utils, web
 
-# Import tools
-from .tools import get_all_tools
-from .tools.filesystem import create_and_save_file, mcp_read_file, mcp_write_file
-from .tools.web import mcp_github_search
+# Import core components (only those used directly in this file)
+from .config import USE_MCP, get_mcp_servers
 
 # Initialize global MCP client if MCP is enabled
 mcp_client = None
@@ -47,36 +42,19 @@ if USE_MCP:
     try:
         mcp_servers = get_mcp_servers()
         if mcp_servers:
+            from .core import SimpleMCPClient
             mcp_client = SimpleMCPClient(mcp_servers)
     except Exception as e:
         _logger = logging.getLogger(__name__)
         _logger.warning("Failed to initialize MCP client: %s", e)
         mcp_client = None
 
-# Import utilities
-from .utils import (
-    cleanup,
-    inject_dependencies,
-    register_cleanup_handlers,
-    store_fact_in_knowledge_base,
-)
+# Import utilities (only those used directly in this file)
 from .utils.pag_logging import (
-    configure_all_rich_logging,
     configure_master_logger,
-    disable_stream_handlers_for_namespace,
-    list_all_loggers,
-    list_handlers,
-    set_logger_level,
-    set_logger_level_for_module,
-    set_logging_level_for_all_handlers,
-    setup_agno_rich_logging,
     setup_logging,
     setup_logging_filters,
-    toggle_stream_handler,
 )
-
-# Import web interface
-from .web import create_app, create_smol_app, register_routes, register_smol_routes
 
 # Package version (matches pyproject.toml)
 __version__ = "0.11.33"  # Defined once to avoid duplication
@@ -105,9 +83,6 @@ if _logger.isEnabledFor(logging.INFO) and root_logger.isEnabledFor(logging.INFO)
 
 # Main entry points
 from .agno_main import cli_main, run_agno_cli, run_agno_cli_wrapper
-from .langchain_main import cli_main as langchain_cli_main
-from .langchain_main import main as langchain_main
-from .smol_main import run_smolagents_cli, run_smolagents_web
 
 
 def print_configuration() -> str:
@@ -198,60 +173,24 @@ def print_configuration() -> str:
 
 # Export public API
 __all__ = [
-    # Core components
-    "SimpleMCPClient",
-    "create_agent_executor",
-    "setup_weaviate",
-    "is_weaviate_connected",
-    "vector_store",
-    "weaviate_client",
-    # Configuration
-    "USE_MCP",
-    "USE_WEAVIATE",
-    "get_mcp_servers",
-    "ROOT_DIR",
+    # Submodules (for pdoc discovery)
+    "config",
+    "core",
+    "tools",
+    "utils",
+    "web",
+    "cli",
+    "streamlit",
+    "team",
+    "readers",
     # MCP Client
     "mcp_client",
-    # Tools
-    "get_all_tools",
-    "create_and_save_file",
-    "mcp_read_file",
-    "mcp_write_file",
-    "mcp_github_search",
     # Logger
     "logger",
-    # Utilities
-    "cleanup",
-    "inject_dependencies",
-    "register_cleanup_handlers",
-    "store_fact_in_knowledge_base",
-    "configure_all_rich_logging",
-    "configure_master_logger",
-    "disable_stream_handlers_for_namespace",
-    "list_all_loggers",
-    "list_handlers",
-    "set_logger_level",
-    "set_logger_level_for_module",
-    "set_logging_level_for_all_handlers",
-    "setup_agno_rich_logging",
-    "setup_logging",
-    "toggle_stream_handler",
-    "setup_logging_filters",
-    # Web interface
-    "create_app",
-    "register_routes",
-    "create_smol_app",
-    "register_smol_routes",
     # Main entry points - Agno (primary)
     "cli_main",
     "run_agno_cli",
     "run_agno_cli_wrapper",
-    # Main entry points - LangChain (legacy)
-    "langchain_main",
-    "langchain_cli_main",
-    # Main entry points - Smolagents
-    "run_smolagents_web",
-    "run_smolagents_cli",
     # Utility functions
     "print_configuration",
     # Package info
