@@ -199,8 +199,8 @@ class UserRegistry:
         Returns:
             Current user dictionary or None if not found
         """
-        from personal_agent.config import USER_ID
-        return self.get_user(USER_ID)
+        from personal_agent.config import get_userid
+        return self.get_user(get_userid())
     
     def ensure_current_user_registered(self) -> bool:
         """
@@ -210,12 +210,13 @@ class UserRegistry:
         Returns:
             True if user was already registered or successfully added
         """
-        from personal_agent.config import USER_ID
+        from personal_agent.config import get_userid
         
-        if self.user_exists(USER_ID):
+        current_user_id = get_userid()
+        if self.user_exists(current_user_id):
             # Update last_seen for existing user
-            self.update_last_seen(USER_ID)
+            self.update_last_seen(current_user_id)
             return True
         else:
             # Auto-register current user
-            return self.add_user(USER_ID, USER_ID, "Admin")
+            return self.add_user(current_user_id, current_user_id, "Admin")

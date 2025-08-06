@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personal-agent"
-version = "v0.11.33"
+version = "v0.11.37"
 description = "Personal AI agent with MCP and Memory, powered by Agno, LightRAG and Ollama"
 authors = ["Eric Suchanek <suchanek@mac.com>"]
 readme = "README.md"
@@ -87,6 +87,216 @@ install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"
 store-fact = "scripts.store_fact:main"
+
+[tool.poetry.group.dev.dependencies]
+poethepoet = "^0.36.0"
+
+# Poe the Poet task configuration
+[tool.poe.tasks]
+
+# === Core Application Tasks ===
+[tool.poe.tasks.serve]
+help = "Start the personal agent Streamlit interface"
+cmd = "streamlit run src/personal_agent/web/agno_interface.py"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
+  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
+]
+
+[tool.poe.tasks.serve-agno]
+help = "Start Agno Streamlit interface"
+cmd = "streamlit run src/personal_agent/web/agno_interface.py --server.port 8501"
+
+[tool.poe.tasks.serve-langchain]
+help = "Start LangChain interface server (legacy)"
+cmd = "personal-agent-langchain"
+
+[tool.poe.tasks.serve-smolagent]
+help = "Start SmoLAgent interface server (legacy)"
+cmd = "personal-agent-smolagent"
+
+# === CLI Interface Tasks ===
+[tool.poe.tasks.cli]
+help = "Run CLI interface"
+cmd = "paga_cli"
+args = [
+  { name = "interface", options = ["-i", "--interface"], default = "agno", help = "Interface to use (agno/langchain/smolagent)" }
+]
+
+[tool.poe.tasks.cli-agno]
+help = "Run Agno CLI interface"
+cmd = "paga_cli"
+
+[tool.poe.tasks.cli-langchain]
+help = "Run LangChain CLI interface"
+cmd = "paglc"
+
+[tool.poe.tasks.cli-smolagent]
+help = "Run SmoLAgent CLI interface"
+cmd = "pags_cli"
+
+[tool.poe.tasks.team]
+help = "Run reasoning team CLI"
+cmd = "rteam"
+
+# === MCP Server Management ===
+[tool.poe.tasks.mcp-install]
+help = "Install MCP servers"
+cmd = "install-mcp-servers"
+
+[tool.poe.tasks.mcp-test]
+help = "Test MCP server availability"
+cmd = "test-mcp-servers"
+
+[tool.poe.tasks.mcp-setup]
+help = "Install and test MCP servers"
+sequence = ["mcp-install", "mcp-test"]
+
+# === Testing Tasks ===
+[tool.poe.tasks.test]
+help = "Run all tests"
+cmd = "pytest"
+args = [
+  { name = "path", positional = true, default = "tests/", help = "Test path or file" },
+  { name = "verbose", options = ["-v", "--verbose"], type = "boolean", help = "Verbose output" },
+  { name = "coverage", options = ["-c", "--coverage"], type = "boolean", help = "Run with coverage" }
+]
+
+[tool.poe.tasks.test-tools]
+help = "Test available tools"
+cmd = "test-tools"
+
+[tool.poe.tasks.test-unit]
+help = "Run unit tests"
+cmd = "pytest tests/unit -v"
+
+[tool.poe.tasks.test-integration]
+help = "Run integration tests"
+cmd = "pytest tests/integration -v"
+
+[tool.poe.tasks.test-memory]
+help = "Run memory system tests"
+cmd = "pytest memory_tests/ -v"
+
+[tool.poe.tasks.test-all]
+help = "Run comprehensive test suite"
+sequence = ["test-unit", "test-integration", "test-memory", "test-tools", "mcp-test"]
+
+# === Development Workflow Tasks ===
+[tool.poe.tasks.dev-setup]
+help = "Complete development environment setup"
+sequence = ["mcp-setup", "test-tools"]
+
+[tool.poe.tasks.dev]
+help = "Start development server with full setup"
+sequence = ["dev-setup", "serve"]
+
+[tool.poe.tasks.dev-langchain]
+help = "Start LangChain development environment (legacy)"
+sequence = ["dev-setup", "serve-langchain"]
+
+[tool.poe.tasks.dev-smolagent]
+help = "Start SmoLAgent development environment (legacy)"
+sequence = ["dev-setup", "serve-smolagent"]
+
+# === Memory and Knowledge Management ===
+[tool.poe.tasks.store-fact]
+help = "Store a fact in the knowledge base"
+cmd = "store-fact"
+args = [
+  { name = "fact", positional = true, help = "Fact to store" },
+  { name = "category", options = ["-c", "--category"], help = "Fact category" }
+]
+
+[tool.poe.tasks.memory-clean]
+help = "Clean memory system"
+script = "src.personal_agent.tools.memory_cleaner:main"
+
+# === Docker and Infrastructure ===
+[tool.poe.tasks.docker-build]
+help = "Build Docker image"
+cmd = "docker build -t personal-agent ."
+
+
+[tool.poe.tasks.lightrag-restart]
+help = "Restart LightRAG server"
+shell = "./restart-lightrag.sh"
+
+[tool.poe.tasks.lightrag-smart-restart]
+help = "Smart restart LightRAG server"
+shell = "./smart-restart-lightrag.sh"
+
+# === Analysis and Debugging ===
+[tool.poe.tasks.analyze]
+help = "Run comprehensive analysis"
+cmd = "python analysis/test_comprehensive_research.py"
+
+
+# === Streamlit Dashboard ===
+[tool.poe.tasks.dashboard]
+help = "Start Streamlit dashboard"
+cmd = "streamlit run src/personal_agent/streamlit/dashboard.py"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Streamlit port" }
+]
+
+# === Utility Tasks ===
+[tool.poe.tasks.clean]
+help = "Clean up temporary files and caches"
+sequence = [
+  { cmd = "find . -type d -name '__pycache__' -exec rm -rf {} + || true" },
+  { cmd = "find . -name '*.pyc' -delete || true" },
+  { cmd = "find . -name '.pytest_cache' -exec rm -rf {} + || true" }
+]
+
+[tool.poe.tasks.lint]
+help = "Run code linting"
+cmd = "ruff check ."
+args = [
+  { name = "fix", options = ["--fix"], type = "boolean", help = "Auto-fix issues" }
+]
+
+[tool.poe.tasks.format]
+help = "Format code"
+cmd = "ruff format ."
+
+[tool.poe.tasks.check]
+help = "Run all code quality checks"
+sequence = ["lint", "format", "test"]
+
+# === Environment Management ===
+[tool.poe.tasks.switch-user]
+help = "Switch user configuration"
+cmd = "python switch-user.py ${user}"
+args = [
+  { name = "user", positional = true, help = "User to switch to" }
+]
+
+[tool.poe.tasks.switch-ollama]
+help = "Switch Ollama configuration"
+shell = "./switch-ollama.sh"
+
+# === Examples and Demos ===
+[tool.poe.tasks.demo-memory]
+help = "Run memory system demo"
+cmd = "python examples/15_memory_demo.py"
+
+[tool.poe.tasks.demo-team]
+help = "Run team demo"
+cmd = "python examples/personal_agent_team_demo.py"
+
+[tool.poe.tasks.example-mcp]
+help = "Run MCP tools example"
+cmd = "python examples/mcp_tools_examples.py"
+
+# === Quick Start Tasks ===
+[tool.poe.tasks.quick-start]
+help = "Quick start for new users"
+sequence = ["dev-setup", "demo-memory", "serve"]
+
+[tool.poe.tasks.full-demo]
+help = "Full system demonstration"
+sequence = ["dev-setup", "demo-memory", "demo-team", "example-mcp"]
 
 [build-system]
 requires = ["poetry-core"]

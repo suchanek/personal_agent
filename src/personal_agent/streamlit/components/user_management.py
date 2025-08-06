@@ -121,8 +121,8 @@ def _render_switch_user():
     
     try:
         # Get current user
-        from personal_agent.config.settings import USER_ID
-        current_user = USER_ID
+        from personal_agent.config.settings import get_userid
+        current_user = get_userid()
         
         st.info(f"Current User: {current_user}")
         
@@ -205,8 +205,8 @@ def _render_user_settings():
     
     try:
         # Get current user
-        from personal_agent.config.settings import USER_ID
-        current_user = USER_ID
+        from personal_agent.config.settings import get_userid
+        current_user = get_userid()
         
         # Get user details
         user_details = get_user_details(current_user)

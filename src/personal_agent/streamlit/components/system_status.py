@@ -119,11 +119,12 @@ def _render_user_info():
     try:
         # This would be replaced with actual user data from your system
         # For now, using placeholder data
-        from personal_agent.config.settings import USER_ID
+        from personal_agent.config.settings import get_userid
         
+        current_user_id = get_userid()
         user_info = {
-            "Current User": USER_ID,
-            "User Directory": f"/home/{USER_ID}",
+            "Current User": current_user_id,
+            "User Directory": f"//{current_user_id}",
             "User Config": "Default",
             "Last Login": "Today at 09:15",
         }

@@ -154,9 +154,9 @@ class LightRAGManager:
             Dictionary with operation results
         """
         if user_id is None:
-            from personal_agent.config import USER_ID
+            from personal_agent.config import get_userid
 
-            user_id = USER_ID
+            user_id = get_userid()
 
         results = {
             "success": True,

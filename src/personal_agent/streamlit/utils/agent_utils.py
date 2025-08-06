@@ -13,7 +13,7 @@ from personal_agent.config import (
     AGNO_STORAGE_DIR,
     LLM_MODEL,
     OLLAMA_URL,
-    USER_ID,
+    get_userid,
 )
 
 
@@ -31,7 +31,7 @@ def get_agent_instance() -> Optional[AgnoPersonalAgent]:
             model_provider="ollama",
             model_name=LLM_MODEL,
             ollama_base_url=OLLAMA_URL,
-            user_id=USER_ID,
+            user_id=get_userid(),
             debug=False,  # Disable debug for cleaner Streamlit output
             enable_memory=True,
             enable_mcp=True,
@@ -96,7 +96,7 @@ async def initialize_agent_async() -> Optional[AgnoPersonalAgent]:
             model_provider="ollama",
             model_name=LLM_MODEL,
             ollama_base_url=OLLAMA_URL,
-            user_id=USER_ID,
+            user_id=get_userid(),
             debug=False,
             enable_memory=True,
             enable_mcp=True,

@@ -1583,7 +1583,7 @@ def main():
 
     from agno.memory.v2.db.sqlite import SqliteMemoryDb
 
-    from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
+    from personal_agent.config import AGNO_STORAGE_DIR, get_userid
 
     print("🧠 Semantic Memory Manager Demo")
     print("=" * 50)
@@ -1615,7 +1615,7 @@ def main():
     print("\n🔄 Processing demo inputs...")
     for i, input_text in enumerate(demo_inputs, 1):
         print(f"\n--- Input {i}: {input_text}")
-        result = manager.process_input(input_text, memory_db, USER_ID)
+        result = manager.process_input(input_text, memory_db, get_userid())
 
         if result["success"]:
             print(f"✅ Processed successfully:")
@@ -1636,7 +1636,7 @@ def main():
 
     for query in search_queries:
         print(f"\n--- Search: '{query}'")
-        results = manager.search_memories(query, memory_db, USER_ID, limit=3)
+        results = manager.search_memories(query, memory_db, get_userid(), limit=3)
 
         if results:
             for memory, similarity in results:
@@ -1648,7 +1648,7 @@ def main():
 
     # Demo memory stats
     print(f"\n📊 Memory Statistics:")
-    stats = manager.get_memory_stats(memory_db, USER_ID)
+    stats = manager.get_memory_stats(memory_db, get_userid())
 
     for key, value in stats.items():
         if key == "topic_distribution" and isinstance(value, dict):
