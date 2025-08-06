@@ -62,11 +62,6 @@ from .agno_storage import (
 from .docker_integration import ensure_docker_user_consistency
 from .knowledge_coordinator import create_knowledge_coordinator
 from .semantic_memory_manager import MemoryStorageResult, MemoryStorageStatus
-from .smollm2_parser import (
-    extract_content_from_smollm2_response,
-    is_smollm2_model,
-    parse_smollm2_response,
-)
 
 # Configure logging
 logger = setup_logging(__name__, level=LOG_LEVEL)
@@ -177,7 +172,7 @@ class AgnoPersonalAgent(Agent):
         if user_id is None:
             user_id = get_userid()
         self.user_id = user_id
-        
+
         # Set up storage paths
         self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
 
@@ -199,6 +194,8 @@ class AgnoPersonalAgent(Agent):
         self.lightrag_knowledge_enabled = False
         self.agno_memory = None
         self.knowledge_coordinator = None
+        self.knowledge_ingestion_tools = None
+        self.semantic_knowledge_ingestion_tools = None
 
         # Legacy compatibility fields
         self._last_response = None
@@ -417,7 +414,7 @@ class AgnoPersonalAgent(Agent):
                             uv_pip_install=True,
                         ),
                         ShellTools(
-                            base_dir="."
+                            base_dir="~"
                         ),  # Match Streamlit configuration for consistency
                         PersonalAgentFilesystemTools(),
                     ]
@@ -1150,7 +1147,7 @@ async def create_agno_agent(
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = None,
     recreate: bool = False,
-    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+    instruction_level: InstructionLevel = InstructionLevel.EXPLICIT,
 ) -> AgnoPersonalAgent:
     """Create an agno-based personal agent.
 
@@ -1180,7 +1177,7 @@ async def create_agno_agent(
     # Set user_id with fallback
     if user_id is None:
         user_id = get_userid()
-    
+
     # Just create the agent - initialization happens automatically when needed
     return AgnoPersonalAgent(
         model_provider=model_provider,
