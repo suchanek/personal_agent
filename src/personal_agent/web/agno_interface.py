@@ -294,13 +294,46 @@ def sanitize_for_json_display(data):
 
 def format_tool_call_for_debug(tool_call):
     """Standardize tool call format for consistent storage and display."""
-    if hasattr(tool_call, "name"):
+    
+    # Add debugging information to understand the object structure
+    tool_type = type(tool_call).__name__
+    available_attributes = [attr for attr in dir(tool_call) if not attr.startswith('_')]
+    
+    if logger:
+        logger.debug(f"Processing tool call of type: {tool_type}")
+        logger.debug(f"Available attributes: {available_attributes}")
+    
+    # Handle ToolExecution objects specifically
+    if hasattr(tool_call, "tool_name") and hasattr(tool_call, "tool_args"):
+        # ToolExecution object format
+        tool_name = getattr(tool_call, "tool_name", "Unknown")
+        tool_args = getattr(tool_call, "tool_args", {})
+        tool_result = getattr(tool_call, "result", None)
+        tool_error = getattr(tool_call, "tool_call_error", False)
+        
+        return {
+            "name": tool_name,
+            "arguments": tool_args,
+            "result": tool_result,
+            "status": "error" if tool_error else "success",
+            "raw_type": tool_type,
+            "available_attributes": available_attributes,
+            "name_source": "tool_name",
+            "args_source": "tool_args",
+            "result_source": "result",
+        }
+    elif hasattr(tool_call, "name"):
         # Direct tool object
         return {
             "name": getattr(tool_call, "name", "Unknown"),
             "arguments": getattr(tool_call, "arguments", {}),
             "result": getattr(tool_call, "result", None),
             "status": "success",
+            "raw_type": tool_type,
+            "available_attributes": available_attributes,
+            "name_source": "name",
+            "args_source": "arguments",
+            "result_source": "result",
         }
     elif hasattr(tool_call, "function"):
         # Tool call with function attribute
@@ -309,14 +342,25 @@ def format_tool_call_for_debug(tool_call):
             "arguments": getattr(tool_call.function, "arguments", {}),
             "result": getattr(tool_call, "result", None),
             "status": "success",
+            "raw_type": tool_type,
+            "available_attributes": available_attributes,
+            "name_source": "function.name",
+            "args_source": "function.arguments",
+            "result_source": "result",
         }
     else:
-        # Fallback for unknown format
+        # Fallback for unknown format - include debugging info
         return {
-            "name": str(type(tool_call).__name__),
+            "name": tool_type,
             "arguments": {},
             "result": str(tool_call),
             "status": "unknown",
+            "raw_type": tool_type,
+            "available_attributes": available_attributes,
+            "raw_str": str(tool_call),
+            "name_source": "type_name",
+            "args_source": "none",
+            "result_source": "str_conversion",
         }
 
 
