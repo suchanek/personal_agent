@@ -173,6 +173,7 @@ async def create_agno_agent_with_params(model_name, ollama_url):
         debug=True,
         user_id=get_userid(),
         ollama_base_url=ollama_url,
+        alltools=True,  # Ensure all tools are initialized
     )
     return agent
 
@@ -319,6 +320,24 @@ def format_tool_call_for_debug(tool_call):
         }
 
 
+def display_tool_calls_inline(container, tools):
+    """Display tool calls in real-time during streaming."""
+    if not tools:
+        return
+
+    with container.container():
+        st.markdown("**🔧 Tool Calls:**")
+        for i, tool in enumerate(tools, 1):
+            tool_name = getattr(tool, "name", "Unknown Tool")
+            tool_args = getattr(tool, "arguments", {})
+
+            with st.expander(f"Tool {i}: {tool_name}", expanded=False):
+                if tool_args:
+                    st.json(tool_args)
+                else:
+                    st.write("No arguments")
+
+
 def main():
     """Main Streamlit application."""
     # Page configuration
@@ -447,6 +466,7 @@ def main():
                         debug=True,
                         user_id=get_userid(),
                         ollama_base_url=st.session_state.current_ollama_url,
+                        alltools=True,  # Ensure all tools are initialized
                     )
                     return agent
 
@@ -899,11 +919,17 @@ def main():
                 if message_data:
                     st.subheader("📝 Per-Message Details")
                     with st.expander("View Message-by-Message Breakdown", expanded=False):
-                        for i, msg_data in enumerate(message_data, 1):
+                        # Handle both single message dict and list of messages
+                        if isinstance(message_data, list):
+                            message_list = message_data
+                        else:
+                            message_list = [message_data]
+                        
+                        for i, msg_data in enumerate(message_list, 1):
                             st.write(f"**Assistant Message {i}:**")
-                            if msg_data.get("content"):
+                            if isinstance(msg_data, dict) and msg_data.get("content"):
                                 st.write(f"- **Content:** {msg_data['content'][:100]}{'...' if len(msg_data['content']) > 100 else ''}")
-                            if msg_data.get("tool_calls"):
+                            if isinstance(msg_data, dict) and msg_data.get("tool_calls"):
                                 st.write(f"- **Tool Calls:** {len(msg_data['tool_calls'])} calls")
                                 for j, tc in enumerate(msg_data['tool_calls'], 1):
                                     # Handle both old and new format
@@ -916,7 +942,7 @@ def main():
                                     tool_status = tc.get("status", "unknown")
                                     status_icon = "✅" if tool_status == "success" else "❓" if tool_status == "unknown" else "❌"
                                     st.write(f"  - Call {j}: {status_icon} {tool_name}")
-                            if msg_data.get("metrics"):
+                            if isinstance(msg_data, dict) and msg_data.get("metrics"):
                                 st.write(f"- **Message Metrics:**")
                                 try:
                                     sanitized_metrics = sanitize_for_json_display(msg_data["metrics"])
@@ -1040,17 +1066,23 @@ def main():
 
         # Get agent response
         with st.chat_message("assistant"):
+            # Create containers for tool calls and response
+            tool_calls_container = st.empty()
+            resp_container = st.empty()
+            
             with st.spinner("🤔 Thinking..."):
                 start_time = time.time()
                 start_timestamp = datetime.now()
                 tool_calls_made = 0
+                tool_call_details = []
+                all_tools_used = []
                 
                 try:
                     # Handle AgnoPersonalAgent with proper tool call collection
                     if isinstance(current_agent, AgnoPersonalAgent):
                         
                         async def run_agent_with_streaming():
-                            nonlocal tool_calls_made
+                            nonlocal tool_calls_made, tool_call_details, all_tools_used
                             
                             try:
                                 # Use the simplified agent.run() method
@@ -1061,11 +1093,21 @@ def main():
                                 # Get tool calls using the correct method that collects from streaming events
                                 tools_used = current_agent.get_last_tool_calls()
                                 
-                                # Process tool calls
+                                # Process and display tool calls
                                 if tools_used:
                                     tool_calls_made = len(tools_used)
                                     if logger:
                                         logger.info(f"Processing {len(tools_used)} tool calls from streaming events")
+                                    
+                                    for i, tool_call in enumerate(tools_used):
+                                        if logger:
+                                            logger.debug(f"Tool call {i}: {tool_call}")
+                                        formatted_tool = format_tool_call_for_debug(tool_call)
+                                        tool_call_details.append(formatted_tool)
+                                        all_tools_used.append(tool_call)
+                                    
+                                    # Display tool calls in real-time
+                                    display_tool_calls_inline(tool_calls_container, all_tools_used)
                                 
                                 return response_content
                                 
@@ -1098,6 +1140,9 @@ def main():
                         finally:
                             loop.close()
 
+                    # Display the final response
+                    resp_container.markdown(response_content)
+
                     # Calculate response time and performance metrics
                     end_time = time.time()
                     response_time = end_time - start_time
@@ -1107,7 +1152,7 @@ def main():
                     output_tokens = len(response_content.split()) * 1.3 if response_content else 0
                     total_tokens = input_tokens + output_tokens
 
-                    # Update performance stats
+                    # Update performance stats with real-time tool call count
                     stats = st.session_state.performance_stats
                     stats["total_requests"] += 1
                     stats["total_response_time"] += response_time
@@ -1118,7 +1163,7 @@ def main():
                     stats["slowest_response"] = max(stats["slowest_response"], response_time)
                     stats["tool_calls_count"] += tool_calls_made
 
-                    # Store debug metrics
+                    # Store debug metrics with standardized format
                     debug_entry = {
                         "timestamp": start_timestamp.strftime("%H:%M:%S"),
                         "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
@@ -1127,6 +1172,12 @@ def main():
                         "output_tokens": round(output_tokens),
                         "total_tokens": round(total_tokens),
                         "tool_calls": tool_calls_made,
+                        "tool_call_details": tool_call_details,
+                        "response_type": (
+                            "AgnoPersonalAgent"
+                            if isinstance(current_agent, AgnoPersonalAgent)
+                            else "Unknown"
+                        ),
                         "success": True,
                     }
                     st.session_state.debug_metrics.append(debug_entry)
@@ -1139,10 +1190,15 @@ def main():
                         current_agent, display_metrics=True, display_tool_calls=True
                     )
 
-                    # Display response
-                    st.markdown(response_content)
-                    response_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    st.caption(f"*{response_timestamp}*")
+                    # Add to chat history with metadata for future reference
+                    chat_message_data = {
+                        "role": "assistant",
+                        "content": response_content,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "tool_calls": tool_call_details,  # Store the standardized list
+                        "response_time": response_time,
+                    }
+                    st.session_state.messages.append(chat_message_data)
 
                     # Store metrics in session state for sidebar display
                     if metrics and st.session_state.get("show_metrics", False):
@@ -1150,7 +1206,7 @@ def main():
 
                     # Store tool calls and message data in session state for sidebar display
                     if st.session_state.get("show_tool_calls", False):
-                        st.session_state.last_response_tool_calls = tool_calls if tool_calls else []
+                        st.session_state.last_response_tool_calls = tool_call_details if tool_call_details else []
                         st.session_state.last_response_message_data = message_data if message_data else []
                     
                     # Also add session metrics if available
@@ -1162,16 +1218,7 @@ def main():
                         except Exception as e:
                             logger.warning(f"Could not extract session metrics: {e}")
 
-                    # Add to chat history
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": response_content,
-                            "timestamp": response_timestamp,
-                        }
-                    )
-
-                    # Store interaction in memory if available
+                    # Store interaction in memory if available (do this in background)
                     store_func = st.session_state.get(
                         "store_interaction_func", store_interaction_func
                     )
@@ -1184,11 +1231,23 @@ def main():
                             if logger:
                                 logger.warning(f"Could not store interaction: {e}")
 
+                    # Force immediate UI refresh to show the response
+                    st.rerun()
+
                 except Exception as e:
                     end_time = time.time()
                     response_time = end_time - start_time
                     error_msg = f"Sorry, I encountered an error: {str(e)}"
                     st.error(error_msg)
+
+                    # Add error to chat history immediately
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": error_msg,
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                    )
 
                     # Log failed request in debug metrics
                     debug_entry = {
@@ -1199,6 +1258,8 @@ def main():
                         "output_tokens": 0,
                         "total_tokens": 0,
                         "tool_calls": 0,
+                        "tool_call_details": [],
+                        "response_type": "Error",
                         "success": False,
                         "error": str(e),
                     }
@@ -1206,17 +1267,11 @@ def main():
                     if len(st.session_state.debug_metrics) > 10:
                         st.session_state.debug_metrics.pop(0)
 
-                    # Add error to chat history
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": error_msg,
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        }
-                    )
-
                     if logger:
                         logger.error(f"Error processing query: {str(e)}")
+
+                    # Force immediate UI refresh to show the error
+                    st.rerun()
 
     # Footer
     st.markdown("---")

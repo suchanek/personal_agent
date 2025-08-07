@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Enhanced Streamlit Debug Interface**: The `agno_interface.py` has been significantly upgraded with a comprehensive debug sidebar, real-time tool call display, and performance metrics. This provides a much richer environment for inspecting and understanding the agent's behavior. See [ADR-052](./refs/adr/052-enhanced-streamlit-debug-interface.md) for details.
+
+### Changed
+- **Task Management**: Migrated from a local `TODO.md` file to GitHub Issues for more robust and collaborative task management. See [ADR-051](./refs/adr/051-github-issues-for-task-management.md) for details.
+
 ### Fixed
 - **Knowledge Coordinator Initialization**: Fixed a critical bug where the `KnowledgeCoordinator` was not being initialized with the local `agno_knowledge` base, preventing local and hybrid knowledge queries from functioning. The coordinator is now correctly instantiated in the `KnowledgeTools` constructor, ensuring reliable query routing. See [ADR-050](./refs/adr/050-knowledge-coordinator-initialization-fix.md) for details.
 

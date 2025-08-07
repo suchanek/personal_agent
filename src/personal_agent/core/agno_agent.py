@@ -816,13 +816,28 @@ class AgnoPersonalAgent(Agent):
 
         if hasattr(self, "tools") and self.tools:
             for tool in self.tools:
-                tool_name = getattr(tool, "__name__", str(type(tool).__name__))
+                # Get tool name - try multiple approaches for different tool types
+                tool_name = None
+                
+                # Try common name attributes
+                for name_attr in ["name", "__name__", "_name"]:
+                    if hasattr(tool, name_attr):
+                        tool_name = getattr(tool, name_attr)
+                        if tool_name:
+                            break
+                
+                # Fallback to class name
+                if not tool_name:
+                    tool_name = str(type(tool).__name__)
+                
+                # Get tool description
                 tool_doc = getattr(tool, "__doc__", "No description available")
 
                 # Clean up docstring for display
                 if tool_doc:
                     tool_doc = tool_doc.strip().split("\n")[0]  # First line only
 
+                # Classify tool type
                 if tool_name.startswith("use_") and "_server" in tool_name:
                     mcp_tools.append(
                         {
@@ -832,11 +847,18 @@ class AgnoPersonalAgent(Agent):
                         }
                     )
                 else:
+                    # Determine if it's a built-in agno tool or custom tool
+                    tool_type = "Built-in Tool"
+                    if any(keyword in tool_name.lower() for keyword in ["memory", "knowledge", "ingestion"]):
+                        tool_type = "Memory/Knowledge Tool"
+                    elif "Tools" in tool_name:
+                        tool_type = "Built-in Tool"
+                    
                     built_in_tools.append(
                         {
                             "name": tool_name,
                             "description": tool_doc,
-                            "type": "Built-in Tool",
+                            "type": tool_type,
                         }
                     )
 
@@ -1119,6 +1141,7 @@ async def create_agno_agent(
     user_id: str = None,
     recreate: bool = False,
     instruction_level: InstructionLevel = InstructionLevel.EXPLICIT,
+    alltools: Optional[bool] = True,  # Add alltools parameter
 ) -> AgnoPersonalAgent:
     """Create an agno-based personal agent.
 
@@ -1162,4 +1185,5 @@ async def create_agno_agent(
         user_id=user_id,
         recreate=recreate,
         instruction_level=instruction_level,
+        alltools=alltools,  # Pass through alltools parameter
     )
