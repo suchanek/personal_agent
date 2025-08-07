@@ -138,8 +138,9 @@ class KnowledgeTools(Toolkit):
 
     """
 
-    def __init__(self, knowledge_manager: KnowledgeManager):
+    def __init__(self, knowledge_manager: KnowledgeManager, agno_knowledge=None):
         self.knowledge_manager = knowledge_manager
+        self.agno_knowledge = agno_knowledge
         
         # Initialize knowledge coordinator for unified querying
         self.knowledge_coordinator = None
@@ -490,7 +491,7 @@ class KnowledgeTools(Toolkit):
             logger.error(f"Error in batch ingestion: {e}")
             return f"❌ Error in batch ingestion: {str(e)}"
 
-    def query_knowledge_base(
+    async def query_knowledge_base(
         self, query: str, mode: str = "auto", limit: Optional[int] = 5
     ) -> str:
         """Query the unified knowledge base to retrieve stored factual information and documents.
@@ -573,31 +574,19 @@ class KnowledgeTools(Toolkit):
 
             # Initialize knowledge coordinator if not already done
             if self.knowledge_coordinator is None:
-                # Try to get agno_knowledge from the knowledge manager if available
-                agno_knowledge = getattr(self.knowledge_manager, 'agno_knowledge', None)
+                # Use the agno_knowledge passed to the constructor
                 self.knowledge_coordinator = create_knowledge_coordinator(
-                    agno_knowledge=agno_knowledge,
+                    agno_knowledge=self.agno_knowledge,
                     lightrag_url=settings.LIGHTRAG_URL,
                     debug=False
                 )
 
-            # Use the knowledge coordinator for unified querying
-            import asyncio
-            
-            # Run the async query in a sync context
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            
-            result = loop.run_until_complete(
-                self.knowledge_coordinator.query_knowledge_base(
-                    query=query.strip(),
-                    mode=mode,
-                    limit=limit,
-                    response_type="Multiple Paragraphs"
-                )
+            # Use the knowledge coordinator for unified querying - now properly async
+            result = await self.knowledge_coordinator.query_knowledge_base(
+                query=query.strip(),
+                mode=mode,
+                limit=limit,
+                response_type="Multiple Paragraphs"
             )
             
             logger.info(f"Knowledge query completed: {query[:50]}...")

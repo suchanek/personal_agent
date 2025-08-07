@@ -379,7 +379,7 @@ class AgnoPersonalAgent(Agent):
 
             # 6. Create tool instances (CRITICAL: Must be done after managers)
             if self.enable_memory:
-                self.knowledge_tools = KnowledgeTools(self.knowledge_manager)
+                self.knowledge_tools = KnowledgeTools(self.knowledge_manager, self.agno_knowledge)
                 self.knowledge_ingestion_tools = KnowledgeIngestionTools()
                 self.semantic_knowledge_ingestion_tools = (
                     SemanticKnowledgeIngestionTools()

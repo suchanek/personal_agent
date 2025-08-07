@@ -1,5 +1,9 @@
 # Personal Log
 
+**2025-08-06**
+
+- branch team/v0.11.37 working on the agno_agent web interface. fixed the init of the knowledgemanager, was not passing the KB
+
 **2025-08-03**
 
 - Created new branch `v0.11.37` from the latest `team/v0.11.37` branch. This version is generally functional and includes a significant refactoring of `user_sync.py` for improved robustness.

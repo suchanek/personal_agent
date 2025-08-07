@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Knowledge Coordinator Initialization**: Fixed a critical bug where the `KnowledgeCoordinator` was not being initialized with the local `agno_knowledge` base, preventing local and hybrid knowledge queries from functioning. The coordinator is now correctly instantiated in the `KnowledgeTools` constructor, ensuring reliable query routing. See [ADR-050](./refs/adr/050-knowledge-coordinator-initialization-fix.md) for details.
+
 ### Changed
 - **Centralized Service Management**: Introduced a new `ServiceManager` to handle all Docker service operations, decoupling them from the `UserManager`. This improves modularity and simplifies the user switching process. A new `switch-user.py` script provides a unified CLI for managing user contexts. See [ADR-049](./refs/adr/049-centralized-service-management.md) for details.
 
