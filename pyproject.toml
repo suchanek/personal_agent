@@ -63,6 +63,7 @@ groq = "^0.30.0"
 prompt-toolkit = "^3.0.51"
 anthropic = "^0.59.0"
 e2b-code-interpreter = "^1.5.2"
+openai-harmony = "^0.0.3"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"

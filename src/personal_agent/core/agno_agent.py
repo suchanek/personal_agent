@@ -390,50 +390,130 @@ class AgnoPersonalAgent(Agent):
             model = self.model_manager.create_model()
             logger.info("Created model: %s", self.model_name)
             tools = []
-            # 8. Prepare tools list - MEMORY AGENT ONLY: Just memory and knowledge tools
-            if self.alltools:
-                tools = (
-                    [  # Add GoogleSearch tools directly for web search functionality
-                        GoogleSearchTools(),
-                        CalculatorTools(
-                            enable_all=True
-                        ),  # Add calculator tools for mathematical operations
-                        YFinanceTools(
-                            stock_price=True,
-                            company_info=True,
-                            stock_fundamentals=True,
-                            key_financial_ratios=True,
-                            analyst_recommendations=True,
-                        ),
-                        PythonTools(
-                            base_dir="/tmp",
-                            run_code=True,
-                            list_files=True,
-                            run_files=True,
-                            read_files=True,
-                            uv_pip_install=True,
-                        ),
-                        ShellTools(
-                            base_dir="~"
-                        ),  # Match Streamlit configuration for consistency
-                        PersonalAgentFilesystemTools(),
-                    ]
-                )
-
-            if self.enable_memory:
-                tools.extend(
-                    [
-                        self.knowledge_tools,
-                        self.knowledge_ingestion_tools,
-                        self.semantic_knowledge_ingestion_tools,
-                        self.memory_tools,
-                    ]
-                )
+            # 8. Prepare tools list with intelligent model-specific limitations
+            tools = []
+            
+            # Get model-specific tool limitations
+            model_limits = self._get_model_tool_limits(self.model_name)
+            max_tools = model_limits.get("max_tools")
+            exclude_complex = model_limits.get("exclude_complex", [])
+            simple_tools_only = model_limits.get("simple_tools_only", False)
+            
+            if max_tools is not None:
                 logger.info(
-                    "Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools to memory agent"
+                    f"🔧 Model {self.model_name} has tool limitations: max_tools={max_tools}, "
+                    f"simple_tools_only={simple_tools_only}, exclude_complex={exclude_complex}"
                 )
+            
+            if self.alltools:
+                # Start with all available tools
+                all_tools = [
+                    ("GoogleSearchTools", GoogleSearchTools()),
+                    ("CalculatorTools", CalculatorTools(enable_all=True)),
+                    ("YFinanceTools", YFinanceTools(
+                        stock_price=True,
+                        company_info=True,
+                        stock_fundamentals=True,
+                        key_financial_ratios=True,
+                        analyst_recommendations=True,
+                    )),
+                    ("PythonTools", PythonTools(
+                        base_dir="/tmp",
+                        run_code=True,
+                        list_files=True,
+                        run_files=True,
+                        read_files=True,
+                        uv_pip_install=True,
+                    )),
+                    ("ShellTools", ShellTools(base_dir="~")),
+                    ("PersonalAgentFilesystemTools", PersonalAgentFilesystemTools()),
+                ]
+                
+                # Filter out excluded tools
+                filtered_tools = []
+                for tool_name, tool_instance in all_tools:
+                    if tool_name not in exclude_complex:
+                        filtered_tools.append((tool_name, tool_instance))
+                    else:
+                        logger.info(f"🔧 Excluding complex tool {tool_name} for model {self.model_name}")
+                
+                # Apply tool count limit
+                if max_tools is not None and len(filtered_tools) > max_tools:
+                    # Prioritize essential tools: Calculator, GoogleSearch, then others
+                    priority_order = ["CalculatorTools", "GoogleSearchTools", "PersonalAgentFilesystemTools", 
+                                    "YFinanceTools", "PythonTools", "ShellTools"]
+                    
+                    prioritized_tools = []
+                    remaining_tools = filtered_tools.copy()
+                    
+                    # Add priority tools first
+                    for priority_tool in priority_order:
+                        for tool_name, tool_instance in remaining_tools:
+                            if tool_name == priority_tool:
+                                prioritized_tools.append((tool_name, tool_instance))
+                                remaining_tools.remove((tool_name, tool_instance))
+                                break
+                        if len(prioritized_tools) >= max_tools:
+                            break
+                    
+                    # Add remaining tools if we still have slots
+                    for tool_name, tool_instance in remaining_tools:
+                        if len(prioritized_tools) >= max_tools:
+                            break
+                        prioritized_tools.append((tool_name, tool_instance))
+                    
+                    filtered_tools = prioritized_tools[:max_tools]
+                    
+                    excluded_tools = [name for name, _ in all_tools if name not in [t[0] for t in filtered_tools]]
+                    logger.info(
+                        f"🔧 Limited to {len(filtered_tools)} tools for model {self.model_name}. "
+                        f"Excluded: {excluded_tools}"
+                    )
+                
+                # Extract just the tool instances
+                tools = [tool_instance for _, tool_instance in filtered_tools]
+                
+                if tools:
+                    tool_names = [name for name, _ in filtered_tools]
+                    logger.info(f"Added {len(tools)} tools for model {self.model_name}: {tool_names}")
+                else:
+                    logger.warning(f"No tools available for model {self.model_name}")
+
+            # Add memory tools if enabled (these are usually simpler and more compatible)
+            if self.enable_memory:
+                memory_tools = [
+                    self.knowledge_tools,
+                    self.knowledge_ingestion_tools,
+                    self.semantic_knowledge_ingestion_tools,
+                    self.memory_tools,
+                ]
+                
+                # Check if we need to limit memory tools too
+                if max_tools is not None:
+                    current_tool_count = len(tools)
+                    available_slots = max_tools - current_tool_count
+                    
+                    if available_slots > 0:
+                        # Add as many memory tools as we can fit
+                        memory_tools_to_add = memory_tools[:available_slots]
+                        tools.extend(memory_tools_to_add)
+                        
+                        if len(memory_tools_to_add) < len(memory_tools):
+                            logger.info(
+                                f"🔧 Added {len(memory_tools_to_add)} of {len(memory_tools)} memory tools "
+                                f"due to tool limit for model {self.model_name}"
+                            )
+                        else:
+                            logger.info("Added all memory tools")
+                    else:
+                        logger.warning(
+                            f"🔧 No slots available for memory tools due to tool limit for model {self.model_name}"
+                        )
+                else:
+                    tools.extend(memory_tools)
+                    logger.info("Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools")
             else:
-                logger.warning("Memory disabled - memory agent will have no tools!")
+                logger.warning("Memory disabled - no memory tools added")
 
             # 9. Create instructions using the AgentInstructionManager
             instructions = self.instruction_manager.create_instructions()
@@ -508,10 +588,150 @@ class AgnoPersonalAgent(Agent):
             ),
         )
 
-    async def run(
+    async def run_custom(
         self, query: str, stream: bool = False, add_thought_callback=None
     ) -> str:
-        """Run a query through the agent.
+        """Custom run method with enhanced diagnostics (renamed to avoid conflicts).
+
+        Args:
+            query: User query to process
+            stream: Whether to stream the response (parameter kept for compatibility)
+            add_thought_callback: Optional callback for adding thoughts during processing
+
+        Returns:
+            Agent's final string response
+
+        Raises:
+            RuntimeError: If agent initialization fails
+        """
+        # Ensure agent is initialized before running
+        await self._ensure_initialized()
+
+        try:
+            logger.info(f"🔍 DIAGNOSTIC: Starting run_custom() with model: {self.model_name}")
+            logger.info(f"🔍 DIAGNOSTIC: Query: {query[:100]}...")
+            
+            # Use the inherited Agent's arun method
+            response_stream = await self.arun(query, user_id=self.user_id)
+
+            # DIAGNOSTIC: Log stream details
+            logger.info(f"🔍 DIAGNOSTIC: Response stream type: {type(response_stream)}")
+            logger.info(f"🔍 DIAGNOSTIC: Response stream attributes: {[attr for attr in dir(response_stream) if not attr.startswith('_')]}")
+            logger.info(f"🔍 DIAGNOSTIC: Has __aiter__: {hasattr(response_stream, '__aiter__')}")
+
+            # Initialize variables
+            self._collected_tool_calls = []
+            final_content = ""
+
+            # Handle both streaming and direct responses
+            if hasattr(response_stream, "__aiter__"):
+                logger.info("🔍 DIAGNOSTIC: Processing as streaming response")
+                
+                # Streaming response - collect all chunks with enhanced error handling
+                chunks = []
+                chunk_count = 0
+                
+                try:
+                    async for chunk in response_stream:
+                        chunk_count += 1
+                        logger.debug(f"🔍 DIAGNOSTIC: Processing chunk {chunk_count}")
+                        logger.debug(f"🔍 DIAGNOSTIC: Chunk type: {type(chunk)}")
+                        logger.debug(f"🔍 DIAGNOSTIC: Chunk attributes: {[attr for attr in dir(chunk) if not attr.startswith('_')]}")
+                        
+                        # Log chunk content if available
+                        if hasattr(chunk, "content"):
+                            content_preview = getattr(chunk, "content", "")
+                            if content_preview:
+                                logger.debug(f"🔍 DIAGNOSTIC: Chunk content preview: {str(content_preview)[:100]}...")
+                        
+                        # Log event type if available
+                        if hasattr(chunk, "event"):
+                            logger.debug(f"🔍 DIAGNOSTIC: Chunk event: {getattr(chunk, 'event', 'None')}")
+                        
+                        chunks.append(chunk)
+
+                        # Collect tool calls from streaming events
+                        if hasattr(chunk, "event") and chunk.event == "ToolCallCompleted":
+                            if hasattr(chunk, "tool"):
+                                logger.info(f"🔍 DIAGNOSTIC: Found tool call in chunk {chunk_count}")
+                                self._collected_tool_calls.append(chunk.tool)
+
+                except Exception as stream_error:
+                    logger.error(f"🔍 DIAGNOSTIC: Stream iteration failed at chunk {chunk_count}")
+                    logger.error(f"🔍 DIAGNOSTIC: Stream error type: {type(stream_error)}")
+                    logger.error(f"🔍 DIAGNOSTIC: Stream error message: {str(stream_error)}")
+                    
+                    # Try to get more details about the error
+                    if hasattr(stream_error, '__dict__'):
+                        logger.error(f"🔍 DIAGNOSTIC: Stream error details: {stream_error.__dict__}")
+                    
+                    # Re-raise the original error for proper handling
+                    raise stream_error
+
+                logger.info(f"🔍 DIAGNOSTIC: Processed {len(chunks)} chunks successfully")
+
+                # Process final response from chunks
+                if chunks:
+                    final_response = chunks[-1]
+                    final_content = getattr(final_response, "content", "")
+                    logger.info(f"🔍 DIAGNOSTIC: Final response content length: {len(final_content) if final_content else 0}")
+
+                    # If no content in final chunk, try to extract from all chunks
+                    if not final_content or not final_content.strip():
+                        logger.info("🔍 DIAGNOSTIC: No content in final chunk, searching previous chunks")
+                        for i, chunk in enumerate(reversed(chunks)):
+                            chunk_content = getattr(chunk, "content", "")
+                            if chunk_content and chunk_content.strip():
+                                final_content = chunk_content
+                                logger.info(f"🔍 DIAGNOSTIC: Found content in chunk {len(chunks) - i}")
+                                break
+
+                    self._last_response = final_response
+                else:
+                    logger.warning("🔍 DIAGNOSTIC: No chunks received from streaming response")
+                    self._last_response = None
+            else:
+                logger.info("🔍 DIAGNOSTIC: Processing as direct response object")
+                # Direct response object
+                self._last_response = response_stream
+                final_content = getattr(
+                    response_stream, "content", str(response_stream)
+                )
+                logger.info(f"🔍 DIAGNOSTIC: Direct response content length: {len(final_content) if final_content else 0}")
+
+            # Validate and clean content
+            final_content = self._validate_response_content(final_content, query)
+            logger.info(f"🔍 DIAGNOSTIC: Final validated content length: {len(final_content) if final_content else 0}")
+            logger.info(f"🔍 DIAGNOSTIC: Collected {len(self._collected_tool_calls)} tool calls")
+
+            return (
+                final_content.strip()
+                if final_content
+                else "I apologize, but I didn't generate a proper response. Could you please try again?"
+            )
+
+        except Exception as e:
+            logger.error("🔍 DIAGNOSTIC: Error in run_custom() method")
+            logger.error(f"🔍 DIAGNOSTIC: Error type: {type(e)}")
+            logger.error(f"🔍 DIAGNOSTIC: Error message: {str(e)}")
+            logger.error("🔍 DIAGNOSTIC: Full traceback:", exc_info=True)
+            
+            # Try to provide more context about the error
+            if "template" in str(e).lower():
+                logger.error("🔍 DIAGNOSTIC: This appears to be a template-related error")
+                logger.error(f"🔍 DIAGNOSTIC: Model name: {self.model_name}")
+                logger.error(f"🔍 DIAGNOSTIC: Number of tools: {len(self.tools) if hasattr(self, 'tools') and self.tools else 0}")
+                
+                if hasattr(self, 'tools') and self.tools:
+                    tool_names = [getattr(tool, 'name', type(tool).__name__) for tool in self.tools]
+                    logger.error(f"🔍 DIAGNOSTIC: Tool names: {tool_names}")
+            
+            return f"Error processing request: {str(e)}"
+
+    async def run(self, query: str, stream: bool = False, add_thought_callback=None) -> str:
+        """Run a query through the agent using native Agent methods.
+
+        This method now properly handles the async generator returned by Agent.arun().
 
         Args:
             query: User query to process
@@ -531,63 +751,79 @@ class AgnoPersonalAgent(Agent):
             if add_thought_callback:
                 add_thought_callback("🚀 Executing agent...")
 
-            # Use the inherited Agent's arun method
-            response_stream = await self.arun(query, user_id=self.user_id)
+            logger.info(f"🔍 FIXED: Starting run() with proper async generator handling for model: {self.model_name}")
+            logger.info(f"🔍 FIXED: Query: {query[:100]}...")
 
+            # Use the native Agent's arun method directly
+            response_generator = await self.arun(query, user_id=self.user_id)
+            
+            logger.info(f"🔍 FIXED: Response type: {type(response_generator)}")
+            
             # Initialize variables
             self._collected_tool_calls = []
             final_content = ""
-
-            # Handle both streaming and direct responses
-            if hasattr(response_stream, "__aiter__"):
-                # Streaming response - collect all chunks
+            
+            # Check if it's an async generator (which it should be based on our test)
+            if hasattr(response_generator, '__aiter__'):
+                logger.info("🔍 FIXED: Processing async generator response")
+                
+                # Iterate through the async generator to get the final response
                 chunks = []
-                async for chunk in response_stream:
+                async for chunk in response_generator:
                     chunks.append(chunk)
-
-                    # Collect tool calls from streaming events
+                    logger.debug(f"🔍 FIXED: Received chunk: {type(chunk)}")
+                    
+                    # Collect tool calls if available
                     if hasattr(chunk, "event") and chunk.event == "ToolCallCompleted":
                         if hasattr(chunk, "tool"):
                             self._collected_tool_calls.append(chunk.tool)
-
-                # Process final response from chunks
+                
+                # Get the final response from the last chunk
                 if chunks:
                     final_response = chunks[-1]
-                    final_content = getattr(final_response, "content", "")
-
-                    # If no content in final chunk, try to extract from all chunks
-                    if not final_content or not final_content.strip():
-                        for i, chunk in enumerate(reversed(chunks)):
-                            chunk_content = getattr(chunk, "content", "")
-                            if chunk_content and chunk_content.strip():
-                                final_content = chunk_content
-                                break
-
                     self._last_response = final_response
+                    
+                    # Extract content from the final response
+                    if hasattr(final_response, 'content'):
+                        final_content = final_response.content
+                        logger.info(f"🔍 FIXED: Extracted content from final chunk: {len(final_content) if final_content else 0} chars")
+                    else:
+                        # Try to find content in any chunk
+                        for chunk in reversed(chunks):
+                            if hasattr(chunk, 'content') and chunk.content:
+                                final_content = chunk.content
+                                logger.info(f"🔍 FIXED: Found content in previous chunk: {len(final_content) if final_content else 0} chars")
+                                break
                 else:
-                    logger.warning("No chunks received from streaming response")
-                    self._last_response = None
+                    logger.warning("🔍 FIXED: No chunks received from async generator")
+                    
+            elif hasattr(response_generator, 'content'):
+                # Direct response object with content
+                final_content = response_generator.content
+                self._last_response = response_generator
+                logger.info(f"🔍 FIXED: Direct response with content: {len(final_content) if final_content else 0} chars")
             else:
-                # Direct response object
-                self._last_response = response_stream
-                final_content = getattr(
-                    response_stream, "content", str(response_stream)
-                )
-
-            # Validate and clean content
-            final_content = self._validate_response_content(final_content, query)
+                # Fallback
+                final_content = str(response_generator) if response_generator else ""
+                self._last_response = response_generator
+                logger.info(f"🔍 FIXED: Fallback string conversion: {len(final_content) if final_content else 0} chars")
 
             if add_thought_callback:
                 add_thought_callback("✅ Agent execution complete.")
 
-            return (
-                final_content.strip()
-                if final_content
-                else "I apologize, but I didn't generate a proper response. Could you please try again?"
-            )
+            # Return the content, with a fallback message if empty
+            if final_content and final_content.strip():
+                return final_content.strip()
+            else:
+                logger.warning("🔍 FIXED: No content extracted from response")
+                return "I apologize, but I didn't generate a proper response. Could you please try again?"
 
         except Exception as e:
-            logger.error("Error running agent: %s", e, exc_info=True)
+            logger.error("🔍 FIXED: Error in Agent.arun() call")
+            logger.error(f"🔍 FIXED: Error type: {type(e)}")
+            logger.error(f"🔍 FIXED: Error message: {str(e)}")
+            logger.error("🔍 FIXED: Full traceback:", exc_info=True)
+            
             if add_thought_callback:
                 add_thought_callback(f"❌ Error: {str(e)}")
             return f"Error processing request: {str(e)}"
@@ -599,6 +835,54 @@ class AgnoPersonalAgent(Agent):
             List of ToolExecution objects from the most recent run
         """
         return getattr(self, "_collected_tool_calls", [])
+
+    def _get_model_tool_limits(self, model_name: str) -> dict:
+        """Get tool limitations for specific models.
+        
+        This method defines model-specific limitations to prevent template errors
+        and ensure compatibility with different model architectures.
+        
+        Args:
+            model_name: The name of the model to get limits for
+            
+        Returns:
+            Dictionary with tool limitations:
+            - max_tools: Maximum number of tools (None = no limit)
+            - exclude_complex: List of complex tool names to exclude
+            - simple_tools_only: Whether to only use simple tools
+        """
+        model_limits = {
+            # Models with known tool calling template issues
+            "gpt-oss:20b": {
+                "max_tools": 6,
+                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
+                "simple_tools_only": True,
+            },
+            "gpt4all": {
+                "max_tools": 4,
+                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
+                "simple_tools_only": True,
+            },
+            "phi": {
+                "max_tools": 4,
+                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
+                "simple_tools_only": True,
+            },
+            "gemma": {
+                "max_tools": 4,
+                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
+                "simple_tools_only": True,
+            },
+            # Add more problematic models as discovered
+        }
+        
+        # Check if any of the problematic model names are in the model name
+        for problematic_model, limits in model_limits.items():
+            if problematic_model.lower() in model_name.lower():
+                return limits
+        
+        # Default: no limitations for compatible models
+        return {"max_tools": None, "exclude_complex": [], "simple_tools_only": False}
 
     def _validate_response_content(self, content: str, query: str) -> str:
         """Validate and potentially fix response content.
