@@ -2,6 +2,11 @@
 
 **2025-08-06**
 
+- fixed tool listing and agno_web.py. the response handling is now good enough to use within the main agent
+- @todo - correct the mcp server handling to use agno's mcptools()
+
+**2025-08-06**
+
 - branch team/v0.11.37 working on the agno_agent web interface. fixed the init of the knowledgemanager, was not passing the KB
 
 **2025-08-03**
