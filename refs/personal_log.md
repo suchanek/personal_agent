@@ -1,5 +1,9 @@
 # Personal Log
 
+**2025-08-07**
+
+- branch monTeam/v0.11.37 - the agno_agent.py web interface is working well with good debugging on tool calls. I will work to incorporate into the streamlit_agno apps. Need to unify this into a single framework!
+
 **2025-08-06**
 
 - fixed tool listing and agno_web.py. the response handling is now good enough to use within the main agent

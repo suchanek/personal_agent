@@ -13,19 +13,27 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import from the correct path
-from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, REMOTE_OLLAMA_URL, USER_ID
+from personal_agent.config import (
+    AGNO_STORAGE_DIR,
+    LLM_MODEL,
+    OLLAMA_URL,
+    REMOTE_OLLAMA_URL,
+    get_current_user_id,
+)
 from personal_agent.team.personal_agent_team import create_personal_agent_team
+
+USER_ID = get_current_user_id()
+
 
 # Parse command line arguments
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Personal Agent Team Streamlit App")
     parser.add_argument(
-        "--remote", 
-        action="store_true", 
-        help="Use remote Ollama URL instead of local"
+        "--remote", action="store_true", help="Use remote Ollama URL instead of local"
     )
     return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
+
 
 # Parse arguments and determine Ollama URL
 args, unknown = parse_args()
@@ -323,14 +331,15 @@ def initialize_team(model_name, ollama_url):
             user_id=USER_ID,
             debug=True,
         )
-        
+
         # Create memory system for Streamlit compatibility
         from personal_agent.core.agno_storage import create_agno_memory
+
         agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
-        
+
         # Attach memory to team for Streamlit access
         team.agno_memory = agno_memory
-        
+
         return team
     except Exception as e:
         st.error(f"Failed to initialize team: {str(e)}")
@@ -424,8 +433,14 @@ if prompt := st.chat_input("What would you like to talk about?"):
             try:
                 # Use the standard agno Team arun method (async)
                 if st.session_state.team:
-                    response = asyncio.run(st.session_state.team.arun(prompt, user_id=USER_ID))
-                    response_content = response.content if hasattr(response, 'content') else str(response)
+                    response = asyncio.run(
+                        st.session_state.team.arun(prompt, user_id=USER_ID)
+                    )
+                    response_content = (
+                        response.content
+                        if hasattr(response, "content")
+                        else str(response)
+                    )
                 else:
                     response_content = "Team not initialized properly"
 
@@ -444,15 +459,17 @@ if prompt := st.chat_input("What would you like to talk about?"):
                 # Extract tool call information from response
                 tool_calls_made = 0
                 tool_call_details = []
-                
-                if hasattr(response, 'messages') and response.messages:
+
+                if hasattr(response, "messages") and response.messages:
                     for message in response.messages:
-                        if hasattr(message, 'tool_calls') and message.tool_calls:
+                        if hasattr(message, "tool_calls") and message.tool_calls:
                             tool_calls_made += len(message.tool_calls)
                             for tool_call in message.tool_calls:
                                 tool_info = {
                                     "type": getattr(tool_call, "type", "function"),
-                                    "function_name": getattr(tool_call, "name", "unknown"),
+                                    "function_name": getattr(
+                                        tool_call, "name", "unknown"
+                                    ),
                                     "function_args": getattr(tool_call, "input", {}),
                                 }
                                 tool_call_details.append(tool_info)
@@ -520,11 +537,17 @@ if prompt := st.chat_input("What would you like to talk about?"):
                             for i, tool_call in enumerate(tool_call_details, 1):
                                 st.write(f"**Tool Call {i}:**")
                                 if isinstance(tool_call, dict):
-                                    st.write(f"  - Type: {tool_call.get('type', 'function')}")
-                                    st.write(f"  - Function: {tool_call.get('function_name', 'unknown')}")
+                                    st.write(
+                                        f"  - Type: {tool_call.get('type', 'function')}"
+                                    )
+                                    st.write(
+                                        f"  - Function: {tool_call.get('function_name', 'unknown')}"
+                                    )
                                     args = tool_call.get("function_args", {})
                                     if isinstance(args, dict) and args:
-                                        formatted_args = ", ".join([f"{k}={v}" for k, v in args.items()])
+                                        formatted_args = ", ".join(
+                                            [f"{k}={v}" for k, v in args.items()]
+                                        )
                                         st.write(f"  - Arguments: {formatted_args}")
                                     elif args:
                                         st.write(f"  - Arguments: {args}")
@@ -540,17 +563,23 @@ if prompt := st.chat_input("What would you like to talk about?"):
                         if st.session_state.team:
                             st.write("**🤝 Team Information:**")
                             st.write(f"  - Framework: agno")
-                            st.write(f"  - Team Name: {getattr(st.session_state.team, 'name', 'Unknown')}")
-                            st.write(f"  - Member Count: {len(getattr(st.session_state.team, 'members', []))}")
-                            
-                            members = getattr(st.session_state.team, 'members', [])
+                            st.write(
+                                f"  - Team Name: {getattr(st.session_state.team, 'name', 'Unknown')}"
+                            )
+                            st.write(
+                                f"  - Member Count: {len(getattr(st.session_state.team, 'members', []))}"
+                            )
+
+                            members = getattr(st.session_state.team, "members", [])
                             if members:
                                 st.write("**👥 Team Members:**")
                                 for member in members:
-                                    member_name = getattr(member, 'name', 'Unknown')
-                                    member_role = getattr(member, 'role', 'Unknown')
-                                    member_tools = len(getattr(member, 'tools', []))
-                                    st.write(f"  - {member_name}: {member_role} ({member_tools} tools)")
+                                    member_name = getattr(member, "name", "Unknown")
+                                    member_role = getattr(member, "role", "Unknown")
+                                    member_tools = len(getattr(member, "tools", []))
+                                    st.write(
+                                        f"  - {member_name}: {member_role} ({member_tools} tools)"
+                                    )
 
                 # Display the response content
                 if response_content:
@@ -599,6 +628,7 @@ if prompt := st.chat_input("What would you like to talk about?"):
                         st.write(f"**Error Message:** {str(e)}")
 
                         import traceback
+
                         st.code(traceback.format_exc())
 
                 st.session_state.messages.append(
@@ -691,33 +721,33 @@ with st.sidebar:
     st.header("Team Information")
     st.write(f"**Current Model:** {st.session_state.current_model}")
     st.write(f"**Current Ollama URL:** {st.session_state.current_ollama_url}")
-    
+
     # Show remote mode indicator
-    if hasattr(args, 'remote') and args.remote:
+    if hasattr(args, "remote") and args.remote:
         st.success("🌐 **Remote Mode:** Using remote Ollama server")
     else:
         st.info("🏠 **Local Mode:** Using local Ollama server")
-    
+
     st.write(f"**User ID:** {USER_ID}")
 
     # Show team composition
     if st.session_state.team:
         st.write(f"**Team Framework:** agno")
-        members = getattr(st.session_state.team, 'members', [])
+        members = getattr(st.session_state.team, "members", [])
         st.write(f"**Team Members:** {len(members)}")
-        
+
         if members:
             st.write("**Specialized Agents:**")
             for member in members:
-                member_name = getattr(member, 'name', 'Unknown')
-                member_role = getattr(member, 'role', 'Unknown')
+                member_name = getattr(member, "name", "Unknown")
+                member_role = getattr(member, "role", "Unknown")
                 st.write(f"• **{member_name}**: {member_role}")
 
     st.header("Controls")
     if st.button("Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
-        
+
     # Semantic Memory Manager Controls
     st.header("🧠 Semantic Memory")
 
@@ -749,7 +779,9 @@ with st.sidebar:
             if st.button(
                 "🗑️ Yes, Delete All Memories", type="primary", use_container_width=True
             ):
-                if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
+                if st.session_state.team and hasattr(
+                    st.session_state.team, "agno_memory"
+                ):
                     try:
                         # Clear all user memories
                         st.session_state.team.agno_memory.clear_user_memories(
@@ -765,7 +797,7 @@ with st.sidebar:
                     st.error("Memory system not available")
 
     if st.button("Show All Memories"):
-        if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
+        if st.session_state.team and hasattr(st.session_state.team, "agno_memory"):
             try:
                 memories = st.session_state.team.agno_memory.get_user_memories(
                     user_id=USER_ID
@@ -783,9 +815,7 @@ with st.sidebar:
                             st.write(
                                 f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                             )
-                            st.write(
-                                f"**Input:** {getattr(memory, 'input', 'N/A')}"
-                            )
+                            st.write(f"**Input:** {getattr(memory, 'input', 'N/A')}")
                             topics = getattr(memory, "topics", [])
                             if topics:
                                 st.write(f"**Topics:** {', '.join(topics)}")
@@ -800,7 +830,7 @@ with st.sidebar:
 
     # Memory Statistics
     if st.button("📊 Show Memory Statistics"):
-        if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
+        if st.session_state.team and hasattr(st.session_state.team, "agno_memory"):
             try:
                 # Access the SemanticMemoryManager through the Memory object
                 memory_manager = st.session_state.team.agno_memory.memory_manager
@@ -840,13 +870,23 @@ with st.sidebar:
                     config = memory_manager.config
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.write(f"**Similarity Threshold:** {config.similarity_threshold}")
-                        st.write(f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}")
-                        st.write(f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}")
+                        st.write(
+                            f"**Similarity Threshold:** {config.similarity_threshold}"
+                        )
+                        st.write(
+                            f"**Semantic Dedup:** {'✅' if config.enable_semantic_dedup else '❌'}"
+                        )
+                        st.write(
+                            f"**Exact Dedup:** {'✅' if config.enable_exact_dedup else '❌'}"
+                        )
                     with col2:
-                        st.write(f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}")
+                        st.write(
+                            f"**Topic Classification:** {'✅' if config.enable_topic_classification else '❌'}"
+                        )
                         st.write(f"**Max Memory Length:** {config.max_memory_length}")
-                        st.write(f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}")
+                        st.write(
+                            f"**Debug Mode:** {'✅' if config.debug_mode else '❌'}"
+                        )
 
                 else:
                     st.info(
@@ -855,6 +895,7 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Error getting memory statistics: {str(e)}")
                 import traceback
+
                 st.code(traceback.format_exc())
         else:
             st.error("Memory system not available")
@@ -868,20 +909,18 @@ with st.sidebar:
     )
 
     if st.button("Search") and search_query:
-        if st.session_state.team and hasattr(st.session_state.team, 'agno_memory'):
+        if st.session_state.team and hasattr(st.session_state.team, "agno_memory"):
             try:
                 # Try different search methods to avoid the KeyError bug
                 memories = None
 
                 # First try the "agentic" method for semantic search
                 try:
-                    memories = (
-                        st.session_state.team.agno_memory.search_user_memories(
-                            user_id=USER_ID,
-                            query=search_query,
-                            retrieval_method="agentic",
-                            limit=10,
-                        )
+                    memories = st.session_state.team.agno_memory.search_user_memories(
+                        user_id=USER_ID,
+                        query=search_query,
+                        retrieval_method="agentic",
+                        limit=10,
                     )
                 except Exception as search_error:
                     st.warning(f"Semantic search failed: {str(search_error)}")
@@ -898,9 +937,7 @@ with st.sidebar:
                             search_terms = search_query.lower().split()
 
                             for memory in all_memories:
-                                memory_content = getattr(
-                                    memory, "memory", ""
-                                ).lower()
+                                memory_content = getattr(memory, "memory", "").lower()
                                 memory_topics = getattr(memory, "topics", [])
                                 topic_text = " ".join(memory_topics).lower()
 
@@ -916,9 +953,7 @@ with st.sidebar:
                             memories = []
 
                     except Exception as fallback_error:
-                        st.error(
-                            f"Fallback search also failed: {str(fallback_error)}"
-                        )
+                        st.error(f"Fallback search also failed: {str(fallback_error)}")
                         memories = []
 
                 if memories:
@@ -942,6 +977,7 @@ with st.sidebar:
                 st.error(f"Error searching memories: {str(e)}")
                 # Show detailed error for debugging
                 import traceback
+
                 st.code(traceback.format_exc())
         else:
             st.error("Memory system not available")
@@ -1021,8 +1057,12 @@ with st.sidebar:
             st.success("Debug data cleared!")
             st.rerun()
 
-# Instructions for running
-if __name__ == "__main__":
+# Initialize instructions display state
+if "instructions_shown" not in st.session_state:
+    st.session_state.instructions_shown = False
+
+# Instructions for running - only show once
+if not st.session_state.instructions_shown:
     st.markdown(
         """
     ---
@@ -1030,9 +1070,10 @@ if __name__ == "__main__":
     
     Try these example queries:
     - "What do you remember about me?" (Memory Agent)
-    - "What's the latest AI news?" (Web Research Agent)  
+    - "What's the latest AI news?" (Web Research Agent)
     - "What's Tesla's stock price?" (Finance Agent)
     - "Calculate 15% of 250" (Calculator Agent)
     - "Remember that I love hiking, then search for hiking news" (Multiple agents)
     """
     )
+    st.session_state.instructions_shown = True
