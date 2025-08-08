@@ -21,7 +21,9 @@ from personal_agent.streamlit.utils.docker_utils import (
     stop_container,
     restart_container,
     get_container_logs,
-    get_container_stats
+    get_container_stats,
+    start_all_containers,
+    stop_all_containers
 )
 from personal_agent.streamlit.utils.smart_docker_restart import get_smart_restart_manager
 
@@ -183,13 +185,31 @@ def _render_container_management():
             
             with col1:
                 if st.button("Start All"):
-                    st.info("Starting all containers...")
-                    # Implementation would go here
+                    try:
+                        with st.spinner("Starting all containers..."):
+                            success, message = start_all_containers()
+                        
+                        if success:
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {message}")
+                    except Exception as e:
+                        st.error(f"Error starting all containers: {str(e)}")
             
             with col2:
                 if st.button("Stop All"):
-                    st.info("Stopping all containers...")
-                    # Implementation would go here
+                    try:
+                        with st.spinner("Stopping all containers..."):
+                            success, message = stop_all_containers()
+                        
+                        if success:
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {message}")
+                    except Exception as e:
+                        st.error(f"Error stopping all containers: {str(e)}")
         else:
             st.info("No Docker containers found.")
             

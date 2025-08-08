@@ -344,6 +344,110 @@ def update_container_env(container_name: str, env_vars: Dict[str, str]) -> bool:
         return False
 
 
+def start_all_containers() -> tuple[bool, str]:
+    """
+    Start all LightRAG containers.
+    
+    Returns:
+        Tuple of (success, message)
+    """
+    try:
+        # Get Docker client
+        client = get_docker_client()
+        if not client:
+            return False, "Failed to connect to Docker"
+        
+        # Get all containers
+        containers = client.containers.list(all=True)
+        
+        # Filter for lightrag_* containers only
+        lightrag_containers = [c for c in containers if c.name.startswith('lightrag')]
+        
+        if not lightrag_containers:
+            return False, "No LightRAG containers found"
+        
+        # Start all containers
+        started_containers = []
+        failed_containers = []
+        
+        for container in lightrag_containers:
+            try:
+                if container.status != 'running':
+                    container.start()
+                    started_containers.append(container.name)
+                else:
+                    # Container already running
+                    pass
+            except Exception as e:
+                failed_containers.append(f"{container.name}: {str(e)}")
+        
+        # Prepare result message
+        if failed_containers:
+            message = f"Started {len(started_containers)} containers. Failed: {', '.join(failed_containers)}"
+            return len(started_containers) > 0, message
+        else:
+            if started_containers:
+                message = f"Successfully started {len(started_containers)} containers: {', '.join(started_containers)}"
+            else:
+                message = "All containers were already running"
+            return True, message
+    
+    except Exception as e:
+        return False, f"Error starting containers: {str(e)}"
+
+
+def stop_all_containers() -> tuple[bool, str]:
+    """
+    Stop all LightRAG containers.
+    
+    Returns:
+        Tuple of (success, message)
+    """
+    try:
+        # Get Docker client
+        client = get_docker_client()
+        if not client:
+            return False, "Failed to connect to Docker"
+        
+        # Get all containers
+        containers = client.containers.list(all=True)
+        
+        # Filter for lightrag_* containers only
+        lightrag_containers = [c for c in containers if c.name.startswith('lightrag')]
+        
+        if not lightrag_containers:
+            return False, "No LightRAG containers found"
+        
+        # Stop all containers
+        stopped_containers = []
+        failed_containers = []
+        
+        for container in lightrag_containers:
+            try:
+                if container.status == 'running':
+                    container.stop()
+                    stopped_containers.append(container.name)
+                else:
+                    # Container already stopped
+                    pass
+            except Exception as e:
+                failed_containers.append(f"{container.name}: {str(e)}")
+        
+        # Prepare result message
+        if failed_containers:
+            message = f"Stopped {len(stopped_containers)} containers. Failed: {', '.join(failed_containers)}"
+            return len(stopped_containers) > 0, message
+        else:
+            if stopped_containers:
+                message = f"Successfully stopped {len(stopped_containers)} containers: {', '.join(stopped_containers)}"
+            else:
+                message = "All containers were already stopped"
+            return True, message
+    
+    except Exception as e:
+        return False, f"Error stopping containers: {str(e)}"
+
+
 def get_docker_compose_services() -> List[str]:
     """
     Get a list of services defined in docker-compose.yml.

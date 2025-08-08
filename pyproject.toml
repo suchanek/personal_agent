@@ -108,33 +108,16 @@ args = [
 help = "Start Agno Streamlit interface"
 cmd = "streamlit run src/personal_agent/web/agno_interface.py --server.port 8501"
 
-[tool.poe.tasks.serve-langchain]
-help = "Start LangChain interface server (legacy)"
-cmd = "personal-agent-langchain"
-
-[tool.poe.tasks.serve-smolagent]
-help = "Start SmoLAgent interface server (legacy)"
-cmd = "personal-agent-smolagent"
 
 # === CLI Interface Tasks ===
 [tool.poe.tasks.cli]
 help = "Run CLI interface"
 cmd = "paga_cli"
-args = [
-  { name = "interface", options = ["-i", "--interface"], default = "agno", help = "Interface to use (agno/langchain/smolagent)" }
-]
 
 [tool.poe.tasks.cli-agno]
 help = "Run Agno CLI interface"
 cmd = "paga_cli"
 
-[tool.poe.tasks.cli-langchain]
-help = "Run LangChain CLI interface"
-cmd = "paglc"
-
-[tool.poe.tasks.cli-smolagent]
-help = "Run SmoLAgent CLI interface"
-cmd = "pags_cli"
 
 [tool.poe.tasks.team]
 help = "Run reasoning team CLI"
@@ -192,13 +175,6 @@ sequence = ["mcp-setup", "test-tools"]
 help = "Start development server with full setup"
 sequence = ["dev-setup", "serve"]
 
-[tool.poe.tasks.dev-langchain]
-help = "Start LangChain development environment (legacy)"
-sequence = ["dev-setup", "serve-langchain"]
-
-[tool.poe.tasks.dev-smolagent]
-help = "Start SmoLAgent development environment (legacy)"
-sequence = ["dev-setup", "serve-smolagent"]
 
 # === Memory and Knowledge Management ===
 [tool.poe.tasks.store-fact]
