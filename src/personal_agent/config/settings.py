@@ -41,57 +41,42 @@ dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
 
 logger = _get_logger()
 
+
 def load_user_from_file():
     """Load the USER_ID from ~/.persag/env.userid and set it in the environment."""
     try:
         # Import here to avoid circular imports
         from pathlib import Path
-        
+
         persag_dir = Path.home() / ".persag"
         userid_file = persag_dir / "env.userid"
-        
+
         # Try to read from ~/.persag/env.userid first
         if userid_file.exists():
-            with open(userid_file, 'r') as f:
+            with open(userid_file, "r", encoding="utf-8") as f:
                 content = f.read().strip()
                 if content.startswith("USER_ID="):
                     user_id = content.split("=", 1)[1].strip().strip("'\"")
                     os.environ["USER_ID"] = user_id
                     return user_id
-        
-        # If ~/.persag/env.userid doesn't exist, try to migrate from old location
-        old_userid_file = BASE_DIR / "env.userid"
-        if old_userid_file.exists():
-            with open(old_userid_file, 'r') as f:
-                content = f.read().strip()
-                if content.startswith("USER_ID="):
-                    user_id = content.split("=", 1)[1].strip().strip("'\"")
-                    
-                    # Create ~/.persag directory and migrate
-                    persag_dir.mkdir(exist_ok=True)
-                    with open(userid_file, 'w') as f:
-                        f.write(f'USER_ID="{user_id}"\n')
-                    
-                    os.environ["USER_ID"] = user_id
-                    logger.info(f"Migrated USER_ID from {old_userid_file} to {userid_file}")
-                    return user_id
-        
+
         # If neither exists, create default
         default_user_id = "default_user"
         persag_dir.mkdir(exist_ok=True)
-        with open(userid_file, 'w') as f:
+        with open(userid_file, "w") as f:
             f.write(f'USER_ID="{default_user_id}"\n')
-        
+
         os.environ["USER_ID"] = default_user_id
         logger.info(f"Created default USER_ID in {userid_file}")
         return default_user_id
-        
+
     except Exception as e:
         logger.warning(f"Failed to load user ID from ~/.persag: {e}")
         # Fallback to environment variable
         fallback_user_id = os.getenv("USER_ID", "default_user")
         os.environ["USER_ID"] = fallback_user_id
         return fallback_user_id
+
 
 # Initialize ~/.persag and load user ID
 load_user_from_file()
@@ -159,21 +144,36 @@ REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
 # Storage backend configuration
 STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
 
+
 def get_userid() -> str:
     """Get the current USER_ID dynamically from ~/.persag/env.userid"""
     return load_user_from_file()
+
 
 def get_user_storage_paths():
     """Get user-specific storage paths"""
     current_user_id = get_userid()
     return {
-        "AGNO_STORAGE_DIR": os.path.expandvars(f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}"),
-        "AGNO_KNOWLEDGE_DIR": os.path.expandvars(f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/knowledge"),
-        "LIGHTRAG_STORAGE_DIR": os.path.expandvars(f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/rag_storage"),
-        "LIGHTRAG_INPUTS_DIR": os.path.expandvars(f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/inputs"),
-        "LIGHTRAG_MEMORY_STORAGE_DIR": os.path.expandvars(f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_rag_storage"),
-        "LIGHTRAG_MEMORY_INPUTS_DIR": os.path.expandvars(f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs"),
+        "AGNO_STORAGE_DIR": os.path.expandvars(
+            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}"
+        ),
+        "AGNO_KNOWLEDGE_DIR": os.path.expandvars(
+            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/knowledge"
+        ),
+        "LIGHTRAG_STORAGE_DIR": os.path.expandvars(
+            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/rag_storage"
+        ),
+        "LIGHTRAG_INPUTS_DIR": os.path.expandvars(
+            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/inputs"
+        ),
+        "LIGHTRAG_MEMORY_STORAGE_DIR": os.path.expandvars(
+            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_rag_storage"
+        ),
+        "LIGHTRAG_MEMORY_INPUTS_DIR": os.path.expandvars(
+            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs"
+        ),
     }
+
 
 # Get initial storage paths (these will be dynamic)
 _storage_paths = get_user_storage_paths()
@@ -190,7 +190,7 @@ LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "qwen3-4b-mlx")
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
 
 # Docker environment variables for LightRAG containers
 # HTTP timeout configurations
@@ -250,7 +250,9 @@ def refresh_user_dependent_settings(user_id: str = None):
     lightrag_memory_storage_dir = (
         f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_rag_storage"
     )
-    lightrag_memory_inputs_dir = f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs"
+    lightrag_memory_inputs_dir = (
+        f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs"
+    )
 
     return {
         "USER_ID": current_user_id,
@@ -339,10 +341,6 @@ def print_config():
         {
             "title": "⚙️  Feature Flags",
             "items": [
-                (
-                    "Use Weaviate",
-                    f"{GREEN}✓{ENDC}" if USE_WEAVIATE else f"{RED}✗{ENDC}",
-                ),
                 ("Use MCP", f"{GREEN}✓{ENDC}" if USE_MCP else f"{RED}✗{ENDC}"),
                 (
                     "Show Splash Screen",
