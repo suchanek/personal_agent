@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Centralized User Memory Storage**: Refactored all agent and team implementations to use the central `AgentMemoryManager` for storing user memories. This eliminates code duplication and ensures consistent application of critical logic like memory restatement and dual storage across the entire system. See [ADR-053](./refs/adr/053-centralized-user-memory-storage.md) for details.
+
 ### Added
 - **Enhanced Streamlit Debug Interface**: The `agno_interface.py` has been significantly upgraded with a comprehensive debug sidebar, real-time tool call display, and performance metrics. This provides a much richer environment for inspecting and understanding the agent's behavior. See [ADR-052](./refs/adr/052-enhanced-streamlit-debug-interface.md) for details.
 
