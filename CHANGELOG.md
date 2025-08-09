@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Robust User Deletion**: Implemented a comprehensive and safe user deletion system. The `UserManager` now supports full data directory cleanup, pre-deletion data backups, and a dry-run mode to preview changes. This functionality is exposed through a new, intuitive "Delete User" interface in the Streamlit dashboard, which includes explicit confirmation checks to prevent accidental data loss. See [ADR-056](./refs/adr/056-robust-user-deletion-with-data-management.md) for details.
+
+### Changed
+- **Topic Classification**: Expanded the `astronomy` topic in `topics.yaml` with more keywords to improve memory classification accuracy.
+
 ### Fixed
 - **Memory Instruction Clarity**: Resolved a key ambiguity in the agent's instructions regarding the handling of user memories. The agent is now given a clear, three-stage process (Input, Storage, Presentation) that distinguishes its responsibility (presenting memories in the second person) from the system's (storing memories in the third person). This eliminates confusion and ensures consistent memory processing. See [ADR-055](./refs/adr/055-clarified-memory-instructions.md) for details.
 

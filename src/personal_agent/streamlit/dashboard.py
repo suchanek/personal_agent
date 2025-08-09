@@ -27,7 +27,7 @@ from personal_agent.streamlit.utils.system_utils import load_css, check_dependen
 
 # Set page configuration
 st.set_page_config(
-    page_title="Memory & User Manager",
+    page_title="PersonalAgent Management Dashboard",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -43,7 +43,7 @@ def main():
     check_dependencies()
     
     # Sidebar navigation
-    st.sidebar.title("🧠 Memory & User Manager")
+    st.sidebar.title("🧠 PersonalAgent Management Dashboard")
     
     # Navigation
     selected_tab = st.sidebar.radio(
