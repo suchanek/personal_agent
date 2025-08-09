@@ -151,7 +151,7 @@ await agent.initialize()
    - Updated `create_agno_agent()` to be a simple wrapper
    - Added deprecation messages
 
-2. **`src/personal_agent/team/ollama_reasoning_multi_purpose_team.py`**:
+2. **`src/personal_agent/team/reasoning_team.py`**:
    - Updated `create_memory_agent()` to use new pattern
    - Removed manual `initialize()` call
 
