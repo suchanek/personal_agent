@@ -112,16 +112,16 @@ cmd = "streamlit run src/personal_agent/web/agno_interface.py --server.port 8501
 # === CLI Interface Tasks ===
 [tool.poe.tasks.cli]
 help = "Run CLI interface"
-cmd = "paga_cli"
+cmd = "poetry run paga_cli"
 
 [tool.poe.tasks.cli-agno]
 help = "Run Agno CLI interface"
-cmd = "paga_cli"
+cmd = "poetry run paga_cli"
 
 
 [tool.poe.tasks.team]
 help = "Run reasoning team CLI"
-cmd = "rteam"
+cmd = "poetry run rteam"
 
 # === MCP Server Management ===
 [tool.poe.tasks.mcp-install]
@@ -274,6 +274,11 @@ sequence = ["dev-setup", "demo-memory", "serve"]
 [tool.poe.tasks.full-demo]
 help = "Full system demonstration"
 sequence = ["dev-setup", "demo-memory", "demo-team", "example-mcp"]
+
+# === Documentation ===
+[tool.poe.tasks.pdoc]
+help = "Generate project documentation using pdoc"
+cmd = "pdoc -o docs src/personal_agent"
 
 [build-system]
 requires = ["poetry-core"]
