@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Memory Instruction Clarity**: Resolved a key ambiguity in the agent's instructions regarding the handling of user memories. The agent is now given a clear, three-stage process (Input, Storage, Presentation) that distinguishes its responsibility (presenting memories in the second person) from the system's (storing memories in the third person). This eliminates confusion and ensures consistent memory processing. See [ADR-055](./refs/adr/055-clarified-memory-instructions.md) for details.
+
 ### Changed
 - **Simplified Agent Execution**: Refactored the `AgnoPersonalAgent` to use a simpler, more reliable, non-streaming execution pattern. This removes over 200 lines of complex custom code for response and tool-call handling, resolving multiple bugs and improving maintainability. See [ADR-054](./refs/adr/054-simplified-agent-execution.md) for details.
 - **Centralized User Memory Storage**: Refactored all agent and team implementations to use the central `AgentMemoryManager` for storing user memories. This eliminates code duplication and ensures consistent application of critical logic like memory restatement and dual storage across the entire system. See [ADR-053](./refs/adr/053-centralized-user-memory-storage.md) for details.
