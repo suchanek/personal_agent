@@ -25,7 +25,10 @@ logger: Optional[logging.Logger] = None
 
 
 async def run_agno_cli_wrapper(
-    query: str = None, use_remote_ollama: bool = False, recreate: bool = False, instruction_level: str = "STANDARD"
+    query: str = None,
+    use_remote_ollama: bool = False,
+    recreate: bool = False,
+    instruction_level: str = "STANDARD",
 ):
     """
     Wrapper function to initialize system and run CLI.
@@ -36,17 +39,17 @@ async def run_agno_cli_wrapper(
     :param instruction_level: The instruction level for the agent
     """
     global agno_agent
-    
+
     # Initialize system
     agent, query_kb, store_int, clear_kb, ollama_url = await initialize_agno_system(
         use_remote_ollama, recreate=recreate, instruction_level=instruction_level
     )
-    
+
     agno_agent = agent
-    
+
     # Create console for CLI
     console = Console(force_terminal=True)
-    
+
     # Run the CLI
     await run_agno_cli(agent, ollama_url, console)
 
@@ -65,12 +68,23 @@ def cli_main():
         "--recreate", action="store_true", help="Recreate the knowledge base"
     )
     parser.add_argument(
-        "--instruction-level", type=str, default="STANDARD", help="Set the instruction level for the agent (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL)"
+        "--instruction-level",
+        type=str,
+        default="STANDARD",
+        help="Set the instruction level for the agent (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL)",
     )
     args = parser.parse_args()
 
     print("Starting Personal AI Agent in CLI mode...")
-    asyncio.run(run_agno_cli_wrapper(use_remote_ollama=args.remote, recreate=args.recreate, instruction_level=args.instruction_level))
+    asyncio.run(
+        run_agno_cli_wrapper(
+            use_remote_ollama=args.remote,
+            recreate=args.recreate,
+            instruction_level=args.instruction_level,
+        )
+    )
+
+
 
 
 if __name__ == "__main__":
