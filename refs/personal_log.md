@@ -1,5 +1,9 @@
 # Personal Log
 
+**2025-08-08**
+
+- v0.11.38dev branch working on personalagent team, tool calling agent
+
 **2025-08-07**
 
 - branch monTeam/v0.11.37 - the agno_agent.py web interface is working well with good debugging on tool calls. I will work to incorporate into the streamlit_agno apps. Need to unify this into a single framework!
@@ -9,7 +13,7 @@
 - fixed tool listing and agno_web.py. the response handling is now good enough to use within the main agent
 - @todo - correct the mcp server handling to use agno's mcptools()
 
-**2025-08-06**
+**2.25-08-06**
 
 - branch team/v0.11.37 working on the agno_agent web interface. fixed the init of the knowledgemanager, was not passing the KB
 

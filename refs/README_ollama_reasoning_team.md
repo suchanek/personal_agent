@@ -75,7 +75,7 @@ Follows the exact pattern from your `agno_agent.py`:
 
 ## Files Created
 
-### 1. `examples/teams/ollama_reasoning_multi_purpose_team.py`
+### 1. `examples/teams/reasoning_team.py`
 The main implementation file with all agents and team coordination.
 
 ### 2. `test_ollama_reasoning_team.py`
@@ -92,7 +92,7 @@ This documentation file.
 ### Basic Usage
 ```python
 import asyncio
-from examples.teams.ollama_reasoning_multi_purpose_team import create_team
+from examples.teams.reasoning_team import create_team
 
 async def main():
     # Create the team
@@ -111,7 +111,7 @@ if __name__ == "__main__":
 ### Running the Example
 ```bash
 # Run the main example
-python examples/teams/ollama_reasoning_multi_purpose_team.py
+python examples/teams/reasoning_team.py
 
 # Run the test suite
 python test_ollama_reasoning_team.py

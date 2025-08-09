@@ -36,7 +36,7 @@ Usage:
 
     ```bash
     # Run as CLI
-    python -m personal_agent.team.ollama_reasoning_multi_purpose_team
+    python -m personal_agent.team.reasoning_team
 
     # Or use the installed command
     paga_team_cli
@@ -45,7 +45,7 @@ Usage:
     Programmatic usage:
     ```python
     import asyncio
-    from personal_agent.team.ollama_reasoning_multi_purpose_team import create_team
+    from personal_agent.team.reasoning_team import create_team
 
     async def main():
         team = await create_team()

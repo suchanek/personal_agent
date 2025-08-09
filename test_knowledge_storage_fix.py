@@ -16,7 +16,7 @@ async def test_knowledge_storage_fix():
     
     try:
         # Import the fixed team
-        from personal_agent.team.ollama_reasoning_multi_purpose_team import create_team
+        from personal_agent.team.reasoning_team import create_team
         
         # Create the team
         print("📝 Creating team...")

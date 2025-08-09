@@ -81,8 +81,8 @@ paga = "src.personal_agent.web.agno_interface:main"
 personal-agent-agno-cli = "src.personal_agent.agno_main:cli_main"
 paga_cli = "src.personal_agent.agno_main:cli_main"
 
-paga_team_cli = "src.personal_agent.team.ollama_reasoning_multi_purpose_team:cli_main"
-rteam = "src.personal_agent.team.ollama_reasoning_multi_purpose_team:cli_main"
+paga_team_cli = "src.personal_agent.team.reasoning_team:cli_main"
+rteam = "src.personal_agent.team.reasoning_team:cli_main"
 
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"

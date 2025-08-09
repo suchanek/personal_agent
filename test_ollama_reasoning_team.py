@@ -12,7 +12,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from examples.teams.ollama_reasoning_multi_purpose_team import create_team
+from examples.teams.reasoning_team import create_team
 
 async def test_team():
     """Test the Ollama reasoning team with various queries."""

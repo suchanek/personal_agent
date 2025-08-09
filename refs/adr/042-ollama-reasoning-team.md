@@ -16,7 +16,7 @@ The goal is to create a multi-agent team that:
 
 ## Decision
 
-We will create a new `ollama_reasoning_multi_purpose_team.py` module. This module will define a team of agents for various tasks (web search, finance, writing, calculator, and memory/knowledge).
+We will create a new `reasoning_team.py` module. This module will define a team of agents for various tasks (web search, finance, writing, calculator, and memory/knowledge).
 
 Key characteristics of this implementation:
 
