@@ -19,7 +19,8 @@ from personal_agent.streamlit.utils.user_utils import (
     get_all_users,
     create_new_user,
     switch_user,
-    get_user_details
+    get_user_details,
+    delete_user
 )
 
 
@@ -28,7 +29,7 @@ def user_management_tab():
     st.title("User Management")
     
     # Create tabs for different user management functions
-    tabs = st.tabs(["User Overview", "Create User", "Switch User", "User Settings"])
+    tabs = st.tabs([" User Overview ", " Create User ", " Switch User ", " Delete User ", " User Settings "])
     
     with tabs[0]:
         _render_user_overview()
@@ -40,12 +41,23 @@ def user_management_tab():
         _render_switch_user()
     
     with tabs[3]:
+        _render_delete_user()
+    
+    with tabs[4]:
         _render_user_settings()
 
 
 def _render_user_overview():
     """Display overview of all users."""
     st.subheader("User Overview")
+    
+    # Add refresh button to manually refresh user list
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("🔄 Refresh", help="Refresh user list"):
+            from personal_agent.streamlit.utils.user_utils import get_user_manager
+            get_user_manager.clear()
+            st.rerun()
     
     try:
         # Get all users
@@ -58,14 +70,6 @@ def _render_user_overview():
             
             # Display user count
             st.caption(f"Total Users: {len(users)}")
-            
-            # Allow selecting a user to view details
-            selected_user = st.selectbox("Select User for Details", 
-                                         [user['user_id'] for user in users])
-            
-            if selected_user:
-                user_details = get_user_details(selected_user)
-                st.json(user_details)
         else:
             st.info("No users found.")
             
@@ -238,3 +242,144 @@ def _render_user_settings():
             
     except Exception as e:
         st.error(f"Error loading user settings: {str(e)}")
+
+
+def _render_delete_user():
+    """Interface for deleting users with enhanced options."""
+    st.subheader("Delete User")
+    
+    st.warning("⚠️ **Warning**: User deletion is permanent and cannot be undone!")
+    
+    try:
+        # Get current user
+        from personal_agent.config.settings import get_userid
+        current_user = get_userid()
+        
+        # Get all users except current user
+        users = get_all_users()
+        user_ids = [user['user_id'] for user in users if user['user_id'] != current_user]
+        
+        if user_ids:
+            # Form for deleting user
+            with st.form("delete_user_form"):
+                selected_user = st.selectbox("Select User to Delete",
+                                           [""] + user_ids,
+                                           help="Choose the user you want to delete")
+                
+                if selected_user:
+                    # Show user details
+                    user_details = get_user_details(selected_user)
+                    if user_details:
+                        st.info(f"**User Details:**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**User ID:** {user_details.get('user_id', 'N/A')}")
+                            st.write(f"**User Name:** {user_details.get('user_name', 'N/A')}")
+                        with col2:
+                            st.write(f"**User Type:** {user_details.get('user_type', 'N/A')}")
+                            st.write(f"**Created:** {user_details.get('created_at', 'N/A')}")
+                
+                st.subheader("Deletion Options")
+                
+                # Deletion options
+                col1, col2 = st.columns(2)
+                with col1:
+                    delete_data = st.checkbox("Delete User Data",
+                                            value=True,
+                                            help="Delete all persistent data directories for this user")
+                    backup_data = st.checkbox("Backup Data Before Deletion",
+                                            value=False,
+                                            help="Create a backup of user data before deleting")
+                
+                with col2:
+                    dry_run = st.checkbox("Dry Run (Preview Only)",
+                                        value=False,
+                                        help="Preview what would be deleted without actually deleting")
+                
+                # Confirmation
+                st.subheader("Confirmation")
+                confirmation_text = ""
+                if selected_user:
+                    confirmation_text = st.text_input(
+                        f"Type '{selected_user}' to confirm deletion:",
+                        help="This is a safety measure to prevent accidental deletions"
+                    )
+                
+                # Submit button - always enabled
+                submitted = st.form_submit_button(
+                    "🗑️ Delete User" if not dry_run else "👁️ Preview Deletion",
+                    type="primary" if dry_run else "secondary"
+                )
+                
+                # Validation and confirmation after submission
+                if submitted:
+                    if not selected_user:
+                        st.error("❌ Please select a user to delete.")
+                    elif not dry_run and confirmation_text != selected_user:
+                        st.error(f"❌ Please type '{selected_user}' exactly to confirm deletion.")
+                    else:
+                        try:
+                            # Perform deletion
+                            with st.spinner(f"{'Previewing' if dry_run else 'Deleting'} user '{selected_user}'..."):
+                                result = delete_user(
+                                    user_id=selected_user,
+                                    delete_data=delete_data,
+                                    backup_data=backup_data,
+                                    dry_run=dry_run
+                                )
+                        
+                            if result['success']:
+                                if dry_run:
+                                    st.success("✅ Dry run completed successfully!")
+                                    st.info("**Preview Results:**")
+                                else:
+                                    st.success(f"✅ User '{selected_user}' deleted successfully!")
+                                
+                                # Display detailed results
+                                if result.get('actions_performed'):
+                                    st.subheader("Actions Performed:")
+                                    for action in result['actions_performed']:
+                                        st.write(f"• {action}")
+                                
+                                # Display data deletion info
+                                data_info = result.get('data_deleted', {})
+                                if data_info.get('files_removed', 0) > 0:
+                                    st.info(f"📊 **Data Summary:** {data_info['files_removed']} files, "
+                                           f"{data_info['total_size_mb']:.2f} MB")
+                                
+                                # Display backup info
+                                backup_info = result.get('backup_info', {})
+                                if backup_info.get('success'):
+                                    st.success(f"💾 **Backup Created:** {backup_info['backup_path']}")
+                                    st.info(f"Backup contains {backup_info['files_backed_up']} files "
+                                           f"({backup_info['backup_size_mb']:.2f} MB)")
+                                
+                                # Display warnings
+                                if result.get('warnings'):
+                                    st.subheader("Warnings:")
+                                    for warning in result['warnings']:
+                                        st.warning(f"⚠️ {warning}")
+                                
+                                if not dry_run:
+                                    # Clear the cached user manager to refresh user list
+                                    from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                    get_user_manager.clear()
+                                    st.success("🔄 User list updated automatically!")
+                                    st.rerun()
+                            else:
+                                st.error(f"❌ Failed to delete user: {result.get('error', 'Unknown error')}")
+                                
+                                # Display any errors
+                                if result.get('errors'):
+                                    st.subheader("Errors:")
+                                    for error in result['errors']:
+                                        st.error(f"❌ {error}")
+                                        
+                        except Exception as e:
+                            st.error(f"❌ Error during user deletion: {str(e)}")
+        else:
+            st.info("ℹ️ No users available for deletion (cannot delete current user).")
+            st.write(f"Current user: **{current_user}**")
+            
+    except Exception as e:
+        st.error(f"❌ Error loading user information: {str(e)}")

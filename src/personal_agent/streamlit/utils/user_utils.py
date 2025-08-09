@@ -98,20 +98,22 @@ def switch_user(user_id: str, restart_containers: bool = True) -> Dict[str, Any]
         return {"success": False, "error": str(e)}
 
 
-def delete_user(user_id: str, delete_data: bool = False) -> Dict[str, Any]:
+def delete_user(user_id: str, delete_data: bool = True, backup_data: bool = False, dry_run: bool = False) -> Dict[str, Any]:
     """
-    Delete a user from the system.
+    Delete a user from the system with enhanced options.
     
     Args:
         user_id: ID of the user to delete
-        delete_data: Whether to delete user data
+        delete_data: Whether to delete persistent data directory (default: True)
+        backup_data: Whether to backup data before deletion (default: False)
+        dry_run: Preview mode - show what would be deleted without deleting (default: False)
         
     Returns:
-        Dictionary containing result information
+        Dictionary containing detailed result information
     """
     try:
         user_manager = get_user_manager()
-        return user_manager.delete_user(user_id)
+        return user_manager.delete_user(user_id, delete_data=delete_data, backup_data=backup_data, dry_run=dry_run)
     except Exception as e:
         st.error(f"Error deleting user: {str(e)}")
         return {"success": False, "error": str(e)}
