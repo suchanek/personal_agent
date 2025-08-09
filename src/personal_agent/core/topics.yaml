@@ -377,6 +377,20 @@ categories:
     - content
     - frustrated
     - disappointed
+    - insecure
+    - secure
+    - confident
+    - nervous
+    - worried
+    - calm
+    - peaceful
+    - uncomfortable
+    - comfortable
+    - vulnerable
+    - strong
+    - weak
+    - emotional
+    - moody
     - feel
     - feeling
   friends:
@@ -535,6 +549,33 @@ phrases:
     - am excited
     - am anxious
     - am stressed
+    - is insecure
+    - very insecure
+    - feeling insecure
+    - am insecure
+    - feels insecure
+    - is confident
+    - very confident
+    - feeling confident
+    - am confident
+    - feels confident
+    - is nervous
+    - very nervous
+    - feeling nervous
+    - am nervous
+    - feels nervous
+    - is worried
+    - very worried
+    - feeling worried
+    - am worried
+    - feels worried
+    - is vulnerable
+    - feeling vulnerable
+    - am vulnerable
+    - feels vulnerable
+    - carries a blanket
+    - security blanket
+    - comfort object
   friends:
     - have a friend
     - my friend

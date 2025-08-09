@@ -156,6 +156,7 @@ class AgnoPersonalAgent(Agent):
         self.enable_mcp = (
             enable_mcp and USE_MCP
         )  # Keep for compatibility but simplified
+
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.user_id = user_id
@@ -379,7 +380,9 @@ class AgnoPersonalAgent(Agent):
 
             # 6. Create tool instances (CRITICAL: Must be done after managers)
             if self.enable_memory:
-                self.knowledge_tools = KnowledgeTools(self.knowledge_manager, self.agno_knowledge)
+                self.knowledge_tools = KnowledgeTools(
+                    self.knowledge_manager, self.agno_knowledge
+                )
                 self.knowledge_ingestion_tools = KnowledgeIngestionTools()
                 self.semantic_knowledge_ingestion_tools = (
                     SemanticKnowledgeIngestionTools()
@@ -426,7 +429,9 @@ class AgnoPersonalAgent(Agent):
                     self.memory_tools,
                 ]
                 tools.extend(memory_tools)
-                logger.info("Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools")
+                logger.info(
+                    "Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools"
+                )
             else:
                 logger.warning("Memory disabled - no memory tools added")
 
@@ -479,7 +484,9 @@ class AgnoPersonalAgent(Agent):
             logger.error("Failed to initialize AgnoPersonalAgent: %s", e, exc_info=True)
             return False
 
-    async def run(self, query: str, stream: bool = False, add_thought_callback=None) -> str:
+    async def run(
+        self, query: str, stream: bool = False, add_thought_callback=None
+    ) -> str:
         """Run a query through the agent and capture the final response and tool calls.
 
         This method uses the native `arun` from the superclass with streaming disabled
@@ -511,7 +518,11 @@ class AgnoPersonalAgent(Agent):
         if add_thought_callback:
             add_thought_callback("✅ Agent execution complete.")
 
-        return response.content if response else "I apologize, but I didn't generate a proper response."
+        return (
+            response.content
+            if response
+            else "I apologize, but I didn't generate a proper response."
+        )
 
     def get_last_tool_calls(self) -> List[Any]:
         """Get tool calls from the last agent run.
@@ -520,52 +531,6 @@ class AgnoPersonalAgent(Agent):
             List of ToolExecution objects from the most recent run.
         """
         return self._collected_tool_calls
-        """Get tool limitations for specific models.
-        
-        This method defines model-specific limitations to prevent template errors
-        and ensure compatibility with different model architectures.
-        
-        Args:
-            model_name: The name of the model to get limits for
-            
-        Returns:
-            Dictionary with tool limitations:
-            - max_tools: Maximum number of tools (None = no limit)
-            - exclude_complex: List of complex tool names to exclude
-            - simple_tools_only: Whether to only use simple tools
-        """
-        model_limits = {
-            # Models with known tool calling template issues
-            "gpt-oss:20b": {
-                "max_tools": 6,
-                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
-                "simple_tools_only": True,
-            },
-            "gpt4all": {
-                "max_tools": 4,
-                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
-                "simple_tools_only": True,
-            },
-            "phi": {
-                "max_tools": 4,
-                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
-                "simple_tools_only": True,
-            },
-            "gemma": {
-                "max_tools": 4,
-                "exclude_complex": ["YFinanceTools", "PythonTools", "ShellTools"],
-                "simple_tools_only": True,
-            },
-            # Add more problematic models as discovered
-        }
-        
-        # Check if any of the problematic model names are in the model name
-        for problematic_model, limits in model_limits.items():
-            if problematic_model.lower() in model_name.lower():
-                return limits
-        
-        # Default: no limitations for compatible models
-        return {"max_tools": None, "exclude_complex": [], "simple_tools_only": False}
 
     def _validate_response_content(self, content: str, query: str) -> str:
         """Validate and potentially fix response content.
@@ -785,18 +750,18 @@ class AgnoPersonalAgent(Agent):
             for tool in self.tools:
                 # Get tool name - try multiple approaches for different tool types
                 tool_name = None
-                
+
                 # Try common name attributes
                 for name_attr in ["name", "__name__", "_name"]:
                     if hasattr(tool, name_attr):
                         tool_name = getattr(tool, name_attr)
                         if tool_name:
                             break
-                
+
                 # Fallback to class name
                 if not tool_name:
                     tool_name = str(type(tool).__name__)
-                
+
                 # Get tool description
                 tool_doc = getattr(tool, "__doc__", "No description available")
 
@@ -816,11 +781,14 @@ class AgnoPersonalAgent(Agent):
                 else:
                     # Determine if it's a built-in agno tool or custom tool
                     tool_type = "Built-in Tool"
-                    if any(keyword in tool_name.lower() for keyword in ["memory", "knowledge", "ingestion"]):
+                    if any(
+                        keyword in tool_name.lower()
+                        for keyword in ["memory", "knowledge", "ingestion"]
+                    ):
                         tool_type = "Memory/Knowledge Tool"
                     elif "Tools" in tool_name:
                         tool_type = "Built-in Tool"
-                    
+
                     built_in_tools.append(
                         {
                             "name": tool_name,
@@ -848,6 +816,7 @@ class AgnoPersonalAgent(Agent):
             "initialized": self._initialized,
             "storage_dir": self.storage_dir,
             "knowledge_dir": self.knowledge_dir,
+            "ollama_base_url": self.ollama_base_url,
             "lightrag_url": LIGHTRAG_URL,
             "lightrag_memory_url": LIGHTRAG_MEMORY_URL,
             "tool_counts": {
@@ -893,6 +862,21 @@ class AgnoPersonalAgent(Agent):
         main_table.add_row("Total Tools", str(info["tool_counts"]["total"]))
 
         console.print(main_table)
+
+        # Service Endpoints table
+        endpoints_table = Table(
+            title="🔌 Service Endpoints",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        endpoints_table.add_column("Service", style="cyan")
+        endpoints_table.add_column("URL", style="green")
+
+        endpoints_table.add_row("Ollama", info["ollama_base_url"])
+        endpoints_table.add_row("LightRAG Knowledge", info["lightrag_url"])
+        endpoints_table.add_row("LightRAG Memory", info["lightrag_memory_url"])
+
+        console.print(endpoints_table)
 
         # Tools table
         tools_table = Table(
@@ -977,7 +961,7 @@ class AgnoPersonalAgent(Agent):
         where async cleanup cannot be used.
         """
         try:
-            logger.info("Running synchronous cleanup...")
+            logger.debug("Running synchronous cleanup...")
 
             # Clean up storage references
             if self.agno_storage:
@@ -1003,7 +987,7 @@ class AgnoPersonalAgent(Agent):
             self.knowledge_manager = None
             self.tool_manager = None
 
-            logger.info("Synchronous cleanup completed successfully")
+            logger.debug("Synchronous cleanup completed successfully")
 
         except Exception as e:
             logger.warning("Error during synchronous cleanup: %s", e)
