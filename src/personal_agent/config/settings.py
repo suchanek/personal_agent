@@ -398,6 +398,90 @@ def print_config():
     print(f"{BOLD}{GREEN}Configuration loaded successfully!{ENDC}")
     print(f"{BOLD}{HEADER}{'='*60}{ENDC}")
 
+def print_configuration() -> str:
+    """Print comprehensive configuration information for the Personal AI Agent.
+
+    Uses the enhanced configuration display method from the module's tools.
+
+    :return: Configuration information as formatted string
+    """
+    try:
+        # Import and use the enhanced display function from the module's tools
+        from .tools.show_config import show_config
+
+        # Call the show_config function with default colored output
+        show_config()
+
+        return "Configuration displayed successfully using module tools.show_config method."
+
+    except Exception as e:
+        # Fallback to the settings.print_config() method if enhanced method fails
+        _logger.warning("Could not use module tools.show_config display: %s", e)
+
+        try:
+            from .config.settings import print_config
+
+            print_config()
+            return "Configuration displayed successfully using settings.print_config() fallback."
+        except ImportError as fallback_error:
+            _logger.warning(
+                "Could not import settings.print_config: %s", fallback_error
+            )
+
+            # Final fallback to basic configuration display
+            from .config import get_mcp_servers
+            from .config.settings import (
+                AGNO_KNOWLEDGE_DIR,
+                AGNO_STORAGE_DIR,
+                DATA_DIR,
+                HOME_DIR,
+                LLM_MODEL,
+                LOG_LEVEL_STR,
+                OLLAMA_URL,
+                REPO_DIR,
+                ROOT_DIR,
+                STORAGE_BACKEND,
+                USE_MCP,
+                USE_WEAVIATE,
+                WEAVIATE_URL,
+            )
+
+            config_lines = [
+                "=" * 80,
+                "🤖 PERSONAL AI AGENT CONFIGURATION",
+                "=" * 80,
+                "",
+                "📊 CORE SETTINGS:",
+                f"  • Package Version: {__version__}",
+                f"  • LLM Model: {LLM_MODEL}",
+                f"  • Storage Backend: {STORAGE_BACKEND}",
+                f"  • Log Level: {LOG_LEVEL_STR}",
+                "",
+                "🌐 SERVICE ENDPOINTS:",
+                f"  • Ollama URL: {OLLAMA_URL}",
+                f"  • Weaviate URL: {WEAVIATE_URL}",
+                "",
+                "🔧 FEATURE FLAGS:",
+                f"  • Weaviate Enabled: {'✅' if USE_WEAVIATE else '❌'} ({USE_WEAVIATE})",
+                f"  • MCP Enabled: {'✅' if USE_MCP else '❌'} ({USE_MCP})",
+                "",
+                "📁 DIRECTORY CONFIGURATION:",
+                f"  • Root Directory: {ROOT_DIR}",
+                f"  • Home Directory: {HOME_DIR}",
+                f"  • Data Directory: {DATA_DIR}",
+                f"  • Repository Directory: {REPO_DIR}",
+                f"  • Agno Storage Directory: {AGNO_STORAGE_DIR}",
+                f"  • Agno Knowledge Directory: {AGNO_KNOWLEDGE_DIR}",
+                "",
+                "=" * 80,
+                "🚀 Configuration loaded successfully!",
+                "=" * 80,
+            ]
+
+            # Join and print
+            config_text = "\n".join(config_lines)
+            print(config_text)
+            return config_text
 
 if __name__ == "__main__":
     print_config()

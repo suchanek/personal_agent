@@ -6,9 +6,9 @@ from .settings import (
     AGNO_STORAGE_DIR,
     DATA_DIR,
     HOME_DIR,
+    LIGHTRAG_MEMORY_URL,
     LIGHTRAG_SERVER,
     LIGHTRAG_URL,
-    LIGHTRAG_MEMORY_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
@@ -20,10 +20,11 @@ from .settings import (
     USE_MCP,
     USE_WEAVIATE,
     WEAVIATE_URL,
+    get_current_user_id,
     get_env_bool,
     get_env_var,
-    get_current_user_id,
     get_userid,
+    print_configuration,
     refresh_user_dependent_settings,
 )
 
@@ -84,4 +85,5 @@ __all__ = [
     "get_settings",
     "get_current_user_id",
     "refresh_user_dependent_settings",
+    "print_configuration",
 ]
