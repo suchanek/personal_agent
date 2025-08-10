@@ -2,14 +2,16 @@
 
 from agno.document.reader.website_reader import WebsiteReader
 
+
 def create_web_reader(max_depth=3, max_links=10):
     """Create a WebsiteReader instance with specified parameters."""
     return WebsiteReader(max_depth=max_depth, max_links=max_links)
 
+
 def read_website(url: str, max_depth=3, max_links=10):
     """Read content from a website URL."""
     reader = create_web_reader(max_depth=max_depth, max_links=max_links)
-    
+
     try:
         print(f"Starting read of {url}...")
         documents = reader.read(url)
@@ -28,6 +30,7 @@ def read_website(url: str, max_depth=3, max_links=10):
         print(f"Error type: {type(e)}")
         print(f"Error occurred: {str(e)}")
         return None
+
 
 # Example usage (only runs if this file is executed directly)
 if __name__ == "__main__":

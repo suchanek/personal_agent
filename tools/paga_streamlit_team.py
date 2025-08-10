@@ -389,6 +389,10 @@ if "performance_stats" not in st.session_state:
 if "show_memory_confirmation" not in st.session_state:
     st.session_state.show_memory_confirmation = False
 
+# Initialize per-memory delete confirmations map
+if "delete_confirmations" not in st.session_state:
+    st.session_state.delete_confirmations = {}
+
 # Apply theme before rendering UI
 apply_custom_theme()
 
@@ -819,6 +823,42 @@ with st.sidebar:
                             topics = getattr(memory, "topics", [])
                             if topics:
                                 st.write(f"**Topics:** {', '.join(topics)}")
+                            
+                            # Memory deletion with confirmation
+                            delete_key = f"delete_browse_{getattr(memory, 'memory_id', 'N/A')}"
+                            if delete_key not in st.session_state.delete_confirmations:
+                                st.session_state.delete_confirmations[delete_key] = False
+
+                            if not st.session_state.delete_confirmations[delete_key]:
+                                if st.button("🗑️ Delete", key=delete_key):
+                                    st.session_state.delete_confirmations[delete_key] = True
+                                    st.rerun()
+                            else:
+                                st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
+                                        st.session_state.delete_confirmations[delete_key] = False
+                                        st.rerun()
+                                with col2:
+                                    if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                                        with st.spinner("Deleting memory..."):
+                                            try:
+                                                success, message = st.session_state.team.agno_memory.memory_manager.delete_memory(
+                                                    memory_id=getattr(memory, "memory_id", None),
+                                                    db=st.session_state.team.agno_memory.db,
+                                                    user_id=USER_ID,
+                                                )
+                                                if success:
+                                                    st.success(f"Memory deleted: {message}")
+                                                    st.session_state.delete_confirmations[delete_key] = False
+                                                    st.rerun()
+                                                else:
+                                                    st.error(f"Failed to delete memory: {message}")
+                                                    st.session_state.delete_confirmations[delete_key] = False
+                                            except Exception as e:
+                                                st.error(f"Error deleting memory: {str(e)}")
+                                                st.session_state.delete_confirmations[delete_key] = False
                 else:
                     st.info(
                         "No memories stored yet. Start chatting to create some memories!"
@@ -971,6 +1011,42 @@ with st.sidebar:
                             st.write(
                                 f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
                             )
+
+                            # Memory deletion with confirmation
+                            delete_key = f"delete_search_{getattr(memory, 'memory_id', 'N/A')}"
+                            if delete_key not in st.session_state.delete_confirmations:
+                                st.session_state.delete_confirmations[delete_key] = False
+
+                            if not st.session_state.delete_confirmations[delete_key]:
+                                if st.button("🗑️ Delete Memory", key=delete_key):
+                                    st.session_state.delete_confirmations[delete_key] = True
+                                    st.rerun()
+                            else:
+                                st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
+                                        st.session_state.delete_confirmations[delete_key] = False
+                                        st.rerun()
+                                with col2:
+                                    if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                                        with st.spinner("Deleting memory..."):
+                                            try:
+                                                success, message = st.session_state.team.agno_memory.memory_manager.delete_memory(
+                                                    memory_id=getattr(memory, "memory_id", None),
+                                                    db=st.session_state.team.agno_memory.db,
+                                                    user_id=USER_ID,
+                                                )
+                                                if success:
+                                                    st.success(f"Memory deleted: {message}")
+                                                    st.session_state.delete_confirmations[delete_key] = False
+                                                    st.rerun()
+                                                else:
+                                                    st.error(f"Failed to delete memory: {message}")
+                                                    st.session_state.delete_confirmations[delete_key] = False
+                                            except Exception as e:
+                                                st.error(f"Error deleting memory: {str(e)}")
+                                                st.session_state.delete_confirmations[delete_key] = False
                 else:
                     st.info("No matching memories found. Try different keywords.")
             except Exception as e:

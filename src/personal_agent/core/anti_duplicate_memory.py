@@ -615,36 +615,33 @@ class AntiDuplicateMemory(Memory):
         :param memory_id: ID of the memory to delete
         :param user_id: User ID for the memory
         :param refresh_from_db: Whether to refresh from database before deleting
-        :return: None (raises exception on failure)
+        :return: None
         """
         # Default user_id if not provided
         if user_id is None:
             user_id = get_current_user_id()
             
-        # First, check if the memory exists by getting all memories and looking for the ID
-        try:
-            all_memories = self.db.read_memories()
-            memory_exists = any(row.id == memory_id for row in all_memories)
-            
-            if not memory_exists:
-                raise ValueError(f"Memory with ID '{memory_id}' not found")
-            
-            # Memory exists, proceed with deletion
+        # Refresh from the DB
+        if refresh_from_db:
+            self.refresh_from_db(user_id=user_id)
+
+        # Check if memory exists in our local cache
+        if user_id not in self.memories or memory_id not in self.memories[user_id]:
+            logger.warning("Memory %s not found for user %s", memory_id, user_id)
+            if self.debug_mode:
+                print(f"⚠️  Memory {memory_id} not found for deletion")
+            return None
+
+        # Delete from local cache
+        del self.memories[user_id][memory_id]
+        
+        # Delete from database
+        if self.db:
             self.db.delete_memory(memory_id)
-            logger.info("Deleted memory %s for user %s", memory_id, user_id)
-            if self.debug_mode:
-                print(f"🗑️  Deleted memory: {memory_id}")
-        except ValueError:
-            # Re-raise ValueError for non-existent memory
-            raise
-        except Exception as e:
-            logger.error(
-                "Failed to delete memory %s for user %s: %s", memory_id, user_id, e
-            )
-            if self.debug_mode:
-                print(f"❌ Failed to delete memory {memory_id}: {e}")
-            # Re-raise the exception to match parent class behavior
-            raise
+            
+        logger.info("Deleted memory %s for user %s", memory_id, user_id)
+        if self.debug_mode:
+            print(f"🗑️  Deleted memory: {memory_id}")
 
     def get_memory_stats(self, user_id: str = None) -> dict:
         if user_id is None:

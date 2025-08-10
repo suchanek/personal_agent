@@ -97,7 +97,7 @@ poethepoet = "^0.36.0"
 
 # === Core Application Tasks ===
 [tool.poe.tasks.serve]
-help = "Start the personal agent Streamlit interface"
+help = "Start the simple personal agent interface"
 cmd = "streamlit run src/personal_agent/web/agno_interface.py"
 args = [
   { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
@@ -105,8 +105,12 @@ args = [
 ]
 
 [tool.poe.tasks.serve-agno]
-help = "Start Agno Streamlit interface"
-cmd = "streamlit run src/personal_agent/web/agno_interface.py --server.port 8501"
+help = "Start Personal Agent Full interface"
+cmd = "streamlit run tools/paga_streamlit_agno.py --server.port 8501"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
+  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
+]
 
 
 # === CLI Interface Tasks ===
@@ -126,11 +130,11 @@ cmd = "poetry run rteam"
 # === MCP Server Management ===
 [tool.poe.tasks.mcp-install]
 help = "Install MCP servers"
-cmd = "install-mcp-servers"
+cmd = "python scripts/install_mcp.py"
 
 [tool.poe.tasks.mcp-test]
 help = "Test MCP server availability"
-cmd = "test-mcp-servers"
+cmd = "python tests/test_mcp_availability.py"
 
 [tool.poe.tasks.mcp-setup]
 help = "Install and test MCP servers"
@@ -166,16 +170,6 @@ cmd = "pytest memory_tests/ -v"
 help = "Run comprehensive test suite"
 sequence = ["test-unit", "test-integration", "test-memory", "test-tools", "mcp-test"]
 
-# === Development Workflow Tasks ===
-[tool.poe.tasks.dev-setup]
-help = "Complete development environment setup"
-sequence = ["mcp-setup", "test-tools"]
-
-[tool.poe.tasks.dev]
-help = "Start development server with full setup"
-sequence = ["dev-setup", "serve"]
-
-
 # === Memory and Knowledge Management ===
 [tool.poe.tasks.store-fact]
 help = "Store a fact in the knowledge base"
@@ -188,12 +182,6 @@ args = [
 [tool.poe.tasks.memory-clean]
 help = "Clean memory system"
 script = "src.personal_agent.tools.memory_cleaner:main"
-
-# === Docker and Infrastructure ===
-[tool.poe.tasks.docker-build]
-help = "Build Docker image"
-cmd = "docker build -t personal-agent ."
-
 
 [tool.poe.tasks.lightrag-restart]
 help = "Restart LightRAG server"
@@ -226,21 +214,6 @@ sequence = [
   { cmd = "find . -name '.pytest_cache' -exec rm -rf {} + || true" }
 ]
 
-[tool.poe.tasks.lint]
-help = "Run code linting"
-cmd = "ruff check ."
-args = [
-  { name = "fix", options = ["--fix"], type = "boolean", help = "Auto-fix issues" }
-]
-
-[tool.poe.tasks.format]
-help = "Format code"
-cmd = "ruff format ."
-
-[tool.poe.tasks.check]
-help = "Run all code quality checks"
-sequence = ["lint", "format", "test"]
-
 # === Environment Management ===
 [tool.poe.tasks.switch-user]
 help = "Switch user configuration"
@@ -269,16 +242,16 @@ cmd = "python examples/mcp_tools_examples.py"
 # === Quick Start Tasks ===
 [tool.poe.tasks.quick-start]
 help = "Quick start for new users"
-sequence = ["dev-setup", "demo-memory", "serve"]
+sequence = ["mcp-setup", "demo-memory", "serve"]
 
 [tool.poe.tasks.full-demo]
 help = "Full system demonstration"
-sequence = ["dev-setup", "demo-memory", "demo-team", "example-mcp"]
+sequence = ["mcp-setup", "demo-memory", "demo-team", "example-mcp"]
 
 # === Documentation ===
-[tool.poe.tasks.pdoc]
+[tool.poe.tasks.docs]
 help = "Generate project documentation using pdoc"
-cmd = "pdoc -o docs src/personal_agent"
+shell = "cd src && pdoc -o ../docs personal_agent"
 
 [build-system]
 requires = ["poetry-core"]

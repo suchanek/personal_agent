@@ -116,10 +116,13 @@ from personal_agent.config import (
     LLM_MODEL,
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
-    USER_ID,
+    get_current_user_id,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent, create_agno_agent
-from tools.streamlit_helpers import StreamlitKnowledgeHelper, StreamlitMemoryHelper
+from personal_agent.tools.streamlit_helpers import (
+    StreamlitKnowledgeHelper,
+    StreamlitMemoryHelper,
+)
 
 # Constants for session state keys
 SESSION_KEY_MESSAGES = "messages"
@@ -135,6 +138,9 @@ SESSION_KEY_SHOW_DEBUG = "show_debug"
 SESSION_KEY_MEMORY_HELPER = "memory_helper"
 SESSION_KEY_KNOWLEDGE_HELPER = "knowledge_helper"
 SESSION_KEY_RAG_SERVER_LOCATION = "rag_server_location"
+SESSION_KEY_DELETE_CONFIRMATIONS = "delete_confirmations"
+
+USER_ID = get_current_user_id()
 
 # Optional imports
 try:
@@ -274,6 +280,9 @@ def initialize_session_state():
 
     if SESSION_KEY_RAG_SERVER_LOCATION not in st.session_state:
         st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = "localhost"
+
+    if SESSION_KEY_DELETE_CONFIRMATIONS not in st.session_state:
+        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS] = {}
 
     # Initialize debug mode based on command line flag
     if SESSION_KEY_SHOW_DEBUG not in st.session_state:
@@ -646,15 +655,35 @@ def render_memory_tab():
                         f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                     )
                     st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                    if st.button(
-                        f"🗑️ Delete Memory", key=f"delete_search_{memory.memory_id}"
-                    ):
-                        success, message = memory_helper.delete_memory(memory.memory_id)
-                        if success:
-                            st.success(f"Memory deleted: {message}")
+                    
+                    # Memory deletion with confirmation
+                    delete_key = f"delete_search_{memory.memory_id}"
+                    if delete_key not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]:
+                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                    
+                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key]:
+                        if st.button(f"🗑️ Delete Memory", key=delete_key):
+                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = True
                             st.rerun()
-                        else:
-                            st.error(f"Failed to delete memory: {message}")
+                    else:
+                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
+                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                st.rerun()
+                        with col2:
+                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                                with st.spinner("Deleting memory..."):
+                                    success, message = memory_helper.delete_memory(memory.memory_id)
+                                    if success:
+                                        st.success(f"Memory deleted: {message}")
+                                        # Clear the confirmation state
+                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Failed to delete memory: {message}")
+                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
         else:
             st.info("No matching memories found.")
 
@@ -677,13 +706,35 @@ def render_memory_tab():
                     topics = getattr(memory, "topics", [])
                     if topics:
                         st.write(f"**Topics:** {', '.join(topics)}")
-                    if st.button(f"🗑️ Delete", key=f"delete_browse_{memory.memory_id}"):
-                        success, message = memory_helper.delete_memory(memory.memory_id)
-                        if success:
-                            st.success(f"Memory deleted: {message}")
+                    
+                    # Memory deletion with confirmation
+                    delete_key = f"delete_browse_{memory.memory_id}"
+                    if delete_key not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]:
+                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                    
+                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key]:
+                        if st.button(f"🗑️ Delete", key=delete_key):
+                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = True
                             st.rerun()
-                        else:
-                            st.error(f"Failed to delete memory: {message}")
+                    else:
+                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
+                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                st.rerun()
+                        with col2:
+                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                                with st.spinner("Deleting memory..."):
+                                    success, message = memory_helper.delete_memory(memory.memory_id)
+                                    if success:
+                                        st.success(f"Memory deleted: {message}")
+                                        # Clear the confirmation state
+                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Failed to delete memory: {message}")
+                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
         else:
             st.info("No memories stored yet.")
 
@@ -1357,15 +1408,17 @@ def render_sidebar():
                             new_ollama_url,
                             st.session_state[SESSION_KEY_AGENT],
                         )
-                        
+
                         # Update helper classes with new agent
-                        st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
-                            st.session_state[SESSION_KEY_AGENT]
+                        st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                            StreamlitMemoryHelper(st.session_state[SESSION_KEY_AGENT])
                         )
-                        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(
-                            st.session_state[SESSION_KEY_AGENT]
+                        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                            StreamlitKnowledgeHelper(
+                                st.session_state[SESSION_KEY_AGENT]
+                            )
                         )
-                        
+
                         st.session_state[SESSION_KEY_MESSAGES] = []
                         st.success(f"Agent updated to use model: {selected_model}")
                         st.rerun()
@@ -1379,7 +1432,7 @@ def render_sidebar():
         st.write(
             f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
         )
-        
+
         # Show debug info about URL configuration
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
             with st.expander("🔍 URL Debug Info", expanded=False):
@@ -1387,14 +1440,22 @@ def render_sidebar():
                 st.write(f"**OLLAMA_URL (local):** {OLLAMA_URL}")
                 st.write(f"**REMOTE_OLLAMA_URL:** {REMOTE_OLLAMA_URL}")
                 st.write(f"**EFFECTIVE_OLLAMA_URL (startup):** {EFFECTIVE_OLLAMA_URL}")
-                st.write(f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}")
-                
+                st.write(
+                    f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
+                )
+
                 # Show agent's actual configuration if available
                 agent = st.session_state.get(SESSION_KEY_AGENT)
-                if agent and hasattr(agent, 'ollama_base_url'):
+                if agent and hasattr(agent, "ollama_base_url"):
                     st.write(f"**Agent's Ollama URL:** {agent.ollama_base_url}")
-                elif agent and hasattr(agent, 'model_manager') and hasattr(agent.model_manager, 'ollama_base_url'):
-                    st.write(f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}")
+                elif (
+                    agent
+                    and hasattr(agent, "model_manager")
+                    and hasattr(agent.model_manager, "ollama_base_url")
+                ):
+                    st.write(
+                        f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}"
+                    )
                 else:
                     st.write("**Agent URL:** Not accessible")
 
@@ -1410,7 +1471,7 @@ def render_sidebar():
         st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox(
             debug_label,
             value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, DEBUG_FLAG),
-            help="Debug mode can be enabled via --debug flag or this checkbox"
+            help="Debug mode can be enabled via --debug flag or this checkbox",
         )
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
             st.subheader("📊 Performance Statistics")

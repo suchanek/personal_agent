@@ -17,17 +17,23 @@ from personal_agent.config import (
 )
 
 
-@st.cache_resource
+@st.cache_resource(ttl=300)  # Cache for 5 minutes, then refresh
 def get_agent_instance() -> Optional[AgnoPersonalAgent]:
     """
-    Get or create a cached AgnoPersonalAgent instance for Streamlit.
+    Get or create a cached AgnoPersonalAgent instance for Streamlit using the same pattern as paga_streamlit_agno.py.
     
     Returns:
         AgnoPersonalAgent instance or None if initialization fails
     """
     try:
-        # Create agent with same configuration as CLI
-        agent = AgnoPersonalAgent(
+        # Import the create_agno_agent function (same as paga_streamlit_agno.py)
+        from personal_agent.core.agno_agent import create_agno_agent
+        
+        # Import knowledge directory setting
+        from personal_agent.config import AGNO_KNOWLEDGE_DIR
+        
+        # Use asyncio.run to properly initialize the agent (same pattern as paga_streamlit_agno.py)
+        agent = asyncio.run(create_agno_agent(
             model_provider="ollama",
             model_name=LLM_MODEL,
             ollama_base_url=OLLAMA_URL,
@@ -36,25 +42,9 @@ def get_agent_instance() -> Optional[AgnoPersonalAgent]:
             enable_memory=True,
             enable_mcp=True,
             storage_dir=AGNO_STORAGE_DIR,
-        )
-        
-        # Initialize the agent synchronously
-        # Note: We need to handle async initialization in Streamlit context
-        loop = None
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        if loop.is_running():
-            # If loop is already running, we can't use asyncio.run()
-            # This is a limitation in Streamlit - we'll need to handle this differently
-            st.warning("Agent initialization requires async support. Some features may be limited.")
-            return agent
-        else:
-            # Initialize the agent
-            loop.run_until_complete(agent.initialize())
+            knowledge_dir=AGNO_KNOWLEDGE_DIR,
+            recreate=False,
+        ))
         
         return agent
         
@@ -113,7 +103,7 @@ async def initialize_agent_async() -> Optional[AgnoPersonalAgent]:
 
 def check_agent_status(agent: Optional[AgnoPersonalAgent]) -> dict:
     """
-    Check the status of an agent instance.
+    Check the status of an agent instance, accounting for lazy initialization.
     
     Args:
         agent: AgnoPersonalAgent instance or None
@@ -129,10 +119,27 @@ def check_agent_status(agent: Optional[AgnoPersonalAgent]) -> dict:
         }
     
     try:
+        # Check if agent is initialized (accounting for lazy initialization)
+        is_initialized = getattr(agent, '_initialized', False)
+        
+        # For lazy initialization, trigger initialization if needed to get accurate status
+        if not is_initialized and hasattr(agent, '_ensure_initialized'):
+            try:
+                # Trigger lazy initialization to get accurate memory status
+                asyncio.run(agent._ensure_initialized())
+                is_initialized = getattr(agent, '_initialized', False)
+            except Exception as init_e:
+                return {
+                    "initialized": False,
+                    "memory_available": False,
+                    "error": f"Initialization failed: {str(init_e)}"
+                }
+        
+        # Check memory availability after ensuring initialization
         memory_available = hasattr(agent, 'agno_memory') and agent.agno_memory is not None
         
         return {
-            "initialized": True,
+            "initialized": is_initialized,
             "memory_available": memory_available,
             "user_id": getattr(agent, 'user_id', 'unknown'),
             "model": getattr(agent, 'model_name', 'unknown'),
