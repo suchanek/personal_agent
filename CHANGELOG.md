@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Memory System Consistency**: Resolved several critical inconsistencies across the memory system. The `show-config` tool now accurately reflects all available memory tools, their dependencies, and the dynamic user ID. The `clear_all_memories` function and the Streamlit UI deletion logic have been consolidated to correctly wipe data from all storage systems (local and graph). A validation script has also been added to prevent future regressions. See [ADR-057](./refs/adr/057-memory-system-consistency-and-validation.md) for details.
+
 ### Changed
 - **Refactoring**: Renamed `src/personal_agent/team/ollama_reasoning_multi_purpose_team.py` to `src/personal_agent/team/reasoning_team.py` and updated all references to the old name. This change was made to simplify the file name and improve clarity.
 

@@ -20,7 +20,7 @@ async def run_test():
     # 1. Initialize the agent
     print("Initializing agent...")
     agent = await create_agno_agent(
-        enable_mcp=False, recreate=True, user_id="charlie"  # Start with a clean slate
+        enable_mcp=False, recreate=True, user_id="charlie_test"  # Start with a clean slate
     )
     assert agent is not None, "Agent initialization failed"
     print("Agent initialized.")

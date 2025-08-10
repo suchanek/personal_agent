@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # Import components
 from personal_agent.streamlit.components.system_status import system_status_tab
 from personal_agent.streamlit.components.user_management import user_management_tab
-from personal_agent.streamlit.components.memory_management import memory_management_tab
+from personal_agent.streamlit.components.dashboard_memory_management import memory_management_tab
 from personal_agent.streamlit.components.docker_services import docker_services_tab
 
 # Import utilities

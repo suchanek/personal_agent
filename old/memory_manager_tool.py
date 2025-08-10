@@ -6,9 +6,12 @@ This tool provides comprehensive memory database management capabilities includi
 - List all users in the memory database
 - View memories by user
 - Search memories by content
-- Delete specific memories or all memories for a user
+- Delete specific memories or all memories for a user from BOTH SQLite and LightRAG
 - Database statistics and health checks
 - Export memories to JSON
+
+IMPORTANT: This tool now uses DUAL STORAGE deletion, ensuring memories are removed
+from both the SQLite database AND the LightRAG graph memory system.
 
 Usage:
     python memory_manager_tool.py                                       # Interactive mode (default)
@@ -17,8 +20,8 @@ Usage:
     python memory_manager_tool.py list-users
     python memory_manager_tool.py list-memories --user-id test_user
     python memory_manager_tool.py search --query "hiking" --user-id test_user
-    python memory_manager_tool.py delete-memory --memory-id <id>
-    python memory_manager_tool.py clear-user --user-id test_user
+    python memory_manager_tool.py delete-memory --memory-id <id>        # Deletes from BOTH systems
+    python memory_manager_tool.py clear-user --user-id test_user        # Deletes from BOTH systems
     python memory_manager_tool.py stats
     python memory_manager_tool.py export --user-id test_user --output memories.json
 """
@@ -26,6 +29,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -43,12 +47,14 @@ from rich.table import Table
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
+from personal_agent.config import AGNO_STORAGE_DIR, get_current_user_id
 from personal_agent.utils import setup_logging
 
 # Configure logging
 logger = setup_logging(__name__)
 console = Console()
+
+USER_ID = get_current_user_id()
 
 
 class MemoryManager:
@@ -65,11 +71,11 @@ class MemoryManager:
             db_path = f"{AGNO_STORAGE_DIR}/agent_memory.db"
 
         self.db_path = Path(db_path)
-        
+
         # Auto-detect table name if not provided
         if table_name is None:
             table_name = self._detect_table_name()
-        
+
         self.db = SqliteMemoryDb(
             table_name=table_name,
             db_file=str(self.db_path),
@@ -87,41 +93,49 @@ class MemoryManager:
 
     def _detect_table_name(self) -> str:
         """Auto-detect the memory table name by checking what tables exist in the database.
-        
+
         :return: The detected table name, defaults to 'personal_agent_memory'
         """
         import sqlite3
-        
+
         if not self.db_path.exists():
             return "personal_agent_memory"  # Default table name
-            
+
         try:
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
-            
+
             # Get all table names
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
             tables = [row[0] for row in cursor.fetchall()]
             conn.close()
-            
+
             # Look for common memory table names
             if "memory" in tables:
                 console.print(f"[green]Detected table name: 'memory'[/green]")
                 return "memory"
             elif "personal_agent_memory" in tables:
-                console.print(f"[green]Detected table name: 'personal_agent_memory'[/green]")
+                console.print(
+                    f"[green]Detected table name: 'personal_agent_memory'[/green]"
+                )
                 return "personal_agent_memory"
             elif tables:
                 # Use the first table if we can't find a standard name
                 table_name = tables[0]
-                console.print(f"[yellow]Using first available table: '{table_name}'[/yellow]")
+                console.print(
+                    f"[yellow]Using first available table: '{table_name}'[/yellow]"
+                )
                 return table_name
             else:
-                console.print("[yellow]No tables found, using default: 'personal_agent_memory'[/yellow]")
+                console.print(
+                    "[yellow]No tables found, using default: 'personal_agent_memory'[/yellow]"
+                )
                 return "personal_agent_memory"
-                
+
         except Exception as e:
-            console.print(f"[yellow]Could not detect table name ({e}), using default: 'personal_agent_memory'[/yellow]")
+            console.print(
+                f"[yellow]Could not detect table name ({e}), using default: 'personal_agent_memory'[/yellow]"
+            )
             return "personal_agent_memory"
 
     def list_users(self) -> List[str]:
@@ -308,14 +322,17 @@ class MemoryManager:
             console.print(f"[red]Error searching memories: {e}[/red]")
             return []
 
-    def delete_memory(self, memory_id: str) -> bool:
-        """Delete a specific memory by ID.
+    def delete_memory_dual_storage(self, memory_id: str) -> bool:
+        """Delete a specific memory by ID from BOTH SQLite and LightRAG systems.
+        
+        This method uses the integrated AgentMemoryManager to ensure consistent
+        deletion across both storage systems.
 
         :param memory_id: Memory ID to delete
         :return: True if successful, False otherwise
         """
         try:
-            # Find the memory first
+            # Find the memory first for confirmation
             all_memories = self.db.read_memories()
             memory_to_delete = None
 
@@ -344,30 +361,69 @@ class MemoryManager:
             # Show memory details
             console.print(
                 Panel(
-                    f"[bold]Memory to delete:[/bold]\n"
+                    f"[bold]Memory to delete from BOTH storage systems:[/bold]\n"
                     f"ID: {memory_to_delete.id}\n"
                     f"User: {memory_to_delete.user_id}\n"
                     f"Content: {memory_to_delete.memory.get('memory', 'N/A')[:100] if hasattr(memory_to_delete.memory, 'get') else str(memory_to_delete.memory)[:100]}...\n"
-                    f"Topics: {memory_to_delete.memory.get('topics', []) if hasattr(memory_to_delete.memory, 'get') else 'N/A'}",
-                    title="⚠️  Confirm Deletion",
+                    f"Topics: {memory_to_delete.memory.get('topics', []) if hasattr(memory_to_delete.memory, 'get') else 'N/A'}\n\n"
+                    f"[yellow]⚠️  This will delete from SQLite AND LightRAG graph memory[/yellow]",
+                    title="⚠️  Confirm Dual Storage Deletion",
                 )
             )
 
-            if not Confirm.ask("Are you sure you want to delete this memory?"):
+            if not Confirm.ask("Are you sure you want to delete this memory from BOTH storage systems?"):
                 console.print("[yellow]Deletion cancelled[/yellow]")
                 return False
 
-            # Delete the memory
-            self.db.delete_memory(memory_to_delete.id)
-            console.print(f"[green]✅ Successfully deleted memory: {memory_id}[/green]")
+            # Use the integrated deletion function that handles both storage systems
+            import asyncio
+            from personal_agent.core.agent_memory_manager import AgentMemoryManager
+            from personal_agent.config import get_current_user_id, AGNO_STORAGE_DIR
+            
+            # Initialize the integrated memory manager
+            user_id = memory_to_delete.user_id or get_current_user_id()
+            
+            # Create a minimal AgentMemoryManager instance for deletion
+            # We need to import the agno_memory setup
+            from agno.memory.v2.db.sqlite import SqliteMemoryDb
+            from personal_agent.core.semantic_memory_manager import create_semantic_memory_manager
+            
+            # Create agno_memory structure
+            class MockAgnoMemory:
+                def __init__(self):
+                    self.db = SqliteMemoryDb(
+                        table_name="personal_agent_memory",
+                        db_file=f"{AGNO_STORAGE_DIR}/agent_memory.db"
+                    )
+                    self.memory_manager = create_semantic_memory_manager()
+            
+            mock_agno_memory = MockAgnoMemory()
+            
+            # Initialize AgentMemoryManager
+            memory_manager = AgentMemoryManager(
+                user_id=user_id,
+                storage_dir=AGNO_STORAGE_DIR,
+                agno_memory=mock_agno_memory,
+                lightrag_memory_url=os.getenv("LIGHTRAG_MEMORY_URL", "http://localhost:9622"),
+                enable_memory=True
+            )
+            
+            # Perform the dual-storage deletion
+            result = asyncio.run(memory_manager.delete_memory(str(memory_to_delete.id)))
+            
+            console.print(f"[green]✅ Dual storage deletion result: {result}[/green]")
             return True
 
         except Exception as e:
-            console.print(f"[red]Error deleting memory: {e}[/red]")
+            console.print(f"[red]Error deleting memory from dual storage: {e}[/red]")
+            logger.error(f"Dual storage deletion failed: {e}", exc_info=True)
             return False
 
-    def clear_user_memories(self, user_id: str) -> bool:
-        """Delete all memories for a specific user.
+    def clear_user_memories_dual_storage(self, user_id: str) -> bool:
+        """Delete all memories for a specific user from BOTH SQLite and LightRAG systems.
+        
+        This method uses the integrated AgentMemoryManager to ensure consistent
+        deletion across both storage systems.
 
         :param user_id: User ID to clear memories for
         :return: True if successful, False otherwise
@@ -384,28 +440,80 @@ class MemoryManager:
                 f"[yellow]Found {len(user_memories)} memories for user: {user_id}[/yellow]"
             )
 
+            console.print(
+                Panel(
+                    f"[bold]About to delete ALL memories for user: {user_id}[/bold]\n"
+                    f"Total memories: {len(user_memories)}\n\n"
+                    f"[yellow]⚠️  This will delete from BOTH SQLite AND LightRAG graph memory[/yellow]\n"
+                    f"[red]⚠️  This action cannot be undone![/red]",
+                    title="⚠️  Confirm Complete User Memory Deletion",
+                )
+            )
+
             if not Confirm.ask(
-                f"Are you sure you want to delete ALL {len(user_memories)} memories for user '{user_id}'?"
+                f"Are you sure you want to delete ALL {len(user_memories)} memories for user '{user_id}' from BOTH storage systems?"
             ):
                 console.print("[yellow]Deletion cancelled[/yellow]")
                 return False
 
-            # Delete all user memories
+            # Use the integrated deletion function for each memory
+            import asyncio
+            from personal_agent.core.agent_memory_manager import AgentMemoryManager
+            from personal_agent.config import AGNO_STORAGE_DIR
+            from agno.memory.v2.db.sqlite import SqliteMemoryDb
+            from personal_agent.core.semantic_memory_manager import create_semantic_memory_manager
+            
+            # Create agno_memory structure
+            class MockAgnoMemory:
+                def __init__(self):
+                    self.db = SqliteMemoryDb(
+                        table_name="personal_agent_memory",
+                        db_file=f"{AGNO_STORAGE_DIR}/agent_memory.db"
+                    )
+                    self.memory_manager = create_semantic_memory_manager()
+            
+            mock_agno_memory = MockAgnoMemory()
+            
+            # Initialize AgentMemoryManager
+            memory_manager = AgentMemoryManager(
+                user_id=user_id,
+                storage_dir=AGNO_STORAGE_DIR,
+                agno_memory=mock_agno_memory,
+                lightrag_memory_url=os.getenv("LIGHTRAG_MEMORY_URL", "http://localhost:9622"),
+                enable_memory=True
+            )
+
+            # Delete all user memories using dual storage deletion
             deleted_count = 0
+            failed_count = 0
+            
             for memory in user_memories:
                 try:
-                    self.db.delete_memory(memory.id)
-                    deleted_count += 1
+                    result = asyncio.run(memory_manager.delete_memory(str(memory.id)))
+                    if "✅" in result or "Successfully deleted" in result:
+                        deleted_count += 1
+                        console.print(f"[dim]Deleted memory {memory.id}[/dim]")
+                    else:
+                        failed_count += 1
+                        console.print(f"[red]Failed to delete memory {memory.id}: {result}[/red]")
                 except Exception as e:
+                    failed_count += 1
                     console.print(f"[red]Error deleting memory {memory.id}: {e}[/red]")
 
-            console.print(
-                f"[green]✅ Successfully deleted {deleted_count} memories for user: {user_id}[/green]"
-            )
-            return True
+            if failed_count == 0:
+                console.print(
+                    f"[green]✅ Successfully deleted all {deleted_count} memories for user: {user_id} from both storage systems[/green]"
+                )
+            else:
+                console.print(
+                    f"[yellow]⚠️ Deleted {deleted_count} memories, {failed_count} failed for user: {user_id}[/yellow]"
+                )
+            
+            return deleted_count > 0
 
         except Exception as e:
-            console.print(f"[red]Error clearing user memories: {e}[/red]")
+            console.print(f"[red]Error clearing user memories from dual storage: {e}[/red]")
+            logger.error(f"Dual storage user memory clearing failed: {e}", exc_info=True)
             return False
 
     def get_stats(self) -> Dict:
@@ -648,11 +756,11 @@ def interactive_mode(manager: MemoryManager):
 
             elif choice == "delete-memory":
                 memory_id = Prompt.ask("[cyan]Enter Memory ID to delete[/cyan]")
-                manager.delete_memory(memory_id=memory_id)
+                manager.delete_memory_dual_storage(memory_id=memory_id)
 
             elif choice == "clear-user":
                 user_id = Prompt.ask("[cyan]Enter User ID to clear all memories[/cyan]")
-                manager.clear_user_memories(user_id=user_id)
+                manager.clear_user_memories_dual_storage(user_id=user_id)
 
             elif choice == "stats":
                 manager.get_stats()
@@ -686,8 +794,8 @@ def show_help():
 [cyan]list-users[/cyan]     - List all users in the database
 [cyan]list-memories[/cyan]  - List memories for a specific user
 [cyan]search[/cyan]         - Search memories by content
-[cyan]delete-memory[/cyan]  - Delete a specific memory by ID
-[cyan]clear-user[/cyan]     - Delete all memories for a user
+[cyan]delete-memory[/cyan]  - Delete a specific memory by ID from BOTH storage systems
+[cyan]clear-user[/cyan]     - Delete all memories for a user from BOTH storage systems
 [cyan]stats[/cyan]          - Show database statistics
 [cyan]export[/cyan]         - Export memories to JSON file
 [cyan]help[/cyan]           - Show this help message
@@ -738,13 +846,13 @@ def main():
 
     # Delete memory command
     delete_parser = subparsers.add_parser(
-        "delete-memory", help="Delete a specific memory"
+        "delete-memory", help="Delete a specific memory from BOTH storage systems"
     )
     delete_parser.add_argument("--memory-id", required=True, help="Memory ID to delete")
 
     # Clear user command
     clear_parser = subparsers.add_parser(
-        "clear-user", help="Delete all memories for a user"
+        "clear-user", help="Delete all memories for a user from BOTH storage systems"
     )
     clear_parser.add_argument(
         "--user-id", required=True, help="User ID to clear memories for"
@@ -791,10 +899,10 @@ def main():
             )
 
         elif args.command == "delete-memory":
-            manager.delete_memory(memory_id=args.memory_id)
+            manager.delete_memory_dual_storage(memory_id=args.memory_id)
 
         elif args.command == "clear-user":
-            manager.clear_user_memories(user_id=args.user_id)
+            manager.clear_user_memories_dual_storage(user_id=args.user_id)
 
         elif args.command == "stats":
             manager.get_stats()

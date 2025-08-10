@@ -83,7 +83,7 @@ def output_json():
         "ai_storage": {
             "storage_backend": settings.STORAGE_BACKEND,
             "llm_model": settings.LLM_MODEL,
-            "user_id": settings.USER_ID,
+            "user_id": settings.get_userid(),
             "log_level": settings.LOG_LEVEL_STR,
         },
         "agentic_tools": get_agentic_tools(),
@@ -251,7 +251,12 @@ def get_agentic_tools():
                     "category": "memory"
                 },
                 {
-                    "name": "query_memory", 
+                    "name": "direct_search_memories",
+                    "description": "Direct semantic search in local memory (bypasses agentic pipeline)",
+                    "category": "memory"
+                },
+                {
+                    "name": "query_memory",
                     "description": "Search user memories using semantic search",
                     "category": "memory"
                 },
@@ -292,22 +297,27 @@ def get_agentic_tools():
                 },
                 {
                     "name": "store_graph_memory",
-                    "description": "Store memory in LightRAG graph database for relationship capture",
+                    "description": "Store memory in LightRAG graph database for relationship capture (requires LIGHTRAG_MEMORY_URL)",
                     "category": "memory"
                 },
                 {
                     "name": "query_graph_memory",
-                    "description": "Query LightRAG memory graph to explore relationships",
+                    "description": "Query LightRAG memory graph to explore relationships (requires LIGHTRAG_MEMORY_URL)",
                     "category": "memory"
                 },
                 {
                     "name": "get_memory_graph_labels",
-                    "description": "Get entity and relation labels from memory graph",
+                    "description": "Get entity and relation labels from memory graph (requires LIGHTRAG_MEMORY_URL)",
                     "category": "memory"
                 },
                 {
-                    "name": "clear_memories",
-                    "description": "Clear all memories for the user",
+                    "name": "seed_entity_in_graph",
+                    "description": "Seed an entity into the graph by uploading a synthetic document (requires LIGHTRAG_MEMORY_URL)",
+                    "category": "memory"
+                },
+                {
+                    "name": "check_entity_exists",
+                    "description": "Check if an entity exists in the memory graph (requires LIGHTRAG_MEMORY_URL)",
                     "category": "memory"
                 },
                 {
@@ -445,7 +455,7 @@ def print_config_colored():
             'items': [
                 ('Storage Backend', settings.STORAGE_BACKEND),
                 ('LLM Model', settings.LLM_MODEL),
-                ('User ID', settings.USER_ID),
+                ('User ID', settings.get_userid()),
                 ('Log Level', settings.LOG_LEVEL_STR),
             ]
         }
@@ -626,7 +636,7 @@ def print_config_no_color():
             'items': [
                 ('Storage Backend', settings.STORAGE_BACKEND),
                 ('LLM Model', settings.LLM_MODEL),
-                ('User ID', settings.USER_ID),
+                ('User ID', settings.get_userid()),
                 ('Log Level', settings.LOG_LEVEL_STR),
             ]
         }
