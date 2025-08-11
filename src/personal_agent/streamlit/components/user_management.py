@@ -125,7 +125,7 @@ def _render_switch_user():
     
     try:
         # Get current user
-        from personal_agent.config.settings import get_userid
+        from personal_agent.config.user_id_mgr import get_userid
         current_user = get_userid()
         
         st.info(f"Current User: {current_user}")
@@ -209,7 +209,7 @@ def _render_user_settings():
     
     try:
         # Get current user
-        from personal_agent.config.settings import get_userid
+        from personal_agent.config.user_id_mgr import get_userid
         current_user = get_userid()
         
         # Get user details
@@ -252,7 +252,7 @@ def _render_delete_user():
     
     try:
         # Get current user
-        from personal_agent.config.settings import get_userid
+        from personal_agent.config.user_id_mgr import get_userid
         current_user = get_userid()
         
         # Get all users except current user

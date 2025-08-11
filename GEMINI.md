@@ -32,13 +32,14 @@ This project is a sophisticated personal AI assistant powered by the **Agno Fram
 
 ## Dynamic Multi-User System
 
-The agent now features a full-stack, dynamic multi-user system that allows for seamless user switching at runtime. This ensures strong data isolation and stable service management. The single source of truth for the current user is the `env.userid` file at the project root. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) and [ADR-015](./docs/adr/015-persistent-user-context.md) for details.
+The agent now features a full-stack, dynamic multi-user system that allows for seamless user switching at runtime. This ensures strong data isolation and stable service management. The single source of truth for the current user is the `env.userid` file located in the `~/.persag` directory in the user's home directory. All user-specific configurations, data, and Docker service files are also stored in this centralized location, decoupling them from the project's source code. See [ADR-048](./refs/adr/048-decoupled-user-docker-config.md) and [ADR-058](./refs/adr/058-modular-user-id-management.md) for details.
 
 ### Key Components:
 *   **`UserManager`**: The central orchestrator for all user-related operations (creation, switching, deletion).
+*   **`user_id_mgr.py`**: A dedicated module that handles all user ID and user-specific path management, including the automatic creation of the `~/.persag` environment.
 *   **`UserRegistry`**: A JSON-based registry to persistently manage user profiles.
 *   **`LightRAGManager`**: A Python-native manager to control LightRAG Docker services and inject the current `USER_ID` dynamically.
-*   **`smart-restart-lightrag.sh`**: A robust shell script to prevent port conflicts and ensure service stability during user switches.
+*   **`smart-restart-lightrag.sh`**: A robust shell script to prevent port conflicts and ensure service stability during user switches. It now operates on the Docker configurations located in `~/.persag`.
 *   **`switch-user.py`**: A CLI script for creating and switching between users.
 
 ## Personal Files
@@ -76,14 +77,18 @@ This is a Python project managed with `Poetry`.
     poetry install
     ```
 
-2.  **Start LightRAG Server**
+2.  **First Run & Environment Setup**
 
-    Use the smart restart script to ensure a clean start.
+    On the first run of any agent command (e.g., `poetry run paga_cli`), the system will automatically create a `.persag` directory in your home directory (`~/.persag`). This directory will be populated with the necessary default configurations, including the Docker configurations for the LightRAG services. You do not need to configure this manually.
+
+3.  **Start LightRAG Server**
+
+    Use the smart restart script to ensure a clean start. This script now automatically finds the Docker configurations in your `~/.persag` directory.
     ```bash
     ./smart-restart-lightrag.sh
     ```
 
-3.  **Manage Users (CLI)**
+4.  **Manage Users (CLI)**
     
     Use the `switch-user.py` script to create or switch between user contexts. This will automatically update configurations and restart services.
     ```bash
@@ -94,7 +99,7 @@ This is a Python project managed with `Poetry`.
     python switch-user.py eric
     ```
 
-4.  **Manage MCP & Ollama Servers**
+5.  **Manage MCP & Ollama Servers**
 
     Use the provided scripts to manage your MCP and Ollama servers:
 
@@ -109,7 +114,7 @@ This is a Python project managed with `Poetry`.
     ./switch-ollama.sh status
     ```
 
-5.  **Setup Ollama**
+6.  **Setup Ollama**
 
     ```bash
     # Install Ollama (macOS example)
@@ -126,27 +131,23 @@ This is a Python project managed with `Poetry`.
     ollama pull nomic-embed-text
     ```
 
-6.  **Configure Environment**
+7.  **Configure Environment (`.env` file)**
 
-    Copy `env.example` to `.env`. The `USER_ID` is now managed dynamically by the user system.
+    You can create a `.env` file in the project root for optional settings. The core user-specific paths are now managed automatically.
 
     ```bash
-    # Required: Filesystem paths
+    # Optional: Filesystem paths for MCP server if you need to override defaults
     ROOT_DIR=/Users/your_username
-    DATA_DIR=/Users/your_username/data
+    HOME_DIR=/Users/your_username
+
+    # Optional: Override default data root. 
+    # User-specific data will be stored in PERSAG_ROOT/agno/USER_ID/
+    PERSAG_ROOT=/path/to/your/custom/data/location
 
     # Required: Ollama Configuration
     OLLAMA_URL=http://localhost:11434
     OLLAMA_DOCKER_URL=http://host.docker.internal:11434
     LMSTUDIO_URL="http://localhost:1234/v1" # LMStudio server
-
-    # LightRAG Storage Directories (USER_ID is injected dynamically)
-    LIGHTRAG_SERVER_PORT=9621
-    LIGHTRAG_MEMORY_PORT=9622
-    LIGHTRAG_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/rag_storage
-    LIGHTRAG_INPUTS_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/inputs
-    LIGHTRAG_MEMORY_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/memory_rag_storage
-    LIGHTRAG_MEMORY_INPUTS_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/memory_inputs
 
     # Optional: API keys for enhanced functionality
     GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
@@ -225,116 +226,22 @@ The project uses a custom testing setup.
 *   **Streamlit**: For the agent's user interface.
 *   **MCP (Model Context Protocol)**: For integrated servers and tools.
 
-## LMStudio and MLX Model Integration
-
-To broaden local model support, especially for Apple Silicon users, the agent now integrates with LMStudio to run MLX-optimized models. This is achieved by treating LMStudio as an OpenAI-compatible endpoint. See [ADR-029](./refs/adr/029-lmstudio-mlx-integration.md) for more details.
-
-### Agno Framework Bug Workaround
-
-During the LMStudio integration, a critical bug was found in the `agno` framework where the `system` role was incorrectly mapped to `developer`, causing API errors. A workaround has been implemented to patch the model's role mapping at runtime. See [ADR-030](./refs/adr/030-agno-role-mapping-bug-workaround.md) for details.
-
-## LightRAG Integration
-
-The project has been updated to integrate with the LightRAG server, a powerful tool for building RAG applications. This integration enhances the agent's knowledge capabilities by providing a robust and scalable solution for managing and querying large document collections.
-
-### Key Changes:
-
-*   **Dynamic Multi-User Management**: The entire system has been refactored to support dynamic user switching at runtime, with strong data isolation and service management. See [ADR-013](./docs/adr/013-dynamic-multi-user-management.md) for details.
-*   **`GEMINI.md`**: This file has been significantly updated to reflect the integration with `LightRAG` and recent system enhancements. It now includes:
-    *   A detailed overview of `LightRAG`'s features.
-    *   Installation and usage instructions for the `lightrag` package.
-    *   A new section documenting the LightRAG Server API, including its endpoints and key characteristics like authentication and versioning.
-    *   Updates on the **Enriched Graph Ingestion Pipeline** (ADR-007) and the **LightRAG Timeout Fix** (ADR-006).
-*   **`pyproject.toml`**: The `lightrag-hku` package has been added as a dependency. This is a crucial change that ensures the `LightRAG` library is installed alongside other project dependencies, making its functionality available to the application.
-*   **Docker Configuration (`docker-compose.yml`)**: The Docker configuration has been substantially modified to:
-    *   **Tailor the image for the personal agent:** The `docker-compose.yml` has been updated to create a specialized Docker image that includes all the necessary dependencies and configurations for the personal agent project.
-    *   **Integrate `LightRAG`:** The Docker build process now correctly installs the `lightrag` library, ensuring it's available within the containerized environment.
-*   **Memory Sync Fix**: Addressed inconsistencies in memory access between the Streamlit interface and agent tools. Both now use a consistent `SemanticMemoryManager` interface. Introduced memory sync monitoring and repair functionality in the Streamlit UI.
-*   **New LightRAG Storage Configuration**: Added dedicated environment variables and settings for LightRAG storage and input directories (`LIGHTRAG_STORAGE_DIR`, `LIGHTRAG_INPUTS_DIR`, etc.) for better organization and multi-user support.
-*   **Enhanced Memory Cleaner**: Modified `memory_cleaner.py` to delete source files from LightRAG memory to prevent rescanning.
-    *   **Improved Config Display**: Updated the `show-config` tool to display the new LightRAG storage directories.
-
-## Tools & Capabilities
-
-### Memory Tools
-
-All memory operations are now user-specific, ensuring data isolation between different users.
-
-*   **store_user_memory**: Store personal information with topic classification, now leveraging an **Enriched Graph Ingestion Pipeline** for more accurate knowledge graph construction (see ADR-007).
-*   **query_memory**: Search user memories using semantic similarity. Args: `query` (str), `limit` (int, optional). Returns: `str` (found memories or message if none found).
-*   **get_recent_memories**: Retrieve recent memories by searching all memories and sorting by date. Args: `limit` (int, default: 10). Returns: `str` (recent memories or message if none found).
-*   **get_all_memories**: Get all user memories. Returns: `str` (all memories or message if none found).
-*   **get_memories_by_topic**: Get memories by topic without similarity search. Args: `topics` (list[str] or str, optional), `limit` (int, optional). Returns: `str` (found memories or a message if none are found).
-*   **list_memories**: List all memories in a simple, user-friendly format. Returns: `str` (all memories or message if none found).
-*   **update_memory**: Update an existing memory. Args: `memory_id` (str), `content` (str), `topics` (list[str] or str, optional). Returns: `str` (success or error message).
-*   **delete_memory**: Delete a memory from both SQLite and LightRAG systems. It now searches for documents in LightRAG using a filename pattern derived from the `memory_id` and then deletes them. Args: `memory_id` (str). Returns: `str` (success or error message).
-*   **delete_memories_by_topic**: Delete all memories associated with a specific topic or list of topics. Args: `topics` (list[str] or str). Returns: `str` (success or error message).
-*   **clear_memories**: Clear all memories for the user from local storage. Returns: `str` (success or error message).
-*   **clear_all_memories**: Clear all memories from BOTH local SQLite and LightRAG graph systems. Returns: `str` (success or error message).
-*   **get_memory_stats**: Get memory statistics. Returns: `str` (memory statistics).
-*   **store_graph_memory**: Store a complex memory in your knowledge graph to capture relationships. Uses file upload approach with enhanced entity and relationship extraction. Combines reliable file upload with advanced NLP processing. Args: `content` (str), `topics` (list[str] or str, optional), `memory_id` (str, optional). Returns: `str` (success or error message).
-*   **get_memory_graph_labels**: Get the list of all entity and relation labels from the memory graph. Returns: `str` (sorted graph labels).
-
-### Knowledge Tools
-
-*   **ingest_knowledge_file**: Ingest a file into the LightRAG knowledge base.
-*   **ingest_knowledge_text**: Ingest text content directly into the LightRAG knowledge base.
-*   **ingest_knowledge_from_url**: Ingest content from a URL into the LightRAG knowledge base.
-*   **batch_ingest_directory**: Process multiple files from a directory into the LightRAG knowledge base.
-*   **ingest_semantic_file**: Ingest a file into the local semantic (LanceDB) knowledge base.
-*   **ingest_semantic_text**: Ingest text content directly into the local semantic (LanceDB) knowledge base.
-*   **ingest_semantic_from_url**: Ingest content from a URL into the local semantic (LanceDB) knowledge base.
-*   **batch_ingest_semantic_directory**: Process multiple files from a directory into the local semantic (LanceDB) knowledge base.
-*   **query_knowledge_base**: Unified knowledge base query with intelligent routing. Automatically routes queries between local semantic search and LightRAG based on mode and query characteristics. Supports modes like "local", "global", "hybrid", "naive", and "auto" (default).
-*   **query_semantic_knowledge**: DEPRECATED. Search the local semantic knowledge base (SQLite/LanceDB) for specific facts or documents. Args: `query` (str), `limit` (int, default: 5). Returns: `str` (formatted search results or message if none found).
-
-### MCP-Powered Tools: The Ephemeral Agent Requirement
-
-To ensure absolute stability, the agent **must** use an **ephemeral agent pattern** for all MCP tool interactions. This is a mandatory architectural requirement, not an implementation choice.
-
-Previous experiments with persistent clients or factories proved to be fundamentally unstable. The correct and required pattern, detailed in [ADR-028](./refs/adr/028-ephemeral-mcp-tool-agents.md), is to create a new, single-purpose client for every tool call, execute the operation, and immediately tear it down. This guarantees perfect isolation and prevents resource conflicts.
-
-This architecture provides access to a powerful suite of external tools, including:
-
-*   **Filesystem**: Secure, configurable access to the local filesystem.
-*   **GitHub**: Repository search and code analysis.
-*   **Web Search**: Real-time information via DuckDuckGo.
-*   **Puppeteer**: Web content extraction and automation.
-*   **Finance**: Stock analysis.
-*   **Python**: Safe code execution.
-
-### Built-in Tools
-
-*   **DuckDuckGo Search**: Web search and news retrieval
-*   **Python Execution**: Mathematical calculations and data analysis
-*   **Shell Commands**: System operations with security restrictions
-
-### Utility Scripts
-
-*   **Send File to LightRAG**: `python3 scripts/send_to_lightrag.py <file_path>`
-    This script sends a specified file to the LightRAG server's `/documents/file` endpoint for processing.
-*   **Clear Memory When Ready**: `python3 clear_memory_when_ready.py`
-    This script waits for the LightRAG pipeline to finish processing, then clears both local and graph memories.
-
-## Memory System
-
-The agent uses an advanced semantic memory system that:
-
-*   **Prevents Duplicates**: Intelligent detection of similar content
-*   **Classifies Topics**: Automatic categorization (personal_info, work, education, etc.)
-*   **Enables Search**: Semantic similarity search across all memories
-*   **Provides Analytics**: Memory statistics and usage patterns
-
 ## Configuration
+
+The agent's configuration has been significantly simplified. Core user-specific and Docker-related files are now managed automatically within the `~/.persag` directory in your home directory. 
 
 ### Environment Variables
 
-The `USER_ID` is now managed dynamically by the new user system (`switch-user.py`, Streamlit UI) and should not be set manually in the `.env` file for normal operation.
+For most use cases, you will not need to set any environment variables manually. The system uses sensible defaults and manages user-specific paths automatically. However, you can override certain settings by creating a `.env` file in the project root.
 
 ```bash
-# Required
-ROOT_DIR="/Users/your_username"        # Home directory access
-DATA_DIR="/Users/your_username/data"   # Data storage location
+# Optional: Override the default location for all user data.
+# Default is /Users/Shared/personal_agent_data
+PERSAG_ROOT=/path/to/your/custom/data/location
+
+# Optional: Override for MCP server if needed
+ROOT_DIR="/Users/your_username"      
+HOME_DIR="/Users/your_username"
 
 # Optional API Keys
 GITHUB_PERSONAL_ACCESS_TOKEN="token"   # GitHub integration

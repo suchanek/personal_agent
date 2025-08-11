@@ -34,13 +34,13 @@ if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
 try:
-    from personal_agent.config.settings import get_userid
+    from personal_agent.config.user_id_mgr import get_userid
     from personal_agent.core.agno_agent import AgnoPersonalAgent
     from personal_agent.core.memory import is_memory_connected
     from personal_agent.utils.pag_logging import setup_logging
 except ImportError:
     # Fallback for relative imports
-    from ..config.settings import get_userid
+    from ..config import get_userid
     from ..core.memory import is_memory_connected
     from ..utils.pag_logging import setup_logging
 
@@ -158,12 +158,12 @@ async def create_agno_agent_with_params(model_name, ollama_url):
             AGNO_STORAGE_DIR,
             USE_MCP,
         )
-        from personal_agent.core.agno_agent import create_agno_agent
+        from personal_agent.core.agno_agent import AgnoPersonalAgent
     except ImportError:
         from ..config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, USE_MCP
-        from ..core.agno_agent import create_agno_agent
+        from ..core.agno_agent import AgnoPersonalAgent
 
-    agent = await create_agno_agent(
+    agent = await AgnoPersonalAgent.create_with_init(
         model_provider="ollama",
         model_name=model_name,
         enable_memory=True,
@@ -485,7 +485,7 @@ def main():
                     OLLAMA_URL,
                     USE_MCP,
                 )
-                from personal_agent.core.agno_agent import create_agno_agent
+                from personal_agent.core.agno_agent import AgnoPersonalAgent
             except ImportError:
                 from ..config.settings import (
                     AGNO_KNOWLEDGE_DIR,
@@ -494,13 +494,13 @@ def main():
                     OLLAMA_URL,
                     USE_MCP,
                 )
-                from ..core.agno_agent import create_agno_agent
+                from ..core.agno_agent import AgnoPersonalAgent
 
             # Initialize the agent
             with st.spinner("Creating agno agent..."):
 
                 async def init_agent():
-                    agent = await create_agno_agent(
+                    agent = await AgnoPersonalAgent.create_with_init(
                         model_provider="ollama",
                         model_name=st.session_state.current_model,
                         enable_memory=True,

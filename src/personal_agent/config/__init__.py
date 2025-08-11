@@ -20,11 +20,14 @@ from .settings import (
     USE_MCP,
     USE_WEAVIATE,
     WEAVIATE_URL,
-    get_current_user_id,
     get_env_bool,
     get_env_var,
-    get_userid,
     print_configuration,
+)
+from .user_id_mgr import (
+    get_current_user_id,
+    get_userid,
+    get_user_storage_paths,
     refresh_user_dependent_settings,
 )
 
@@ -84,6 +87,7 @@ __all__ = [
     "get_mcp_servers",
     "get_settings",
     "get_current_user_id",
+    "get_user_storage_paths",
     "refresh_user_dependent_settings",
     "print_configuration",
 ]

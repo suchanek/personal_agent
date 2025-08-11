@@ -104,22 +104,9 @@ args = [
   { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
 ]
 
-[tool.poe.tasks.serve-agno]
-help = "Start Personal Agent Full interface"
-cmd = "streamlit run tools/paga_streamlit_agno.py --server.port 8501"
-args = [
-  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
-  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
-]
-
-
 # === CLI Interface Tasks ===
 [tool.poe.tasks.cli]
 help = "Run CLI interface"
-cmd = "poetry run paga_cli"
-
-[tool.poe.tasks.cli-agno]
-help = "Run Agno CLI interface"
 cmd = "poetry run paga_cli"
 
 
@@ -183,11 +170,7 @@ args = [
 help = "Clean memory system"
 script = "src.personal_agent.tools.memory_cleaner:main"
 
-[tool.poe.tasks.lightrag-restart]
-help = "Restart LightRAG server"
-shell = "./restart-lightrag.sh"
-
-[tool.poe.tasks.lightrag-smart-restart]
+[tool.poe.tasks.restart-lightrag]
 help = "Smart restart LightRAG server"
 shell = "./smart-restart-lightrag.sh"
 

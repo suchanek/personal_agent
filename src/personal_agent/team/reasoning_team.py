@@ -573,7 +573,7 @@ async def create_memory_agent(
     # Get user_id dynamically if not provided
     if user_id is None:
         user_id = get_userid()
-    
+
     try:
         from ..tools.knowledge_tools import KnowledgeTools
         from ..tools.refactored_memory_tools import AgnoMemoryTools
@@ -647,10 +647,10 @@ async def create_team(use_remote: bool = False):
 
     # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
     try:
-        from ..config.settings import get_userid
+        from ..config.user_id_mgr import get_userid
         from ..core.docker_integration import ensure_docker_user_consistency
     except ImportError:
-        from personal_agent.config.settings import get_userid
+        from personal_agent.config.user_id_mgr import get_userid
         from personal_agent.core.docker_integration import (
             ensure_docker_user_consistency,
         )
@@ -763,7 +763,9 @@ async def cleanup_team(team):
                             await member.memory.db.close()
                         logging.info(f"✅ {member_name} memory database closed")
                     except Exception as e:
-                        logging.info(f"⚠️ Error closing {member_name} memory database: {e}")
+                        logging.info(
+                            f"⚠️ Error closing {member_name} memory database: {e}"
+                        )
 
                 # Close member's tools
                 if hasattr(member, "tools") and member.tools:

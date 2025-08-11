@@ -11,11 +11,21 @@ from dotenv import load_dotenv
 # Define the project's base directory.
 # This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+# Default: ~/.persag, overridable via environment variable PERSAG_HOME
+PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 
 
 # Handle imports differently when run as a script vs imported as a module
 def _get_logger():
-    """Get logger with fallback for circular import issues."""
+    """Initialize logging system with import path handling and circular import protection.
+    
+    Attempts to import the custom logging setup from the utils module, handling both
+    direct script execution and module import scenarios. Falls back to basic logging
+    if circular imports occur.
+    
+    Returns:
+        logging.Logger: Configured logger instance
+    """
     try:
         if __name__ == "__main__":
             # When run directly, use absolute imports
@@ -42,41 +52,8 @@ dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
 logger = _get_logger()
 
 
-def load_user_from_file():
-    """Load the USER_ID from ~/.persag/env.userid and set it in the environment."""
-    try:
-        # Import here to avoid circular imports
-        from pathlib import Path
-
-        persag_dir = Path.home() / ".persag"
-        userid_file = persag_dir / "env.userid"
-
-        # Try to read from ~/.persag/env.userid first
-        if userid_file.exists():
-            with open(userid_file, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content.startswith("USER_ID="):
-                    user_id = content.split("=", 1)[1].strip().strip("'\"")
-                    os.environ["USER_ID"] = user_id
-                    return user_id
-
-        # If neither exists, create default
-        default_user_id = "default_user"
-        persag_dir.mkdir(exist_ok=True)
-        with open(userid_file, "w") as f:
-            f.write(f'USER_ID="{default_user_id}"\n')
-
-        os.environ["USER_ID"] = default_user_id
-        logger.info(f"Created default USER_ID in {userid_file}")
-        return default_user_id
-
-    except Exception as e:
-        logger.warning(f"Failed to load user ID from ~/.persag: {e}")
-        # Fallback to environment variable
-        fallback_user_id = os.getenv("USER_ID", "default_user")
-        os.environ["USER_ID"] = fallback_user_id
-        return fallback_user_id
-
+# Import user management functions from the dedicated module
+from .user_id_mgr import load_user_from_file
 
 # Initialize ~/.persag and load user ID
 load_user_from_file()
@@ -92,7 +69,19 @@ else:
 
 
 def get_env_var(key: str, fallback: str = "") -> str:
-    """Get environment variable from dotenv cache first, then os.environ as fallback."""
+    """Retrieve environment variable with intelligent fallback strategy.
+    
+    Prioritizes dotenv cache over os.environ to ensure consistent behavior.
+    Uses a two-tier lookup: first checks the cached .env values, then falls
+    back to system environment variables if not found or if dotenv loading failed.
+    
+    Args:
+        key: Environment variable name to retrieve
+        fallback: Default value if variable not found (default: empty string)
+        
+    Returns:
+        str: Environment variable value or fallback if not found
+    """
     if dotenv_loaded and key in _env_vars:
         return _env_vars[key] or fallback
     else:
@@ -100,8 +89,25 @@ def get_env_var(key: str, fallback: str = "") -> str:
         return os.getenv(key, fallback)
 
 
+# Per-user configuration base directory for docker configs and user state
+LIGHTRAG_SERVER_DIR = os.path.join(PERSAG_HOME, "lightrag_server")
+LIGHTRAG_MEMORY_DIR = os.path.join(PERSAG_HOME, "lightrag_memory_server")
+
+
 def get_env_bool(key: str, fallback: bool = True) -> bool:
-    """Get boolean environment variable with proper parsing."""
+    """Parse environment variable as boolean with flexible string interpretation.
+    
+    Converts string environment variables to boolean values using common
+    boolean representations. Accepts multiple formats for true values:
+    'true', '1', 'yes', 'on' (case-insensitive).
+    
+    Args:
+        key: Environment variable name to retrieve and parse
+        fallback: Default boolean value if variable not found (default: True)
+        
+    Returns:
+        bool: Parsed boolean value or fallback if variable not found
+    """
     value = get_env_var(key, str(fallback))
     return value.lower() in ("true", "1", "yes", "on")
 
@@ -137,6 +143,9 @@ USE_MCP = get_env_bool("USE_MCP", True)
 
 # Directory configurations
 ROOT_DIR = get_env_var("ROOT_DIR", "/")  # Root directory for MCP filesystem server
+PERSAG_ROOT = get_env_var(
+    "PERSAG_ROOT", "/Users/Shared/personal_agent_data"
+)  # Root directory for MCP filesystem server
 HOME_DIR = get_env_var("HOME_DIR", os.path.expanduser("~"))  # User's home directory
 DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
 REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
@@ -145,34 +154,8 @@ REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
 STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
 
 
-def get_userid() -> str:
-    """Get the current USER_ID dynamically from ~/.persag/env.userid"""
-    return load_user_from_file()
-
-
-def get_user_storage_paths():
-    """Get user-specific storage paths"""
-    current_user_id = get_userid()
-    return {
-        "AGNO_STORAGE_DIR": os.path.expandvars(
-            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}"
-        ),
-        "AGNO_KNOWLEDGE_DIR": os.path.expandvars(
-            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/knowledge"
-        ),
-        "LIGHTRAG_STORAGE_DIR": os.path.expandvars(
-            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/rag_storage"
-        ),
-        "LIGHTRAG_INPUTS_DIR": os.path.expandvars(
-            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/inputs"
-        ),
-        "LIGHTRAG_MEMORY_STORAGE_DIR": os.path.expandvars(
-            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_rag_storage"
-        ),
-        "LIGHTRAG_MEMORY_INPUTS_DIR": os.path.expandvars(
-            f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs"
-        ),
-    }
+# Import user-specific functions from the dedicated module
+from .user_id_mgr import get_userid, get_user_storage_paths
 
 
 # Get initial storage paths (these will be dynamic)
@@ -183,7 +166,7 @@ LIGHTRAG_STORAGE_DIR = _storage_paths["LIGHTRAG_STORAGE_DIR"]
 LIGHTRAG_INPUTS_DIR = _storage_paths["LIGHTRAG_INPUTS_DIR"]
 LIGHTRAG_MEMORY_STORAGE_DIR = _storage_paths["LIGHTRAG_MEMORY_STORAGE_DIR"]
 LIGHTRAG_MEMORY_INPUTS_DIR = _storage_paths["LIGHTRAG_MEMORY_INPUTS_DIR"]
-
+DATA_DIR = _storage_paths["DATA_DIR"]
 
 # Logging configuration
 LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
@@ -215,58 +198,20 @@ EMBEDDING_TIMEOUT = get_env_var("EMBEDDING_TIMEOUT", "3600")
 SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
 
 
-def get_current_user_id():
-    """Get the current USER_ID dynamically from ~/.persag/env.userid.
-
-    This function always reads from ~/.persag/env.userid to ensure we get the latest value
-    after user switching, rather than the cached value from module import time.
-
-    Returns:
-        Current USER_ID from ~/.persag/env.userid or default fallback
-    """
-    return get_userid()
-
-
-def refresh_user_dependent_settings(user_id: str = None):
-    """Refresh all USER_ID-dependent settings after user switching.
-
-    This function recalculates all storage paths and settings that depend on USER_ID
-    to ensure they reflect the current user after switching.
-
-    Args:
-        user_id: Optional user_id to refresh settings for. If not provided,
-                 the current user_id from ~/.persag will be used.
-
-    Returns:
-        Dictionary with updated settings
-    """
-    current_user_id = user_id or get_userid()
-
-    # Recalculate storage directories with current USER_ID
-    agno_storage_dir = f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}"
-    agno_knowledge_dir = f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/knowledge"
-    lightrag_storage_dir = f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/rag_storage"
-    lightrag_inputs_dir = f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/inputs"
-    lightrag_memory_storage_dir = (
-        f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_rag_storage"
-    )
-    lightrag_memory_inputs_dir = (
-        f"{DATA_DIR}/{STORAGE_BACKEND}/{current_user_id}/memory_inputs"
-    )
-
-    return {
-        "USER_ID": current_user_id,
-        "AGNO_STORAGE_DIR": agno_storage_dir,
-        "AGNO_KNOWLEDGE_DIR": agno_knowledge_dir,
-        "LIGHTRAG_STORAGE_DIR": lightrag_storage_dir,
-        "LIGHTRAG_INPUTS_DIR": lightrag_inputs_dir,
-        "LIGHTRAG_MEMORY_STORAGE_DIR": lightrag_memory_storage_dir,
-        "LIGHTRAG_MEMORY_INPUTS_DIR": lightrag_memory_inputs_dir,
-    }
+# Import remaining user-specific functions from the dedicated module
+from .user_id_mgr import get_current_user_id, refresh_user_dependent_settings
 
 
 def get_package_version():
-    """Get package version from the package __init__.py."""
+    """Retrieve package version with import path handling.
+    
+    Attempts to import the version from the package's __init__.py file,
+    handling both standalone script execution and module import scenarios.
+    Uses different import strategies based on execution context.
+    
+    Returns:
+        str: Package version string or 'unknown' if import fails
+    """
     try:
         if __name__ == "__main__":
             # When run as standalone, try absolute import
@@ -281,7 +226,18 @@ def get_package_version():
 
 
 def print_config():
-    """Pretty print configuration and environment variables."""
+    """Display comprehensive configuration status with ANSI color formatting.
+    
+    Renders a detailed, visually formatted configuration report including:
+    - Environment file loading status
+    - All loaded environment variables (with sensitive value masking)
+    - Organized configuration sections (servers, features, directories, etc.)
+    - Current user settings and storage paths
+    - Docker and timeout configurations
+    
+    Uses ANSI color codes for enhanced readability and visual organization.
+    Automatically masks sensitive values containing 'password', 'secret', 'key', or 'token'.
+    """
     # ANSI color codes
     HEADER = "\033[95m"
     BLUE = "\033[94m"
@@ -353,8 +309,12 @@ def print_config():
             "items": [
                 ("Root Directory", ROOT_DIR),
                 ("Home Directory", HOME_DIR),
-                ("Data Directory", DATA_DIR),
+                ("Persag Env Home", PERSAG_HOME),
+                ("Persag Data Directory", PERSAG_ROOT),
+                ("User Data Directory", DATA_DIR),
                 ("Repository Directory", REPO_DIR),
+                ("LightRAG Server Dir", LIGHTRAG_SERVER_DIR),
+                ("LightRAG Memory Dir", LIGHTRAG_MEMORY_DIR),
                 ("Agno Storage Directory", AGNO_STORAGE_DIR),
                 ("Agno Knowledge Directory", AGNO_KNOWLEDGE_DIR),
             ],
@@ -398,16 +358,25 @@ def print_config():
     print(f"{BOLD}{GREEN}Configuration loaded successfully!{ENDC}")
     print(f"{BOLD}{HEADER}{'='*60}{ENDC}")
 
+
 def print_configuration() -> str:
-    """Print comprehensive configuration information for the Personal AI Agent.
-
-    Uses the enhanced configuration display method from the module's tools.
-
-    :return: Configuration information as formatted string
+    """Display comprehensive configuration with multiple fallback strategies.
+    
+    Attempts to use the enhanced configuration display from the tools module,
+    with graceful fallbacks to simpler display methods if imports fail.
+    Provides a robust configuration viewing experience regardless of module state.
+    
+    Fallback Strategy:
+        1. Try enhanced tools.show_config() method (preferred)
+        2. Fall back to settings.print_config() with ANSI colors
+        3. Final fallback to basic text-based configuration display
+    
+    Returns:
+        str: Status message indicating which display method was used
     """
     try:
         # Import and use the enhanced display function from the module's tools
-        from .tools.show_config import show_config
+        from ..tools.show_config import show_config
 
         # Call the show_config function with default colored output
         show_config()
@@ -416,35 +385,15 @@ def print_configuration() -> str:
 
     except Exception as e:
         # Fallback to the settings.print_config() method if enhanced method fails
-        _logger.warning("Could not use module tools.show_config display: %s", e)
+        logger.warning("Could not use module tools.show_config display: %s", e)
 
         try:
-            from .config.settings import print_config
-
             print_config()
             return "Configuration displayed successfully using settings.print_config() fallback."
-        except ImportError as fallback_error:
-            _logger.warning(
-                "Could not import settings.print_config: %s", fallback_error
-            )
+        except Exception as fallback_error:
+            logger.warning("Could not use settings.print_config: %s", fallback_error)
 
             # Final fallback to basic configuration display
-            from .config import get_mcp_servers
-            from .config.settings import (
-                AGNO_KNOWLEDGE_DIR,
-                AGNO_STORAGE_DIR,
-                DATA_DIR,
-                HOME_DIR,
-                LLM_MODEL,
-                LOG_LEVEL_STR,
-                OLLAMA_URL,
-                REPO_DIR,
-                ROOT_DIR,
-                STORAGE_BACKEND,
-                USE_MCP,
-                USE_WEAVIATE,
-                WEAVIATE_URL,
-            )
 
             config_lines = [
                 "=" * 80,
@@ -452,7 +401,7 @@ def print_configuration() -> str:
                 "=" * 80,
                 "",
                 "📊 CORE SETTINGS:",
-                f"  • Package Version: {__version__}",
+                f"  • Package Version: {get_package_version()}",
                 f"  • LLM Model: {LLM_MODEL}",
                 f"  • Storage Backend: {STORAGE_BACKEND}",
                 f"  • Log Level: {LOG_LEVEL_STR}",
@@ -468,7 +417,8 @@ def print_configuration() -> str:
                 "📁 DIRECTORY CONFIGURATION:",
                 f"  • Root Directory: {ROOT_DIR}",
                 f"  • Home Directory: {HOME_DIR}",
-                f"  • Data Directory: {DATA_DIR}",
+                f"  • User Data Directory: {DATA_DIR}",
+                f"  • Personal Agent Data Directory: {PERSAG_ROOT}"
                 f"  • Repository Directory: {REPO_DIR}",
                 f"  • Agno Storage Directory: {AGNO_STORAGE_DIR}",
                 f"  • Agno Knowledge Directory: {AGNO_KNOWLEDGE_DIR}",
@@ -482,6 +432,7 @@ def print_configuration() -> str:
             config_text = "\n".join(config_lines)
             print(config_text)
             return config_text
+
 
 if __name__ == "__main__":
     print_config()

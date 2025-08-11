@@ -119,7 +119,7 @@ def _render_user_info():
     try:
         # This would be replaced with actual user data from your system
         # For now, using placeholder data
-        from personal_agent.config.settings import get_userid
+        from personal_agent.config.user_id_mgr import get_userid
         
         current_user_id = get_userid()
         user_info = {
