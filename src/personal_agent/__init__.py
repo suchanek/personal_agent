@@ -106,7 +106,7 @@ __all__ = [
     "run_agno_cli",
     "run_agno_cli_wrapper",
     # Utility functions
-    "print_configuration",
+    
     # Package info
     "__version__",
 ]

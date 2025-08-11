@@ -71,8 +71,12 @@ def output_json():
         "directories": {
             "root_dir": settings.ROOT_DIR,
             "home_dir": settings.HOME_DIR,
-            "data_dir": settings.DATA_DIR,
+            "persag_env_home": settings.PERSAG_HOME,
+            "persag_data_root": settings.PERSAG_ROOT,
+            "user_data_dir": settings.DATA_DIR,
             "repo_dir": settings.REPO_DIR,
+            "lightrag_server_dir": settings.LIGHTRAG_SERVER_DIR,
+            "lightrag_memory_dir": settings.LIGHTRAG_MEMORY_DIR,
             "agno_storage_dir": settings.AGNO_STORAGE_DIR,
             "agno_knowledge_dir": settings.AGNO_KNOWLEDGE_DIR,
             "lightrag_storage_dir": settings.LIGHTRAG_STORAGE_DIR,
@@ -113,16 +117,16 @@ def load_env_file(env_path):
 
 def get_docker_env_variables_by_server():
     """Get environment variables from Docker env files organized by server."""
-    project_root = get_project_root()
+    persag_home = settings.PERSAG_HOME
     
     servers = {
         "lightrag_server": {
-            "env_file": project_root / "lightrag_server" / "env.server",
-            "mounted_env": project_root / "lightrag_server" / ".env"
+            "env_file": Path(persag_home) / "lightrag_server" / "env.server",
+            "mounted_env": Path(persag_home) / "lightrag_server" / ".env"
         },
         "lightrag_memory_server": {
-            "env_file": project_root / ".env",  # memory server uses main .env as env_file
-            "mounted_env": project_root / "lightrag_memory_server" / "env.memory_server"
+            "env_file": Path(persag_home) / ".env",
+            "mounted_env": Path(persag_home) / "lightrag_memory_server" / "env.memory_server"
         }
     }
     
@@ -440,8 +444,12 @@ def print_config_colored():
             'items': [
                 ('Root Directory', settings.ROOT_DIR),
                 ('Home Directory', settings.HOME_DIR),
-                ('Data Directory', settings.DATA_DIR),
+                ('Persag Env Home', settings.PERSAG_HOME),
+                ('Persag Data Root', settings.PERSAG_ROOT),
+                ('User Data Directory', settings.DATA_DIR),
                 ('Repository Directory', settings.REPO_DIR),
+                ('LightRAG Server Dir', settings.LIGHTRAG_SERVER_DIR),
+                ('LightRAG Memory Dir', settings.LIGHTRAG_MEMORY_DIR),
                 ('Agno Storage Directory', settings.AGNO_STORAGE_DIR),
                 ('Agno Knowledge Directory', settings.AGNO_KNOWLEDGE_DIR),
                 ('LightRAG Storage Directory', settings.LIGHTRAG_STORAGE_DIR),
@@ -621,8 +629,12 @@ def print_config_no_color():
             'items': [
                 ('Root Directory', settings.ROOT_DIR),
                 ('Home Directory', settings.HOME_DIR),
-                ('Data Directory', settings.DATA_DIR),
+                ('Persag Env Home', settings.PERSAG_HOME),
+                ('Persag Data Root', settings.PERSAG_ROOT),
+                ('User Data Directory', settings.DATA_DIR),
                 ('Repository Directory', settings.REPO_DIR),
+                ('LightRAG Server Dir', settings.LIGHTRAG_SERVER_DIR),
+                ('LightRAG Memory Dir', settings.LIGHTRAG_MEMORY_DIR),
                 ('Agno Storage Directory', settings.AGNO_STORAGE_DIR),
                 ('Agno Knowledge Directory', settings.AGNO_KNOWLEDGE_DIR),
                 ('LightRAG Storage Directory', settings.LIGHTRAG_STORAGE_DIR),
