@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Modular User ID Management**: Refactored user ID and path management into a dedicated module (`src/personal_agent/config/user_id_mgr.py`) to resolve circular dependencies and improve modularity. User-specific configurations, including Docker files, are now centralized in a `~/.persag` directory in the user's home, which is created and populated automatically on first run. See [ADR-058](./refs/adr/058-modular-user-id-management.md) for details.
+
 ### Fixed
 - **Memory System Consistency**: Resolved several critical inconsistencies across the memory system. The `show-config` tool now accurately reflects all available memory tools, their dependencies, and the dynamic user ID. The `clear_all_memories` function and the Streamlit UI deletion logic have been consolidated to correctly wipe data from all storage systems (local and graph). A validation script has also been added to prevent future regressions. See [ADR-057](./refs/adr/057-memory-system-consistency-and-validation.md) for details.
 

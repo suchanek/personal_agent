@@ -112,13 +112,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
+    DATA_DIR,
     LIGHTRAG_URL,
     LLM_MODEL,
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
     get_current_user_id,
 )
-from personal_agent.core.agno_agent import AgnoPersonalAgent, create_agno_agent
+from personal_agent.core.agno_agent import AgnoPersonalAgent
 from personal_agent.tools.streamlit_helpers import (
     StreamlitKnowledgeHelper,
     StreamlitMemoryHelper,
@@ -199,7 +200,7 @@ async def initialize_agent_async(
     """Initialize AgnoPersonalAgent with proper async handling."""
     # Always create a new agent when URL or model changes to ensure proper configuration
     # This is more reliable than trying to update existing agent configuration
-    return await create_agno_agent(
+    return await AgnoPersonalAgent.create_with_init(
         model_provider="ollama",
         model_name=model_name,
         ollama_base_url=ollama_url,
@@ -848,7 +849,8 @@ def render_knowledge_status(knowledge_helper):
             st.markdown("**SQLite/LanceDB**")
 
             # Show the knowledge directory path
-            st.caption(f"**Path:** {AGNO_KNOWLEDGE_DIR}")
+            st.caption(f"**Data Dir:** {DATA_DIR}")
+            st.caption(f"**Knowledge Dir:** {AGNO_KNOWLEDGE_DIR}")
 
             # FORCE AGENT INITIALIZATION TO CHECK REAL STATUS
             try:

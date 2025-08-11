@@ -14,16 +14,18 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-LIGHTRAG_SERVER_DIR="lightrag_server"
-LIGHTRAG_MEMORY_DIR="lightrag_memory_server"
+# Resolve base ~/.persag directory and allow env overrides
+PERSAG_HOME="${PERSAG_HOME:-$HOME/.persag}"
+LIGHTRAG_SERVER_DIR="${LIGHTRAG_SERVER_DIR:-$PERSAG_HOME/lightrag_server}"
+LIGHTRAG_MEMORY_DIR="${LIGHTRAG_MEMORY_DIR:-$PERSAG_HOME/lightrag_memory_server}"
 LIGHTRAG_SERVER_PORT=${LIGHTRAG_SERVER_PORT:-9621}
 LIGHTRAG_MEMORY_PORT=${LIGHTRAG_MEMORY_PORT:-9622}
-MAX_WAIT_TIME=30
-CLEANUP_WAIT=5
+MAX_WAIT_TIME=${MAX_WAIT_TIME:-30}
+CLEANUP_WAIT=${CLEANUP_WAIT:-5}
 
 echo -e "${BLUE}🧠 Smart LightRAG Docker Restart${NC}"
 echo -e "${CYAN}Intelligent restart with proper port cleanup and waiting periods${NC}"
-echo "=" * 70
+printf '%*s\n' 70 '' | tr ' ' '='
 
 # Function to check if a port is available
 check_port_available() {

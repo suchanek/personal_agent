@@ -117,6 +117,7 @@ class AgnoPersonalAgent(Agent):
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
         seed: Optional[int] = None,
         alltools: Optional[bool] = True,
+        initialize_agent: Optional[bool] = False,
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -134,6 +135,9 @@ class AgnoPersonalAgent(Agent):
             recreate: Whether to recreate knowledge bases
             instruction_level: The sophistication level for agent instructions (kept for compatibility)
             seed: Optional seed for model reproducibility
+            alltools: Whether to enable all built-in tools (Google Search, Calculator, YFinance, Python, Shell, etc.)
+            initialize_agent: Whether to force immediate initialization instead of lazy initialization
+            **kwargs: Additional keyword arguments for backward compatibility with base Agent class
         """
         # Store configuration
         self.config = AgnoPersonalAgentConfig(
@@ -168,6 +172,7 @@ class AgnoPersonalAgent(Agent):
         # Lazy initialization flag
         self._initialized = False
         self._initialization_lock = asyncio.Lock()
+        self._force_init = initialize_agent
 
         # Set user_id with fallback
         if user_id is None:
@@ -220,6 +225,7 @@ class AgnoPersonalAgent(Agent):
             debug_mode=debug,
             stream_intermediate_steps=True,
             stream=True,
+            **kwargs,
         )
 
         logger.info(
@@ -274,10 +280,7 @@ class AgnoPersonalAgent(Agent):
             logger.info("✅ Lazy initialization completed successfully")
 
     async def initialize(self, recreate: bool = False) -> bool:
-        """Initialize the agent using the proven create_memory_agent() pattern.
-
-        DEPRECATED: This method is kept for backward compatibility.
-        Initialization now happens automatically when needed.
+        """Initialize the agent.
 
         Args:
             recreate: Whether to recreate the agent knowledge bases
@@ -286,7 +289,7 @@ class AgnoPersonalAgent(Agent):
             True if initialization successful, False otherwise
         """
         logger.info(
-            "🚀 AgnoPersonalAgent.initialize() called with recreate=%s (deprecated - use constructor directly)",
+            "🚀 AgnoPersonalAgent.initialize() called with recreate=%s",
             recreate,
         )
 
@@ -857,6 +860,7 @@ class AgnoPersonalAgent(Agent):
         main_table.add_row("Knowledge Enabled", str(info["knowledge_enabled"]))
         main_table.add_row("Debug Mode", str(info["debug_mode"]))
         main_table.add_row("User ID", info["user_id"])
+        main_table.add_row("User Data Directory", DATA_DIR)
         main_table.add_row("Storage Directory", info["storage_dir"])
         main_table.add_row("Knowledge Directory", info["knowledge_dir"])
         main_table.add_row("Total Tools", str(info["tool_counts"]["total"]))
@@ -992,6 +996,60 @@ class AgnoPersonalAgent(Agent):
         except Exception as e:
             logger.warning("Error during synchronous cleanup: %s", e)
 
+    @classmethod
+    async def create_with_init(
+        cls,
+        model_provider: str = "ollama",
+        model_name: str = LLM_MODEL,
+        enable_memory: bool = True,
+        enable_mcp: bool = True,
+        storage_dir: str = AGNO_STORAGE_DIR,
+        knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
+        debug: bool = False,
+        ollama_base_url: str = OLLAMA_URL,
+        user_id: str = None,
+        recreate: bool = False,
+        instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+        seed: Optional[int] = None,
+        alltools: Optional[bool] = True,
+        **kwargs,
+    ) -> "AgnoPersonalAgent":
+        """Create and fully initialize an AgnoPersonalAgent.
+
+        This is an async factory method that creates the agent and immediately
+        initializes it, which is useful when you need the agent to be ready
+        to use immediately.
+
+        Args:
+            Same as __init__ method
+
+        Returns:
+            Fully initialized AgnoPersonalAgent instance
+        """
+        # Create the agent instance
+        agent = cls(
+            model_provider=model_provider,
+            model_name=model_name,
+            enable_memory=enable_memory,
+            enable_mcp=enable_mcp,
+            storage_dir=storage_dir,
+            knowledge_dir=knowledge_dir,
+            debug=debug,
+            ollama_base_url=ollama_base_url,
+            user_id=user_id,
+            recreate=recreate,
+            instruction_level=instruction_level,
+            seed=seed,
+            alltools=alltools,
+            initialize_agent=False,  # Don't try to force init in constructor
+            **kwargs,
+        )
+
+        # Now initialize it
+        await agent._ensure_initialized()
+
+        return agent
+
     # Legacy property for backward compatibility
     @property
     def agent(self):
@@ -1093,11 +1151,12 @@ async def create_agno_agent(
     recreate: bool = False,
     instruction_level: InstructionLevel = InstructionLevel.EXPLICIT,
     alltools: Optional[bool] = True,  # Add alltools parameter
+    seed: Optional[int] = None,
 ) -> AgnoPersonalAgent:
-    """Create an agno-based personal agent.
+    """Create and fully initialize an agno-based personal agent.
 
-    DEPRECATED: Use AgnoPersonalAgent() constructor directly.
-    This function is kept for backward compatibility.
+    This function creates an AgnoPersonalAgent and performs complete initialization,
+    ensuring the agent is ready to use immediately upon return.
 
     Args:
         model_provider: LLM provider ('ollama' or 'openai')
@@ -1111,20 +1170,22 @@ async def create_agno_agent(
         user_id: User identifier for memory operations
         recreate: Whether to recreate knowledge bases
         instruction_level: The sophistication level for agent instructions
+        alltools: Whether to enable all built-in tools
+        seed: Optional seed for model reproducibility
 
     Returns:
-        Agent instance (initialization happens automatically on first use)
+        Fully initialized AgnoPersonalAgent instance
     """
     logger.info(
-        "create_agno_agent() called (deprecated - use AgnoPersonalAgent() constructor directly)"
+        "create_agno_agent() called - creating and initializing agent with proper init"
     )
 
     # Set user_id with fallback
     if user_id is None:
         user_id = get_userid()
 
-    # Just create the agent - initialization happens automatically when needed
-    return AgnoPersonalAgent(
+    # Use the create_with_init class method to ensure proper initialization
+    return await AgnoPersonalAgent.create_with_init(
         model_provider=model_provider,
         model_name=model_name,
         enable_memory=enable_memory,
@@ -1136,5 +1197,6 @@ async def create_agno_agent(
         user_id=user_id,
         recreate=recreate,
         instruction_level=instruction_level,
-        alltools=alltools,  # Pass through alltools parameter
+        seed=seed,
+        alltools=alltools,
     )

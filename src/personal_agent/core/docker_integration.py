@@ -26,12 +26,12 @@ except ImportError:
 
 # Handle relative imports when running as script vs module
 try:
-    from ..config.settings import get_userid
+    from ..config.user_id_mgr import get_userid
     from ..utils.pag_logging import setup_logging
 except ImportError:
     # Running as script, use absolute imports
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from personal_agent.config.settings import get_userid
+    from personal_agent.config import get_userid
     from personal_agent.utils.pag_logging import setup_logging
 
 logger = setup_logging()
