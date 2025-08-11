@@ -48,7 +48,7 @@ def load_user_from_file():
 
         # Create ~/.persag and copy default configs if it doesn't exist
         if not persag_dir.exists():
-            logger.info(f"PERSAG directory not found. Creating at: {persag_dir}")
+            _logger.info(f"PERSAG directory not found. Creating at: {persag_dir}")
             persag_dir.mkdir(parents=True, exist_ok=True)
 
             # Copy lightrag server directories from project root
@@ -61,14 +61,14 @@ def load_user_from_file():
             try:
                 if source_server_dir.exists() and not dest_server_dir.exists():
                     shutil.copytree(source_server_dir, dest_server_dir)
-                    logger.info(f"Copied default lightrag_server to {dest_server_dir}")
+                    _logger.info(f"Copied default lightrag_server to {dest_server_dir}")
                 if source_memory_dir.exists() and not dest_memory_dir.exists():
                     shutil.copytree(source_memory_dir, dest_memory_dir)
-                    logger.info(
+                    _logger.info(
                         f"Copied default lightrag_memory_server to {dest_memory_dir}"
                     )
             except Exception as copy_e:
-                logger.critical(
+                _logger.critical(
                     f"Failed to copy LightRAG directories to {persag_dir}: {copy_e}"
                 )
 
@@ -87,11 +87,11 @@ def load_user_from_file():
         with open(userid_file, "w", encoding="utf-8") as f:
             f.write(f'USER_ID="{default_user_id}"\n')
         os.environ["USER_ID"] = default_user_id
-        logger.info(f"Created default USER_ID in {userid_file}")
+        _logger.info(f"Created default USER_ID in {userid_file}")
         return default_user_id
 
     except Exception as e:
-        logger.warning(f"Failed to load user ID from ~/.persag: {e}")
+        _logger.warning(f"Failed to load user ID from ~/.persag: {e}")
         fallback_user_id = os.getenv("USER_ID", "default_user")
         os.environ["USER_ID"] = fallback_user_id
         return fallback_user_id

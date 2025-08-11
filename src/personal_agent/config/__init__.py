@@ -22,7 +22,7 @@ from .settings import (
     WEAVIATE_URL,
     get_env_bool,
     get_env_var,
-    print_configuration,
+    
 )
 from .user_id_mgr import (
     get_current_user_id,
