@@ -189,6 +189,14 @@ args = [
 ]
 
 # === Utility Tasks ===
+[tool.poe.tasks.config]
+help = "Display Personal Agent configuration"
+cmd = "python -m src.personal_agent.tools.show_config"
+args = [
+  { name = "no-color", options = ["--no-color"], type = "boolean", help = "Disable colored output" },
+  { name = "json", options = ["--json"], type = "boolean", help = "Output configuration as JSON" }
+]
+
 [tool.poe.tasks.clean]
 help = "Clean up temporary files and caches"
 sequence = [
