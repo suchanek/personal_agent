@@ -4,9 +4,16 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
-# Add the src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 from personal_agent.config import USE_MCP, USE_WEAVIATE, get_mcp_servers
 from personal_agent.core import SimpleMCPClient, setup_weaviate

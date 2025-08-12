@@ -1,4 +1,4 @@
-ee#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Test script for the Personal Agent Team
 
@@ -14,8 +14,14 @@ import logging
 import sys
 from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 from personal_agent.config import LLM_MODEL, OLLAMA_URL, USER_ID, AGNO_STORAGE_DIR
 from personal_agent.team.personal_agent_team import (

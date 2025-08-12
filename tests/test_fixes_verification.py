@@ -10,8 +10,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Add the src directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 from personal_agent.tools.personal_agent_tools import PersonalAgentFilesystemTools
 from personal_agent.tools.knowledge_ingestion_tools import KnowledgeIngestionTools

@@ -7,6 +7,16 @@ import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import patch, mock_open
+import sys
+
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 from src.personal_agent.core.persag_manager import PersagManager, get_userid, get_persag_manager
 
