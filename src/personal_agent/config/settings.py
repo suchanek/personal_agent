@@ -25,24 +25,9 @@ dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Handle imports differently when run as a script vs imported as a module
-try:
-    if __name__ == "__main__":
-        # When run directly, use absolute imports
-        sys.path.insert(0, str(BASE_DIR))
-        from personal_agent.config.user_id_mgr import load_user_from_file
-    else:
-        # When imported as a module, use relative imports
-        from .user_id_mgr import load_user_from_file
-except ImportError:
-    # Fallback import handling
-    try:
-        from .user_id_mgr import load_user_from_file
-    except ImportError:
-        sys.path.insert(0, str(BASE_DIR))
-        from personal_agent.config.user_id_mgr import load_user_from_file
+from .user_id_mgr import load_user_from_file
 
-# Initialize ~/.persag and load user ID
+# Initialize ~/.persag (PERSAG_HOME) and load user ID
 load_user_from_file()
 
 
@@ -141,20 +126,8 @@ REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
 STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
 
 
-# Import user-specific functions from the dedicated module
-try:
-    if __name__ == "__main__":
-        # When run directly, use absolute imports
-        from personal_agent.config.user_id_mgr import get_user_storage_paths, get_userid
-    else:
-        # When imported as a module, use relative imports
-        from .user_id_mgr import get_user_storage_paths, get_userid
-except ImportError:
-    # Fallback import handling
-    try:
-        from .user_id_mgr import get_user_storage_paths, get_userid
-    except ImportError:
-        from personal_agent.config.user_id_mgr import get_user_storage_paths, get_userid
+# Import user-specific functions
+from .user_id_mgr import get_user_storage_paths, get_userid
 
 # Get initial storage paths (these will be dynamic)
 _storage_paths = get_user_storage_paths()
@@ -199,20 +172,8 @@ EMBEDDING_TIMEOUT = get_env_var("EMBEDDING_TIMEOUT", "3600")
 SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
 
 
-# Import remaining user-specific functions from the dedicated module
-try:
-    if __name__ == "__main__":
-        # When run directly, use absolute imports
-        from personal_agent.config.user_id_mgr import get_current_user_id, refresh_user_dependent_settings
-    else:
-        # When imported as a module, use relative imports
-        from .user_id_mgr import get_current_user_id, refresh_user_dependent_settings
-except ImportError:
-    # Fallback import handling
-    try:
-        from .user_id_mgr import get_current_user_id, refresh_user_dependent_settings
-    except ImportError:
-        from personal_agent.config.user_id_mgr import get_current_user_id, refresh_user_dependent_settings
+# Import remaining user-specific functions
+from .user_id_mgr import get_current_user_id, refresh_user_dependent_settings
 
 
 def get_package_version():

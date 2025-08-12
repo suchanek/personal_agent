@@ -9,6 +9,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from personal_agent.config import DATA_DIR, STORAGE_BACKEND
+from personal_agent.config.user_id_mgr import get_current_user_id, get_userid
 
 
 class UserRegistry:
@@ -23,7 +25,6 @@ class UserRegistry:
             storage_backend: Storage backend (defaults to config STORAGE_BACKEND)
         """
         if data_dir is None or storage_backend is None:
-            from personal_agent.config import DATA_DIR, STORAGE_BACKEND
             data_dir = data_dir or DATA_DIR
             storage_backend = storage_backend or STORAGE_BACKEND
         
@@ -194,13 +195,12 @@ class UserRegistry:
     
     def get_current_user(self) -> Optional[Dict[str, Any]]:
         """
-        Get the current user based on USER_ID environment variable.
+        Get the current user from the single source of truth (user_id_mgr).
         
         Returns:
             Current user dictionary or None if not found
         """
-        from personal_agent.config import get_userid
-        return self.get_user(get_userid())
+        return self.get_user(get_current_user_id())
     
     def ensure_current_user_registered(self) -> bool:
         """
@@ -210,8 +210,6 @@ class UserRegistry:
         Returns:
             True if user was already registered or successfully added
         """
-        from personal_agent.config import get_userid
-        
         current_user_id = get_userid()
         if self.user_exists(current_user_id):
             # Update last_seen for existing user
