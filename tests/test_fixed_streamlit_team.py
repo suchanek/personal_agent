@@ -8,8 +8,14 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 from personal_agent.config import AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL, USER_ID
 from personal_agent.team.personal_agent_team import create_personal_agent_team

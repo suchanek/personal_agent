@@ -20,8 +20,9 @@ import sys
 from pathlib import Path
 from typing import List, Set
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from src.personal_agent.config.settings import OLLAMA_URL, USER_ID
 from src.personal_agent.core.agent_instruction_manager import InstructionLevel

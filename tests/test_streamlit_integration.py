@@ -6,8 +6,9 @@ Test script to verify the Streamlit integration with SemanticMemoryManager works
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
 from personal_agent.core.semantic_memory_manager import SemanticMemoryManager, SemanticMemoryManagerConfig

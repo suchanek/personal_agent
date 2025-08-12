@@ -7,9 +7,16 @@ This test validates that the updated agent prompt correctly guides the LLM to us
 import os
 import sys
 import tempfile
+from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 
 def test_agent_prompt_includes_json_guidance():

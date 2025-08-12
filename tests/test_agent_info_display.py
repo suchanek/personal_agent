@@ -2,9 +2,9 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from src.personal_agent.core.agno_agent import create_agno_agent
 

@@ -8,9 +8,16 @@ AgnoPersonalAgent components using Python's built-in unittest framework.
 import unittest
 import sys
 import os
+from pathlib import Path
 
-# Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 # Import all test modules
 from tests.test_agent_model_manager import TestAgentModelManager, TestAgentModelManagerIntegration

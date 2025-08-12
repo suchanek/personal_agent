@@ -2,9 +2,10 @@
 """Test the new configuration structure."""
 
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from personal_agent.config import (
     DATA_DIR,

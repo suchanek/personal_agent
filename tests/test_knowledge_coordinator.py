@@ -11,8 +11,14 @@ import logging
 import sys
 from pathlib import Path
 
-# Add the src directory to the Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath()
 
 from personal_agent.core.knowledge_coordinator import create_knowledge_coordinator
 from personal_agent.core.agno_storage import create_agno_storage, create_combined_knowledge_base

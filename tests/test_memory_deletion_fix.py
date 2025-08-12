@@ -3,9 +3,16 @@ import os
 import re
 import sys
 from unittest.mock import MagicMock
+from pathlib import Path
 
-# Fix Python path to allow imports from src
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+def _add_src_to_syspath():
+    # Ensure 'personal_agent' package is importable in src/ layout
+    repo_root = Path(__file__).resolve().parents[1]
+    src_dir = repo_root / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+_add_src_to_syspath())
 
 from src.personal_agent.cli.memory_commands import delete_memory_by_id_cli
 from src.personal_agent.core.agno_agent import AgnoPersonalAgent, create_agno_agent

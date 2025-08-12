@@ -10,8 +10,9 @@ import os
 import sys
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 def test_user_id_propagation():
     """Test that USER_ID propagation works correctly."""
