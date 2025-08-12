@@ -33,16 +33,53 @@ src_dir = current_dir.parent.parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
+# Consolidated imports at module level with fallback defaults
 try:
     from personal_agent.config.user_id_mgr import get_userid
     from personal_agent.core.agno_agent import AgnoPersonalAgent
     from personal_agent.core.memory import is_memory_connected
     from personal_agent.utils.pag_logging import setup_logging
+    from personal_agent.config.settings import (
+        AGNO_KNOWLEDGE_DIR,
+        AGNO_STORAGE_DIR,
+        LLM_MODEL,
+        OLLAMA_URL,
+        USE_MCP,
+    )
 except ImportError:
     # Fallback for relative imports
-    from ..config import get_userid
-    from ..core.memory import is_memory_connected
-    from ..utils.pag_logging import setup_logging
+    try:
+        from ..config import get_userid
+        from ..core.agno_agent import AgnoPersonalAgent
+        from ..core.memory import is_memory_connected
+        from ..utils.pag_logging import setup_logging
+        from ..config.settings import (
+            AGNO_KNOWLEDGE_DIR,
+            AGNO_STORAGE_DIR,
+            LLM_MODEL,
+            OLLAMA_URL,
+            USE_MCP,
+        )
+    except ImportError:
+        # Final fallback with default values
+        def get_userid():
+            return "default_user"
+        
+        class AgnoPersonalAgent:
+            pass
+        
+        def is_memory_connected():
+            return False
+        
+        def setup_logging():
+            return logging.getLogger(__name__)
+        
+        # Default settings
+        AGNO_KNOWLEDGE_DIR = "./knowledge"
+        AGNO_STORAGE_DIR = "./storage"
+        LLM_MODEL = "llama3.2:3b"
+        OLLAMA_URL = "http://localhost:11434"
+        USE_MCP = False
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -152,17 +189,6 @@ def get_ollama_models(ollama_url):
 
 async def create_agno_agent_with_params(model_name, ollama_url):
     """Create an agno agent with specific model and URL parameters."""
-    try:
-        from personal_agent.config.settings import (
-            AGNO_KNOWLEDGE_DIR,
-            AGNO_STORAGE_DIR,
-            USE_MCP,
-        )
-        from personal_agent.core.agno_agent import AgnoPersonalAgent
-    except ImportError:
-        from ..config.settings import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, USE_MCP
-        from ..core.agno_agent import AgnoPersonalAgent
-
     agent = await AgnoPersonalAgent.create_with_init(
         model_provider="ollama",
         model_name=model_name,
@@ -454,19 +480,11 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # Initialize session state for model selection
+    # Initialize session state for model selection using module-level imports
     if "current_ollama_url" not in st.session_state:
-        try:
-            from personal_agent.config.settings import OLLAMA_URL
-        except ImportError:
-            from ..config.settings import OLLAMA_URL
         st.session_state.current_ollama_url = OLLAMA_URL
 
     if "current_model" not in st.session_state:
-        try:
-            from personal_agent.config.settings import LLM_MODEL
-        except ImportError:
-            from ..config.settings import LLM_MODEL
         st.session_state.current_model = LLM_MODEL
 
     # Check if agent is initialized (prefer session state, fallback to global)
@@ -476,27 +494,7 @@ def main():
         # Try to initialize the agent if running directly
         st.info("🔄 Initializing agent...")
         try:
-            # Import the agent creation function
-            try:
-                from personal_agent.config.settings import (
-                    AGNO_KNOWLEDGE_DIR,
-                    AGNO_STORAGE_DIR,
-                    LLM_MODEL,
-                    OLLAMA_URL,
-                    USE_MCP,
-                )
-                from personal_agent.core.agno_agent import AgnoPersonalAgent
-            except ImportError:
-                from ..config.settings import (
-                    AGNO_KNOWLEDGE_DIR,
-                    AGNO_STORAGE_DIR,
-                    LLM_MODEL,
-                    OLLAMA_URL,
-                    USE_MCP,
-                )
-                from ..core.agno_agent import AgnoPersonalAgent
-
-            # Initialize the agent
+            # Initialize the agent using module-level imports
             with st.spinner("Creating agno agent..."):
 
                 async def init_agent():
