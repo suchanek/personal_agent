@@ -15,7 +15,9 @@ from pathlib import Path
 import streamlit as st
 
 # Add project root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from personal_agent.streamlit.components.dashboard_memory_management import (
     memory_management_tab,
