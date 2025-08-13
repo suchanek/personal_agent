@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Centralized Configuration Management**: Consolidated all configuration variables into the `src/personal_agent/config` package, making them centrally accessible and improving maintainability. See [ADR-061](./refs/adr/061-centralized-configuration-management.md) for details.
+
+### Changed
 - **User Identity Single Source of Truth**: Refactored all user identity and path management logic into a single source of truth (`src/personal_agent/config/user_id_mgr.py`) to eliminate duplication and ensure consistent, predictable behavior across the application. See [ADR-060](./refs/adr/060-user-identity-sot-refactor.md) for details.
 - **Centralized Configuration Display**: Consolidated all configuration display logic into `src/personal_agent/tools/show_config.py` to eliminate redundancy and improve maintainability. The `settings.py` module no longer contains display logic, adhering to the Single Responsibility Principle. See [ADR-059](./refs/adr/059-centralized-configuration-display.md) for details.
 - **Modular User ID Management**: Refactored user ID and path management into a dedicated module (`src/personal_agent/config/user_id_mgr.py`) to resolve circular dependencies and improve modularity. User-specific configurations, including Docker files, are now centralized in a `~/.persag` directory in the user's home, which is created and populated automatically on first run. See [ADR-058](./refs/adr/058-modular-user-id-management.md) for details.

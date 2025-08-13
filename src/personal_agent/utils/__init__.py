@@ -20,6 +20,7 @@ from .pag_logging import (
     setup_logging_filters,
     toggle_stream_handler,
 )
+from .src_path import add_src_to_path
 from .store_fact import store_fact_in_knowledge_base
 
 __all__ = [
@@ -42,4 +43,6 @@ __all__ = [
     "toggle_stream_handler",
     # Fact storage utilities
     "store_fact_in_knowledge_base",
+    # Path utilities
+    "add_src_to_path",
 ]

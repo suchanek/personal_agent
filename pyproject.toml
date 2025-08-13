@@ -208,10 +208,15 @@ sequence = [
 
 # === Environment Management ===
 [tool.poe.tasks.switch-user]
-help = "Switch user configuration"
-cmd = "python switch-user.py ${user}"
+help = "Switch or manage user configurations"
+cmd = "python switch-user.py"
 args = [
-  { name = "user", positional = true, help = "User to switch to" }
+    {name = "user_id", positional = true, help = "User ID to switch to"},
+    {name = "user_name", options = ["--user-name"], help = "Display name for new users"},
+    {name = "user_type", options = ["--user-type"], help = "User type for new users"},
+    {name = "no_restart", options = ["--no-restart"], type = "boolean", help = "Don't restart LightRAG services"},
+    {name = "status", options = ["--status"], type = "boolean", help = "Display user status"},
+    {name = "create_only", options = ["--create-only"], type = "boolean", help = "Only create the user"}
 ]
 
 [tool.poe.tasks.switch-ollama]
