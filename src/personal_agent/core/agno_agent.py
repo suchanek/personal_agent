@@ -27,6 +27,7 @@ from ..config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
     DATA_DIR,
+    PERSAG_ROOT,
     LIGHTRAG_MEMORY_URL,
     LIGHTRAG_URL,
     LLM_MODEL,
@@ -249,10 +250,10 @@ class AgnoPersonalAgent(Agent):
         if user_id != get_userid():
             # Replace the default user ID in the paths with the custom user ID
             self.storage_dir = os.path.expandvars(
-                f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}"
+                f"{PERSAG_ROOT}/{STORAGE_BACKEND}/{user_id}"
             )
             self.knowledge_dir = os.path.expandvars(
-                f"{DATA_DIR}/{STORAGE_BACKEND}/{user_id}/knowledge"
+                f"{PERSAG_ROOT}/{STORAGE_BACKEND}/{user_id}/knowledge"
             )
         else:
             self.storage_dir = storage_dir
@@ -1069,8 +1070,8 @@ def create_simple_personal_agent(
     pattern that avoids async initialization complexity.
 
     Args:
-        storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
-        knowledge_dir: Directory containing knowledge files (defaults to DATA_DIR/knowledge)
+        storage_dir: Directory for storage files (defaults to PERSAG_ROOT/agno)
+        knowledge_dir: Directory containing knowledge files (defaults to PERSAG_ROOT/knowledge)
         model_provider: LLM provider ('ollama' or 'openai')
         model_name: Model name to use
 

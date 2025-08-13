@@ -105,6 +105,14 @@ args = [
   { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
 ]
 
+[tool.poe.tasks.server-persag]
+help = "Start the Personal Agent Streamlit interface (PAGA)"
+cmd = "streamlit run tools/paga_streamlit_agno.py"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
+  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
+]
+
 # === CLI Interface Tasks ===
 [tool.poe.tasks.cli]
 help = "Run CLI interface"

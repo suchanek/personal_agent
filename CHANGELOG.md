@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Unambiguous Data Directory Configuration**: Refactored data directory management to remove ambiguity. The new `USER_DATA_DIR` variable now explicitly points to the current user's data directory, while `DATA_DIR` consistently refers to the global application data root (`PERSAG_ROOT`). This improves configuration clarity and maintainability. See [ADR-062](./refs/adr/062-unambiguous-data-directory-configuration.md) for details.
+- **Agent Instruction Refinement**: Updated agent instructions to prevent the output of internal reasoning or chain-of-thought, ensuring responses are direct and user-focused.
+
+### Added
+- Added a new `server-persag` task to `pyproject.toml` for starting the Streamlit interface.
+
+### Changed
 - **Centralized Configuration Management**: Consolidated all configuration variables into the `src/personal_agent/config` package, making them centrally accessible and improving maintainability. See [ADR-061](./refs/adr/061-centralized-configuration-management.md) for details.
 
 ### Changed

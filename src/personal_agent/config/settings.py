@@ -119,7 +119,6 @@ PERSAG_ROOT = get_env_var(
     "PERSAG_ROOT", "/Users/Shared/personal_agent_data"
 )  # Root directory for MCP filesystem server
 HOME_DIR = get_env_var("HOME_DIR", os.path.expanduser("~"))  # User's home directory
-DATA_DIR = get_env_var("DATA_DIR", "./data")  # Data directory for vector database
 REPO_DIR = get_env_var("REPO_DIR", "./repos")  # Repository directory
 
 # Storage backend configuration
@@ -138,6 +137,7 @@ LIGHTRAG_INPUTS_DIR = _storage_paths["LIGHTRAG_INPUTS_DIR"]
 LIGHTRAG_MEMORY_STORAGE_DIR = _storage_paths["LIGHTRAG_MEMORY_STORAGE_DIR"]
 LIGHTRAG_MEMORY_INPUTS_DIR = _storage_paths["LIGHTRAG_MEMORY_INPUTS_DIR"]
 DATA_DIR = _storage_paths["DATA_DIR"]
+USER_DATA_DIR = _storage_paths["USER_DATA_DIR"]
 
 # Logging configuration
 LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
