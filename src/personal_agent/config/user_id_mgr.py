@@ -143,9 +143,10 @@ def get_user_storage_paths():
 
     current_user_id = get_userid()
     return {
-        "DATA_DIR": os.path.expandvars(
+        "USER_DATA_DIR": os.path.expandvars(
             f"{PERSAG_ROOT}/{STORAGE_BACKEND}/{current_user_id}/data"
         ),
+        "DATA_DIR": os.path.expandvars(f"{PERSAG_ROOT}"),
         "AGNO_STORAGE_DIR": os.path.expandvars(
             f"{PERSAG_ROOT}/{STORAGE_BACKEND}/{current_user_id}"
         ),
