@@ -1080,12 +1080,12 @@ def render_knowledge_tab():
                         # Use the knowledge ingestion tools from the agent
                         agent = st.session_state[SESSION_KEY_AGENT]
                         if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
-                            # Find the knowledge ingestion tools
+                            # Find the knowledge tools (consolidated)
                             knowledge_tools = None
                             for tool in agent.agent.tools:
                                 if hasattr(
                                     tool, "__class__"
-                                ) and "KnowledgeIngestionTools" in str(tool.__class__):
+                                ) and "KnowledgeTools" in str(tool.__class__):
                                     knowledge_tools = tool
                                     break
 
@@ -1097,7 +1097,7 @@ def render_knowledge_tab():
                                 results.append(f"**{uploaded_file.name}**: {result}")
                             else:
                                 results.append(
-                                    f"**{uploaded_file.name}**: ❌ Knowledge ingestion tools not available"
+                                    f"**{uploaded_file.name}**: ❌ Knowledge tools not available"
                                 )
                         else:
                             results.append(
@@ -1154,12 +1154,12 @@ def render_knowledge_tab():
                 # Use the knowledge ingestion tools from the agent
                 agent = st.session_state[SESSION_KEY_AGENT]
                 if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
-                    # Find the knowledge ingestion tools
+                    # Find the knowledge tools (consolidated)
                     knowledge_tools = None
                     for tool in agent.agent.tools:
                         if hasattr(
                             tool, "__class__"
-                        ) and "KnowledgeIngestionTools" in str(tool.__class__):
+                        ) and "KnowledgeTools" in str(tool.__class__):
                             knowledge_tools = tool
                             break
 
@@ -1177,7 +1177,7 @@ def render_knowledge_tab():
                         st.session_state.knowledge_content = ""
                         st.rerun()
                     else:
-                        st.error("❌ Knowledge ingestion tools not available")
+                        st.error("❌ Knowledge tools not available")
                 else:
                     st.error("❌ Agent tools not accessible")
             except Exception as e:
@@ -1207,12 +1207,12 @@ def render_knowledge_tab():
                     # Use the knowledge ingestion tools from the agent
                     agent = st.session_state[SESSION_KEY_AGENT]
                     if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
-                        # Find the knowledge ingestion tools
+                        # Find the knowledge tools (consolidated)
                         knowledge_tools = None
                         for tool in agent.agent.tools:
                             if hasattr(
                                 tool, "__class__"
-                            ) and "KnowledgeIngestionTools" in str(tool.__class__):
+                            ) and "KnowledgeTools" in str(tool.__class__):
                                 knowledge_tools = tool
                                 break
 
@@ -1229,7 +1229,7 @@ def render_knowledge_tab():
                             st.session_state.url_title = ""
                             st.rerun()
                         else:
-                            st.error("❌ Knowledge ingestion tools not available")
+                            st.error("❌ Knowledge tools not available")
                     else:
                         st.error("❌ Agent tools not accessible")
             except Exception as e:

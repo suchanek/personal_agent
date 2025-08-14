@@ -38,14 +38,12 @@ from ..config.settings import (
     USE_MCP,
     get_userid,
 )
-from ..tools.knowledge_ingestion_tools import KnowledgeIngestionTools
 from ..tools.knowledge_tools import KnowledgeTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
 from ..tools.refactored_memory_tools import AgnoMemoryTools
-from ..tools.semantic_knowledge_ingestion_tools import SemanticKnowledgeIngestionTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -387,10 +385,6 @@ class AgnoPersonalAgent(Agent):
                 self.knowledge_tools = KnowledgeTools(
                     self.knowledge_manager, self.agno_knowledge
                 )
-                self.knowledge_ingestion_tools = KnowledgeIngestionTools()
-                self.semantic_knowledge_ingestion_tools = (
-                    SemanticKnowledgeIngestionTools()
-                )
                 self.memory_tools = AgnoMemoryTools(self.memory_manager)
 
             # 7. Create the model
@@ -427,14 +421,12 @@ class AgnoPersonalAgent(Agent):
             # Add memory tools if enabled
             if self.enable_memory:
                 memory_tools = [
-                    self.knowledge_tools,
-                    self.knowledge_ingestion_tools,
-                    self.semantic_knowledge_ingestion_tools,
+                    self.knowledge_tools,  # Now contains all knowledge functionality
                     self.memory_tools,
                 ]
                 tools.extend(memory_tools)
                 logger.info(
-                    "Added KnowledgeTools, KnowledgeIngestionTools, SemanticKnowledgeIngestionTools, and AgnoMemoryTools"
+                    "Added consolidated KnowledgeTools and AgnoMemoryTools"
                 )
             else:
                 logger.warning("Memory disabled - no memory tools added")

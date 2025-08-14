@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Consolidated Knowledge Ingestion**: Overhauled the knowledge ingestion architecture by consolidating logic from four redundant classes into a single, authoritative `KnowledgeTools` toolkit. This eliminated over 1000 lines of duplicate code, established a single source of truth for both LightRAG and semantic knowledge operations, and significantly simplified the agent's architecture and maintainability. For a detailed overview, see the [technical summary](./refs/KNOWLEDGE_INGESTION_CONSOLIDATION_SUMMARY.md) and [ADR-063](./refs/adr/063-consolidated-knowledge-ingestion.md).
+
+### Changed
 - **Unambiguous Data Directory Configuration**: Refactored data directory management to remove ambiguity. The new `USER_DATA_DIR` variable now explicitly points to the current user's data directory, while `DATA_DIR` consistently refers to the global application data root (`PERSAG_ROOT`). This improves configuration clarity and maintainability. See [ADR-062](./refs/adr/062-unambiguous-data-directory-configuration.md) for details.
 - **Agent Instruction Refinement**: Updated agent instructions to prevent the output of internal reasoning or chain-of-thought, ensuring responses are direct and user-focused.
 
