@@ -1,5 +1,9 @@
 # Personal Log
 
+**2025-08-13**
+
+- branch `refactorknowledgetools/v0.11.38dev1` - we are consolidating the knowledge ingestion stuff
+
 **2025-08-08**
 
 - v0.11.38dev branch working on personalagent team, tool calling agent

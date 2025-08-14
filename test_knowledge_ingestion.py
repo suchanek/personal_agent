@@ -15,7 +15,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from personal_agent.tools.knowledge_ingestion_tools import KnowledgeIngestionTools
+from personal_agent.tools.knowledge_tools import KnowledgeTools
 from personal_agent.core.knowledge_manager import KnowledgeManager
 from personal_agent.config import settings
 
@@ -25,15 +25,15 @@ async def test_knowledge_ingestion():
     print("🧪 Testing Knowledge Ingestion System")
     print("=" * 50)
     
-    # Initialize the knowledge ingestion tools
-    knowledge_tools = KnowledgeIngestionTools()
-    
     # Initialize the knowledge manager
     knowledge_manager = KnowledgeManager(
         user_id="test_user",
         knowledge_dir=settings.AGNO_KNOWLEDGE_DIR,
         lightrag_url=settings.LIGHTRAG_URL
     )
+    
+    # Initialize the knowledge tools
+    knowledge_tools = KnowledgeTools(knowledge_manager, agno_knowledge=None)
     
     print(f"📁 Knowledge directory: {settings.AGNO_KNOWLEDGE_DIR}")
     print(f"🌐 LightRAG URL: {settings.LIGHTRAG_URL}")
