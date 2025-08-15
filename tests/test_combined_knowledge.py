@@ -4,6 +4,10 @@
 import asyncio
 import logging
 
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
+
 from src.personal_agent.config import LLM_MODEL
 from src.personal_agent.core.agno_agent import AgnoPersonalAgent
 

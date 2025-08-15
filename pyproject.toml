@@ -1,9 +1,13 @@
 [tool.poetry]
 name = "personal-agent"
-version = "0.8.6"
-license = "GPL-3.0-only"
-description = "Personal AI agent with MCP and Memory, powered by Agno and Ollama"
+version = "v0.11.38dev"
+description = "Personal AI agent with MCP and Memory, powered by Agno, LightRAG and Ollama"
 authors = ["Eric Suchanek <suchanek@mac.com>"]
+readme = "README.md"
+homepage = "https://github.com/suchanek/personal_agent"
+repository = "https://github.com/suchanek/personal_agent"
+keywords = ["personal-agent", "mcp", "memory", "ollama", "langchain"]
+license = "GPL-3.0-only"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
@@ -48,6 +52,19 @@ googlesearch-python = "^1.3.0"
 pycountry = "^24.6.1"
 lightrag-hku = "^1.3.9"
 pyyaml = "^6.0.2"
+spacy = "^3.0.0"
+pytest = "^8.4.1"
+docker = "^7.1.0"
+plotly = "^6.2.0"
+python-dateutil = "^2.9.0.post0"
+pygithub = "^2.6.1"
+google-genai = "^1.26.0"
+groq = "^0.30.0"
+prompt-toolkit = "^3.0.51"
+anthropic = "^0.59.0"
+e2b-code-interpreter = "^1.5.2"
+openai-harmony = "^0.0.3"
+psutil = "^7.0.0"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"
@@ -65,10 +82,185 @@ paga = "src.personal_agent.web.agno_interface:main"
 personal-agent-agno-cli = "src.personal_agent.agno_main:cli_main"
 paga_cli = "src.personal_agent.agno_main:cli_main"
 
+paga_team_cli = "src.personal_agent.team.reasoning_team:cli_main"
+rteam = "src.personal_agent.team.reasoning_team:cli_main"
+
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
 test-tools = "tests.test_tools:main"
 store-fact = "scripts.store_fact:main"
+
+[tool.poetry.group.dev.dependencies]
+poethepoet = "^0.36.0"
+
+# Poe the Poet task configuration
+[tool.poe.tasks]
+
+# === Core Application Tasks ===
+[tool.poe.tasks.serve]
+help = "Start the simple personal agent interface"
+cmd = "streamlit run src/personal_agent/web/agno_interface.py"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
+  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
+]
+
+[tool.poe.tasks.server-persag]
+help = "Start the Personal Agent Streamlit interface (PAGA)"
+cmd = "streamlit run tools/paga_streamlit_agno.py"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
+  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
+]
+
+# === CLI Interface Tasks ===
+[tool.poe.tasks.cli]
+help = "Run CLI interface"
+cmd = "poetry run paga_cli"
+
+
+[tool.poe.tasks.team]
+help = "Run reasoning team CLI"
+cmd = "poetry run rteam"
+
+# === MCP Server Management ===
+[tool.poe.tasks.mcp-install]
+help = "Install MCP servers"
+cmd = "python scripts/install_mcp.py"
+
+[tool.poe.tasks.mcp-test]
+help = "Test MCP server availability"
+cmd = "python tests/test_mcp_availability.py"
+
+[tool.poe.tasks.mcp-setup]
+help = "Install and test MCP servers"
+sequence = ["mcp-install", "mcp-test"]
+
+# === Testing Tasks ===
+[tool.poe.tasks.test]
+help = "Run all tests"
+cmd = "pytest"
+args = [
+  { name = "path", positional = true, default = "tests/", help = "Test path or file" },
+  { name = "verbose", options = ["-v", "--verbose"], type = "boolean", help = "Verbose output" },
+  { name = "coverage", options = ["-c", "--coverage"], type = "boolean", help = "Run with coverage" }
+]
+
+[tool.poe.tasks.test-tools]
+help = "Test available tools"
+cmd = "test-tools"
+
+[tool.poe.tasks.test-unit]
+help = "Run unit tests"
+cmd = "pytest tests/unit -v"
+
+[tool.poe.tasks.test-integration]
+help = "Run integration tests"
+cmd = "pytest tests/integration -v"
+
+[tool.poe.tasks.test-memory]
+help = "Run memory system tests"
+cmd = "pytest memory_tests/ -v"
+
+[tool.poe.tasks.test-all]
+help = "Run comprehensive test suite"
+sequence = ["test-unit", "test-integration", "test-memory", "test-tools", "mcp-test"]
+
+# === Memory and Knowledge Management ===
+[tool.poe.tasks.store-fact]
+help = "Store a fact in the knowledge base"
+cmd = "store-fact"
+args = [
+  { name = "fact", positional = true, help = "Fact to store" },
+  { name = "category", options = ["-c", "--category"], help = "Fact category" }
+]
+
+[tool.poe.tasks.memory-clean]
+help = "Clean memory system"
+script = "src.personal_agent.tools.memory_cleaner:main"
+
+[tool.poe.tasks.restart-lightrag]
+help = "Smart restart LightRAG server"
+shell = "./smart-restart-lightrag.sh"
+
+# === Analysis and Debugging ===
+[tool.poe.tasks.analyze]
+help = "Run comprehensive analysis"
+cmd = "python analysis/test_comprehensive_research.py"
+
+
+# === Streamlit Dashboard ===
+[tool.poe.tasks.dashboard]
+help = "Start Streamlit dashboard"
+cmd = "streamlit run src/personal_agent/streamlit/dashboard.py"
+args = [
+  { name = "port", options = ["--server.port"], default = "8501", help = "Streamlit port" }
+]
+
+# === Utility Tasks ===
+[tool.poe.tasks.config]
+help = "Display Personal Agent configuration"
+cmd = "python -m src.personal_agent.tools.show_config"
+args = [
+  { name = "no-color", options = ["--no-color"], type = "boolean", help = "Disable colored output" },
+  { name = "json", options = ["--json"], type = "boolean", help = "Output configuration as JSON" }
+]
+
+[tool.poe.tasks.show-config]
+help = "Show the current configuration"
+cmd = "python tools/show-config.py"
+
+[tool.poe.tasks.clean]
+help = "Clean up temporary files and caches"
+sequence = [
+  { cmd = "find . -type d -name '__pycache__' -exec rm -rf {} + || true" },
+  { cmd = "find . -name '*.pyc' -delete || true" },
+  { cmd = "find . -name '.pytest_cache' -exec rm -rf {} + || true" }
+]
+
+# === Environment Management ===
+[tool.poe.tasks.switch-user]
+help = "Switch or manage user configurations"
+cmd = "python switch-user.py"
+args = [
+    {name = "user_id", positional = true, help = "User ID to switch to"},
+    {name = "user_name", options = ["--user-name"], help = "Display name for new users"},
+    {name = "user_type", options = ["--user-type"], help = "User type for new users"},
+    {name = "no_restart", options = ["--no-restart"], type = "boolean", help = "Don't restart LightRAG services"},
+    {name = "status", options = ["--status"], type = "boolean", help = "Display user status"},
+    {name = "create_only", options = ["--create-only"], type = "boolean", help = "Only create the user"}
+]
+
+[tool.poe.tasks.switch-ollama]
+help = "Switch Ollama configuration"
+shell = "./switch-ollama.sh"
+
+# === Examples and Demos ===
+[tool.poe.tasks.demo-memory]
+help = "Run memory system demo"
+cmd = "python examples/15_memory_demo.py"
+
+[tool.poe.tasks.demo-team]
+help = "Run team demo"
+cmd = "python examples/personal_agent_team_demo.py"
+
+[tool.poe.tasks.example-mcp]
+help = "Run MCP tools example"
+cmd = "python examples/mcp_tools_examples.py"
+
+# === Quick Start Tasks ===
+[tool.poe.tasks.quick-start]
+help = "Quick start for new users"
+sequence = ["mcp-setup", "demo-memory", "serve"]
+
+[tool.poe.tasks.full-demo]
+help = "Full system demonstration"
+sequence = ["mcp-setup", "demo-memory", "demo-team", "example-mcp"]
+
+# === Documentation ===
+[tool.poe.tasks.docs]
+help = "Generate project documentation using pdoc"
+shell = "cd src && pdoc -o ../docs personal_agent"
 
 [build-system]
 requires = ["poetry-core"]

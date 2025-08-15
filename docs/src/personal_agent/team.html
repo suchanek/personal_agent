@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="pdoc 15.0.4"/>
+    <title>src.personal_agent.team API documentation</title>
+
+    <style>/*! * Bootstrap Reboot v5.0.0 (https://getbootstrap.com/) * Copyright 2011-2021 The Bootstrap Authors * Copyright 2011-2021 Twitter, Inc. * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE) * Forked from Normalize.css, licensed MIT (https://github.com/necolas/normalize.css/blob/master/LICENSE.md) */*,::after,::before{box-sizing:border-box}@media (prefers-reduced-motion:no-preference){:root{scroll-behavior:smooth}}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}hr{margin:1rem 0;color:inherit;background-color:currentColor;border:0;opacity:.25}hr:not([size]){height:1px}h1,h2,h3,h4,h5,h6{margin-top:0;margin-bottom:.5rem;font-weight:500;line-height:1.2}h1{font-size:calc(1.375rem + 1.5vw)}@media (min-width:1200px){h1{font-size:2.5rem}}h2{font-size:calc(1.325rem + .9vw)}@media (min-width:1200px){h2{font-size:2rem}}h3{font-size:calc(1.3rem + .6vw)}@media (min-width:1200px){h3{font-size:1.75rem}}h4{font-size:calc(1.275rem + .3vw)}@media (min-width:1200px){h4{font-size:1.5rem}}h5{font-size:1.25rem}h6{font-size:1rem}p{margin-top:0;margin-bottom:1rem}abbr[data-bs-original-title],abbr[title]{-webkit-text-decoration:underline dotted;text-decoration:underline dotted;cursor:help;-webkit-text-decoration-skip-ink:none;text-decoration-skip-ink:none}address{margin-bottom:1rem;font-style:normal;line-height:inherit}ol,ul{padding-left:2rem}dl,ol,ul{margin-top:0;margin-bottom:1rem}ol ol,ol ul,ul ol,ul ul{margin-bottom:0}dt{font-weight:700}dd{margin-bottom:.5rem;margin-left:0}blockquote{margin:0 0 1rem}b,strong{font-weight:bolder}small{font-size:.875em}mark{padding:.2em;background-color:#fcf8e3}sub,sup{position:relative;font-size:.75em;line-height:0;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}a{color:#0d6efd;text-decoration:underline}a:hover{color:#0a58ca}a:not([href]):not([class]),a:not([href]):not([class]):hover{color:inherit;text-decoration:none}code,kbd,pre,samp{font-family:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:1em;direction:ltr;unicode-bidi:bidi-override}pre{display:block;margin-top:0;margin-bottom:1rem;overflow:auto;font-size:.875em}pre code{font-size:inherit;color:inherit;word-break:normal}code{font-size:.875em;color:#d63384;word-wrap:break-word}a>code{color:inherit}kbd{padding:.2rem .4rem;font-size:.875em;color:#fff;background-color:#212529;border-radius:.2rem}kbd kbd{padding:0;font-size:1em;font-weight:700}figure{margin:0 0 1rem}img,svg{vertical-align:middle}table{caption-side:bottom;border-collapse:collapse}caption{padding-top:.5rem;padding-bottom:.5rem;color:#6c757d;text-align:left}th{text-align:inherit;text-align:-webkit-match-parent}tbody,td,tfoot,th,thead,tr{border-color:inherit;border-style:solid;border-width:0}label{display:inline-block}button{border-radius:0}button:focus:not(:focus-visible){outline:0}button,input,optgroup,select,textarea{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}button,select{text-transform:none}[role=button]{cursor:pointer}select{word-wrap:normal}select:disabled{opacity:1}[list]::-webkit-calendar-picker-indicator{display:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button}[type=button]:not(:disabled),[type=reset]:not(:disabled),[type=submit]:not(:disabled),button:not(:disabled){cursor:pointer}::-moz-focus-inner{padding:0;border-style:none}textarea{resize:vertical}fieldset{min-width:0;padding:0;margin:0;border:0}legend{float:left;width:100%;padding:0;margin-bottom:.5rem;font-size:calc(1.275rem + .3vw);line-height:inherit}@media (min-width:1200px){legend{font-size:1.5rem}}legend+*{clear:left}::-webkit-datetime-edit-day-field,::-webkit-datetime-edit-fields-wrapper,::-webkit-datetime-edit-hour-field,::-webkit-datetime-edit-minute,::-webkit-datetime-edit-month-field,::-webkit-datetime-edit-text,::-webkit-datetime-edit-year-field{padding:0}::-webkit-inner-spin-button{height:auto}[type=search]{outline-offset:-2px;-webkit-appearance:textfield}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-color-swatch-wrapper{padding:0}::file-selector-button{font:inherit}::-webkit-file-upload-button{font:inherit;-webkit-appearance:button}output{display:inline-block}iframe{border:0}summary{display:list-item;cursor:pointer}progress{vertical-align:baseline}[hidden]{display:none!important}</style>
+    <style>/*! syntax-highlighting.css */pre{line-height:125%;}span.linenos{color:inherit; background-color:transparent; padding-left:5px; padding-right:20px;}.pdoc-code .hll{background-color:#ffffcc}.pdoc-code{background:#f8f8f8;}.pdoc-code .c{color:#3D7B7B; font-style:italic}.pdoc-code .err{border:1px solid #FF0000}.pdoc-code .k{color:#008000; font-weight:bold}.pdoc-code .o{color:#666666}.pdoc-code .ch{color:#3D7B7B; font-style:italic}.pdoc-code .cm{color:#3D7B7B; font-style:italic}.pdoc-code .cp{color:#9C6500}.pdoc-code .cpf{color:#3D7B7B; font-style:italic}.pdoc-code .c1{color:#3D7B7B; font-style:italic}.pdoc-code .cs{color:#3D7B7B; font-style:italic}.pdoc-code .gd{color:#A00000}.pdoc-code .ge{font-style:italic}.pdoc-code .gr{color:#E40000}.pdoc-code .gh{color:#000080; font-weight:bold}.pdoc-code .gi{color:#008400}.pdoc-code .go{color:#717171}.pdoc-code .gp{color:#000080; font-weight:bold}.pdoc-code .gs{font-weight:bold}.pdoc-code .gu{color:#800080; font-weight:bold}.pdoc-code .gt{color:#0044DD}.pdoc-code .kc{color:#008000; font-weight:bold}.pdoc-code .kd{color:#008000; font-weight:bold}.pdoc-code .kn{color:#008000; font-weight:bold}.pdoc-code .kp{color:#008000}.pdoc-code .kr{color:#008000; font-weight:bold}.pdoc-code .kt{color:#B00040}.pdoc-code .m{color:#666666}.pdoc-code .s{color:#BA2121}.pdoc-code .na{color:#687822}.pdoc-code .nb{color:#008000}.pdoc-code .nc{color:#0000FF; font-weight:bold}.pdoc-code .no{color:#880000}.pdoc-code .nd{color:#AA22FF}.pdoc-code .ni{color:#717171; font-weight:bold}.pdoc-code .ne{color:#CB3F38; font-weight:bold}.pdoc-code .nf{color:#0000FF}.pdoc-code .nl{color:#767600}.pdoc-code .nn{color:#0000FF; font-weight:bold}.pdoc-code .nt{color:#008000; font-weight:bold}.pdoc-code .nv{color:#19177C}.pdoc-code .ow{color:#AA22FF; font-weight:bold}.pdoc-code .w{color:#bbbbbb}.pdoc-code .mb{color:#666666}.pdoc-code .mf{color:#666666}.pdoc-code .mh{color:#666666}.pdoc-code .mi{color:#666666}.pdoc-code .mo{color:#666666}.pdoc-code .sa{color:#BA2121}.pdoc-code .sb{color:#BA2121}.pdoc-code .sc{color:#BA2121}.pdoc-code .dl{color:#BA2121}.pdoc-code .sd{color:#BA2121; font-style:italic}.pdoc-code .s2{color:#BA2121}.pdoc-code .se{color:#AA5D1F; font-weight:bold}.pdoc-code .sh{color:#BA2121}.pdoc-code .si{color:#A45A77; font-weight:bold}.pdoc-code .sx{color:#008000}.pdoc-code .sr{color:#A45A77}.pdoc-code .s1{color:#BA2121}.pdoc-code .ss{color:#19177C}.pdoc-code .bp{color:#008000}.pdoc-code .fm{color:#0000FF}.pdoc-code .vc{color:#19177C}.pdoc-code .vg{color:#19177C}.pdoc-code .vi{color:#19177C}.pdoc-code .vm{color:#19177C}.pdoc-code .il{color:#666666}</style>
+    <style>/*! theme.css */:root{--pdoc-background:#fff;}.pdoc{--text:#212529;--muted:#6c757d;--link:#3660a5;--link-hover:#1659c5;--code:#f8f8f8;--active:#fff598;--accent:#eee;--accent2:#c1c1c1;--nav-hover:rgba(255, 255, 255, 0.5);--name:#0066BB;--def:#008800;--annotation:#007020;}</style>
+    <style>/*! layout.css */html, body{width:100%;height:100%;}html, main{scroll-behavior:smooth;}body{background-color:var(--pdoc-background);}@media (max-width:769px){#navtoggle{cursor:pointer;position:absolute;width:50px;height:40px;top:1rem;right:1rem;border-color:var(--text);color:var(--text);display:flex;opacity:0.8;z-index:999;}#navtoggle:hover{opacity:1;}#togglestate + div{display:none;}#togglestate:checked + div{display:inherit;}main, header{padding:2rem 3vw;}header + main{margin-top:-3rem;}.git-button{display:none !important;}nav input[type="search"]{max-width:77%;}nav input[type="search"]:first-child{margin-top:-6px;}nav input[type="search"]:valid ~ *{display:none !important;}}@media (min-width:770px){:root{--sidebar-width:clamp(12.5rem, 28vw, 22rem);}nav{position:fixed;overflow:auto;height:100vh;width:var(--sidebar-width);}main, header{padding:3rem 2rem 3rem calc(var(--sidebar-width) + 3rem);width:calc(54rem + var(--sidebar-width));max-width:100%;}header + main{margin-top:-4rem;}#navtoggle{display:none;}}#togglestate{position:absolute;height:0;opacity:0;}nav.pdoc{--pad:clamp(0.5rem, 2vw, 1.75rem);--indent:1.5rem;background-color:var(--accent);border-right:1px solid var(--accent2);box-shadow:0 0 20px rgba(50, 50, 50, .2) inset;padding:0 0 0 var(--pad);overflow-wrap:anywhere;scrollbar-width:thin; scrollbar-color:var(--accent2) transparent; z-index:1}nav.pdoc::-webkit-scrollbar{width:.4rem; }nav.pdoc::-webkit-scrollbar-thumb{background-color:var(--accent2); }nav.pdoc > div{padding:var(--pad) 0;}nav.pdoc .module-list-button{display:inline-flex;align-items:center;color:var(--text);border-color:var(--muted);margin-bottom:1rem;}nav.pdoc .module-list-button:hover{border-color:var(--text);}nav.pdoc input[type=search]{display:block;outline-offset:0;width:calc(100% - var(--pad));}nav.pdoc .logo{max-width:calc(100% - var(--pad));max-height:35vh;display:block;margin:0 auto 1rem;transform:translate(calc(-.5 * var(--pad)), 0);}nav.pdoc ul{list-style:none;padding-left:0;}nav.pdoc > div > ul{margin-left:calc(0px - var(--pad));}nav.pdoc li a{padding:.2rem 0 .2rem calc(var(--pad) + var(--indent));}nav.pdoc > div > ul > li > a{padding-left:var(--pad);}nav.pdoc li{transition:all 100ms;}nav.pdoc li:hover{background-color:var(--nav-hover);}nav.pdoc a, nav.pdoc a:hover{color:var(--text);}nav.pdoc a{display:block;}nav.pdoc > h2:first-of-type{margin-top:1.5rem;}nav.pdoc .class:before{content:"class ";color:var(--muted);}nav.pdoc .function:after{content:"()";color:var(--muted);}nav.pdoc footer:before{content:"";display:block;width:calc(100% - var(--pad));border-top:solid var(--accent2) 1px;margin-top:1.5rem;padding-top:.5rem;}nav.pdoc footer{font-size:small;}</style>
+    <style>/*! content.css */.pdoc{color:var(--text);box-sizing:border-box;line-height:1.5;background:none;}.pdoc .pdoc-button{cursor:pointer;display:inline-block;border:solid black 1px;border-radius:2px;font-size:.75rem;padding:calc(0.5em - 1px) 1em;transition:100ms all;}.pdoc .alert{padding:1rem 1rem 1rem calc(1.5rem + 24px);border:1px solid transparent;border-radius:.25rem;background-repeat:no-repeat;background-position:.75rem center;margin-bottom:1rem;}.pdoc .alert > em{display:none;}.pdoc .alert > *:last-child{margin-bottom:0;}.pdoc .alert.note{color:#084298;background-color:#cfe2ff;border-color:#b6d4fe;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23084298%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M8%2016A8%208%200%201%200%208%200a8%208%200%200%200%200%2016zm.93-9.412-1%204.705c-.07.34.029.533.304.533.194%200%20.487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703%200-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381%202.29-.287zM8%205.5a1%201%200%201%201%200-2%201%201%200%200%201%200%202z%22/%3E%3C/svg%3E");}.pdoc .alert.tip{color:#0a3622;background-color:#d1e7dd;border-color:#a3cfbb;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%230a3622%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M2%206a6%206%200%201%201%2010.174%204.31c-.203.196-.359.4-.453.619l-.762%201.769A.5.5%200%200%201%2010.5%2013a.5.5%200%200%201%200%201%20.5.5%200%200%201%200%201l-.224.447a1%201%200%200%201-.894.553H6.618a1%201%200%200%201-.894-.553L5.5%2015a.5.5%200%200%201%200-1%20.5.5%200%200%201%200-1%20.5.5%200%200%201-.46-.302l-.761-1.77a2%202%200%200%200-.453-.618A5.98%205.98%200%200%201%202%206m6-5a5%205%200%200%200-3.479%208.592c.263.254.514.564.676.941L5.83%2012h4.342l.632-1.467c.162-.377.413-.687.676-.941A5%205%200%200%200%208%201%22/%3E%3C/svg%3E");}.pdoc .alert.important{color:#055160;background-color:#cff4fc;border-color:#9eeaf9;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23055160%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M2%200a2%202%200%200%200-2%202v12a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V2a2%202%200%200%200-2-2zm6%204c.535%200%20.954.462.9.995l-.35%203.507a.552.552%200%200%201-1.1%200L7.1%204.995A.905.905%200%200%201%208%204m.002%206a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E");}.pdoc .alert.warning{color:#664d03;background-color:#fff3cd;border-color:#ffecb5;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23664d03%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M8.982%201.566a1.13%201.13%200%200%200-1.96%200L.165%2013.233c-.457.778.091%201.767.98%201.767h13.713c.889%200%201.438-.99.98-1.767L8.982%201.566zM8%205c.535%200%20.954.462.9.995l-.35%203.507a.552.552%200%200%201-1.1%200L7.1%205.995A.905.905%200%200%201%208%205zm.002%206a1%201%200%201%201%200%202%201%201%200%200%201%200-2z%22/%3E%3C/svg%3E");}.pdoc .alert.caution{color:#842029;background-color:#f8d7da;border-color:#f5c2c7;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23842029%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M11.46.146A.5.5%200%200%200%2011.107%200H4.893a.5.5%200%200%200-.353.146L.146%204.54A.5.5%200%200%200%200%204.893v6.214a.5.5%200%200%200%20.146.353l4.394%204.394a.5.5%200%200%200%20.353.146h6.214a.5.5%200%200%200%20.353-.146l4.394-4.394a.5.5%200%200%200%20.146-.353V4.893a.5.5%200%200%200-.146-.353zM8%204c.535%200%20.954.462.9.995l-.35%203.507a.552.552%200%200%201-1.1%200L7.1%204.995A.905.905%200%200%201%208%204m.002%206a1%201%200%201%201%200%202%201%201%200%200%201%200-2%22/%3E%3C/svg%3E");}.pdoc .alert.danger{color:#842029;background-color:#f8d7da;border-color:#f5c2c7;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23842029%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M5.52.359A.5.5%200%200%201%206%200h4a.5.5%200%200%201%20.474.658L8.694%206H12.5a.5.5%200%200%201%20.395.807l-7%209a.5.5%200%200%201-.873-.454L6.823%209.5H3.5a.5.5%200%200%201-.48-.641l2.5-8.5z%22/%3E%3C/svg%3E");}.pdoc .visually-hidden{position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;overflow:hidden !important;clip:rect(0, 0, 0, 0) !important;white-space:nowrap !important;border:0 !important;}.pdoc h1, .pdoc h2, .pdoc h3{font-weight:300;margin:.3em 0;padding:.2em 0;}.pdoc > section:not(.module-info) h1{font-size:1.5rem;font-weight:500;}.pdoc > section:not(.module-info) h2{font-size:1.4rem;font-weight:500;}.pdoc > section:not(.module-info) h3{font-size:1.3rem;font-weight:500;}.pdoc > section:not(.module-info) h4{font-size:1.2rem;}.pdoc > section:not(.module-info) h5{font-size:1.1rem;}.pdoc a{text-decoration:none;color:var(--link);}.pdoc a:hover{color:var(--link-hover);}.pdoc blockquote{margin-left:2rem;}.pdoc pre{border-top:1px solid var(--accent2);border-bottom:1px solid var(--accent2);margin-top:0;margin-bottom:1em;padding:.5rem 0 .5rem .5rem;overflow-x:auto;background-color:var(--code);}.pdoc code{color:var(--text);padding:.2em .4em;margin:0;font-size:85%;background-color:var(--accent);border-radius:6px;}.pdoc a > code{color:inherit;}.pdoc pre > code{display:inline-block;font-size:inherit;background:none;border:none;padding:0;}.pdoc > section:not(.module-info){margin-bottom:1.5rem;}.pdoc .modulename{margin-top:0;font-weight:bold;}.pdoc .modulename a{color:var(--link);transition:100ms all;}.pdoc .git-button{float:right;border:solid var(--link) 1px;}.pdoc .git-button:hover{background-color:var(--link);color:var(--pdoc-background);}.view-source-toggle-state,.view-source-toggle-state ~ .pdoc-code{display:none;}.view-source-toggle-state:checked ~ .pdoc-code{display:block;}.view-source-button{display:inline-block;float:right;font-size:.75rem;line-height:1.5rem;color:var(--muted);padding:0 .4rem 0 1.3rem;cursor:pointer;text-indent:-2px;}.view-source-button > span{visibility:hidden;}.module-info .view-source-button{float:none;display:flex;justify-content:flex-end;margin:-1.2rem .4rem -.2rem 0;}.view-source-button::before{position:absolute;content:"View Source";display:list-item;list-style-type:disclosure-closed;}.view-source-toggle-state:checked ~ .attr .view-source-button::before,.view-source-toggle-state:checked ~ .view-source-button::before{list-style-type:disclosure-open;}.pdoc .docstring{margin-bottom:1.5rem;}.pdoc section:not(.module-info) .docstring{margin-left:clamp(0rem, 5vw - 2rem, 1rem);}.pdoc .docstring .pdoc-code{margin-left:1em;margin-right:1em;}.pdoc h1:target,.pdoc h2:target,.pdoc h3:target,.pdoc h4:target,.pdoc h5:target,.pdoc h6:target,.pdoc .pdoc-code > pre > span:target{background-color:var(--active);box-shadow:-1rem 0 0 0 var(--active);}.pdoc .pdoc-code > pre > span:target{display:block;}.pdoc div:target > .attr,.pdoc section:target > .attr,.pdoc dd:target > a{background-color:var(--active);}.pdoc *{scroll-margin:2rem;}.pdoc .pdoc-code .linenos{user-select:none;}.pdoc .attr:hover{filter:contrast(0.95);}.pdoc section, .pdoc .classattr{position:relative;}.pdoc .headerlink{--width:clamp(1rem, 3vw, 2rem);position:absolute;top:0;left:calc(0rem - var(--width));transition:all 100ms ease-in-out;opacity:0;}.pdoc .headerlink::before{content:"#";display:block;text-align:center;width:var(--width);height:2.3rem;line-height:2.3rem;font-size:1.5rem;}.pdoc .attr:hover ~ .headerlink,.pdoc *:target > .headerlink,.pdoc .headerlink:hover{opacity:1;}.pdoc .attr{display:block;margin:.5rem 0 .5rem;padding:.4rem .4rem .4rem 1rem;background-color:var(--accent);overflow-x:auto;}.pdoc .classattr{margin-left:2rem;}.pdoc .decorator-deprecated{color:#842029;}.pdoc .decorator-deprecated ~ span{filter:grayscale(1) opacity(0.8);}.pdoc .name{color:var(--name);font-weight:bold;}.pdoc .def{color:var(--def);font-weight:bold;}.pdoc .signature{background-color:transparent;}.pdoc .param, .pdoc .return-annotation{white-space:pre;}.pdoc .signature.multiline .param{display:block;}.pdoc .signature.condensed .param{display:inline-block;}.pdoc .annotation{color:var(--annotation);}.pdoc .view-value-toggle-state,.pdoc .view-value-toggle-state ~ .default_value{display:none;}.pdoc .view-value-toggle-state:checked ~ .default_value{display:inherit;}.pdoc .view-value-button{font-size:.5rem;vertical-align:middle;border-style:dashed;margin-top:-0.1rem;}.pdoc .view-value-button:hover{background:white;}.pdoc .view-value-button::before{content:"show";text-align:center;width:2.2em;display:inline-block;}.pdoc .view-value-toggle-state:checked ~ .view-value-button::before{content:"hide";}.pdoc .inherited{margin-left:2rem;}.pdoc .inherited dt{font-weight:700;}.pdoc .inherited dt, .pdoc .inherited dd{display:inline;margin-left:0;margin-bottom:.5rem;}.pdoc .inherited dd:not(:last-child):after{content:", ";}.pdoc .inherited .class:before{content:"class ";}.pdoc .inherited .function a:after{content:"()";}.pdoc .search-result .docstring{overflow:auto;max-height:25vh;}.pdoc .search-result.focused > .attr{background-color:var(--active);}.pdoc .attribution{margin-top:2rem;display:block;opacity:0.5;transition:all 200ms;filter:grayscale(100%);}.pdoc .attribution:hover{opacity:1;filter:grayscale(0%);}.pdoc .attribution img{margin-left:5px;height:35px;vertical-align:middle;width:70px;transition:all 200ms;}.pdoc table{display:block;width:max-content;max-width:100%;overflow:auto;margin-bottom:1rem;}.pdoc table th{font-weight:600;}.pdoc table th, .pdoc table td{padding:6px 13px;border:1px solid var(--accent2);}</style>
+    <style>/*! custom.css */</style></head>
+<body>
+    <nav class="pdoc">
+        <label id="navtoggle" for="togglestate" class="pdoc-button"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke-linecap='round' stroke="currentColor" stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/></svg></label>
+        <input id="togglestate" type="checkbox" aria-hidden="true" tabindex="-1">
+        <div>            <a class="pdoc-button module-list-button" href="../personal_agent.html">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-in-left" viewBox="0 0 16 16">
+  <path fill-rule="evenodd" d="M10 3.5a.5.5 0 0 0-.5-.5h-8a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 1 1 0v2A1.5 1.5 0 0 1 9.5 14h-8A1.5 1.5 0 0 1 0 12.5v-9A1.5 1.5 0 0 1 1.5 2h8A1.5 1.5 0 0 1 11 3.5v2a.5.5 0 0 1-1 0v-2z"/>
+  <path fill-rule="evenodd" d="M4.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5H14.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3z"/>
+</svg>                &nbsp;src.personal_agent</a>
+
+
+            <input type="search" placeholder="Search..." role="searchbox" aria-label="search"
+                   pattern=".+" required>
+
+
+
+            <h2>API Documentation</h2>
+                <ul class="memberlist">
+            <li>
+                    <a class="function" href="#create_memory_agent">create_memory_agent</a>
+            </li>
+            <li>
+                    <a class="function" href="#create_web_research_agent">create_web_research_agent</a>
+            </li>
+            <li>
+                    <a class="function" href="#create_finance_agent">create_finance_agent</a>
+            </li>
+            <li>
+                    <a class="function" href="#create_calculator_agent">create_calculator_agent</a>
+            </li>
+            <li>
+                    <a class="function" href="#create_file_operations_agent">create_file_operations_agent</a>
+            </li>
+            <li>
+                    <a class="function" href="#create_personal_agent_team">create_personal_agent_team</a>
+            </li>
+    </ul>
+
+
+
+        <a class="attribution" title="pdoc: Python API documentation generator" href="https://pdoc.dev" target="_blank">
+            built with <span class="visually-hidden">pdoc</span><img
+                alt="pdoc logo"
+                src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20role%3D%22img%22%20aria-label%3D%22pdoc%20logo%22%20width%3D%22300%22%20height%3D%22150%22%20viewBox%3D%22-1%200%2060%2030%22%3E%3Ctitle%3Epdoc%3C/title%3E%3Cpath%20d%3D%22M29.621%2021.293c-.011-.273-.214-.475-.511-.481a.5.5%200%200%200-.489.503l-.044%201.393c-.097.551-.695%201.215-1.566%201.704-.577.428-1.306.486-2.193.182-1.426-.617-2.467-1.654-3.304-2.487l-.173-.172a3.43%203.43%200%200%200-.365-.306.49.49%200%200%200-.286-.196c-1.718-1.06-4.931-1.47-7.353.191l-.219.15c-1.707%201.187-3.413%202.131-4.328%201.03-.02-.027-.49-.685-.141-1.763.233-.721.546-2.408.772-4.076.042-.09.067-.187.046-.288.166-1.347.277-2.625.241-3.351%201.378-1.008%202.271-2.586%202.271-4.362%200-.976-.272-1.935-.788-2.774-.057-.094-.122-.18-.184-.268.033-.167.052-.339.052-.516%200-1.477-1.202-2.679-2.679-2.679-.791%200-1.496.352-1.987.9a6.3%206.3%200%200%200-1.001.029c-.492-.564-1.207-.929-2.012-.929-1.477%200-2.679%201.202-2.679%202.679A2.65%202.65%200%200%200%20.97%206.554c-.383.747-.595%201.572-.595%202.41%200%202.311%201.507%204.29%203.635%205.107-.037.699-.147%202.27-.423%203.294l-.137.461c-.622%202.042-2.515%208.257%201.727%2010.643%201.614.908%203.06%201.248%204.317%201.248%202.665%200%204.492-1.524%205.322-2.401%201.476-1.559%202.886-1.854%206.491.82%201.877%201.393%203.514%201.753%204.861%201.068%202.223-1.713%202.811-3.867%203.399-6.374.077-.846.056-1.469.054-1.537zm-4.835%204.313c-.054.305-.156.586-.242.629-.034-.007-.131-.022-.307-.157-.145-.111-.314-.478-.456-.908.221.121.432.25.675.355.115.039.219.051.33.081zm-2.251-1.238c-.05.33-.158.648-.252.694-.022.001-.125-.018-.307-.157-.217-.166-.488-.906-.639-1.573.358.344.754.693%201.198%201.036zm-3.887-2.337c-.006-.116-.018-.231-.041-.342.635.145%201.189.368%201.599.625.097.231.166.481.174.642-.03.049-.055.101-.067.158-.046.013-.128.026-.298.004-.278-.037-.901-.57-1.367-1.087zm-1.127-.497c.116.306.176.625.12.71-.019.014-.117.045-.345.016-.206-.027-.604-.332-.986-.695.41-.051.816-.056%201.211-.031zm-4.535%201.535c.209.22.379.47.358.598-.006.041-.088.138-.351.234-.144.055-.539-.063-.979-.259a11.66%2011.66%200%200%200%20.972-.573zm.983-.664c.359-.237.738-.418%201.126-.554.25.237.479.548.457.694-.006.042-.087.138-.351.235-.174.064-.694-.105-1.232-.375zm-3.381%201.794c-.022.145-.061.29-.149.401-.133.166-.358.248-.69.251h-.002c-.133%200-.306-.26-.45-.621.417.091.854.07%201.291-.031zm-2.066-8.077a4.78%204.78%200%200%201-.775-.584c.172-.115.505-.254.88-.378l-.105.962zm-.331%202.302a10.32%2010.32%200%200%201-.828-.502c.202-.143.576-.328.984-.49l-.156.992zm-.45%202.157l-.701-.403c.214-.115.536-.249.891-.376a11.57%2011.57%200%200%201-.19.779zm-.181%201.716c.064.398.194.702.298.893-.194-.051-.435-.162-.736-.398.061-.119.224-.3.438-.495zM8.87%204.141c0%20.152-.123.276-.276.276s-.275-.124-.275-.276.123-.276.276-.276.275.124.275.276zm-.735-.389a1.15%201.15%200%200%200-.314.783%201.16%201.16%200%200%200%201.162%201.162c.457%200%20.842-.27%201.032-.653.026.117.042.238.042.362a1.68%201.68%200%200%201-1.679%201.679%201.68%201.68%200%200%201-1.679-1.679c0-.843.626-1.535%201.436-1.654zM5.059%205.406A1.68%201.68%200%200%201%203.38%207.085a1.68%201.68%200%200%201-1.679-1.679c0-.037.009-.072.011-.109.21.3.541.508.935.508a1.16%201.16%200%200%200%201.162-1.162%201.14%201.14%200%200%200-.474-.912c.015%200%20.03-.005.045-.005.926.001%201.679.754%201.679%201.68zM3.198%204.141c0%20.152-.123.276-.276.276s-.275-.124-.275-.276.123-.276.276-.276.275.124.275.276zM1.375%208.964c0-.52.103-1.035.288-1.52.466.394%201.06.64%201.717.64%201.144%200%202.116-.725%202.499-1.738.383%201.012%201.355%201.738%202.499%201.738.867%200%201.631-.421%202.121-1.062.307.605.478%201.267.478%201.942%200%202.486-2.153%204.51-4.801%204.51s-4.801-2.023-4.801-4.51zm24.342%2019.349c-.985.498-2.267.168-3.813-.979-3.073-2.281-5.453-3.199-7.813-.705-1.315%201.391-4.163%203.365-8.423.97-3.174-1.786-2.239-6.266-1.261-9.479l.146-.492c.276-1.02.395-2.457.444-3.268a6.11%206.11%200%200%200%201.18.115%206.01%206.01%200%200%200%202.536-.562l-.006.175c-.802.215-1.848.612-2.021%201.25-.079.295.021.601.274.837.219.203.415.364.598.501-.667.304-1.243.698-1.311%201.179-.02.144-.022.507.393.787.213.144.395.26.564.365-1.285.521-1.361.96-1.381%201.126-.018.142-.011.496.427.746l.854.489c-.473.389-.971.914-.999%201.429-.018.278.095.532.316.713.675.556%201.231.721%201.653.721.059%200%20.104-.014.158-.02.207.707.641%201.64%201.513%201.64h.013c.8-.008%201.236-.345%201.462-.626.173-.216.268-.457.325-.692.424.195.93.374%201.372.374.151%200%20.294-.021.423-.068.732-.27.944-.704.993-1.021.009-.061.003-.119.002-.179.266.086.538.147.789.147.15%200%20.294-.021.423-.069.542-.2.797-.489.914-.754.237.147.478.258.704.288.106.014.205.021.296.021.356%200%20.595-.101.767-.229.438.435%201.094.992%201.656%201.067.106.014.205.021.296.021a1.56%201.56%200%200%200%20.323-.035c.17.575.453%201.289.866%201.605.358.273.665.362.914.362a.99.99%200%200%200%20.421-.093%201.03%201.03%200%200%200%20.245-.164c.168.428.39.846.68%201.068.358.273.665.362.913.362a.99.99%200%200%200%20.421-.093c.317-.148.512-.448.639-.762.251.157.495.257.726.257.127%200%20.25-.024.37-.071.427-.17.706-.617.841-1.314.022-.015.047-.022.068-.038.067-.051.133-.104.196-.159-.443%201.486-1.107%202.761-2.086%203.257zM8.66%209.925a.5.5%200%201%200-1%200c0%20.653-.818%201.205-1.787%201.205s-1.787-.552-1.787-1.205a.5.5%200%201%200-1%200c0%201.216%201.25%202.205%202.787%202.205s2.787-.989%202.787-2.205zm4.4%2015.965l-.208.097c-2.661%201.258-4.708%201.436-6.086.527-1.542-1.017-1.88-3.19-1.844-4.198a.4.4%200%200%200-.385-.414c-.242-.029-.406.164-.414.385-.046%201.249.367%203.686%202.202%204.896.708.467%201.547.7%202.51.7%201.248%200%202.706-.392%204.362-1.174l.185-.086a.4.4%200%200%200%20.205-.527c-.089-.204-.326-.291-.527-.206zM9.547%202.292c.093.077.205.114.317.114a.5.5%200%200%200%20.318-.886L8.817.397a.5.5%200%200%200-.703.068.5.5%200%200%200%20.069.703l1.364%201.124zm-7.661-.065c.086%200%20.173-.022.253-.068l1.523-.893a.5.5%200%200%200-.506-.863l-1.523.892a.5.5%200%200%200-.179.685c.094.158.261.247.432.247z%22%20transform%3D%22matrix%28-1%200%200%201%2058%200%29%22%20fill%3D%22%233bb300%22/%3E%3Cpath%20d%3D%22M.3%2021.86V10.18q0-.46.02-.68.04-.22.18-.5.28-.54%201.34-.54%201.06%200%201.42.28.38.26.44.78.76-1.04%202.38-1.04%201.64%200%203.1%201.54%201.46%201.54%201.46%203.58%200%202.04-1.46%203.58-1.44%201.54-3.08%201.54-1.64%200-2.38-.92v4.04q0%20.46-.04.68-.02.22-.18.5-.14.3-.5.42-.36.12-.98.12-.62%200-1-.12-.36-.12-.52-.4-.14-.28-.18-.5-.02-.22-.02-.68zm3.96-9.42q-.46.54-.46%201.18%200%20.64.46%201.18.48.52%201.2.52.74%200%201.24-.52.52-.52.52-1.18%200-.66-.48-1.18-.48-.54-1.26-.54-.76%200-1.22.54zm14.741-8.36q.16-.3.54-.42.38-.12%201-.12.64%200%201.02.12.38.12.52.42.16.3.18.54.04.22.04.68v11.94q0%20.46-.04.7-.02.22-.18.5-.3.54-1.7.54-1.38%200-1.54-.98-.84.96-2.34.96-1.8%200-3.28-1.56-1.48-1.58-1.48-3.66%200-2.1%201.48-3.68%201.5-1.58%203.28-1.58%201.48%200%202.3%201v-4.2q0-.46.02-.68.04-.24.18-.52zm-3.24%2010.86q.52.54%201.26.54.74%200%201.22-.54.5-.54.5-1.18%200-.66-.48-1.22-.46-.56-1.26-.56-.8%200-1.28.56-.48.54-.48%201.2%200%20.66.52%201.2zm7.833-1.2q0-2.4%201.68-3.96%201.68-1.56%203.84-1.56%202.16%200%203.82%201.56%201.66%201.54%201.66%203.94%200%201.66-.86%202.96-.86%201.28-2.1%201.9-1.22.6-2.54.6-1.32%200-2.56-.64-1.24-.66-2.1-1.92-.84-1.28-.84-2.88zm4.18%201.44q.64.48%201.3.48.66%200%201.32-.5.66-.5.66-1.48%200-.98-.62-1.46-.62-.48-1.34-.48-.72%200-1.34.5-.62.5-.62%201.48%200%20.96.64%201.46zm11.412-1.44q0%20.84.56%201.32.56.46%201.18.46.64%200%201.18-.36.56-.38.9-.38.6%200%201.46%201.06.46.58.46%201.04%200%20.76-1.1%201.42-1.14.8-2.8.8-1.86%200-3.58-1.34-.82-.64-1.34-1.7-.52-1.08-.52-2.36%200-1.3.52-2.34.52-1.06%201.34-1.7%201.66-1.32%203.54-1.32.76%200%201.48.22.72.2%201.06.4l.32.2q.36.24.56.38.52.4.52.92%200%20.5-.42%201.14-.72%201.1-1.38%201.1-.38%200-1.08-.44-.36-.34-1.04-.34-.66%200-1.24.48-.58.48-.58%201.34z%22%20fill%3D%22green%22/%3E%3C/svg%3E"/>
+        </a>
+</div>
+    </nav>
+    <main class="pdoc">
+            <section class="module-info">
+                    <h1 class="modulename">
+src<wbr>.<a href="./../personal_agent.html">personal_agent</a><wbr>.team    </h1>
+
+                        <div class="docstring"><p>Personal Agent Team Module</p>
+
+<p>This module provides specialized agents that work together as a team,
+following the reasoning_multi_purpose_team.py pattern from agno examples.</p>
+</div>
+
+                        <input id="mod-team-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+
+                        <label class="view-source-button" for="mod-team-view-source"><span>View Source</span></label>
+
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos"> 1</span></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-2"><a href="#L-2"><span class="linenos"> 2</span></a><span class="sd">Personal Agent Team Module</span>
+</span><span id="L-3"><a href="#L-3"><span class="linenos"> 3</span></a>
+</span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a><span class="sd">This module provides specialized agents that work together as a team,</span>
+</span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a><span class="sd">following the reasoning_multi_purpose_team.py pattern from agno examples.</span>
+</span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a>
+</span><span id="L-8"><a href="#L-8"><span class="linenos"> 8</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">.specialized_agents</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="L-9"><a href="#L-9"><span class="linenos"> 9</span></a>    <span class="n">create_memory_agent</span><span class="p">,</span>
+</span><span id="L-10"><a href="#L-10"><span class="linenos">10</span></a>    <span class="n">create_web_research_agent</span><span class="p">,</span>
+</span><span id="L-11"><a href="#L-11"><span class="linenos">11</span></a>    <span class="n">create_finance_agent</span><span class="p">,</span>
+</span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a>    <span class="n">create_calculator_agent</span><span class="p">,</span>
+</span><span id="L-13"><a href="#L-13"><span class="linenos">13</span></a>    <span class="n">create_file_operations_agent</span><span class="p">,</span>
+</span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a><span class="p">)</span>
+</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">.personal_agent_team</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_personal_agent_team</span>
+</span><span id="L-16"><a href="#L-16"><span class="linenos">16</span></a>
+</span><span id="L-17"><a href="#L-17"><span class="linenos">17</span></a><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a>    <span class="s2">&quot;create_memory_agent&quot;</span><span class="p">,</span>
+</span><span id="L-19"><a href="#L-19"><span class="linenos">19</span></a>    <span class="s2">&quot;create_web_research_agent&quot;</span><span class="p">,</span> 
+</span><span id="L-20"><a href="#L-20"><span class="linenos">20</span></a>    <span class="s2">&quot;create_finance_agent&quot;</span><span class="p">,</span>
+</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a>    <span class="s2">&quot;create_calculator_agent&quot;</span><span class="p">,</span>
+</span><span id="L-22"><a href="#L-22"><span class="linenos">22</span></a>    <span class="s2">&quot;create_file_operations_agent&quot;</span><span class="p">,</span>
+</span><span id="L-23"><a href="#L-23"><span class="linenos">23</span></a>    <span class="s2">&quot;create_personal_agent_team&quot;</span><span class="p">,</span>
+</span><span id="L-24"><a href="#L-24"><span class="linenos">24</span></a><span class="p">]</span>
+</span></pre></div>
+
+
+            </section>
+                <section id="create_memory_agent">
+                            <input id="create_memory_agent-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">create_memory_agent</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;ollama&#39;</span>,</span><span class="param">	<span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;qwen3:8b&#39;</span>,</span><span class="param">	<span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http://localhost:11434&#39;</span>,</span><span class="param">	<span class="n">storage_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;./data/agno&#39;</span>,</span><span class="param">	<span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;default_user&#39;</span>,</span><span class="param">	<span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="n">agno</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">Agent</span>:</span></span>
+
+                <label class="view-source-button" for="create_memory_agent-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#create_memory_agent"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="create_memory_agent-486"><a href="#create_memory_agent-486"><span class="linenos">486</span></a><span class="k">def</span><span class="w"> </span><span class="nf">create_memory_agent</span><span class="p">(</span>
+</span><span id="create_memory_agent-487"><a href="#create_memory_agent-487"><span class="linenos">487</span></a>    <span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-488"><a href="#create_memory_agent-488"><span class="linenos">488</span></a>    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="create_memory_agent-489"><a href="#create_memory_agent-489"><span class="linenos">489</span></a>    <span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="create_memory_agent-490"><a href="#create_memory_agent-490"><span class="linenos">490</span></a>    <span class="n">storage_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;./data/agno&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-491"><a href="#create_memory_agent-491"><span class="linenos">491</span></a>    <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default_user&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-492"><a href="#create_memory_agent-492"><span class="linenos">492</span></a>    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="create_memory_agent-493"><a href="#create_memory_agent-493"><span class="linenos">493</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Agent</span><span class="p">:</span>
+</span><span id="create_memory_agent-494"><a href="#create_memory_agent-494"><span class="linenos">494</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a specialized memory agent following the exact pattern from AgnoPersonalAgent.</span>
+</span><span id="create_memory_agent-495"><a href="#create_memory_agent-495"><span class="linenos">495</span></a>
+</span><span id="create_memory_agent-496"><a href="#create_memory_agent-496"><span class="linenos">496</span></a><span class="sd">    This agent uses the same memory tool creation pattern as the main AgnoPersonalAgent,</span>
+</span><span id="create_memory_agent-497"><a href="#create_memory_agent-497"><span class="linenos">497</span></a><span class="sd">    ensuring consistency and leveraging the proven working approach.</span>
+</span><span id="create_memory_agent-498"><a href="#create_memory_agent-498"><span class="linenos">498</span></a>
+</span><span id="create_memory_agent-499"><a href="#create_memory_agent-499"><span class="linenos">499</span></a><span class="sd">    :param model_provider: LLM provider (&#39;ollama&#39; or &#39;openai&#39;)</span>
+</span><span id="create_memory_agent-500"><a href="#create_memory_agent-500"><span class="linenos">500</span></a><span class="sd">    :param model_name: Model name to use</span>
+</span><span id="create_memory_agent-501"><a href="#create_memory_agent-501"><span class="linenos">501</span></a><span class="sd">    :param ollama_base_url: Base URL for Ollama API</span>
+</span><span id="create_memory_agent-502"><a href="#create_memory_agent-502"><span class="linenos">502</span></a><span class="sd">    :param storage_dir: Directory for storage files</span>
+</span><span id="create_memory_agent-503"><a href="#create_memory_agent-503"><span class="linenos">503</span></a><span class="sd">    :param user_id: User identifier for memory operations</span>
+</span><span id="create_memory_agent-504"><a href="#create_memory_agent-504"><span class="linenos">504</span></a><span class="sd">    :param debug: Enable debug mode</span>
+</span><span id="create_memory_agent-505"><a href="#create_memory_agent-505"><span class="linenos">505</span></a><span class="sd">    :return: Configured memory agent following AgnoPersonalAgent pattern</span>
+</span><span id="create_memory_agent-506"><a href="#create_memory_agent-506"><span class="linenos">506</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="create_memory_agent-507"><a href="#create_memory_agent-507"><span class="linenos">507</span></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="create_memory_agent-508"><a href="#create_memory_agent-508"><span class="linenos">508</span></a>
+</span><span id="create_memory_agent-509"><a href="#create_memory_agent-509"><span class="linenos">509</span></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">_create_model</span><span class="p">(</span><span class="n">model_provider</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ollama_base_url</span><span class="p">)</span>
+</span><span id="create_memory_agent-510"><a href="#create_memory_agent-510"><span class="linenos">510</span></a>
+</span><span id="create_memory_agent-511"><a href="#create_memory_agent-511"><span class="linenos">511</span></a>    <span class="c1"># Initialize Agno native storage and memory following the working pattern</span>
+</span><span id="create_memory_agent-512"><a href="#create_memory_agent-512"><span class="linenos">512</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">..core.agno_storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_agno_storage</span>
+</span><span id="create_memory_agent-513"><a href="#create_memory_agent-513"><span class="linenos">513</span></a>
+</span><span id="create_memory_agent-514"><a href="#create_memory_agent-514"><span class="linenos">514</span></a>    <span class="n">agno_storage</span> <span class="o">=</span> <span class="n">create_agno_storage</span><span class="p">(</span><span class="n">storage_dir</span><span class="p">)</span>
+</span><span id="create_memory_agent-515"><a href="#create_memory_agent-515"><span class="linenos">515</span></a>    <span class="n">agno_memory</span> <span class="o">=</span> <span class="n">create_agno_memory</span><span class="p">(</span><span class="n">storage_dir</span><span class="p">,</span> <span class="n">debug_mode</span><span class="o">=</span><span class="n">debug</span><span class="p">)</span>
+</span><span id="create_memory_agent-516"><a href="#create_memory_agent-516"><span class="linenos">516</span></a>
+</span><span id="create_memory_agent-517"><a href="#create_memory_agent-517"><span class="linenos">517</span></a>    <span class="c1"># Get memory tools following the exact AgnoPersonalAgent pattern</span>
+</span><span id="create_memory_agent-518"><a href="#create_memory_agent-518"><span class="linenos">518</span></a>    <span class="n">memory_tool_functions</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">_get_memory_tools</span><span class="p">(</span><span class="n">agno_memory</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">storage_dir</span><span class="p">))</span>
+</span><span id="create_memory_agent-519"><a href="#create_memory_agent-519"><span class="linenos">519</span></a>
+</span><span id="create_memory_agent-520"><a href="#create_memory_agent-520"><span class="linenos">520</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+</span><span id="create_memory_agent-521"><a href="#create_memory_agent-521"><span class="linenos">521</span></a>        <span class="s2">&quot;Memory Agent: Created </span><span class="si">%d</span><span class="s2"> memory tools using AgnoPersonalAgent pattern&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-522"><a href="#create_memory_agent-522"><span class="linenos">522</span></a>        <span class="nb">len</span><span class="p">(</span><span class="n">memory_tool_functions</span><span class="p">),</span>
+</span><span id="create_memory_agent-523"><a href="#create_memory_agent-523"><span class="linenos">523</span></a>    <span class="p">)</span>
+</span><span id="create_memory_agent-524"><a href="#create_memory_agent-524"><span class="linenos">524</span></a>
+</span><span id="create_memory_agent-525"><a href="#create_memory_agent-525"><span class="linenos">525</span></a>    <span class="c1"># Create the agent following the exact AgnoPersonalAgent pattern</span>
+</span><span id="create_memory_agent-526"><a href="#create_memory_agent-526"><span class="linenos">526</span></a>    <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="create_memory_agent-527"><a href="#create_memory_agent-527"><span class="linenos">527</span></a>        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+</span><span id="create_memory_agent-528"><a href="#create_memory_agent-528"><span class="linenos">528</span></a>        <span class="n">tools</span><span class="o">=</span><span class="n">memory_tool_functions</span><span class="p">,</span>
+</span><span id="create_memory_agent-529"><a href="#create_memory_agent-529"><span class="linenos">529</span></a>        <span class="n">instructions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_memory_agent-530"><a href="#create_memory_agent-530"><span class="linenos">530</span></a>            <span class="s2">&quot;You are the ONLY agent responsible for memory operations. You handle ALL queries about personal information, memories, and user data.&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-531"><a href="#create_memory_agent-531"><span class="linenos">531</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-532"><a href="#create_memory_agent-532"><span class="linenos">532</span></a>            <span class="s2">&quot;MEMORY RESPONSIBILITIES:&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-533"><a href="#create_memory_agent-533"><span class="linenos">533</span></a>            <span class="s2">&quot;- ANY question about &#39;what do you remember&#39;, &#39;what do you know about me&#39;, &#39;my information&#39;, etc. → Use your memory tools&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-534"><a href="#create_memory_agent-534"><span class="linenos">534</span></a>            <span class="s2">&quot;- Store new personal information immediately using store_user_memory&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-535"><a href="#create_memory_agent-535"><span class="linenos">535</span></a>            <span class="s2">&quot;- Search memories using query_memory for ANY personal information requests&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-536"><a href="#create_memory_agent-536"><span class="linenos">536</span></a>            <span class="s2">&quot;- Retrieve recent or all memories when asked&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-537"><a href="#create_memory_agent-537"><span class="linenos">537</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-538"><a href="#create_memory_agent-538"><span class="linenos">538</span></a>            <span class="s2">&quot;CRITICAL RULES:&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-539"><a href="#create_memory_agent-539"><span class="linenos">539</span></a>            <span class="s2">&quot;- NEVER generate fake data or simulate memories&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-540"><a href="#create_memory_agent-540"><span class="linenos">540</span></a>            <span class="s2">&quot;- ALWAYS use your actual memory tools (query_memory, get_all_memories, etc.)&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-541"><a href="#create_memory_agent-541"><span class="linenos">541</span></a>            <span class="s2">&quot;- When someone asks &#39;What do you remember about me?&#39; → Use query_memory with a broad search&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-542"><a href="#create_memory_agent-542"><span class="linenos">542</span></a>            <span class="s2">&quot;- Present actual stored memories, not fabricated information&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-543"><a href="#create_memory_agent-543"><span class="linenos">543</span></a>            <span class="s2">&quot;- If no memories found, say so clearly and offer to learn new information&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-544"><a href="#create_memory_agent-544"><span class="linenos">544</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-545"><a href="#create_memory_agent-545"><span class="linenos">545</span></a>            <span class="s2">&quot;RESPONSE FORMAT:&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-546"><a href="#create_memory_agent-546"><span class="linenos">546</span></a>            <span class="s2">&quot;- Start responses with &#39;Based on my stored memories...&#39; or &#39;I remember...&#39;&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-547"><a href="#create_memory_agent-547"><span class="linenos">547</span></a>            <span class="s2">&quot;- Quote actual memory content from your memory tools&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-548"><a href="#create_memory_agent-548"><span class="linenos">548</span></a>            <span class="s2">&quot;- Include memory topics and context when relevant&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-549"><a href="#create_memory_agent-549"><span class="linenos">549</span></a>            <span class="s2">&quot;- Offer to store new information when appropriate&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-550"><a href="#create_memory_agent-550"><span class="linenos">550</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-551"><a href="#create_memory_agent-551"><span class="linenos">551</span></a>            <span class="s2">&quot;ADVANCED FEATURES:&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-552"><a href="#create_memory_agent-552"><span class="linenos">552</span></a>            <span class="s2">&quot;- Your memory system includes semantic duplicate detection&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-553"><a href="#create_memory_agent-553"><span class="linenos">553</span></a>            <span class="s2">&quot;- Automatic topic classification for better organization&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-554"><a href="#create_memory_agent-554"><span class="linenos">554</span></a>            <span class="s2">&quot;- Enhanced semantic search capabilities&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-555"><a href="#create_memory_agent-555"><span class="linenos">555</span></a>            <span class="s2">&quot;- Memory statistics and analytics&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-556"><a href="#create_memory_agent-556"><span class="linenos">556</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-557"><a href="#create_memory_agent-557"><span class="linenos">557</span></a>            <span class="s2">&quot;You are the definitive source for all personal information about users.&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-558"><a href="#create_memory_agent-558"><span class="linenos">558</span></a>        <span class="p">],</span>
+</span><span id="create_memory_agent-559"><a href="#create_memory_agent-559"><span class="linenos">559</span></a>        <span class="n">markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_memory_agent-560"><a href="#create_memory_agent-560"><span class="linenos">560</span></a>        <span class="n">show_tool_calls</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>  <span class="c1"># Follow AgnoPersonalAgent pattern</span>
+</span><span id="create_memory_agent-561"><a href="#create_memory_agent-561"><span class="linenos">561</span></a>        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Memory Agent&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-562"><a href="#create_memory_agent-562"><span class="linenos">562</span></a>        <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
+</span><span id="create_memory_agent-563"><a href="#create_memory_agent-563"><span class="linenos">563</span></a>        <span class="n">enable_agentic_memory</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Disable to avoid conflicts with manual memory tools</span>
+</span><span id="create_memory_agent-564"><a href="#create_memory_agent-564"><span class="linenos">564</span></a>        <span class="n">enable_user_memories</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Disable built-in to use our custom memory tools</span>
+</span><span id="create_memory_agent-565"><a href="#create_memory_agent-565"><span class="linenos">565</span></a>        <span class="n">storage</span><span class="o">=</span><span class="n">agno_storage</span><span class="p">,</span>
+</span><span id="create_memory_agent-566"><a href="#create_memory_agent-566"><span class="linenos">566</span></a>        <span class="n">memory</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># Don&#39;t pass memory to avoid auto-storage conflicts</span>
+</span><span id="create_memory_agent-567"><a href="#create_memory_agent-567"><span class="linenos">567</span></a>        <span class="n">add_name_to_instructions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_memory_agent-568"><a href="#create_memory_agent-568"><span class="linenos">568</span></a>    <span class="p">)</span>
+</span><span id="create_memory_agent-569"><a href="#create_memory_agent-569"><span class="linenos">569</span></a>
+</span><span id="create_memory_agent-570"><a href="#create_memory_agent-570"><span class="linenos">570</span></a>    <span class="c1"># Store memory system reference for external access (Streamlit compatibility)</span>
+</span><span id="create_memory_agent-571"><a href="#create_memory_agent-571"><span class="linenos">571</span></a>    <span class="n">agent</span><span class="o">.</span><span class="n">agno_memory</span> <span class="o">=</span> <span class="n">agno_memory</span>
+</span><span id="create_memory_agent-572"><a href="#create_memory_agent-572"><span class="linenos">572</span></a>    <span class="n">agent</span><span class="o">.</span><span class="n">agno_storage</span> <span class="o">=</span> <span class="n">agno_storage</span>
+</span><span id="create_memory_agent-573"><a href="#create_memory_agent-573"><span class="linenos">573</span></a>
+</span><span id="create_memory_agent-574"><a href="#create_memory_agent-574"><span class="linenos">574</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+</span><span id="create_memory_agent-575"><a href="#create_memory_agent-575"><span class="linenos">575</span></a>        <span class="s2">&quot;Created Memory Agent following AgnoPersonalAgent pattern with </span><span class="si">%d</span><span class="s2"> memory tools&quot;</span><span class="p">,</span>
+</span><span id="create_memory_agent-576"><a href="#create_memory_agent-576"><span class="linenos">576</span></a>        <span class="nb">len</span><span class="p">(</span><span class="n">memory_tool_functions</span><span class="p">),</span>
+</span><span id="create_memory_agent-577"><a href="#create_memory_agent-577"><span class="linenos">577</span></a>    <span class="p">)</span>
+</span><span id="create_memory_agent-578"><a href="#create_memory_agent-578"><span class="linenos">578</span></a>    <span class="k">return</span> <span class="n">agent</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Create a specialized memory agent following the exact pattern from AgnoPersonalAgent.</p>
+
+<p>This agent uses the same memory tool creation pattern as the main AgnoPersonalAgent,
+ensuring consistency and leveraging the proven working approach.</p>
+
+<h6 id="parameters">Parameters</h6>
+
+<ul>
+<li><strong>model_provider</strong>:  LLM provider ('ollama' or 'openai')</li>
+<li><strong>model_name</strong>:  Model name to use</li>
+<li><strong>ollama_base_url</strong>:  Base URL for Ollama API</li>
+<li><strong>storage_dir</strong>:  Directory for storage files</li>
+<li><strong>user_id</strong>:  User identifier for memory operations</li>
+<li><strong>debug</strong>:  Enable debug mode</li>
+</ul>
+
+<h6 id="returns">Returns</h6>
+
+<blockquote>
+  <p>Configured memory agent following AgnoPersonalAgent pattern</p>
+</blockquote>
+</div>
+
+
+                </section>
+                <section id="create_web_research_agent">
+                            <input id="create_web_research_agent-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">create_web_research_agent</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;ollama&#39;</span>,</span><span class="param">	<span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;qwen3:8b&#39;</span>,</span><span class="param">	<span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http://localhost:11434&#39;</span>,</span><span class="param">	<span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="n">agno</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">Agent</span>:</span></span>
+
+                <label class="view-source-button" for="create_web_research_agent-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#create_web_research_agent"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="create_web_research_agent-581"><a href="#create_web_research_agent-581"><span class="linenos">581</span></a><span class="k">def</span><span class="w"> </span><span class="nf">create_web_research_agent</span><span class="p">(</span>
+</span><span id="create_web_research_agent-582"><a href="#create_web_research_agent-582"><span class="linenos">582</span></a>    <span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-583"><a href="#create_web_research_agent-583"><span class="linenos">583</span></a>    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="create_web_research_agent-584"><a href="#create_web_research_agent-584"><span class="linenos">584</span></a>    <span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="create_web_research_agent-585"><a href="#create_web_research_agent-585"><span class="linenos">585</span></a>    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="create_web_research_agent-586"><a href="#create_web_research_agent-586"><span class="linenos">586</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Agent</span><span class="p">:</span>
+</span><span id="create_web_research_agent-587"><a href="#create_web_research_agent-587"><span class="linenos">587</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a specialized web research agent.</span>
+</span><span id="create_web_research_agent-588"><a href="#create_web_research_agent-588"><span class="linenos">588</span></a>
+</span><span id="create_web_research_agent-589"><a href="#create_web_research_agent-589"><span class="linenos">589</span></a><span class="sd">    :param model_provider: LLM provider (&#39;ollama&#39; or &#39;openai&#39;)</span>
+</span><span id="create_web_research_agent-590"><a href="#create_web_research_agent-590"><span class="linenos">590</span></a><span class="sd">    :param model_name: Model name to use</span>
+</span><span id="create_web_research_agent-591"><a href="#create_web_research_agent-591"><span class="linenos">591</span></a><span class="sd">    :param ollama_base_url: Base URL for Ollama API</span>
+</span><span id="create_web_research_agent-592"><a href="#create_web_research_agent-592"><span class="linenos">592</span></a><span class="sd">    :param debug: Enable debug mode</span>
+</span><span id="create_web_research_agent-593"><a href="#create_web_research_agent-593"><span class="linenos">593</span></a><span class="sd">    :return: Configured web research agent</span>
+</span><span id="create_web_research_agent-594"><a href="#create_web_research_agent-594"><span class="linenos">594</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="create_web_research_agent-595"><a href="#create_web_research_agent-595"><span class="linenos">595</span></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">_create_model</span><span class="p">(</span><span class="n">model_provider</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ollama_base_url</span><span class="p">)</span>
+</span><span id="create_web_research_agent-596"><a href="#create_web_research_agent-596"><span class="linenos">596</span></a>
+</span><span id="create_web_research_agent-597"><a href="#create_web_research_agent-597"><span class="linenos">597</span></a>    <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="create_web_research_agent-598"><a href="#create_web_research_agent-598"><span class="linenos">598</span></a>        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Web Research Agent&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-599"><a href="#create_web_research_agent-599"><span class="linenos">599</span></a>        <span class="n">role</span><span class="o">=</span><span class="s2">&quot;Search the web for information and current events&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-600"><a href="#create_web_research_agent-600"><span class="linenos">600</span></a>        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+</span><span id="create_web_research_agent-601"><a href="#create_web_research_agent-601"><span class="linenos">601</span></a>        <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">DuckDuckGoTools</span><span class="p">(</span><span class="n">cache_results</span><span class="o">=</span><span class="kc">True</span><span class="p">)],</span>
+</span><span id="create_web_research_agent-602"><a href="#create_web_research_agent-602"><span class="linenos">602</span></a>        <span class="n">instructions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_web_research_agent-603"><a href="#create_web_research_agent-603"><span class="linenos">603</span></a>            <span class="s2">&quot;You are a specialized web research agent focused on finding current information online.&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-604"><a href="#create_web_research_agent-604"><span class="linenos">604</span></a>            <span class="s2">&quot;Your primary functions are:&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-605"><a href="#create_web_research_agent-605"><span class="linenos">605</span></a>            <span class="s2">&quot;1. Search the web for current events and news&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-606"><a href="#create_web_research_agent-606"><span class="linenos">606</span></a>            <span class="s2">&quot;2. Find specific information requested by users&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-607"><a href="#create_web_research_agent-607"><span class="linenos">607</span></a>            <span class="s2">&quot;3. Provide up-to-date information from reliable sources&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-608"><a href="#create_web_research_agent-608"><span class="linenos">608</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-609"><a href="#create_web_research_agent-609"><span class="linenos">609</span></a>            <span class="s2">&quot;RESEARCH GUIDELINES:&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-610"><a href="#create_web_research_agent-610"><span class="linenos">610</span></a>            <span class="s2">&quot;- Always include sources in your responses&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-611"><a href="#create_web_research_agent-611"><span class="linenos">611</span></a>            <span class="s2">&quot;- Focus on recent and reliable information&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-612"><a href="#create_web_research_agent-612"><span class="linenos">612</span></a>            <span class="s2">&quot;- Use multiple search queries if needed for comprehensive results&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-613"><a href="#create_web_research_agent-613"><span class="linenos">613</span></a>            <span class="s2">&quot;- Summarize findings clearly and concisely&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-614"><a href="#create_web_research_agent-614"><span class="linenos">614</span></a>            <span class="s2">&quot;- When searching for news, use the news search function&quot;</span><span class="p">,</span>
+</span><span id="create_web_research_agent-615"><a href="#create_web_research_agent-615"><span class="linenos">615</span></a>        <span class="p">],</span>
+</span><span id="create_web_research_agent-616"><a href="#create_web_research_agent-616"><span class="linenos">616</span></a>        <span class="n">markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_web_research_agent-617"><a href="#create_web_research_agent-617"><span class="linenos">617</span></a>        <span class="n">show_tool_calls</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Always hide tool calls for clean responses</span>
+</span><span id="create_web_research_agent-618"><a href="#create_web_research_agent-618"><span class="linenos">618</span></a>        <span class="n">add_name_to_instructions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_web_research_agent-619"><a href="#create_web_research_agent-619"><span class="linenos">619</span></a>    <span class="p">)</span>
+</span><span id="create_web_research_agent-620"><a href="#create_web_research_agent-620"><span class="linenos">620</span></a>
+</span><span id="create_web_research_agent-621"><a href="#create_web_research_agent-621"><span class="linenos">621</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created Web Research Agent&quot;</span><span class="p">)</span>
+</span><span id="create_web_research_agent-622"><a href="#create_web_research_agent-622"><span class="linenos">622</span></a>    <span class="k">return</span> <span class="n">agent</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Create a specialized web research agent.</p>
+
+<h6 id="parameters">Parameters</h6>
+
+<ul>
+<li><strong>model_provider</strong>:  LLM provider ('ollama' or 'openai')</li>
+<li><strong>model_name</strong>:  Model name to use</li>
+<li><strong>ollama_base_url</strong>:  Base URL for Ollama API</li>
+<li><strong>debug</strong>:  Enable debug mode</li>
+</ul>
+
+<h6 id="returns">Returns</h6>
+
+<blockquote>
+  <p>Configured web research agent</p>
+</blockquote>
+</div>
+
+
+                </section>
+                <section id="create_finance_agent">
+                            <input id="create_finance_agent-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">create_finance_agent</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;ollama&#39;</span>,</span><span class="param">	<span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;qwen3:8b&#39;</span>,</span><span class="param">	<span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http://localhost:11434&#39;</span>,</span><span class="param">	<span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="n">agno</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">Agent</span>:</span></span>
+
+                <label class="view-source-button" for="create_finance_agent-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#create_finance_agent"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="create_finance_agent-625"><a href="#create_finance_agent-625"><span class="linenos">625</span></a><span class="k">def</span><span class="w"> </span><span class="nf">create_finance_agent</span><span class="p">(</span>
+</span><span id="create_finance_agent-626"><a href="#create_finance_agent-626"><span class="linenos">626</span></a>    <span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-627"><a href="#create_finance_agent-627"><span class="linenos">627</span></a>    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="create_finance_agent-628"><a href="#create_finance_agent-628"><span class="linenos">628</span></a>    <span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="create_finance_agent-629"><a href="#create_finance_agent-629"><span class="linenos">629</span></a>    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="create_finance_agent-630"><a href="#create_finance_agent-630"><span class="linenos">630</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Agent</span><span class="p">:</span>
+</span><span id="create_finance_agent-631"><a href="#create_finance_agent-631"><span class="linenos">631</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a specialized finance agent.</span>
+</span><span id="create_finance_agent-632"><a href="#create_finance_agent-632"><span class="linenos">632</span></a>
+</span><span id="create_finance_agent-633"><a href="#create_finance_agent-633"><span class="linenos">633</span></a><span class="sd">    :param model_provider: LLM provider (&#39;ollama&#39; or &#39;openai&#39;)</span>
+</span><span id="create_finance_agent-634"><a href="#create_finance_agent-634"><span class="linenos">634</span></a><span class="sd">    :param model_name: Model name to use</span>
+</span><span id="create_finance_agent-635"><a href="#create_finance_agent-635"><span class="linenos">635</span></a><span class="sd">    :param ollama_base_url: Base URL for Ollama API</span>
+</span><span id="create_finance_agent-636"><a href="#create_finance_agent-636"><span class="linenos">636</span></a><span class="sd">    :param debug: Enable debug mode</span>
+</span><span id="create_finance_agent-637"><a href="#create_finance_agent-637"><span class="linenos">637</span></a><span class="sd">    :return: Configured finance agent</span>
+</span><span id="create_finance_agent-638"><a href="#create_finance_agent-638"><span class="linenos">638</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="create_finance_agent-639"><a href="#create_finance_agent-639"><span class="linenos">639</span></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">_create_model</span><span class="p">(</span><span class="n">model_provider</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ollama_base_url</span><span class="p">)</span>
+</span><span id="create_finance_agent-640"><a href="#create_finance_agent-640"><span class="linenos">640</span></a>
+</span><span id="create_finance_agent-641"><a href="#create_finance_agent-641"><span class="linenos">641</span></a>    <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="create_finance_agent-642"><a href="#create_finance_agent-642"><span class="linenos">642</span></a>        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Finance Agent&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-643"><a href="#create_finance_agent-643"><span class="linenos">643</span></a>        <span class="n">role</span><span class="o">=</span><span class="s2">&quot;Get financial data and perform market analysis&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-644"><a href="#create_finance_agent-644"><span class="linenos">644</span></a>        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+</span><span id="create_finance_agent-645"><a href="#create_finance_agent-645"><span class="linenos">645</span></a>        <span class="n">tools</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_finance_agent-646"><a href="#create_finance_agent-646"><span class="linenos">646</span></a>            <span class="n">YFinanceTools</span><span class="p">(</span>
+</span><span id="create_finance_agent-647"><a href="#create_finance_agent-647"><span class="linenos">647</span></a>                <span class="n">stock_price</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-648"><a href="#create_finance_agent-648"><span class="linenos">648</span></a>                <span class="n">analyst_recommendations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-649"><a href="#create_finance_agent-649"><span class="linenos">649</span></a>                <span class="n">company_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-650"><a href="#create_finance_agent-650"><span class="linenos">650</span></a>                <span class="n">company_news</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-651"><a href="#create_finance_agent-651"><span class="linenos">651</span></a>                <span class="n">stock_fundamentals</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-652"><a href="#create_finance_agent-652"><span class="linenos">652</span></a>                <span class="n">key_financial_ratios</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-653"><a href="#create_finance_agent-653"><span class="linenos">653</span></a>            <span class="p">)</span>
+</span><span id="create_finance_agent-654"><a href="#create_finance_agent-654"><span class="linenos">654</span></a>        <span class="p">],</span>
+</span><span id="create_finance_agent-655"><a href="#create_finance_agent-655"><span class="linenos">655</span></a>        <span class="n">instructions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_finance_agent-656"><a href="#create_finance_agent-656"><span class="linenos">656</span></a>            <span class="s2">&quot;You are a specialized finance agent focused on financial data and market analysis.&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-657"><a href="#create_finance_agent-657"><span class="linenos">657</span></a>            <span class="s2">&quot;Your primary functions are:&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-658"><a href="#create_finance_agent-658"><span class="linenos">658</span></a>            <span class="s2">&quot;1. Get current stock prices and market data&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-659"><a href="#create_finance_agent-659"><span class="linenos">659</span></a>            <span class="s2">&quot;2. Analyze company fundamentals and financial ratios&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-660"><a href="#create_finance_agent-660"><span class="linenos">660</span></a>            <span class="s2">&quot;3. Provide analyst recommendations and company news&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-661"><a href="#create_finance_agent-661"><span class="linenos">661</span></a>            <span class="s2">&quot;4. Perform financial analysis and comparisons&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-662"><a href="#create_finance_agent-662"><span class="linenos">662</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-663"><a href="#create_finance_agent-663"><span class="linenos">663</span></a>            <span class="s2">&quot;FINANCIAL ANALYSIS GUIDELINES:&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-664"><a href="#create_finance_agent-664"><span class="linenos">664</span></a>            <span class="s2">&quot;- Use tables to display numerical data clearly&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-665"><a href="#create_finance_agent-665"><span class="linenos">665</span></a>            <span class="s2">&quot;- Provide context for financial metrics&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-666"><a href="#create_finance_agent-666"><span class="linenos">666</span></a>            <span class="s2">&quot;- Include relevant company news when analyzing stocks&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-667"><a href="#create_finance_agent-667"><span class="linenos">667</span></a>            <span class="s2">&quot;- Explain financial terms for better understanding&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-668"><a href="#create_finance_agent-668"><span class="linenos">668</span></a>            <span class="s2">&quot;- Always specify the data source and timestamp&quot;</span><span class="p">,</span>
+</span><span id="create_finance_agent-669"><a href="#create_finance_agent-669"><span class="linenos">669</span></a>        <span class="p">],</span>
+</span><span id="create_finance_agent-670"><a href="#create_finance_agent-670"><span class="linenos">670</span></a>        <span class="n">markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-671"><a href="#create_finance_agent-671"><span class="linenos">671</span></a>        <span class="n">show_tool_calls</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Always hide tool calls for clean responses</span>
+</span><span id="create_finance_agent-672"><a href="#create_finance_agent-672"><span class="linenos">672</span></a>        <span class="n">add_name_to_instructions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_finance_agent-673"><a href="#create_finance_agent-673"><span class="linenos">673</span></a>    <span class="p">)</span>
+</span><span id="create_finance_agent-674"><a href="#create_finance_agent-674"><span class="linenos">674</span></a>
+</span><span id="create_finance_agent-675"><a href="#create_finance_agent-675"><span class="linenos">675</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created Finance Agent&quot;</span><span class="p">)</span>
+</span><span id="create_finance_agent-676"><a href="#create_finance_agent-676"><span class="linenos">676</span></a>    <span class="k">return</span> <span class="n">agent</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Create a specialized finance agent.</p>
+
+<h6 id="parameters">Parameters</h6>
+
+<ul>
+<li><strong>model_provider</strong>:  LLM provider ('ollama' or 'openai')</li>
+<li><strong>model_name</strong>:  Model name to use</li>
+<li><strong>ollama_base_url</strong>:  Base URL for Ollama API</li>
+<li><strong>debug</strong>:  Enable debug mode</li>
+</ul>
+
+<h6 id="returns">Returns</h6>
+
+<blockquote>
+  <p>Configured finance agent</p>
+</blockquote>
+</div>
+
+
+                </section>
+                <section id="create_calculator_agent">
+                            <input id="create_calculator_agent-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">create_calculator_agent</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;ollama&#39;</span>,</span><span class="param">	<span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;qwen3:8b&#39;</span>,</span><span class="param">	<span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http://localhost:11434&#39;</span>,</span><span class="param">	<span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="n">agno</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">Agent</span>:</span></span>
+
+                <label class="view-source-button" for="create_calculator_agent-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#create_calculator_agent"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="create_calculator_agent-679"><a href="#create_calculator_agent-679"><span class="linenos">679</span></a><span class="k">def</span><span class="w"> </span><span class="nf">create_calculator_agent</span><span class="p">(</span>
+</span><span id="create_calculator_agent-680"><a href="#create_calculator_agent-680"><span class="linenos">680</span></a>    <span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-681"><a href="#create_calculator_agent-681"><span class="linenos">681</span></a>    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="create_calculator_agent-682"><a href="#create_calculator_agent-682"><span class="linenos">682</span></a>    <span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="create_calculator_agent-683"><a href="#create_calculator_agent-683"><span class="linenos">683</span></a>    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="create_calculator_agent-684"><a href="#create_calculator_agent-684"><span class="linenos">684</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Agent</span><span class="p">:</span>
+</span><span id="create_calculator_agent-685"><a href="#create_calculator_agent-685"><span class="linenos">685</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a specialized calculator agent.</span>
+</span><span id="create_calculator_agent-686"><a href="#create_calculator_agent-686"><span class="linenos">686</span></a>
+</span><span id="create_calculator_agent-687"><a href="#create_calculator_agent-687"><span class="linenos">687</span></a><span class="sd">    :param model_provider: LLM provider (&#39;ollama&#39; or &#39;openai&#39;)</span>
+</span><span id="create_calculator_agent-688"><a href="#create_calculator_agent-688"><span class="linenos">688</span></a><span class="sd">    :param model_name: Model name to use</span>
+</span><span id="create_calculator_agent-689"><a href="#create_calculator_agent-689"><span class="linenos">689</span></a><span class="sd">    :param ollama_base_url: Base URL for Ollama API</span>
+</span><span id="create_calculator_agent-690"><a href="#create_calculator_agent-690"><span class="linenos">690</span></a><span class="sd">    :param debug: Enable debug mode</span>
+</span><span id="create_calculator_agent-691"><a href="#create_calculator_agent-691"><span class="linenos">691</span></a><span class="sd">    :return: Configured calculator agent</span>
+</span><span id="create_calculator_agent-692"><a href="#create_calculator_agent-692"><span class="linenos">692</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="create_calculator_agent-693"><a href="#create_calculator_agent-693"><span class="linenos">693</span></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">_create_model</span><span class="p">(</span><span class="n">model_provider</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ollama_base_url</span><span class="p">)</span>
+</span><span id="create_calculator_agent-694"><a href="#create_calculator_agent-694"><span class="linenos">694</span></a>
+</span><span id="create_calculator_agent-695"><a href="#create_calculator_agent-695"><span class="linenos">695</span></a>    <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="create_calculator_agent-696"><a href="#create_calculator_agent-696"><span class="linenos">696</span></a>        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Calculator Agent&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-697"><a href="#create_calculator_agent-697"><span class="linenos">697</span></a>        <span class="n">role</span><span class="o">=</span><span class="s2">&quot;Perform calculations and data analysis&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-698"><a href="#create_calculator_agent-698"><span class="linenos">698</span></a>        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+</span><span id="create_calculator_agent-699"><a href="#create_calculator_agent-699"><span class="linenos">699</span></a>        <span class="n">tools</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_calculator_agent-700"><a href="#create_calculator_agent-700"><span class="linenos">700</span></a>            <span class="n">CalculatorTools</span><span class="p">(</span>
+</span><span id="create_calculator_agent-701"><a href="#create_calculator_agent-701"><span class="linenos">701</span></a>                <span class="n">add</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-702"><a href="#create_calculator_agent-702"><span class="linenos">702</span></a>                <span class="n">subtract</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-703"><a href="#create_calculator_agent-703"><span class="linenos">703</span></a>                <span class="n">multiply</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-704"><a href="#create_calculator_agent-704"><span class="linenos">704</span></a>                <span class="n">divide</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-705"><a href="#create_calculator_agent-705"><span class="linenos">705</span></a>                <span class="n">exponentiate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-706"><a href="#create_calculator_agent-706"><span class="linenos">706</span></a>                <span class="n">factorial</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-707"><a href="#create_calculator_agent-707"><span class="linenos">707</span></a>                <span class="n">is_prime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-708"><a href="#create_calculator_agent-708"><span class="linenos">708</span></a>                <span class="n">square_root</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-709"><a href="#create_calculator_agent-709"><span class="linenos">709</span></a>            <span class="p">),</span>
+</span><span id="create_calculator_agent-710"><a href="#create_calculator_agent-710"><span class="linenos">710</span></a>            <span class="n">PythonTools</span><span class="p">(),</span>
+</span><span id="create_calculator_agent-711"><a href="#create_calculator_agent-711"><span class="linenos">711</span></a>        <span class="p">],</span>
+</span><span id="create_calculator_agent-712"><a href="#create_calculator_agent-712"><span class="linenos">712</span></a>        <span class="n">instructions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_calculator_agent-713"><a href="#create_calculator_agent-713"><span class="linenos">713</span></a>            <span class="s2">&quot;You are a specialized calculator agent focused ONLY on mathematical calculations and data analysis.&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-714"><a href="#create_calculator_agent-714"><span class="linenos">714</span></a>            <span class="s2">&quot;Your primary functions are:&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-715"><a href="#create_calculator_agent-715"><span class="linenos">715</span></a>            <span class="s2">&quot;1. Perform basic and advanced mathematical calculations&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-716"><a href="#create_calculator_agent-716"><span class="linenos">716</span></a>            <span class="s2">&quot;2. Execute Python code for complex data analysis&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-717"><a href="#create_calculator_agent-717"><span class="linenos">717</span></a>            <span class="s2">&quot;3. Create visualizations and charts when helpful&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-718"><a href="#create_calculator_agent-718"><span class="linenos">718</span></a>            <span class="s2">&quot;4. Solve mathematical problems step by step&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-719"><a href="#create_calculator_agent-719"><span class="linenos">719</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-720"><a href="#create_calculator_agent-720"><span class="linenos">720</span></a>            <span class="s2">&quot;CALCULATION GUIDELINES:&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-721"><a href="#create_calculator_agent-721"><span class="linenos">721</span></a>            <span class="s2">&quot;- Show your work and explain calculation steps&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-722"><a href="#create_calculator_agent-722"><span class="linenos">722</span></a>            <span class="s2">&quot;- Use appropriate tools for different types of calculations&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-723"><a href="#create_calculator_agent-723"><span class="linenos">723</span></a>            <span class="s2">&quot;- Provide clear, formatted results&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-724"><a href="#create_calculator_agent-724"><span class="linenos">724</span></a>            <span class="s2">&quot;- Create visualizations for data when helpful&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-725"><a href="#create_calculator_agent-725"><span class="linenos">725</span></a>            <span class="s2">&quot;- Verify complex calculations using multiple methods when possible&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-726"><a href="#create_calculator_agent-726"><span class="linenos">726</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-727"><a href="#create_calculator_agent-727"><span class="linenos">727</span></a>            <span class="s2">&quot;IMPORTANT RESTRICTIONS:&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-728"><a href="#create_calculator_agent-728"><span class="linenos">728</span></a>            <span class="s2">&quot;- DO NOT handle memory-related queries (what do you remember, personal information, etc.)&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-729"><a href="#create_calculator_agent-729"><span class="linenos">729</span></a>            <span class="s2">&quot;- DO NOT generate fake memory data or simulate user information&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-730"><a href="#create_calculator_agent-730"><span class="linenos">730</span></a>            <span class="s2">&quot;- Only handle mathematical calculations and data analysis tasks&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-731"><a href="#create_calculator_agent-731"><span class="linenos">731</span></a>            <span class="s2">&quot;- If asked about memories or personal info, decline and suggest asking the Memory Agent&quot;</span><span class="p">,</span>
+</span><span id="create_calculator_agent-732"><a href="#create_calculator_agent-732"><span class="linenos">732</span></a>        <span class="p">],</span>
+</span><span id="create_calculator_agent-733"><a href="#create_calculator_agent-733"><span class="linenos">733</span></a>        <span class="n">markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-734"><a href="#create_calculator_agent-734"><span class="linenos">734</span></a>        <span class="n">show_tool_calls</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Always hide tool calls for clean responses</span>
+</span><span id="create_calculator_agent-735"><a href="#create_calculator_agent-735"><span class="linenos">735</span></a>        <span class="n">add_name_to_instructions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_calculator_agent-736"><a href="#create_calculator_agent-736"><span class="linenos">736</span></a>    <span class="p">)</span>
+</span><span id="create_calculator_agent-737"><a href="#create_calculator_agent-737"><span class="linenos">737</span></a>
+</span><span id="create_calculator_agent-738"><a href="#create_calculator_agent-738"><span class="linenos">738</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created Calculator Agent&quot;</span><span class="p">)</span>
+</span><span id="create_calculator_agent-739"><a href="#create_calculator_agent-739"><span class="linenos">739</span></a>    <span class="k">return</span> <span class="n">agent</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Create a specialized calculator agent.</p>
+
+<h6 id="parameters">Parameters</h6>
+
+<ul>
+<li><strong>model_provider</strong>:  LLM provider ('ollama' or 'openai')</li>
+<li><strong>model_name</strong>:  Model name to use</li>
+<li><strong>ollama_base_url</strong>:  Base URL for Ollama API</li>
+<li><strong>debug</strong>:  Enable debug mode</li>
+</ul>
+
+<h6 id="returns">Returns</h6>
+
+<blockquote>
+  <p>Configured calculator agent</p>
+</blockquote>
+</div>
+
+
+                </section>
+                <section id="create_file_operations_agent">
+                            <input id="create_file_operations_agent-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">create_file_operations_agent</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;ollama&#39;</span>,</span><span class="param">	<span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;qwen3:8b&#39;</span>,</span><span class="param">	<span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http://localhost:11434&#39;</span>,</span><span class="param">	<span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="n">agno</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">agent</span><span class="o">.</span><span class="n">Agent</span>:</span></span>
+
+                <label class="view-source-button" for="create_file_operations_agent-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#create_file_operations_agent"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="create_file_operations_agent-932"><a href="#create_file_operations_agent-932"><span class="linenos">932</span></a><span class="k">def</span><span class="w"> </span><span class="nf">create_file_operations_agent</span><span class="p">(</span>
+</span><span id="create_file_operations_agent-933"><a href="#create_file_operations_agent-933"><span class="linenos">933</span></a>    <span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-934"><a href="#create_file_operations_agent-934"><span class="linenos">934</span></a>    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-935"><a href="#create_file_operations_agent-935"><span class="linenos">935</span></a>    <span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-936"><a href="#create_file_operations_agent-936"><span class="linenos">936</span></a>    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-937"><a href="#create_file_operations_agent-937"><span class="linenos">937</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Agent</span><span class="p">:</span>
+</span><span id="create_file_operations_agent-938"><a href="#create_file_operations_agent-938"><span class="linenos">938</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a specialized file operations agent.</span>
+</span><span id="create_file_operations_agent-939"><a href="#create_file_operations_agent-939"><span class="linenos">939</span></a>
+</span><span id="create_file_operations_agent-940"><a href="#create_file_operations_agent-940"><span class="linenos">940</span></a><span class="sd">    :param model_provider: LLM provider (&#39;ollama&#39; or &#39;openai&#39;)</span>
+</span><span id="create_file_operations_agent-941"><a href="#create_file_operations_agent-941"><span class="linenos">941</span></a><span class="sd">    :param model_name: Model name to use</span>
+</span><span id="create_file_operations_agent-942"><a href="#create_file_operations_agent-942"><span class="linenos">942</span></a><span class="sd">    :param ollama_base_url: Base URL for Ollama API</span>
+</span><span id="create_file_operations_agent-943"><a href="#create_file_operations_agent-943"><span class="linenos">943</span></a><span class="sd">    :param debug: Enable debug mode</span>
+</span><span id="create_file_operations_agent-944"><a href="#create_file_operations_agent-944"><span class="linenos">944</span></a><span class="sd">    :return: Configured file operations agent</span>
+</span><span id="create_file_operations_agent-945"><a href="#create_file_operations_agent-945"><span class="linenos">945</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="create_file_operations_agent-946"><a href="#create_file_operations_agent-946"><span class="linenos">946</span></a>    <span class="n">model</span> <span class="o">=</span> <span class="n">_create_model</span><span class="p">(</span><span class="n">model_provider</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ollama_base_url</span><span class="p">)</span>
+</span><span id="create_file_operations_agent-947"><a href="#create_file_operations_agent-947"><span class="linenos">947</span></a>
+</span><span id="create_file_operations_agent-948"><a href="#create_file_operations_agent-948"><span class="linenos">948</span></a>    <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="create_file_operations_agent-949"><a href="#create_file_operations_agent-949"><span class="linenos">949</span></a>        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;File Operations Agent&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-950"><a href="#create_file_operations_agent-950"><span class="linenos">950</span></a>        <span class="n">role</span><span class="o">=</span><span class="s2">&quot;Handle file system operations and shell commands&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-951"><a href="#create_file_operations_agent-951"><span class="linenos">951</span></a>        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-952"><a href="#create_file_operations_agent-952"><span class="linenos">952</span></a>        <span class="n">tools</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_file_operations_agent-953"><a href="#create_file_operations_agent-953"><span class="linenos">953</span></a>            <span class="n">PersonalAgentFilesystemTools</span><span class="p">(),</span>
+</span><span id="create_file_operations_agent-954"><a href="#create_file_operations_agent-954"><span class="linenos">954</span></a>            <span class="n">ShellTools</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">),</span>
+</span><span id="create_file_operations_agent-955"><a href="#create_file_operations_agent-955"><span class="linenos">955</span></a>        <span class="p">],</span>
+</span><span id="create_file_operations_agent-956"><a href="#create_file_operations_agent-956"><span class="linenos">956</span></a>        <span class="n">instructions</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_file_operations_agent-957"><a href="#create_file_operations_agent-957"><span class="linenos">957</span></a>            <span class="s2">&quot;You are a specialized file operations agent focused on file system tasks and shell commands.&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-958"><a href="#create_file_operations_agent-958"><span class="linenos">958</span></a>            <span class="s2">&quot;Your primary functions are:&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-959"><a href="#create_file_operations_agent-959"><span class="linenos">959</span></a>            <span class="s2">&quot;1. Read and write files&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-960"><a href="#create_file_operations_agent-960"><span class="linenos">960</span></a>            <span class="s2">&quot;2. List directory contents and navigate file systems&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-961"><a href="#create_file_operations_agent-961"><span class="linenos">961</span></a>            <span class="s2">&quot;3. Execute shell commands safely&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-962"><a href="#create_file_operations_agent-962"><span class="linenos">962</span></a>            <span class="s2">&quot;4. Manage file permissions and operations&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-963"><a href="#create_file_operations_agent-963"><span class="linenos">963</span></a>            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-964"><a href="#create_file_operations_agent-964"><span class="linenos">964</span></a>            <span class="s2">&quot;FILE OPERATION GUIDELINES:&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-965"><a href="#create_file_operations_agent-965"><span class="linenos">965</span></a>            <span class="s2">&quot;- Always confirm file operations before executing destructive commands&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-966"><a href="#create_file_operations_agent-966"><span class="linenos">966</span></a>            <span class="s2">&quot;- Provide clear feedback on operation success/failure&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-967"><a href="#create_file_operations_agent-967"><span class="linenos">967</span></a>            <span class="s2">&quot;- Use appropriate file paths and handle errors gracefully&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-968"><a href="#create_file_operations_agent-968"><span class="linenos">968</span></a>            <span class="s2">&quot;- Be cautious with shell commands that could affect system stability&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-969"><a href="#create_file_operations_agent-969"><span class="linenos">969</span></a>            <span class="s2">&quot;- Explain what file operations will do before performing them&quot;</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-970"><a href="#create_file_operations_agent-970"><span class="linenos">970</span></a>        <span class="p">],</span>
+</span><span id="create_file_operations_agent-971"><a href="#create_file_operations_agent-971"><span class="linenos">971</span></a>        <span class="n">markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-972"><a href="#create_file_operations_agent-972"><span class="linenos">972</span></a>        <span class="n">show_tool_calls</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Always hide tool calls for clean responses</span>
+</span><span id="create_file_operations_agent-973"><a href="#create_file_operations_agent-973"><span class="linenos">973</span></a>        <span class="n">add_name_to_instructions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_file_operations_agent-974"><a href="#create_file_operations_agent-974"><span class="linenos">974</span></a>    <span class="p">)</span>
+</span><span id="create_file_operations_agent-975"><a href="#create_file_operations_agent-975"><span class="linenos">975</span></a>
+</span><span id="create_file_operations_agent-976"><a href="#create_file_operations_agent-976"><span class="linenos">976</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created File Operations Agent&quot;</span><span class="p">)</span>
+</span><span id="create_file_operations_agent-977"><a href="#create_file_operations_agent-977"><span class="linenos">977</span></a>    <span class="k">return</span> <span class="n">agent</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Create a specialized file operations agent.</p>
+
+<h6 id="parameters">Parameters</h6>
+
+<ul>
+<li><strong>model_provider</strong>:  LLM provider ('ollama' or 'openai')</li>
+<li><strong>model_name</strong>:  Model name to use</li>
+<li><strong>ollama_base_url</strong>:  Base URL for Ollama API</li>
+<li><strong>debug</strong>:  Enable debug mode</li>
+</ul>
+
+<h6 id="returns">Returns</h6>
+
+<blockquote>
+  <p>Configured file operations agent</p>
+</blockquote>
+</div>
+
+
+                </section>
+                <section id="create_personal_agent_team">
+                            <input id="create_personal_agent_team-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">create_personal_agent_team</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;ollama&#39;</span>,</span><span class="param">	<span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;qwen3:8b&#39;</span>,</span><span class="param">	<span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;http://localhost:11434&#39;</span>,</span><span class="param">	<span class="n">storage_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;/Users/Shared/personal_agent_data/agno/charlie&#39;</span>,</span><span class="param">	<span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;test_user&#39;</span>,</span><span class="param">	<span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></span><span class="return-annotation">) -> <span class="n">agno</span><span class="o">.</span><span class="n">team</span><span class="o">.</span><span class="n">team</span><span class="o">.</span><span class="n">Team</span>:</span></span>
+
+                <label class="view-source-button" for="create_personal_agent_team-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#create_personal_agent_team"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="create_personal_agent_team-73"><a href="#create_personal_agent_team-73"><span class="linenos"> 73</span></a><span class="k">def</span><span class="w"> </span><span class="nf">create_personal_agent_team</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-74"><a href="#create_personal_agent_team-74"><span class="linenos"> 74</span></a>    <span class="n">model_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ollama&quot;</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-75"><a href="#create_personal_agent_team-75"><span class="linenos"> 75</span></a>    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-76"><a href="#create_personal_agent_team-76"><span class="linenos"> 76</span></a>    <span class="n">ollama_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-77"><a href="#create_personal_agent_team-77"><span class="linenos"> 77</span></a>    <span class="n">storage_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">AGNO_STORAGE_DIR</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-78"><a href="#create_personal_agent_team-78"><span class="linenos"> 78</span></a>    <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;test_user&quot;</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-79"><a href="#create_personal_agent_team-79"><span class="linenos"> 79</span></a>    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-80"><a href="#create_personal_agent_team-80"><span class="linenos"> 80</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Team</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-81"><a href="#create_personal_agent_team-81"><span class="linenos"> 81</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a team of specialized personal agents.</span>
+</span><span id="create_personal_agent_team-82"><a href="#create_personal_agent_team-82"><span class="linenos"> 82</span></a>
+</span><span id="create_personal_agent_team-83"><a href="#create_personal_agent_team-83"><span class="linenos"> 83</span></a><span class="sd">    :param model_provider: LLM provider (&#39;ollama&#39; or &#39;openai&#39;)</span>
+</span><span id="create_personal_agent_team-84"><a href="#create_personal_agent_team-84"><span class="linenos"> 84</span></a><span class="sd">    :param model_name: Model name to use</span>
+</span><span id="create_personal_agent_team-85"><a href="#create_personal_agent_team-85"><span class="linenos"> 85</span></a><span class="sd">    :param ollama_base_url: Base URL for Ollama API</span>
+</span><span id="create_personal_agent_team-86"><a href="#create_personal_agent_team-86"><span class="linenos"> 86</span></a><span class="sd">    :param storage_dir: Directory for storage files</span>
+</span><span id="create_personal_agent_team-87"><a href="#create_personal_agent_team-87"><span class="linenos"> 87</span></a><span class="sd">    :param user_id: User identifier for memory operations</span>
+</span><span id="create_personal_agent_team-88"><a href="#create_personal_agent_team-88"><span class="linenos"> 88</span></a><span class="sd">    :param debug: Enable debug mode</span>
+</span><span id="create_personal_agent_team-89"><a href="#create_personal_agent_team-89"><span class="linenos"> 89</span></a><span class="sd">    :return: Configured team instance</span>
+</span><span id="create_personal_agent_team-90"><a href="#create_personal_agent_team-90"><span class="linenos"> 90</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="create_personal_agent_team-91"><a href="#create_personal_agent_team-91"><span class="linenos"> 91</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating Personal Agent Team - Coordinator as Memory Agent&quot;</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-92"><a href="#create_personal_agent_team-92"><span class="linenos"> 92</span></a>
+</span><span id="create_personal_agent_team-93"><a href="#create_personal_agent_team-93"><span class="linenos"> 93</span></a>    <span class="c1"># Create specialized agents (NO personal memory agent - coordinator handles memory)</span>
+</span><span id="create_personal_agent_team-94"><a href="#create_personal_agent_team-94"><span class="linenos"> 94</span></a>    <span class="n">web_research_agent</span> <span class="o">=</span> <span class="n">create_web_research_agent</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-95"><a href="#create_personal_agent_team-95"><span class="linenos"> 95</span></a>        <span class="n">model_provider</span><span class="o">=</span><span class="n">model_provider</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-96"><a href="#create_personal_agent_team-96"><span class="linenos"> 96</span></a>        <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-97"><a href="#create_personal_agent_team-97"><span class="linenos"> 97</span></a>        <span class="n">ollama_base_url</span><span class="o">=</span><span class="n">ollama_base_url</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-98"><a href="#create_personal_agent_team-98"><span class="linenos"> 98</span></a>        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-99"><a href="#create_personal_agent_team-99"><span class="linenos"> 99</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-100"><a href="#create_personal_agent_team-100"><span class="linenos">100</span></a>
+</span><span id="create_personal_agent_team-101"><a href="#create_personal_agent_team-101"><span class="linenos">101</span></a>    <span class="n">finance_agent</span> <span class="o">=</span> <span class="n">create_finance_agent</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-102"><a href="#create_personal_agent_team-102"><span class="linenos">102</span></a>        <span class="n">model_provider</span><span class="o">=</span><span class="n">model_provider</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-103"><a href="#create_personal_agent_team-103"><span class="linenos">103</span></a>        <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-104"><a href="#create_personal_agent_team-104"><span class="linenos">104</span></a>        <span class="n">ollama_base_url</span><span class="o">=</span><span class="n">ollama_base_url</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-105"><a href="#create_personal_agent_team-105"><span class="linenos">105</span></a>        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-106"><a href="#create_personal_agent_team-106"><span class="linenos">106</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-107"><a href="#create_personal_agent_team-107"><span class="linenos">107</span></a>
+</span><span id="create_personal_agent_team-108"><a href="#create_personal_agent_team-108"><span class="linenos">108</span></a>    <span class="n">calculator_agent</span> <span class="o">=</span> <span class="n">create_calculator_agent</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-109"><a href="#create_personal_agent_team-109"><span class="linenos">109</span></a>        <span class="n">model_provider</span><span class="o">=</span><span class="n">model_provider</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-110"><a href="#create_personal_agent_team-110"><span class="linenos">110</span></a>        <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-111"><a href="#create_personal_agent_team-111"><span class="linenos">111</span></a>        <span class="n">ollama_base_url</span><span class="o">=</span><span class="n">ollama_base_url</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-112"><a href="#create_personal_agent_team-112"><span class="linenos">112</span></a>        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-113"><a href="#create_personal_agent_team-113"><span class="linenos">113</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-114"><a href="#create_personal_agent_team-114"><span class="linenos">114</span></a>
+</span><span id="create_personal_agent_team-115"><a href="#create_personal_agent_team-115"><span class="linenos">115</span></a>    <span class="n">file_operations_agent</span> <span class="o">=</span> <span class="n">create_file_operations_agent</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-116"><a href="#create_personal_agent_team-116"><span class="linenos">116</span></a>        <span class="n">model_provider</span><span class="o">=</span><span class="n">model_provider</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-117"><a href="#create_personal_agent_team-117"><span class="linenos">117</span></a>        <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-118"><a href="#create_personal_agent_team-118"><span class="linenos">118</span></a>        <span class="n">ollama_base_url</span><span class="o">=</span><span class="n">ollama_base_url</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-119"><a href="#create_personal_agent_team-119"><span class="linenos">119</span></a>        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-120"><a href="#create_personal_agent_team-120"><span class="linenos">120</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-121"><a href="#create_personal_agent_team-121"><span class="linenos">121</span></a>
+</span><span id="create_personal_agent_team-122"><a href="#create_personal_agent_team-122"><span class="linenos">122</span></a>    <span class="c1"># Create coordinator model</span>
+</span><span id="create_personal_agent_team-123"><a href="#create_personal_agent_team-123"><span class="linenos">123</span></a>    <span class="n">coordinator_model</span> <span class="o">=</span> <span class="n">_create_coordinator_model</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-124"><a href="#create_personal_agent_team-124"><span class="linenos">124</span></a>        <span class="n">model_provider</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ollama_base_url</span>
+</span><span id="create_personal_agent_team-125"><a href="#create_personal_agent_team-125"><span class="linenos">125</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-126"><a href="#create_personal_agent_team-126"><span class="linenos">126</span></a>
+</span><span id="create_personal_agent_team-127"><a href="#create_personal_agent_team-127"><span class="linenos">127</span></a>    <span class="c1"># Create memory system for direct access</span>
+</span><span id="create_personal_agent_team-128"><a href="#create_personal_agent_team-128"><span class="linenos">128</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">..core.agno_storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_agno_memory</span>
+</span><span id="create_personal_agent_team-129"><a href="#create_personal_agent_team-129"><span class="linenos">129</span></a>    <span class="n">agno_memory</span> <span class="o">=</span> <span class="n">create_agno_memory</span><span class="p">(</span><span class="n">storage_dir</span><span class="p">,</span> <span class="n">debug_mode</span><span class="o">=</span><span class="n">debug</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-130"><a href="#create_personal_agent_team-130"><span class="linenos">130</span></a>
+</span><span id="create_personal_agent_team-131"><a href="#create_personal_agent_team-131"><span class="linenos">131</span></a>    <span class="c1"># Get memory tools using centralized AgentMemoryManager</span>
+</span><span id="create_personal_agent_team-132"><a href="#create_personal_agent_team-132"><span class="linenos">132</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_memory_tools</span><span class="p">():</span>
+</span><span id="create_personal_agent_team-133"><a href="#create_personal_agent_team-133"><span class="linenos">133</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Get memory tools using centralized AgentMemoryManager for consistent restatement logic.&quot;&quot;&quot;</span>
+</span><span id="create_personal_agent_team-134"><a href="#create_personal_agent_team-134"><span class="linenos">134</span></a>        <span class="c1"># Create centralized memory manager</span>
+</span><span id="create_personal_agent_team-135"><a href="#create_personal_agent_team-135"><span class="linenos">135</span></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">..core.agent_memory_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentMemoryManager</span>
+</span><span id="create_personal_agent_team-136"><a href="#create_personal_agent_team-136"><span class="linenos">136</span></a>        <span class="n">memory_manager</span> <span class="o">=</span> <span class="n">AgentMemoryManager</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-137"><a href="#create_personal_agent_team-137"><span class="linenos">137</span></a>            <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-138"><a href="#create_personal_agent_team-138"><span class="linenos">138</span></a>            <span class="n">storage_dir</span><span class="o">=</span><span class="n">storage_dir</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-139"><a href="#create_personal_agent_team-139"><span class="linenos">139</span></a>            <span class="n">agno_memory</span><span class="o">=</span><span class="n">agno_memory</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-140"><a href="#create_personal_agent_team-140"><span class="linenos">140</span></a>            <span class="n">enable_memory</span><span class="o">=</span><span class="kc">True</span>
+</span><span id="create_personal_agent_team-141"><a href="#create_personal_agent_team-141"><span class="linenos">141</span></a>        <span class="p">)</span>
+</span><span id="create_personal_agent_team-142"><a href="#create_personal_agent_team-142"><span class="linenos">142</span></a>        <span class="n">memory_manager</span><span class="o">.</span><span class="n">initialize</span><span class="p">(</span><span class="n">agno_memory</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-143"><a href="#create_personal_agent_team-143"><span class="linenos">143</span></a>        
+</span><span id="create_personal_agent_team-144"><a href="#create_personal_agent_team-144"><span class="linenos">144</span></a>        <span class="n">tools</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="create_personal_agent_team-145"><a href="#create_personal_agent_team-145"><span class="linenos">145</span></a>
+</span><span id="create_personal_agent_team-146"><a href="#create_personal_agent_team-146"><span class="linenos">146</span></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">store_user_memory</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-147"><a href="#create_personal_agent_team-147"><span class="linenos">147</span></a>            <span class="n">content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">topics</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="create_personal_agent_team-148"><a href="#create_personal_agent_team-148"><span class="linenos">148</span></a>        <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-149"><a href="#create_personal_agent_team-149"><span class="linenos">149</span></a><span class="w">            </span><span class="sd">&quot;&quot;&quot;Store information as a user memory using centralized AgentMemoryManager.&quot;&quot;&quot;</span>
+</span><span id="create_personal_agent_team-150"><a href="#create_personal_agent_team-150"><span class="linenos">150</span></a>            <span class="k">try</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-151"><a href="#create_personal_agent_team-151"><span class="linenos">151</span></a>                <span class="c1"># Use the centralized memory manager which has proper restatement logic</span>
+</span><span id="create_personal_agent_team-152"><a href="#create_personal_agent_team-152"><span class="linenos">152</span></a>                <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">memory_manager</span><span class="o">.</span><span class="n">store_user_memory</span><span class="p">(</span><span class="n">content</span><span class="o">=</span><span class="n">content</span><span class="p">,</span> <span class="n">topics</span><span class="o">=</span><span class="n">topics</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-153"><a href="#create_personal_agent_team-153"><span class="linenos">153</span></a>                
+</span><span id="create_personal_agent_team-154"><a href="#create_personal_agent_team-154"><span class="linenos">154</span></a>                <span class="c1"># Convert MemoryStorageResult to string message</span>
+</span><span id="create_personal_agent_team-155"><a href="#create_personal_agent_team-155"><span class="linenos">155</span></a>                <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">is_success</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-156"><a href="#create_personal_agent_team-156"><span class="linenos">156</span></a>                    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;✅ Successfully stored memory: </span><span class="si">{</span><span class="n">content</span><span class="p">[:</span><span class="mi">50</span><span class="p">]</span><span class="si">}</span><span class="s2">... (ID: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">memory_id</span><span class="si">}</span><span class="s2">)&quot;</span>
+</span><span id="create_personal_agent_team-157"><a href="#create_personal_agent_team-157"><span class="linenos">157</span></a>                <span class="k">elif</span> <span class="n">result</span><span class="o">.</span><span class="n">is_rejected</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-158"><a href="#create_personal_agent_team-158"><span class="linenos">158</span></a>                    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;ℹ️ Memory not stored: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-159"><a href="#create_personal_agent_team-159"><span class="linenos">159</span></a>                <span class="k">else</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-160"><a href="#create_personal_agent_team-160"><span class="linenos">160</span></a>                    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;❌ Error storing memory: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-161"><a href="#create_personal_agent_team-161"><span class="linenos">161</span></a>                    
+</span><span id="create_personal_agent_team-162"><a href="#create_personal_agent_team-162"><span class="linenos">162</span></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-163"><a href="#create_personal_agent_team-163"><span class="linenos">163</span></a>                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;❌ Error storing memory: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-164"><a href="#create_personal_agent_team-164"><span class="linenos">164</span></a>
+</span><span id="create_personal_agent_team-165"><a href="#create_personal_agent_team-165"><span class="linenos">165</span></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">query_memory</span><span class="p">(</span><span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-166"><a href="#create_personal_agent_team-166"><span class="linenos">166</span></a><span class="w">            </span><span class="sd">&quot;&quot;&quot;Search user memories using semantic search.&quot;&quot;&quot;</span>
+</span><span id="create_personal_agent_team-167"><a href="#create_personal_agent_team-167"><span class="linenos">167</span></a>            <span class="k">try</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-168"><a href="#create_personal_agent_team-168"><span class="linenos">168</span></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">query</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">query</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+</span><span id="create_personal_agent_team-169"><a href="#create_personal_agent_team-169"><span class="linenos">169</span></a>                    <span class="k">return</span> <span class="s2">&quot;❌ Error: Query cannot be empty.&quot;</span>
+</span><span id="create_personal_agent_team-170"><a href="#create_personal_agent_team-170"><span class="linenos">170</span></a>
+</span><span id="create_personal_agent_team-171"><a href="#create_personal_agent_team-171"><span class="linenos">171</span></a>                <span class="n">all_memories</span> <span class="o">=</span> <span class="n">agno_memory</span><span class="o">.</span><span class="n">get_user_memories</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-172"><a href="#create_personal_agent_team-172"><span class="linenos">172</span></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">all_memories</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-173"><a href="#create_personal_agent_team-173"><span class="linenos">173</span></a>                    <span class="k">return</span> <span class="s2">&quot;🔍 No memories found - you haven&#39;t shared any information with me yet!&quot;</span>
+</span><span id="create_personal_agent_team-174"><a href="#create_personal_agent_team-174"><span class="linenos">174</span></a>
+</span><span id="create_personal_agent_team-175"><a href="#create_personal_agent_team-175"><span class="linenos">175</span></a>                <span class="c1"># Search through memories</span>
+</span><span id="create_personal_agent_team-176"><a href="#create_personal_agent_team-176"><span class="linenos">176</span></a>                <span class="n">query_terms</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+</span><span id="create_personal_agent_team-177"><a href="#create_personal_agent_team-177"><span class="linenos">177</span></a>                <span class="n">matching_memories</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="create_personal_agent_team-178"><a href="#create_personal_agent_team-178"><span class="linenos">178</span></a>
+</span><span id="create_personal_agent_team-179"><a href="#create_personal_agent_team-179"><span class="linenos">179</span></a>                <span class="k">for</span> <span class="n">memory</span> <span class="ow">in</span> <span class="n">all_memories</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-180"><a href="#create_personal_agent_team-180"><span class="linenos">180</span></a>                    <span class="n">memory_content</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">memory</span><span class="p">,</span> <span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+</span><span id="create_personal_agent_team-181"><a href="#create_personal_agent_team-181"><span class="linenos">181</span></a>                    <span class="n">memory_topics</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">memory</span><span class="p">,</span> <span class="s2">&quot;topics&quot;</span><span class="p">,</span> <span class="p">[])</span>
+</span><span id="create_personal_agent_team-182"><a href="#create_personal_agent_team-182"><span class="linenos">182</span></a>                    <span class="n">topic_text</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">memory_topics</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+</span><span id="create_personal_agent_team-183"><a href="#create_personal_agent_team-183"><span class="linenos">183</span></a>
+</span><span id="create_personal_agent_team-184"><a href="#create_personal_agent_team-184"><span class="linenos">184</span></a>                    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-185"><a href="#create_personal_agent_team-185"><span class="linenos">185</span></a>                        <span class="n">term</span> <span class="ow">in</span> <span class="n">memory_content</span> <span class="ow">or</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">topic_text</span>
+</span><span id="create_personal_agent_team-186"><a href="#create_personal_agent_team-186"><span class="linenos">186</span></a>                        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">query_terms</span>
+</span><span id="create_personal_agent_team-187"><a href="#create_personal_agent_team-187"><span class="linenos">187</span></a>                    <span class="p">):</span>
+</span><span id="create_personal_agent_team-188"><a href="#create_personal_agent_team-188"><span class="linenos">188</span></a>                        <span class="n">matching_memories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">memory</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-189"><a href="#create_personal_agent_team-189"><span class="linenos">189</span></a>
+</span><span id="create_personal_agent_team-190"><a href="#create_personal_agent_team-190"><span class="linenos">190</span></a>                <span class="c1"># Also try semantic search</span>
+</span><span id="create_personal_agent_team-191"><a href="#create_personal_agent_team-191"><span class="linenos">191</span></a>                <span class="k">try</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-192"><a href="#create_personal_agent_team-192"><span class="linenos">192</span></a>                    <span class="n">semantic_memories</span> <span class="o">=</span> <span class="n">agno_memory</span><span class="o">.</span><span class="n">search_user_memories</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-193"><a href="#create_personal_agent_team-193"><span class="linenos">193</span></a>                        <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-194"><a href="#create_personal_agent_team-194"><span class="linenos">194</span></a>                        <span class="n">query</span><span class="o">=</span><span class="n">query</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+</span><span id="create_personal_agent_team-195"><a href="#create_personal_agent_team-195"><span class="linenos">195</span></a>                        <span class="n">retrieval_method</span><span class="o">=</span><span class="s2">&quot;agentic&quot;</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-196"><a href="#create_personal_agent_team-196"><span class="linenos">196</span></a>                        <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-197"><a href="#create_personal_agent_team-197"><span class="linenos">197</span></a>                    <span class="p">)</span>
+</span><span id="create_personal_agent_team-198"><a href="#create_personal_agent_team-198"><span class="linenos">198</span></a>                    <span class="k">for</span> <span class="n">sem_memory</span> <span class="ow">in</span> <span class="n">semantic_memories</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-199"><a href="#create_personal_agent_team-199"><span class="linenos">199</span></a>                        <span class="k">if</span> <span class="n">sem_memory</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">matching_memories</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-200"><a href="#create_personal_agent_team-200"><span class="linenos">200</span></a>                            <span class="n">matching_memories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sem_memory</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-201"><a href="#create_personal_agent_team-201"><span class="linenos">201</span></a>                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-202"><a href="#create_personal_agent_team-202"><span class="linenos">202</span></a>                    <span class="k">pass</span>
+</span><span id="create_personal_agent_team-203"><a href="#create_personal_agent_team-203"><span class="linenos">203</span></a>
+</span><span id="create_personal_agent_team-204"><a href="#create_personal_agent_team-204"><span class="linenos">204</span></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">matching_memories</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-205"><a href="#create_personal_agent_team-205"><span class="linenos">205</span></a>                    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;🔍 No memories found for &#39;</span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&#39; (searched through </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_memories</span><span class="p">)</span><span class="si">}</span><span class="s2"> total memories). Try different keywords!&quot;</span>
+</span><span id="create_personal_agent_team-206"><a href="#create_personal_agent_team-206"><span class="linenos">206</span></a>
+</span><span id="create_personal_agent_team-207"><a href="#create_personal_agent_team-207"><span class="linenos">207</span></a>                <span class="k">if</span> <span class="n">limit</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">matching_memories</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">limit</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-208"><a href="#create_personal_agent_team-208"><span class="linenos">208</span></a>                    <span class="n">display_memories</span> <span class="o">=</span> <span class="n">matching_memories</span><span class="p">[:</span><span class="n">limit</span><span class="p">]</span>
+</span><span id="create_personal_agent_team-209"><a href="#create_personal_agent_team-209"><span class="linenos">209</span></a>                    <span class="n">result_note</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;🧠 Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">matching_memories</span><span class="p">)</span><span class="si">}</span><span class="s2"> matches, showing top </span><span class="si">{</span><span class="n">limit</span><span class="si">}</span><span class="s2">:&quot;</span>
+</span><span id="create_personal_agent_team-210"><a href="#create_personal_agent_team-210"><span class="linenos">210</span></a>                <span class="k">else</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-211"><a href="#create_personal_agent_team-211"><span class="linenos">211</span></a>                    <span class="n">display_memories</span> <span class="o">=</span> <span class="n">matching_memories</span>
+</span><span id="create_personal_agent_team-212"><a href="#create_personal_agent_team-212"><span class="linenos">212</span></a>                    <span class="n">result_note</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;🧠 Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">matching_memories</span><span class="p">)</span><span class="si">}</span><span class="s2"> memories about &#39;</span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&#39;:&quot;</span>
+</span><span id="create_personal_agent_team-213"><a href="#create_personal_agent_team-213"><span class="linenos">213</span></a>
+</span><span id="create_personal_agent_team-214"><a href="#create_personal_agent_team-214"><span class="linenos">214</span></a>                <span class="n">result</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">result_note</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-215"><a href="#create_personal_agent_team-215"><span class="linenos">215</span></a>                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">memory</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">display_memories</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+</span><span id="create_personal_agent_team-216"><a href="#create_personal_agent_team-216"><span class="linenos">216</span></a>                    <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">memory</span><span class="o">.</span><span class="n">memory</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-217"><a href="#create_personal_agent_team-217"><span class="linenos">217</span></a>                    <span class="k">if</span> <span class="n">memory</span><span class="o">.</span><span class="n">topics</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-218"><a href="#create_personal_agent_team-218"><span class="linenos">218</span></a>                        <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;   Topics: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">memory</span><span class="o">.</span><span class="n">topics</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-219"><a href="#create_personal_agent_team-219"><span class="linenos">219</span></a>                    <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-220"><a href="#create_personal_agent_team-220"><span class="linenos">220</span></a>
+</span><span id="create_personal_agent_team-221"><a href="#create_personal_agent_team-221"><span class="linenos">221</span></a>                <span class="k">return</span> <span class="n">result</span>
+</span><span id="create_personal_agent_team-222"><a href="#create_personal_agent_team-222"><span class="linenos">222</span></a>
+</span><span id="create_personal_agent_team-223"><a href="#create_personal_agent_team-223"><span class="linenos">223</span></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-224"><a href="#create_personal_agent_team-224"><span class="linenos">224</span></a>                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;❌ Error searching memories: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-225"><a href="#create_personal_agent_team-225"><span class="linenos">225</span></a>
+</span><span id="create_personal_agent_team-226"><a href="#create_personal_agent_team-226"><span class="linenos">226</span></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_recent_memories</span><span class="p">(</span><span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-227"><a href="#create_personal_agent_team-227"><span class="linenos">227</span></a><span class="w">            </span><span class="sd">&quot;&quot;&quot;Get the most recent user memories.&quot;&quot;&quot;</span>
+</span><span id="create_personal_agent_team-228"><a href="#create_personal_agent_team-228"><span class="linenos">228</span></a>            <span class="k">try</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-229"><a href="#create_personal_agent_team-229"><span class="linenos">229</span></a>                <span class="n">memories</span> <span class="o">=</span> <span class="n">agno_memory</span><span class="o">.</span><span class="n">search_user_memories</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-230"><a href="#create_personal_agent_team-230"><span class="linenos">230</span></a>                    <span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span> <span class="n">retrieval_method</span><span class="o">=</span><span class="s2">&quot;last_n&quot;</span>
+</span><span id="create_personal_agent_team-231"><a href="#create_personal_agent_team-231"><span class="linenos">231</span></a>                <span class="p">)</span>
+</span><span id="create_personal_agent_team-232"><a href="#create_personal_agent_team-232"><span class="linenos">232</span></a>
+</span><span id="create_personal_agent_team-233"><a href="#create_personal_agent_team-233"><span class="linenos">233</span></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">memories</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-234"><a href="#create_personal_agent_team-234"><span class="linenos">234</span></a>                    <span class="k">return</span> <span class="s2">&quot;📝 No memories found - you haven&#39;t shared any information with me yet!&quot;</span>
+</span><span id="create_personal_agent_team-235"><a href="#create_personal_agent_team-235"><span class="linenos">235</span></a>
+</span><span id="create_personal_agent_team-236"><a href="#create_personal_agent_team-236"><span class="linenos">236</span></a>                <span class="n">result</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;📝 Your most recent </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">memories</span><span class="p">)</span><span class="si">}</span><span class="s2"> memories:</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-237"><a href="#create_personal_agent_team-237"><span class="linenos">237</span></a>                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">memory</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">memories</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+</span><span id="create_personal_agent_team-238"><a href="#create_personal_agent_team-238"><span class="linenos">238</span></a>                    <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">memory</span><span class="o">.</span><span class="n">memory</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-239"><a href="#create_personal_agent_team-239"><span class="linenos">239</span></a>                    <span class="k">if</span> <span class="n">memory</span><span class="o">.</span><span class="n">topics</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-240"><a href="#create_personal_agent_team-240"><span class="linenos">240</span></a>                        <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;   Topics: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">memory</span><span class="o">.</span><span class="n">topics</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-241"><a href="#create_personal_agent_team-241"><span class="linenos">241</span></a>                    <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-242"><a href="#create_personal_agent_team-242"><span class="linenos">242</span></a>
+</span><span id="create_personal_agent_team-243"><a href="#create_personal_agent_team-243"><span class="linenos">243</span></a>                <span class="k">return</span> <span class="n">result</span>
+</span><span id="create_personal_agent_team-244"><a href="#create_personal_agent_team-244"><span class="linenos">244</span></a>
+</span><span id="create_personal_agent_team-245"><a href="#create_personal_agent_team-245"><span class="linenos">245</span></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="create_personal_agent_team-246"><a href="#create_personal_agent_team-246"><span class="linenos">246</span></a>                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;❌ Error getting recent memories: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="create_personal_agent_team-247"><a href="#create_personal_agent_team-247"><span class="linenos">247</span></a>
+</span><span id="create_personal_agent_team-248"><a href="#create_personal_agent_team-248"><span class="linenos">248</span></a>        <span class="c1"># Set proper function names</span>
+</span><span id="create_personal_agent_team-249"><a href="#create_personal_agent_team-249"><span class="linenos">249</span></a>        <span class="n">store_user_memory</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">=</span> <span class="s2">&quot;store_user_memory&quot;</span>
+</span><span id="create_personal_agent_team-250"><a href="#create_personal_agent_team-250"><span class="linenos">250</span></a>        <span class="n">query_memory</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">=</span> <span class="s2">&quot;query_memory&quot;</span>
+</span><span id="create_personal_agent_team-251"><a href="#create_personal_agent_team-251"><span class="linenos">251</span></a>        <span class="n">get_recent_memories</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">=</span> <span class="s2">&quot;get_recent_memories&quot;</span>
+</span><span id="create_personal_agent_team-252"><a href="#create_personal_agent_team-252"><span class="linenos">252</span></a>
+</span><span id="create_personal_agent_team-253"><a href="#create_personal_agent_team-253"><span class="linenos">253</span></a>        <span class="n">tools</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">store_user_memory</span><span class="p">,</span> <span class="n">query_memory</span><span class="p">,</span> <span class="n">get_recent_memories</span><span class="p">])</span>
+</span><span id="create_personal_agent_team-254"><a href="#create_personal_agent_team-254"><span class="linenos">254</span></a>        <span class="k">return</span> <span class="n">tools</span>
+</span><span id="create_personal_agent_team-255"><a href="#create_personal_agent_team-255"><span class="linenos">255</span></a>
+</span><span id="create_personal_agent_team-256"><a href="#create_personal_agent_team-256"><span class="linenos">256</span></a>    <span class="c1"># Get memory tools for coordinator (sync call)</span>
+</span><span id="create_personal_agent_team-257"><a href="#create_personal_agent_team-257"><span class="linenos">257</span></a>    <span class="n">memory_tools</span> <span class="o">=</span> <span class="n">get_memory_tools</span><span class="p">()</span>
+</span><span id="create_personal_agent_team-258"><a href="#create_personal_agent_team-258"><span class="linenos">258</span></a>
+</span><span id="create_personal_agent_team-259"><a href="#create_personal_agent_team-259"><span class="linenos">259</span></a>    <span class="c1"># Create team instructions - Coordinator IS the personal AI friend</span>
+</span><span id="create_personal_agent_team-260"><a href="#create_personal_agent_team-260"><span class="linenos">260</span></a>    <span class="n">team_instructions</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-261"><a href="#create_personal_agent_team-261"><span class="linenos">261</span></a>        <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+</span><span id="create_personal_agent_team-262"><a href="#create_personal_agent_team-262"><span class="linenos">262</span></a><span class="s2">        You are a warm, friendly personal AI assistant with memory capabilities and access to specialized team members.</span>
+</span><span id="create_personal_agent_team-263"><a href="#create_personal_agent_team-263"><span class="linenos">263</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-264"><a href="#create_personal_agent_team-264"><span class="linenos">264</span></a><span class="s2">        ## YOUR IDENTITY</span>
+</span><span id="create_personal_agent_team-265"><a href="#create_personal_agent_team-265"><span class="linenos">265</span></a><span class="s2">        - You ARE the user&#39;s personal AI friend</span>
+</span><span id="create_personal_agent_team-266"><a href="#create_personal_agent_team-266"><span class="linenos">266</span></a><span class="s2">        - You have direct access to memory tools to remember conversations</span>
+</span><span id="create_personal_agent_team-267"><a href="#create_personal_agent_team-267"><span class="linenos">267</span></a><span class="s2">        - You can delegate specialized tasks to your team members</span>
+</span><span id="create_personal_agent_team-268"><a href="#create_personal_agent_team-268"><span class="linenos">268</span></a><span class="s2">        - You should be conversational, warm, and genuinely interested in the user</span>
+</span><span id="create_personal_agent_team-269"><a href="#create_personal_agent_team-269"><span class="linenos">269</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-270"><a href="#create_personal_agent_team-270"><span class="linenos">270</span></a><span class="s2">        ## YOUR MEMORY TOOLS (use these directly):</span>
+</span><span id="create_personal_agent_team-271"><a href="#create_personal_agent_team-271"><span class="linenos">271</span></a><span class="s2">        - store_user_memory(content, topics): Store new information about the user</span>
+</span><span id="create_personal_agent_team-272"><a href="#create_personal_agent_team-272"><span class="linenos">272</span></a><span class="s2">        - query_memory(query): Search through stored memories about the user  </span>
+</span><span id="create_personal_agent_team-273"><a href="#create_personal_agent_team-273"><span class="linenos">273</span></a><span class="s2">        - get_recent_memories(limit): Get the user&#39;s most recent memories</span>
+</span><span id="create_personal_agent_team-274"><a href="#create_personal_agent_team-274"><span class="linenos">274</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-275"><a href="#create_personal_agent_team-275"><span class="linenos">275</span></a><span class="s2">        ## YOUR TEAM MEMBERS (delegate specialized tasks):</span>
+</span><span id="create_personal_agent_team-276"><a href="#create_personal_agent_team-276"><span class="linenos">276</span></a><span class="s2">        - &quot;Web Research Agent&quot;: Web searches, current events, news</span>
+</span><span id="create_personal_agent_team-277"><a href="#create_personal_agent_team-277"><span class="linenos">277</span></a><span class="s2">        - &quot;Finance Agent&quot;: Stock prices, market data, financial information</span>
+</span><span id="create_personal_agent_team-278"><a href="#create_personal_agent_team-278"><span class="linenos">278</span></a><span class="s2">        - &quot;Calculator Agent&quot;: Math calculations, data analysis</span>
+</span><span id="create_personal_agent_team-279"><a href="#create_personal_agent_team-279"><span class="linenos">279</span></a><span class="s2">        - &quot;File Operations Agent&quot;: File operations, shell commands</span>
+</span><span id="create_personal_agent_team-280"><a href="#create_personal_agent_team-280"><span class="linenos">280</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-281"><a href="#create_personal_agent_team-281"><span class="linenos">281</span></a><span class="s2">        ## BEHAVIOR RULES:</span>
+</span><span id="create_personal_agent_team-282"><a href="#create_personal_agent_team-282"><span class="linenos">282</span></a><span class="s2">        1. **Memory Operations ONLY**: EXECUTE memory functions directly, don&#39;t show code</span>
+</span><span id="create_personal_agent_team-283"><a href="#create_personal_agent_team-283"><span class="linenos">283</span></a><span class="s2">           - &quot;What do you remember about me?&quot; → CALL get_recent_memories() and return results</span>
+</span><span id="create_personal_agent_team-284"><a href="#create_personal_agent_team-284"><span class="linenos">284</span></a><span class="s2">           - &quot;Do you know my preferences?&quot; → CALL query_memory(&quot;preferences&quot;) and return results</span>
+</span><span id="create_personal_agent_team-285"><a href="#create_personal_agent_team-285"><span class="linenos">285</span></a><span class="s2">           - &quot;Remember that I...&quot; → CALL store_user_memory(content, topics) and confirm</span>
+</span><span id="create_personal_agent_team-286"><a href="#create_personal_agent_team-286"><span class="linenos">286</span></a><span class="s2">           - NEVER show function names or code tags - EXECUTE the functions</span>
+</span><span id="create_personal_agent_team-287"><a href="#create_personal_agent_team-287"><span class="linenos">287</span></a><span class="s2">           - NEVER delegate memory tasks to team members</span>
+</span><span id="create_personal_agent_team-288"><a href="#create_personal_agent_team-288"><span class="linenos">288</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-289"><a href="#create_personal_agent_team-289"><span class="linenos">289</span></a><span class="s2">        2. **Math/Calculations**: ALWAYS delegate to Calculator Agent</span>
+</span><span id="create_personal_agent_team-290"><a href="#create_personal_agent_team-290"><span class="linenos">290</span></a><span class="s2">           - &quot;Calculate 15% of 250&quot; → route to &quot;Calculator Agent&quot;</span>
+</span><span id="create_personal_agent_team-291"><a href="#create_personal_agent_team-291"><span class="linenos">291</span></a><span class="s2">           - &quot;What&#39;s 2+2?&quot; → route to &quot;Calculator Agent&quot;</span>
+</span><span id="create_personal_agent_team-292"><a href="#create_personal_agent_team-292"><span class="linenos">292</span></a><span class="s2">           - ANY mathematical operation → route to &quot;Calculator Agent&quot;</span>
+</span><span id="create_personal_agent_team-293"><a href="#create_personal_agent_team-293"><span class="linenos">293</span></a><span class="s2">           - DO NOT use memory functions for calculations</span>
+</span><span id="create_personal_agent_team-294"><a href="#create_personal_agent_team-294"><span class="linenos">294</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-295"><a href="#create_personal_agent_team-295"><span class="linenos">295</span></a><span class="s2">        3. **Other Specialized Tasks**: Delegate to appropriate team members</span>
+</span><span id="create_personal_agent_team-296"><a href="#create_personal_agent_team-296"><span class="linenos">296</span></a><span class="s2">           - Web searches → route to &quot;Web Research Agent&quot;</span>
+</span><span id="create_personal_agent_team-297"><a href="#create_personal_agent_team-297"><span class="linenos">297</span></a><span class="s2">           - Finance queries → route to &quot;Finance Agent&quot;  </span>
+</span><span id="create_personal_agent_team-298"><a href="#create_personal_agent_team-298"><span class="linenos">298</span></a><span class="s2">           - File operations → route to &quot;File Operations Agent&quot;</span>
+</span><span id="create_personal_agent_team-299"><a href="#create_personal_agent_team-299"><span class="linenos">299</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-300"><a href="#create_personal_agent_team-300"><span class="linenos">300</span></a><span class="s2">        4. **Complex Multi-Step Tasks**: Handle memory first, then delegate</span>
+</span><span id="create_personal_agent_team-301"><a href="#create_personal_agent_team-301"><span class="linenos">301</span></a><span class="s2">           - For &quot;Remember X, then search Y&quot;: </span>
+</span><span id="create_personal_agent_team-302"><a href="#create_personal_agent_team-302"><span class="linenos">302</span></a><span class="s2">             a) First CALL store_user_memory() to store X</span>
+</span><span id="create_personal_agent_team-303"><a href="#create_personal_agent_team-303"><span class="linenos">303</span></a><span class="s2">             b) Then delegate search to appropriate team member</span>
+</span><span id="create_personal_agent_team-304"><a href="#create_personal_agent_team-304"><span class="linenos">304</span></a><span class="s2">           - Always acknowledge memory storage before proceeding</span>
+</span><span id="create_personal_agent_team-305"><a href="#create_personal_agent_team-305"><span class="linenos">305</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-306"><a href="#create_personal_agent_team-306"><span class="linenos">306</span></a><span class="s2">        5. **General Conversation**: Respond directly as a friendly AI</span>
+</span><span id="create_personal_agent_team-307"><a href="#create_personal_agent_team-307"><span class="linenos">307</span></a><span class="s2">           - Be warm, conversational, and supportive</span>
+</span><span id="create_personal_agent_team-308"><a href="#create_personal_agent_team-308"><span class="linenos">308</span></a><span class="s2">           - Reference memories to personalize responses</span>
+</span><span id="create_personal_agent_team-309"><a href="#create_personal_agent_team-309"><span class="linenos">309</span></a><span class="s2">           - Ask follow-up questions to show interest</span>
+</span><span id="create_personal_agent_team-310"><a href="#create_personal_agent_team-310"><span class="linenos">310</span></a><span class="s2">        </span>
+</span><span id="create_personal_agent_team-311"><a href="#create_personal_agent_team-311"><span class="linenos">311</span></a><span class="s2">        ## CRITICAL DELEGATION RULES:</span>
+</span><span id="create_personal_agent_team-312"><a href="#create_personal_agent_team-312"><span class="linenos">312</span></a><span class="s2">        - MEMORY tasks: Handle directly with your tools</span>
+</span><span id="create_personal_agent_team-313"><a href="#create_personal_agent_team-313"><span class="linenos">313</span></a><span class="s2">        - MATH tasks: Always delegate to Calculator Agent</span>
+</span><span id="create_personal_agent_team-314"><a href="#create_personal_agent_team-314"><span class="linenos">314</span></a><span class="s2">        - WEB tasks: Always delegate to Web Research Agent</span>
+</span><span id="create_personal_agent_team-315"><a href="#create_personal_agent_team-315"><span class="linenos">315</span></a><span class="s2">        - FINANCE tasks: Always delegate to Finance Agent</span>
+</span><span id="create_personal_agent_team-316"><a href="#create_personal_agent_team-316"><span class="linenos">316</span></a><span class="s2">        - FILE tasks: Always delegate to File Operations Agent</span>
+</span><span id="create_personal_agent_team-317"><a href="#create_personal_agent_team-317"><span class="linenos">317</span></a><span class="s2">        - DO NOT use memory functions for non-memory tasks</span>
+</span><span id="create_personal_agent_team-318"><a href="#create_personal_agent_team-318"><span class="linenos">318</span></a><span class="s2">        &quot;&quot;&quot;</span>
+</span><span id="create_personal_agent_team-319"><a href="#create_personal_agent_team-319"><span class="linenos">319</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-320"><a href="#create_personal_agent_team-320"><span class="linenos">320</span></a>
+</span><span id="create_personal_agent_team-321"><a href="#create_personal_agent_team-321"><span class="linenos">321</span></a>    <span class="c1"># Create team with route mode for proper delegation</span>
+</span><span id="create_personal_agent_team-322"><a href="#create_personal_agent_team-322"><span class="linenos">322</span></a>    <span class="n">team</span> <span class="o">=</span> <span class="n">Team</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-323"><a href="#create_personal_agent_team-323"><span class="linenos">323</span></a>        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Personal Agent Team&quot;</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-324"><a href="#create_personal_agent_team-324"><span class="linenos">324</span></a>        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;route&quot;</span><span class="p">,</span>  <span class="c1"># Enable routing to team members</span>
+</span><span id="create_personal_agent_team-325"><a href="#create_personal_agent_team-325"><span class="linenos">325</span></a>        <span class="n">model</span><span class="o">=</span><span class="n">coordinator_model</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-326"><a href="#create_personal_agent_team-326"><span class="linenos">326</span></a>        <span class="n">tools</span><span class="o">=</span><span class="n">memory_tools</span><span class="p">,</span>  <span class="c1"># Give coordinator direct access to memory tools</span>
+</span><span id="create_personal_agent_team-327"><a href="#create_personal_agent_team-327"><span class="linenos">327</span></a>        <span class="n">members</span><span class="o">=</span><span class="p">[</span>
+</span><span id="create_personal_agent_team-328"><a href="#create_personal_agent_team-328"><span class="linenos">328</span></a>            <span class="n">web_research_agent</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-329"><a href="#create_personal_agent_team-329"><span class="linenos">329</span></a>            <span class="n">finance_agent</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-330"><a href="#create_personal_agent_team-330"><span class="linenos">330</span></a>            <span class="n">calculator_agent</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-331"><a href="#create_personal_agent_team-331"><span class="linenos">331</span></a>            <span class="n">file_operations_agent</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-332"><a href="#create_personal_agent_team-332"><span class="linenos">332</span></a>        <span class="p">],</span>
+</span><span id="create_personal_agent_team-333"><a href="#create_personal_agent_team-333"><span class="linenos">333</span></a>        <span class="n">instructions</span><span class="o">=</span><span class="n">team_instructions</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-334"><a href="#create_personal_agent_team-334"><span class="linenos">334</span></a>        <span class="n">markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="create_personal_agent_team-335"><a href="#create_personal_agent_team-335"><span class="linenos">335</span></a>        <span class="n">show_tool_calls</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>  <span class="c1"># Only show tool calls in debug mode</span>
+</span><span id="create_personal_agent_team-336"><a href="#create_personal_agent_team-336"><span class="linenos">336</span></a>        <span class="n">show_members_responses</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Hide member responses for clean output</span>
+</span><span id="create_personal_agent_team-337"><a href="#create_personal_agent_team-337"><span class="linenos">337</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-338"><a href="#create_personal_agent_team-338"><span class="linenos">338</span></a>
+</span><span id="create_personal_agent_team-339"><a href="#create_personal_agent_team-339"><span class="linenos">339</span></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+</span><span id="create_personal_agent_team-340"><a href="#create_personal_agent_team-340"><span class="linenos">340</span></a>        <span class="s2">&quot;Created Personal Agent Team - Coordinator with memory + </span><span class="si">%d</span><span class="s2"> specialists&quot;</span><span class="p">,</span> 
+</span><span id="create_personal_agent_team-341"><a href="#create_personal_agent_team-341"><span class="linenos">341</span></a>        <span class="nb">len</span><span class="p">(</span><span class="n">team</span><span class="o">.</span><span class="n">members</span><span class="p">)</span>
+</span><span id="create_personal_agent_team-342"><a href="#create_personal_agent_team-342"><span class="linenos">342</span></a>    <span class="p">)</span>
+</span><span id="create_personal_agent_team-343"><a href="#create_personal_agent_team-343"><span class="linenos">343</span></a>    <span class="k">return</span> <span class="n">team</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Create a team of specialized personal agents.</p>
+
+<h6 id="parameters">Parameters</h6>
+
+<ul>
+<li><strong>model_provider</strong>:  LLM provider ('ollama' or 'openai')</li>
+<li><strong>model_name</strong>:  Model name to use</li>
+<li><strong>ollama_base_url</strong>:  Base URL for Ollama API</li>
+<li><strong>storage_dir</strong>:  Directory for storage files</li>
+<li><strong>user_id</strong>:  User identifier for memory operations</li>
+<li><strong>debug</strong>:  Enable debug mode</li>
+</ul>
+
+<h6 id="returns">Returns</h6>
+
+<blockquote>
+  <p>Configured team instance</p>
+</blockquote>
+</div>
+
+
+                </section>
+    </main>
+<script>
+    function escapeHTML(html) {
+        return document.createElement('div').appendChild(document.createTextNode(html)).parentNode.innerHTML;
+    }
+
+    const originalContent = document.querySelector("main.pdoc");
+    let currentContent = originalContent;
+
+    function setContent(innerHTML) {
+        let elem;
+        if (innerHTML) {
+            elem = document.createElement("main");
+            elem.classList.add("pdoc");
+            elem.innerHTML = innerHTML;
+        } else {
+            elem = originalContent;
+        }
+        if (currentContent !== elem) {
+            currentContent.replaceWith(elem);
+            currentContent = elem;
+        }
+    }
+
+    function getSearchTerm() {
+        return (new URL(window.location)).searchParams.get("search");
+    }
+
+    const searchBox = document.querySelector(".pdoc input[type=search]");
+    searchBox.addEventListener("input", function () {
+        let url = new URL(window.location);
+        if (searchBox.value.trim()) {
+            url.hash = "";
+            url.searchParams.set("search", searchBox.value);
+        } else {
+            url.searchParams.delete("search");
+        }
+        history.replaceState("", "", url.toString());
+        onInput();
+    });
+    window.addEventListener("popstate", onInput);
+
+
+    let search, searchErr;
+
+    async function initialize() {
+        try {
+            search = await new Promise((resolve, reject) => {
+                const script = document.createElement("script");
+                script.type = "text/javascript";
+                script.async = true;
+                script.onload = () => resolve(window.pdocSearch);
+                script.onerror = (e) => reject(e);
+                script.src = "../../search.js";
+                document.getElementsByTagName("head")[0].appendChild(script);
+            });
+        } catch (e) {
+            console.error("Cannot fetch pdoc search index");
+            searchErr = "Cannot fetch search index.";
+        }
+        onInput();
+
+        document.querySelector("nav.pdoc").addEventListener("click", e => {
+            if (e.target.hash) {
+                searchBox.value = "";
+                searchBox.dispatchEvent(new Event("input"));
+            }
+        });
+    }
+
+    function onInput() {
+        setContent((() => {
+            const term = getSearchTerm();
+            if (!term) {
+                return null
+            }
+            if (searchErr) {
+                return `<h3>Error: ${searchErr}</h3>`
+            }
+            if (!search) {
+                return "<h3>Searching...</h3>"
+            }
+
+            window.scrollTo({top: 0, left: 0, behavior: 'auto'});
+
+            const results = search(term);
+
+            let html;
+            if (results.length === 0) {
+                html = `No search results for '${escapeHTML(term)}'.`
+            } else {
+                html = `<h4>${results.length} search result${results.length > 1 ? "s" : ""} for '${escapeHTML(term)}'.</h4>`;
+            }
+            for (let result of results.slice(0, 10)) {
+                let doc = result.doc;
+                let url = `../../${doc.modulename.replaceAll(".", "/")}.html`;
+                if (doc.qualname) {
+                    url += `#${doc.qualname}`;
+                }
+
+                let heading;
+                switch (result.doc.kind) {
+                    case "function":
+                        if (doc.fullname.endsWith(".__init__")) {
+                            heading = `<span class="name">${doc.fullname.replace(/\.__init__$/, "")}</span>${doc.signature}`;
+                        } else {
+                            heading = `<span class="def">${doc.funcdef}</span> <span class="name">${doc.fullname}</span>${doc.signature}`;
+                        }
+                        break;
+                    case "class":
+                        heading = `<span class="def">class</span> <span class="name">${doc.fullname}</span>`;
+                        if (doc.bases)
+                            heading += `<wbr>(<span class="base">${doc.bases}</span>)`;
+                        heading += `:`;
+                        break;
+                    case "variable":
+                        heading = `<span class="name">${doc.fullname}</span>`;
+                        if (doc.annotation)
+                            heading += `<span class="annotation">${doc.annotation}</span>`;
+                        if (doc.default_value)
+                            heading += `<span class="default_value"> = ${doc.default_value}</span>`;
+                        break;
+                    default:
+                        heading = `<span class="name">${doc.fullname}</span>`;
+                        break;
+                }
+                html += `
+                        <section class="search-result">
+                        <a href="${url}" class="attr ${doc.kind}">${heading}</a>
+                        <div class="docstring">${doc.doc}</div>
+                        </section>
+                    `;
+
+            }
+            return html;
+        })());
+    }
+
+    if (getSearchTerm()) {
+        initialize();
+        searchBox.value = getSearchTerm();
+        onInput();
+    } else {
+        searchBox.addEventListener("focus", initialize, {once: true});
+    }
+
+    searchBox.addEventListener("keydown", e => {
+        if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) {
+            let focused = currentContent.querySelector(".search-result.focused");
+            if (!focused) {
+                currentContent.querySelector(".search-result").classList.add("focused");
+            } else if (
+                e.key === "ArrowDown"
+                && focused.nextElementSibling
+                && focused.nextElementSibling.classList.contains("search-result")
+            ) {
+                focused.classList.remove("focused");
+                focused.nextElementSibling.classList.add("focused");
+                focused.nextElementSibling.scrollIntoView({
+                    behavior: "smooth",
+                    block: "nearest",
+                    inline: "nearest"
+                });
+            } else if (
+                e.key === "ArrowUp"
+                && focused.previousElementSibling
+                && focused.previousElementSibling.classList.contains("search-result")
+            ) {
+                focused.classList.remove("focused");
+                focused.previousElementSibling.classList.add("focused");
+                focused.previousElementSibling.scrollIntoView({
+                    behavior: "smooth",
+                    block: "nearest",
+                    inline: "nearest"
+                });
+            } else if (
+                e.key === "Enter"
+            ) {
+                focused.querySelector("a").click();
+            }
+        }
+    });
+</script></body>
+</html>

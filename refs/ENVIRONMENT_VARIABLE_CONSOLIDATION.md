@@ -1,0 +1,192 @@
+# Environment Variable Consolidation
+
+## Overview
+
+This document provides instructions for consolidating environment variables from the `docker-compose.yml` file into the `env.memory_server` file. This will simplify configuration management by keeping all environment variables in a single location.
+
+## Current Setup Analysis
+
+The current setup has environment variables defined in two places:
+1. `env.memory_server` (which gets copied to `.env` for use)
+2. The `environment` section of `docker-compose.yml`
+
+Some variables appear in both files, with one case (PDF_CHUNK_SIZE) having different values. The docker-compose.yml values take precedence when both are present.
+
+## Updated env.memory_server
+
+Below is the updated content for `env.memory_server` with all environment variables consolidated:
+
+```
+# Personal AI Agent Environment Variables
+# Copy this file to .env and fill in your actual API keys
+
+### Server Configuration
+LIGHTRAG_MEMORY_PORT=9622
+WEBUI_TITLE="Personal Agent Memory Base"
+WEBUI_DESCRIPTION="P.Agent Knowledge-Graph RAG"
+
+# Directories for the Personal AI Agent
+ROOT_DIR=/                     # Full filesystem access
+HOME_DIR=/Users/egs           # User's home directory  
+DATA_DIR=/Users/Shared/personal_agent_data     # Data directory for vector database
+# USER CONFIGURATION
+USER_ID=Eric
+
+#OLLAMA_URL=http://tesla.local:11434
+OLLAMA_URL=http://localhost:11434
+OLLAMA_DOCKER_URL=http://host.docker.internal:11434
+
+# LLM Model configuration - use actual model names, not dictionary references
+#LLM_MODEL=llama3.1:8b-instruct-q8_0
+LLM_MODEL=qwen3:1.7b
+EMBEDDING_MODEL=nomic-embed-text
+
+# Agno Storage Configuration
+# Storage backend: "weaviate" or "agno"
+STORAGE_BACKEND=agno
+AGNO_STORAGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}
+
+# Knowledge directory for Agno
+AGNO_KNOWLEDGE_DIR=${DATA_DIR}/${STORAGE_BACKEND}/${USER_ID}/knowledge
+
+
+# MODEL CONTEXT SIZE OVERRIDES
+# Override context sizes for specific models (optional)
+# Format: MODEL_NAME_CTX_SIZE (replace : with _ and . with _)
+# Examples:
+QWEN3_1_7B_CTX_SIZE=32768
+QWEN3_4B_CTX_SIZE=32768
+
+# LLAMA3_1_8B_INSTRUCT_Q8_0_CTX_SIZE=65536
+DEFAULT_MODEL_CTX_SIZE=32768
+
+
+# Embedding model (also via Ollama)
+EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_BINDING=ollama
+EMBEDDING_BINDING_HOST=http://host.docker.internal:11434
+EMBEDDING_DIM=768
+
+# LLM Binding Configuration
+LLM_BINDING_HOST=http://host.docker.internal:11434
+# EMBEDDING_BINDING_API_KEY=your_api_key
+# Optional LightRAG REST server configuration
+
+# GUI Endpoint
+LIGHTRAG_MEMORY_SERVER=http://localhost:9622
+LIGHTRAG_MEMORY_SERVER_URL=http://localhost:9622/webui
+
+# LLM_BINDING_API_KEY=your_api_key
+### Time out in seconds for LLM, None for infinite timeout
+TIMEOUT=7200
+### Some models like o1-mini require temperature to be set to 1
+TEMPERATURE=0
+### Max concurrency requests of LLM
+MAX_ASYNC=1
+
+# LIGHTRAG TIMEOUT SETTINGS FOR PDF PROCESSING
+LLM_TIMEOUT=7200          # 120 minutes for LLM processing (increased for remote Ollama)
+EMBEDDING_TIMEOUT=3600    # 60 minutes for embedding processing (increased for remote)
+PDF_CHUNK_SIZE=512        # Changed from 2048 to 512 to match docker-compose.yml
+HTTP_TIMEOUT=7200         # 120 minutes for HTTP client timeout
+CONNECTION_TIMEOUT=600    # 10 minutes for initial connection timeout
+READ_TIMEOUT=7200         # 120 minutes for read operations
+WRITE_TIMEOUT=600         # 10 minutes for write operations
+POOL_TIMEOUT=600          # 10 minutes for connection pool timeout
+
+# HTTPX CLIENT TIMEOUT SETTINGS (for Ollama client)
+HTTPX_TIMEOUT=7200        # 120 minutes for httpx client operations
+HTTPX_CONNECT_TIMEOUT=600 # 10 minutes for httpx connection timeout
+HTTPX_READ_TIMEOUT=7200   # 120 minutes for httpx read timeout
+HTTPX_WRITE_TIMEOUT=600   # 10 minutes for httpx write timeout
+HTTPX_POOL_TIMEOUT=600    # 10 minutes for httpx pool timeout
+
+# CHUNK SETTINGS (from docker-compose.yml)
+CHUNK_SIZE=512
+CHUNK_OVERLAP_SIZE=100
+
+# WORKER SETTINGS (from docker-compose.yml)
+WORKERS=1
+MAX_PARALLEL_INSERT=1
+
+# ADDITIONAL OLLAMA SETTINGS (from docker-compose.yml)
+OLLAMA_TIMEOUT=7200
+OLLAMA_KEEP_ALIVE=3600
+OLLAMA_NUM_PREDICT=16384
+OLLAMA_TEMPERATURE=0.1
+OLLAMA_REQUEST_TIMEOUT=14400
+
+# ADDITIONAL TIMEOUT SETTINGS (from docker-compose.yml)
+REQUESTS_TIMEOUT=14400
+URLLIB3_TIMEOUT=14400
+AIOHTTP_TIMEOUT=14400
+SOCKET_TIMEOUT=14400
+
+# TCP SETTINGS (from docker-compose.yml)
+TCP_KEEPALIVE=true
+TCP_KEEPALIVE_IDLE=600
+TCP_KEEPALIVE_INTERVAL=60
+TCP_KEEPALIVE_COUNT=9
+```
+
+## Updated docker-compose.yml
+
+Below is the updated content for `docker-compose.yml` with the environment section removed:
+
+```yaml
+services:
+  lightrag:
+    container_name: lightrag_memory
+    image: ghcr.io/suchanek/lightrag_pagent:latest
+    env_file:
+      - .env
+    ports:
+      - 9622:9621
+    volumes:
+      - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
+      - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
+      - ./config.ini:/app/config.ini
+      - ./.env:/app/.env
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9621/health')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+```
+
+## Implementation Steps
+
+1. **Backup your current files**:
+   ```bash
+   cp lightrag_memory_server/env.memory_server lightrag_memory_server/env.memory_server.bak
+   cp lightrag_memory_server/docker-compose.yml lightrag_memory_server/docker-compose.yml.bak
+   ```
+
+2. **Update env.memory_server**:
+   Replace the content of `lightrag_memory_server/env.memory_server` with the updated content provided above.
+
+3. **Update docker-compose.yml**:
+   Replace the content of `lightrag_memory_server/docker-compose.yml` with the updated content provided above.
+
+4. **Copy env.memory_server to .env**:
+   ```bash
+   cp lightrag_memory_server/env.memory_server lightrag_memory_server/.env
+   ```
+
+5. **Test the changes**:
+   ```bash
+   cd lightrag_memory_server
+   docker-compose down
+   docker-compose up -d
+   ```
+
+## Benefits of This Approach
+
+1. **Single Source of Truth**: All environment variables are defined in one place
+2. **Simplified Maintenance**: Easier to update and manage environment variables
+3. **Cleaner Docker Configuration**: The docker-compose.yml file is more concise and focused on container configuration
+4. **Consistent Configuration**: Eliminates the risk of inconsistent values between files

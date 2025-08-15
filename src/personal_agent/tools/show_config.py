@@ -22,6 +22,7 @@ import yaml
 # Import settings from the config module
 try:
     from ..config import settings
+    from ..config.mcp_servers import get_mcp_servers
 except ImportError:
     # Fallback for direct execution
     import sys
@@ -31,6 +32,7 @@ except ImportError:
     src_dir = project_root / "src"
     sys.path.insert(0, str(src_dir))
     from personal_agent.config import settings
+    from personal_agent.config.mcp_servers import get_mcp_servers
 
 
 def get_project_root():
@@ -60,6 +62,7 @@ def output_json():
             "ollama_url": settings.OLLAMA_URL,
             "remote_ollama_url": settings.REMOTE_OLLAMA_URL,
         },
+        "mcp_servers": get_mcp_servers(),
         "feature_flags": {
             "use_weaviate": settings.USE_WEAVIATE,
             "use_mcp": settings.USE_MCP,
@@ -68,17 +71,26 @@ def output_json():
         "directories": {
             "root_dir": settings.ROOT_DIR,
             "home_dir": settings.HOME_DIR,
-            "data_dir": settings.DATA_DIR,
+            "persag_env_home": settings.PERSAG_HOME,
+            "persag_data_root": settings.PERSAG_ROOT,
+            "user_data_dir": settings.USER_DATA_DIR,
             "repo_dir": settings.REPO_DIR,
+            "lightrag_server_dir": settings.LIGHTRAG_SERVER_DIR,
+            "lightrag_memory_dir": settings.LIGHTRAG_MEMORY_DIR,
             "agno_storage_dir": settings.AGNO_STORAGE_DIR,
             "agno_knowledge_dir": settings.AGNO_KNOWLEDGE_DIR,
+            "lightrag_storage_dir": settings.LIGHTRAG_STORAGE_DIR,
+            "lightrag_inputs_dir": settings.LIGHTRAG_INPUTS_DIR,
+            "lightrag_memory_storage_dir": settings.LIGHTRAG_MEMORY_STORAGE_DIR,
+            "lightrag_memory_inputs_dir": settings.LIGHTRAG_MEMORY_INPUTS_DIR,
         },
         "ai_storage": {
             "storage_backend": settings.STORAGE_BACKEND,
             "llm_model": settings.LLM_MODEL,
-            "user_id": settings.USER_ID,
+            "user_id": settings.get_userid(),
             "log_level": settings.LOG_LEVEL_STR,
         },
+        "agentic_tools": get_agentic_tools(),
         "docker_compose_summary": get_docker_compose_summary()
     }
     
@@ -105,16 +117,16 @@ def load_env_file(env_path):
 
 def get_docker_env_variables_by_server():
     """Get environment variables from Docker env files organized by server."""
-    project_root = get_project_root()
+    persag_home = settings.PERSAG_HOME
     
     servers = {
         "lightrag_server": {
-            "env_file": project_root / "lightrag_server" / "env.server",
-            "mounted_env": project_root / "lightrag_server" / ".env"
+            "env_file": Path(persag_home) / "lightrag_server" / "env.server",
+            "mounted_env": Path(persag_home) / "lightrag_server" / ".env"
         },
         "lightrag_memory_server": {
-            "env_file": project_root / ".env",  # memory server uses main .env as env_file
-            "mounted_env": project_root / "lightrag_memory_server" / "env.memory_server"
+            "env_file": Path(persag_home) / ".env",
+            "mounted_env": Path(persag_home) / "lightrag_memory_server" / "env.memory_server"
         }
     }
     
@@ -183,6 +195,167 @@ def get_docker_compose_summary():
             summary[name] = {"error": "File not found"}
             
     return summary
+
+
+def get_agentic_tools():
+    """Get a comprehensive list of all agentic tools available in the system."""
+    tools = {
+        "built_in_agno_tools": {
+            "description": "Built-in Agno framework tools",
+            "tools": [
+                {
+                    "name": "GoogleSearchTools",
+                    "description": "Web search functionality using Google Search API",
+                    "category": "web"
+                },
+                {
+                    "name": "YFinanceTools", 
+                    "description": "Financial data and stock market information",
+                    "category": "finance",
+                    "features": ["stock_price", "company_info", "stock_fundamentals", "key_financial_ratios", "analyst_recommendations"]
+                },
+                {
+                    "name": "PythonTools",
+                    "description": "Execute Python code and scripts",
+                    "category": "development"
+                }
+            ]
+        },
+        "personal_agent_tools": {
+            "description": "Custom Personal Agent tools implemented as Agno Toolkit classes",
+            "tools": [
+                {
+                    "name": "PersonalAgentFilesystemTools",
+                    "description": "File system operations with security controls",
+                    "category": "filesystem",
+                    "functions": [
+                        "read_file - Read content from files",
+                        "write_file - Write content to files", 
+                        "list_directory - List directory contents",
+                        "create_and_save_file - Create new files with content",
+                        "intelligent_file_search - Search files by name and content"
+                    ]
+                },
+                {
+                    "name": "PersonalAgentSystemTools", 
+                    "description": "System command execution with safety controls",
+                    "category": "system",
+                    "functions": [
+                        "shell_command - Execute shell commands safely"
+                    ]
+                }
+            ]
+        },
+        "memory_tools": {
+            "description": "Memory management tools for storing and retrieving user information",
+            "tools": [
+                {
+                    "name": "store_user_memory",
+                    "description": "Store information as user memory in both SQLite and LightRAG systems",
+                    "category": "memory"
+                },
+                {
+                    "name": "direct_search_memories",
+                    "description": "Direct semantic search in local memory (bypasses agentic pipeline)",
+                    "category": "memory"
+                },
+                {
+                    "name": "query_memory",
+                    "description": "Search user memories using semantic search",
+                    "category": "memory"
+                },
+                {
+                    "name": "update_memory",
+                    "description": "Update existing memory content",
+                    "category": "memory"
+                },
+                {
+                    "name": "delete_memory",
+                    "description": "Delete memory from both storage systems",
+                    "category": "memory"
+                },
+                {
+                    "name": "get_recent_memories",
+                    "description": "Retrieve recent memories sorted by date",
+                    "category": "memory"
+                },
+                {
+                    "name": "get_all_memories",
+                    "description": "Get all user memories",
+                    "category": "memory"
+                },
+                {
+                    "name": "get_memory_stats",
+                    "description": "Get memory usage statistics",
+                    "category": "memory"
+                },
+                {
+                    "name": "get_memories_by_topic",
+                    "description": "Filter memories by topic/category",
+                    "category": "memory"
+                },
+                {
+                    "name": "list_memories",
+                    "description": "List all memories in simplified format",
+                    "category": "memory"
+                },
+                {
+                    "name": "store_graph_memory",
+                    "description": "Store memory in LightRAG graph database for relationship capture (requires LIGHTRAG_MEMORY_URL)",
+                    "category": "memory"
+                },
+                {
+                    "name": "query_graph_memory",
+                    "description": "Query LightRAG memory graph to explore relationships (requires LIGHTRAG_MEMORY_URL)",
+                    "category": "memory"
+                },
+                {
+                    "name": "get_memory_graph_labels",
+                    "description": "Get entity and relation labels from memory graph (requires LIGHTRAG_MEMORY_URL)",
+                    "category": "memory"
+                },
+                {
+                    "name": "seed_entity_in_graph",
+                    "description": "Seed an entity into the graph by uploading a synthetic document (requires LIGHTRAG_MEMORY_URL)",
+                    "category": "memory"
+                },
+                {
+                    "name": "check_entity_exists",
+                    "description": "Check if an entity exists in the memory graph (requires LIGHTRAG_MEMORY_URL)",
+                    "category": "memory"
+                },
+                {
+                    "name": "delete_memories_by_topic",
+                    "description": "Delete memories by topic/category",
+                    "category": "memory"
+                },
+                {
+                    "name": "clear_all_memories",
+                    "description": "Clear all memories from both SQLite and LightRAG systems",
+                    "category": "memory"
+                }
+            ]
+        },
+        "mcp_tools": {
+            "description": "Model Context Protocol (MCP) server tools for external integrations",
+            "tools": []
+        }
+    }
+    
+    # Add MCP tools from configuration
+    mcp_servers = get_mcp_servers()
+    for server_name, config in mcp_servers.items():
+        tools["mcp_tools"]["tools"].append({
+            "name": f"use_{server_name.replace('-', '_')}_server",
+            "description": config.get("description", f"Access to {server_name} MCP server"),
+            "category": "mcp",
+            "server": server_name,
+            "command": config.get("command", ""),
+            "args_count": len(config.get("args", [])),
+            "env_vars": len(config.get("env", {}))
+        })
+    
+    return tools
 
 
 def print_config_colored():
@@ -271,10 +444,18 @@ def print_config_colored():
             'items': [
                 ('Root Directory', settings.ROOT_DIR),
                 ('Home Directory', settings.HOME_DIR),
-                ('Data Directory', settings.DATA_DIR),
+                ('Persag Env Home', settings.PERSAG_HOME),
+                ('Persag Data Root', settings.PERSAG_ROOT),
+                ('User Data Directory', settings.USER_DATA_DIR),
                 ('Repository Directory', settings.REPO_DIR),
+                ('LightRAG Server Dir', settings.LIGHTRAG_SERVER_DIR),
+                ('LightRAG Memory Dir', settings.LIGHTRAG_MEMORY_DIR),
                 ('Agno Storage Directory', settings.AGNO_STORAGE_DIR),
                 ('Agno Knowledge Directory', settings.AGNO_KNOWLEDGE_DIR),
+                ('LightRAG Storage Directory', settings.LIGHTRAG_STORAGE_DIR),
+                ('LightRAG Inputs Directory', settings.LIGHTRAG_INPUTS_DIR),
+                ('LightRAG Memory Storage Directory', settings.LIGHTRAG_MEMORY_STORAGE_DIR),
+                ('LightRAG Memory Inputs Directory', settings.LIGHTRAG_MEMORY_INPUTS_DIR),
             ]
         },
         {
@@ -282,11 +463,54 @@ def print_config_colored():
             'items': [
                 ('Storage Backend', settings.STORAGE_BACKEND),
                 ('LLM Model', settings.LLM_MODEL),
-                ('User ID', settings.USER_ID),
+                ('User ID', settings.get_userid()),
                 ('Log Level', settings.LOG_LEVEL_STR),
             ]
         }
     ]
+    
+    # MCP Servers section
+    print(f"\n{BLUE}{BOLD}🔌 MCP Servers{RESET}:")
+    mcp_servers = get_mcp_servers()
+    if mcp_servers:
+        print(f"  {BOLD}Server Name{' '*15}Description{RESET}")
+        for name, config in mcp_servers.items():
+            description = config.get('description', 'No description available')
+            print(f"  {YELLOW}{name:<25}{RESET} {GREEN}{description}{RESET}")
+    else:
+        print(f"  {RED}No MCP servers configured{RESET}")
+    
+    # Agentic Tools section
+    print(f"\n{BLUE}{BOLD}🛠️ Agentic Tools{RESET}:")
+    agentic_tools = get_agentic_tools()
+    
+    for category_name, category_info in agentic_tools.items():
+        category_display = category_name.replace('_', ' ').title()
+        print(f"\n  {MAGENTA}{BOLD}📦 {category_display}:{RESET}")
+        print(f"    {CYAN}{category_info['description']}{RESET}")
+        
+        if category_info['tools']:
+            for tool in category_info['tools']:
+                tool_name = tool['name']
+                tool_desc = tool['description']
+                tool_category = tool.get('category', 'general')
+                
+                print(f"    {YELLOW}• {tool_name}{RESET} ({GREEN}{tool_category}{RESET})")
+                print(f"      {tool_desc}")
+                
+                # Show additional details for specific tool types
+                if 'functions' in tool:
+                    print(f"      {CYAN}Functions:{RESET}")
+                    for func in tool['functions']:
+                        print(f"        - {func}")
+                elif 'features' in tool:
+                    print(f"      {CYAN}Features:{RESET} {', '.join(tool['features'])}")
+                elif 'server' in tool:
+                    print(f"      {CYAN}Server:{RESET} {tool['server']} | {CYAN}Args:{RESET} {tool['args_count']} | {CYAN}Env:{RESET} {tool['env_vars']}")
+                
+                print()  # Empty line between tools
+        else:
+            print(f"    {RED}No tools available in this category{RESET}")
     
     for section in sections:
         print(f"\n{section['title']}:")
@@ -405,10 +629,18 @@ def print_config_no_color():
             'items': [
                 ('Root Directory', settings.ROOT_DIR),
                 ('Home Directory', settings.HOME_DIR),
-                ('Data Directory', settings.DATA_DIR),
+                ('Persag Env Home', settings.PERSAG_HOME),
+                ('Persag Data Root', settings.PERSAG_ROOT),
+                ('User Data Directory', settings.USER_DATA_DIR),
                 ('Repository Directory', settings.REPO_DIR),
+                ('LightRAG Server Dir', settings.LIGHTRAG_SERVER_DIR),
+                ('LightRAG Memory Dir', settings.LIGHTRAG_MEMORY_DIR),
                 ('Agno Storage Directory', settings.AGNO_STORAGE_DIR),
                 ('Agno Knowledge Directory', settings.AGNO_KNOWLEDGE_DIR),
+                ('LightRAG Storage Directory', settings.LIGHTRAG_STORAGE_DIR),
+                ('LightRAG Inputs Directory', settings.LIGHTRAG_INPUTS_DIR),
+                ('LightRAG Memory Storage Directory', settings.LIGHTRAG_MEMORY_STORAGE_DIR),
+                ('LightRAG Memory Inputs Directory', settings.LIGHTRAG_MEMORY_INPUTS_DIR),
             ]
         },
         {
@@ -416,11 +648,54 @@ def print_config_no_color():
             'items': [
                 ('Storage Backend', settings.STORAGE_BACKEND),
                 ('LLM Model', settings.LLM_MODEL),
-                ('User ID', settings.USER_ID),
+                ('User ID', settings.get_userid()),
                 ('Log Level', settings.LOG_LEVEL_STR),
             ]
         }
     ]
+    
+    # MCP Servers section
+    print("\n🔌 MCP Servers:")
+    mcp_servers = get_mcp_servers()
+    if mcp_servers:
+        print(f"  Server Name{' '*15}Description")
+        for name, config in mcp_servers.items():
+            description = config.get('description', 'No description available')
+            print(f"  {name:<25} {description}")
+    else:
+        print("  No MCP servers configured")
+    
+    # Agentic Tools section
+    print("\n🛠️ Agentic Tools:")
+    agentic_tools = get_agentic_tools()
+    
+    for category_name, category_info in agentic_tools.items():
+        category_display = category_name.replace('_', ' ').title()
+        print(f"\n  📦 {category_display}:")
+        print(f"    {category_info['description']}")
+        
+        if category_info['tools']:
+            for tool in category_info['tools']:
+                tool_name = tool['name']
+                tool_desc = tool['description']
+                tool_category = tool.get('category', 'general')
+                
+                print(f"    • {tool_name} ({tool_category})")
+                print(f"      {tool_desc}")
+                
+                # Show additional details for specific tool types
+                if 'functions' in tool:
+                    print(f"      Functions:")
+                    for func in tool['functions']:
+                        print(f"        - {func}")
+                elif 'features' in tool:
+                    print(f"      Features: {', '.join(tool['features'])}")
+                elif 'server' in tool:
+                    print(f"      Server: {tool['server']} | Args: {tool['args_count']} | Env: {tool['env_vars']}")
+                
+                print()  # Empty line between tools
+        else:
+            print(f"    No tools available in this category")
     
     for section in sections:
         print(f"\n{section['title']}:")

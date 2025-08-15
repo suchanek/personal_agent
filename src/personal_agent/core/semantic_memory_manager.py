@@ -14,6 +14,7 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -22,15 +23,51 @@ from agno.memory.v2.schema import UserMemory
 from agno.models.base import Model
 from pydantic import BaseModel, Field
 
-from personal_agent.config import USER_ID
-from personal_agent.core.topic_classifier import TopicClassifier
-from personal_agent.utils import setup_logging
+from ..config import get_current_user_id
+from .topic_classifier import TopicClassifier
+from ..utils import setup_logging
 
 logger = setup_logging(__name__)
 
-import re
-from dataclasses import dataclass
-from typing import Dict, List, Pattern
+
+class MemoryStorageStatus(Enum):
+    """Enum for memory storage operation results."""
+    SUCCESS = auto()                    # Memory stored successfully in both systems
+    SUCCESS_LOCAL_ONLY = auto()         # Stored in local SQLite, graph sync failed
+    DUPLICATE_EXACT = auto()           # Rejected: exact duplicate found
+    DUPLICATE_SEMANTIC = auto()        # Rejected: semantic duplicate found  
+    CONTENT_EMPTY = auto()             # Rejected: empty or invalid content
+    CONTENT_TOO_LONG = auto()          # Rejected: content exceeds max length
+    STORAGE_ERROR = auto()             # Error: database/storage failure
+    VALIDATION_ERROR = auto()          # Error: input validation failed
+
+
+@dataclass
+class MemoryStorageResult:
+    """Structured result for memory storage operations."""
+    status: MemoryStorageStatus
+    message: str
+    memory_id: Optional[str] = None
+    topics: Optional[List[str]] = None
+    local_success: bool = False
+    graph_success: bool = False
+    similarity_score: Optional[float] = None
+    
+    @property
+    def is_success(self) -> bool:
+        """True if memory was stored (fully or partially)."""
+        return self.status in [MemoryStorageStatus.SUCCESS, MemoryStorageStatus.SUCCESS_LOCAL_ONLY]
+    
+    @property
+    def is_rejected(self) -> bool:
+        """True if memory was rejected (duplicate, validation, etc.)."""
+        return self.status in [
+            MemoryStorageStatus.DUPLICATE_EXACT,
+            MemoryStorageStatus.DUPLICATE_SEMANTIC,
+            MemoryStorageStatus.CONTENT_EMPTY,
+            MemoryStorageStatus.CONTENT_TOO_LONG,
+            MemoryStorageStatus.VALIDATION_ERROR
+        ]
 
 
 class SemanticDuplicateDetector:
@@ -416,10 +453,10 @@ class SemanticMemoryManager:
         self,
         memory_text: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
-    ) -> Tuple[bool, str, Optional[str], Optional[List[str]]]:
+    ) -> MemoryStorageResult:
         """
         Add a memory with duplicate detection and topic classification.
 
@@ -428,27 +465,58 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memory
         :param topics: Optional list of topics (will be auto-classified if not provided)
         :param input_text: Optional input text that generated this memory
-        :return: Tuple of (success, message, memory_id, topics)
+        :return: MemoryStorageResult with detailed status information
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
+        # Validate input
+        if not memory_text or not memory_text.strip():
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.CONTENT_EMPTY,
+                message="Memory content cannot be empty",
+                local_success=False,
+                graph_success=False
+            )
+
         # Get recent memories for duplicate checking
         existing_memories = self._get_recent_memories(db, user_id)
 
-        # Check if memory should be rejected
-        should_reject, reason = self._should_reject_memory(
-            memory_text, existing_memories
-        )
-
-        if should_reject:
-            logger.info(
-                "Rejecting memory for user %s: %s. Memory: '%s'",
-                user_id,
-                reason,
-                memory_text,
+        # Check memory length
+        if len(memory_text) > self.config.max_memory_length:
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.CONTENT_TOO_LONG,
+                message=f"Memory too long ({len(memory_text)} > {self.config.max_memory_length} chars)",
+                local_success=False,
+                graph_success=False
             )
-            if self.config.debug_mode:
-                print(f"🚫 REJECTED: {reason}")
-                print(f"   Memory: '{memory_text}'")
-            return False, reason, None, None
+
+        # Check for exact duplicates
+        exact_duplicate = self._is_exact_duplicate(memory_text, existing_memories)
+        if exact_duplicate:
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.DUPLICATE_EXACT,
+                message=f"Exact duplicate of: '{exact_duplicate.memory}'",
+                local_success=False,
+                graph_success=False,
+                similarity_score=1.0
+            )
+
+        # Check for semantic duplicates
+        semantic_duplicate = self._is_semantic_duplicate(memory_text, existing_memories)
+        if semantic_duplicate:
+            # Get similarity score for the duplicate
+            existing_texts = [mem.memory for mem in existing_memories]
+            _, _, similarity_score = self.duplicate_detector.is_duplicate(memory_text, existing_texts)
+            
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.DUPLICATE_SEMANTIC,
+                message=f"Semantic duplicate of: '{semantic_duplicate.memory}'",
+                local_success=False,
+                graph_success=False,
+                similarity_score=similarity_score
+            )
 
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
@@ -489,19 +557,31 @@ class SemanticMemoryManager:
             if self.config.debug_mode:
                 print(f"✅ ACCEPTED: '{memory_text}' (topics: {topics})")
 
-            return True, "Memory added successfully", memory_id, topics
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.SUCCESS,
+                message="Memory added successfully",
+                memory_id=memory_id,
+                topics=topics,
+                local_success=True,
+                graph_success=False  # Will be updated by the caller for dual storage
+            )
 
         except Exception as e:
             error_msg = f"Error adding memory: {e}"
             logger.error(error_msg)
-            return False, error_msg, None, None
+            return MemoryStorageResult(
+                status=MemoryStorageStatus.STORAGE_ERROR,
+                message=error_msg,
+                local_success=False,
+                graph_success=False
+            )
 
     def update_memory(
         self,
         memory_id: str,
         memory_text: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
     ) -> Tuple[bool, str]:
@@ -516,6 +596,10 @@ class SemanticMemoryManager:
         :param input_text: Optional input text that generated this memory
         :return: Tuple of (success, message)
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
             topics = self.topic_classifier.classify(memory_text)
@@ -556,7 +640,7 @@ class SemanticMemoryManager:
             return False, error_msg
 
     def delete_memory(
-        self, memory_id: str, db: MemoryDb, user_id: str = USER_ID
+        self, memory_id: str, db: MemoryDb, user_id: str = None
     ) -> Tuple[bool, str]:
         """
         Delete a memory.
@@ -583,7 +667,7 @@ class SemanticMemoryManager:
             return False, error_msg
 
     def delete_memories_by_topic(
-        self, topics: List[str], db: MemoryDb, user_id: str = USER_ID
+        self, topics: List[str], db: MemoryDb, user_id: str = None
     ) -> Tuple[bool, str]:
         """
         Delete all memories associated with a specific topic or list of topics.
@@ -593,6 +677,10 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memories.
         :return: Tuple of (success, message).
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         if not topics:
             return False, "No topics provided for deletion."
 
@@ -639,7 +727,7 @@ class SemanticMemoryManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def clear_memories(self, db: MemoryDb, user_id: str = USER_ID) -> Tuple[bool, str]:
+    def clear_memories(self, db: MemoryDb, user_id: str = None) -> Tuple[bool, str]:
         """
         Clear all memories for a user.
 
@@ -647,6 +735,10 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memories
         :return: Tuple of (success, message)
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             # Get all memories for the user first
             memory_rows = db.read_memories(user_id=user_id)
@@ -673,7 +765,7 @@ class SemanticMemoryManager:
         self,
         query: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         limit: int = None,
         similarity_threshold: float = 0.3,
         search_topics: bool = True,
@@ -691,6 +783,10 @@ class SemanticMemoryManager:
         :param topic_boost: Score boost for topic matches (default: 0.5)
         :return: List of (UserMemory, combined_score) tuples
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             # Enhanced query expansion for better semantic matching
             expanded_queries = self._expand_query(query)
@@ -793,7 +889,7 @@ class SemanticMemoryManager:
     def get_memories_by_topic(
         self,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         topics: Optional[List[str]] = None,
         limit: Optional[int] = None,
     ) -> List[UserMemory]:
@@ -806,6 +902,10 @@ class SemanticMemoryManager:
         :param limit: Maximum number of results to return
         :return: List of UserMemory objects matching the topics.
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id, sort="desc")
@@ -933,7 +1033,41 @@ class SemanticMemoryManager:
 
         return max_score
 
-    def get_memory_stats(self, db: MemoryDb, user_id: str = USER_ID) -> Dict[str, Any]:
+    def get_all_memories(self, db: MemoryDb, user_id: str = None) -> List[UserMemory]:
+        """
+        Get all memories for a user.
+
+        :param db: Memory database instance
+        :param user_id: User ID to retrieve memories for
+        :return: List of UserMemory objects
+        """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
+        try:
+            # Get all memories for the user
+            memory_rows = db.read_memories(user_id=user_id, sort="desc")
+
+            user_memories = []
+            for row in memory_rows:
+                if row.user_id == user_id and row.memory:
+                    try:
+                        user_memory = UserMemory.from_dict(row.memory)
+                        user_memories.append(user_memory)
+                    except (ValueError, KeyError, TypeError) as e:
+                        logger.warning(
+                            "Failed to convert memory row to UserMemory: %s", e
+                        )
+
+            logger.info("Retrieved %d memories for user %s", len(user_memories), user_id)
+            return user_memories
+
+        except Exception as e:
+            logger.error("Error retrieving all memories: %s", e)
+            return []
+
+    def get_memory_stats(self, db: MemoryDb, user_id: str = None) -> Dict[str, Any]:
         """
         Get statistics about memories for a user.
 
@@ -941,6 +1075,10 @@ class SemanticMemoryManager:
         :param user_id: User ID to analyze
         :return: Dictionary with memory statistics
         """
+        # Get current user ID if not provided
+        if user_id is None:
+            user_id = get_current_user_id()
+            
         try:
             memories = self._get_recent_memories(db, user_id)
 
@@ -987,7 +1125,7 @@ class SemanticMemoryManager:
         self,
         input_text: str,
         db: MemoryDb,
-        user_id: str = USER_ID,
+        user_id: str = None,
         extract_multiple: bool = True,
     ) -> Dict[str, Any]:
         """
@@ -1015,7 +1153,7 @@ class SemanticMemoryManager:
             memorable_statements = self._extract_memorable_statements(input_text)
 
             for statement in memorable_statements:
-                success, message, memory_id, topics = self.add_memory(
+                result = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,
@@ -1024,17 +1162,17 @@ class SemanticMemoryManager:
 
                 results["total_processed"] += 1
 
-                if success:
+                if result.is_success:
                     results["memories_added"].append(
                         {
-                            "memory_id": memory_id,
+                            "memory_id": result.memory_id,
                             "memory": statement,
-                            "topics": topics,
+                            "topics": result.topics,
                         }
                     )
                 else:
                     results["memories_rejected"].append(
-                        {"memory": statement, "reason": message}
+                        {"memory": statement, "reason": result.message}
                     )
 
             if results["memories_added"]:
@@ -1136,26 +1274,26 @@ class SemanticMemoryManager:
                 continue
 
             # Add the memory
-            success, message, memory_id, _ = self.add_memory(
+            result = self.add_memory(
                 memory_text=statement,
                 db=db,
                 user_id=user_id,
                 input_text=combined_input,
             )
 
-            if success:
+            if result.is_success:
                 memories_added += 1
                 actions_taken.append(f"Added: '{statement[:50]}...'")
-                logger.debug(f"Added memory: {memory_id}")
+                logger.debug(f"Added memory: {result.memory_id}")
 
                 # Add to existing memories list for subsequent duplicate checking
-                existing_user_memories.append(SimpleMemory(statement, memory_id or ""))
+                existing_user_memories.append(SimpleMemory(statement, result.memory_id or ""))
             else:
                 memories_rejected += 1
                 actions_taken.append(
-                    f"Failed to add: '{statement[:50]}...' - {message}"
+                    f"Failed to add: '{statement[:50]}...' - {result.message}"
                 )
-                logger.warning(f"Failed to add memory: {message}")
+                logger.warning(f"Failed to add memory: {result.message}")
 
         # Set memories_updated flag if any memories were added
         if memories_added > 0:
@@ -1271,28 +1409,28 @@ class SemanticMemoryManager:
                     continue
 
                 # Add the memory
-                success, message, memory_id, _ = self.add_memory(
+                result = self.add_memory(
                     memory_text=statement,
                     db=db,
                     user_id=user_id,
                     input_text=task,
                 )
 
-                if success:
+                if result.is_success:
                     memories_added += 1
                     actions_taken.append(f"Added: '{statement[:50]}...'")
-                    logger.debug(f"Added memory: {memory_id}")
+                    logger.debug(f"Added memory: {result.memory_id}")
 
                     # Add to existing memories list for subsequent duplicate checking
                     existing_user_memories.append(
-                        SimpleMemory(statement, memory_id or "")
+                        SimpleMemory(statement, result.memory_id or "")
                     )
                 else:
                     memories_rejected += 1
                     actions_taken.append(
-                        f"Failed to add: '{statement[:50]}...' - {message}"
+                        f"Failed to add: '{statement[:50]}...' - {result.message}"
                     )
-                    logger.warning(f"Failed to add memory: {message}")
+                    logger.warning(f"Failed to add memory: {result.message}")
 
             # Set memories_updated flag if any memories were added
             if memories_added > 0:
@@ -1445,7 +1583,7 @@ def main():
 
     from agno.memory.v2.db.sqlite import SqliteMemoryDb
 
-    from personal_agent.config import AGNO_STORAGE_DIR, USER_ID
+    from personal_agent.config import AGNO_STORAGE_DIR, get_userid
 
     print("🧠 Semantic Memory Manager Demo")
     print("=" * 50)
@@ -1477,7 +1615,7 @@ def main():
     print("\n🔄 Processing demo inputs...")
     for i, input_text in enumerate(demo_inputs, 1):
         print(f"\n--- Input {i}: {input_text}")
-        result = manager.process_input(input_text, memory_db, USER_ID)
+        result = manager.process_input(input_text, memory_db, get_userid())
 
         if result["success"]:
             print(f"✅ Processed successfully:")
@@ -1498,7 +1636,7 @@ def main():
 
     for query in search_queries:
         print(f"\n--- Search: '{query}'")
-        results = manager.search_memories(query, memory_db, USER_ID, limit=3)
+        results = manager.search_memories(query, memory_db, get_userid(), limit=3)
 
         if results:
             for memory, similarity in results:
@@ -1510,7 +1648,7 @@ def main():
 
     # Demo memory stats
     print(f"\n📊 Memory Statistics:")
-    stats = manager.get_memory_stats(memory_db, USER_ID)
+    stats = manager.get_memory_stats(memory_db, get_userid())
 
     for key, value in stats.items():
         if key == "topic_distribution" and isinstance(value, dict):

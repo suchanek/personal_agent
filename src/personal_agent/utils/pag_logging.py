@@ -5,7 +5,7 @@ convey logging information at a fine-grained level. The functions are completely
 independent of the application and can be used in any Python project.
 
 Author: Eric G. Suchanek, PhD
-Last update: 2025-06-02 23:17:39
+Last update: 2025-07-16 19:27:10
 """
 
 import logging
@@ -96,7 +96,7 @@ def configure_master_logger(
 
 def setup_logging_filters() -> None:
     """Set up logging configuration with Rich handler and configure agno loggers."""
-    # Suppress warnings
+    # Suppress warnings from specific modules (non-spacy/click warnings)
     warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama")
     warnings.filterwarnings(
         "ignore", message=".*model_fields.*", category=DeprecationWarning
@@ -105,6 +105,9 @@ def setup_logging_filters() -> None:
     warnings.filterwarnings(
         "ignore", category=ResourceWarning, message=".*subprocess.*"
     )
+
+    # Note: Click, spacy, weasel, and thinc warnings are now handled by the virtual environment
+    # via PYTHONWARNINGS environment variable set in .venv/bin/activate
 
     # Reduce httpx logging verbosity to WARNING to reduce noise
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -121,6 +124,20 @@ def setup_logging_filters() -> None:
     # Also suppress other common noisy loggers
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)
+
+    # Suppress markdown_it debug logging (causes excessive output)
+    logging.getLogger("markdown_it").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.code").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.fence").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.blockquote").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.hr").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.list").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.reference").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.html_block").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.heading").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.lheading").setLevel(logging.WARNING)
+    logging.getLogger("markdown_it.rules_block.paragraph").setLevel(logging.WARNING)
 
     # Suppress LanceDB/Lance warnings (these come from Rust library)
     logging.getLogger("rust").setLevel(logging.WARNING)

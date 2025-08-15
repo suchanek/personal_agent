@@ -20,7 +20,7 @@ import aiohttp
 from ..config.settings import (
     AGNO_STORAGE_DIR,
     LIGHTRAG_MEMORY_URL,
-    USER_ID,
+    get_userid,
 )
 from ..core.semantic_memory_manager import create_semantic_memory_manager
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
@@ -31,7 +31,7 @@ class MemoryClearingManager:
 
     def __init__(
         self,
-        user_id: str = USER_ID,
+        user_id: str = None,
         storage_dir: str = AGNO_STORAGE_DIR,
         lightrag_memory_url: str = LIGHTRAG_MEMORY_URL,
         verbose: bool = False,
@@ -46,29 +46,40 @@ class MemoryClearingManager:
         self.memory_db = None
         self.memory_manager = None
 
-        print(f"🧠 Memory Clearing Manager initialized")
+        if user_id is None:
+            user_id = get_userid()
+        self.user_id = user_id
+        
+        print("🧠 Memory Clearing Manager initialized")
         print(f"   User ID: {self.user_id}")
         print(f"   Storage Directory: {self.storage_dir}")
         print(f"   LightRAG Memory URL: {self.lightrag_memory_url}")
         print(f"   Semantic DB Path: {self.semantic_db_path}")
 
     def _initialize_semantic_memory(self) -> bool:
-        """Initialize semantic memory components."""
+        """Initialize semantic memory components using the EXACT same pattern as the agent."""
         try:
-            # Create memory database connection
+            # Ensure storage directory exists
+            self.storage_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Use the EXACT same initialization pattern as create_agno_memory() in agno_storage.py
+            # This ensures we're working with the same database and table as the actual agent
             self.memory_db = SqliteMemoryDb(
-                table_name="semantic_memory",
-                db_file=str(self.semantic_db_path),
+                table_name="personal_agent_memory",  # <-- FIXED: Use the correct table name!
+                db_file=str(self.storage_dir / "agent_memory.db"),  # <-- FIXED: Use the correct file name!
             )
 
-            # Create semantic memory manager
+            # Create semantic memory manager with the same configuration as the agent
             self.memory_manager = create_semantic_memory_manager(
                 similarity_threshold=0.8,
                 debug_mode=self.verbose,
             )
 
             if self.verbose:
-                print(f"✅ Semantic memory components initialized")
+                print(f"✅ Semantic memory components initialized using agent pattern")
+                print(f"   Database file: {self.storage_dir / 'agent_memory.db'}")
+                print(f"   Table name: personal_agent_memory")
+                print(f"   Database exists: {(self.storage_dir / 'agent_memory.db').exists()}")
             return True
 
         except Exception as e:
@@ -140,7 +151,7 @@ class MemoryClearingManager:
                 # Delete documents using batch deletion
                 payload = {
                     "doc_ids": doc_ids,
-                    "delete_file": False  # Don't delete source files
+                    "delete_file": True  # DELETE source files to prevent rescan
                 }
                 async with session.delete(
                     f"{self.lightrag_memory_url}/documents/delete_document",
@@ -155,6 +166,10 @@ class MemoryClearingManager:
                         if status == "deletion_started":
                             # Clear cache after deletion
                             await self._clear_lightrag_cache()
+                            
+                            # Also delete the knowledge graph file
+                            await self._delete_knowledge_graph_file()
+                            
                             return {
                                 "success": True,
                                 "message": f"Successfully deleted {len(doc_ids)} documents from LightRAG",
@@ -201,6 +216,60 @@ class MemoryClearingManager:
         except Exception as e:
             print(f"❌ Failed to clear LightRAG cache: {e}")
             return False
+            
+    async def _delete_knowledge_graph_file(self) -> bool:
+        """Delete the knowledge graph file from LightRAG storage directories."""
+        from ..config.settings import LIGHTRAG_STORAGE_DIR, LIGHTRAG_MEMORY_STORAGE_DIR
+        import os
+        
+        graph_file_paths = [
+            os.path.join(LIGHTRAG_STORAGE_DIR, "graph_chunk_entity_relation.graphml"),
+            os.path.join(LIGHTRAG_MEMORY_STORAGE_DIR, "graph_chunk_entity_relation.graphml")
+        ]
+        
+        success = True
+        for graph_file_path in graph_file_paths:
+            try:
+                if os.path.exists(graph_file_path):
+                    os.remove(graph_file_path)
+                    if self.verbose:
+                        print(f"✅ Deleted knowledge graph file: {graph_file_path}")
+                else:
+                    if self.verbose:
+                        print(f"ℹ️ Knowledge graph file not found: {graph_file_path}")
+            except Exception as e:
+                success = False
+                print(f"❌ Failed to delete knowledge graph file {graph_file_path}: {e}")
+                
+        return success
+
+    def _vacuum_database(self) -> bool:
+        """Vacuum the SQLite database to ensure deletions are committed and space is reclaimed."""
+        try:
+            import sqlite3
+            
+            # Use the correct database file path that matches the agent
+            agent_db_path = self.storage_dir / "agent_memory.db"
+            
+            if agent_db_path.exists():
+                # Connect directly to the SQLite database and vacuum it
+                conn = sqlite3.connect(str(agent_db_path))
+                conn.execute("VACUUM")
+                conn.commit()
+                conn.close()
+                
+                if self.verbose:
+                    print("✅ Database vacuumed successfully")
+                return True
+            else:
+                if self.verbose:
+                    print("ℹ️ Database file does not exist, skipping vacuum")
+                return True
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"⚠️ Warning: Could not vacuum database: {e}")
+            return False
 
     def _get_semantic_memory_stats(self) -> Dict[str, Any]:
         """Get statistics about semantic memories."""
@@ -227,11 +296,55 @@ class MemoryClearingManager:
             return True, f"DRY RUN: Would clear {total_memories} semantic memories"
 
         try:
+            # Get count before clearing for verification
+            pre_clear_stats = self._get_semantic_memory_stats()
+            pre_clear_count = pre_clear_stats.get("total_memories", 0)
+            
+            if self.verbose:
+                print(f"📊 Pre-clear: {pre_clear_count} memories found")
+            
+            # Clear memories using the memory manager
             success, message = self.memory_manager.clear_memories(
                 db=self.memory_db,
                 user_id=self.user_id
             )
+            
+            if success:
+                # Force database connection to flush and close
+                try:
+                    # Try to close the database connection to ensure changes are persisted
+                    if hasattr(self.memory_db, 'close'):
+                        self.memory_db.close()
+                    
+                    # Add a small delay to ensure database operations complete
+                    import time
+                    time.sleep(0.1)
+                    
+                    # Vacuum the database to ensure deletions are committed
+                    self._vacuum_database()
+                    
+                    # Reinitialize the database connection for verification
+                    self._initialize_semantic_memory()
+                    
+                    # Verify clearing was successful
+                    post_clear_stats = self._get_semantic_memory_stats()
+                    post_clear_count = post_clear_stats.get("total_memories", 0)
+                    
+                    if self.verbose:
+                        print(f"📊 Post-clear: {post_clear_count} memories found")
+                    
+                    if post_clear_count == 0:
+                        return True, f"Successfully cleared {pre_clear_count} semantic memories (verified)"
+                    else:
+                        return False, f"Clearing incomplete: {post_clear_count} memories still remain after clearing {pre_clear_count}"
+                        
+                except Exception as e:
+                    if self.verbose:
+                        print(f"⚠️ Warning: Could not verify clearing: {e}")
+                    return True, f"{message} (verification failed: {e})"
+            
             return success, message
+            
         except Exception as e:
             return False, f"Error clearing semantic memories: {e}"
 
@@ -408,7 +521,7 @@ def print_clearing_results(results: Dict[str, Any]) -> None:
     # LightRAG Memory Results
     lightrag = results["lightrag_memory"]
     if lightrag["attempted"]:
-        print(f"\n🌐 LightRAG Graph Memory System:")
+        print("\n🌐 LightRAG Graph Memory System:")
         print(f"   Status: {'✅ Success' if lightrag['success'] else '❌ Failed'}")
         print(f"   Message: {lightrag['message']}")
 
@@ -424,7 +537,7 @@ def print_verification_results(verification: Dict[str, Any]) -> None:
 
     # Semantic Memory Verification
     semantic = verification["semantic_memory"]
-    print(f"\n📊 Semantic Memory System:")
+    print("\n📊 Semantic Memory System:")
     print(f"   Cleared: {'✅' if semantic['cleared'] else '❌'}")
     print(f"   Remaining Memories: {semantic['remaining_count']}")
 
@@ -475,7 +588,7 @@ async def main():
         return 1
 
     # Determine user ID
-    user_id = args.user_id if args.user_id else USER_ID
+    user_id = args.user_id if args.user_id else get_userid()
 
     # Create memory clearing manager
     manager = MemoryClearingManager(

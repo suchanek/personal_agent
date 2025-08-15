@@ -5,10 +5,10 @@ import logging
 import sys
 import time
 import warnings
-from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 # Configure logging to capture warnings
 logging.basicConfig(level=logging.INFO)

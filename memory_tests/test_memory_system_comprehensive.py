@@ -15,7 +15,6 @@ Usage:
 """
 
 import os
-import sqlite3
 import sys
 import tempfile
 import time
@@ -388,13 +387,9 @@ class MemorySystemTester:
                 return False
 
             # Delete the memory
-            success = self.anti_dup_memory.delete_user_memory(
+            self.anti_dup_memory.delete_user_memory(
                 memory_id, user_id=self.test_user_id
             )
-
-            if not success:
-                print("❌ Memory deletion returned False")
-                return False
 
             # Verify memory is deleted
             memories_after = self.anti_dup_memory.get_user_memories(
