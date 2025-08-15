@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Optimized Semantic KB Recreate**: Improved the performance and reliability of the semantic knowledge base by implementing a selective recreate strategy. Batch ingestions now trigger a single, efficient vector embedding reload at the end of the process, while single ingestions continue to reload immediately for instant data availability. This reduces batch processing time and prevents race conditions. See [ADR-064](./refs/adr/064-optimized-semantic-kb-recreate.md) for details.
+
+### Changed
 - **Consolidated Knowledge Ingestion**: Overhauled the knowledge ingestion architecture by consolidating logic from four redundant classes into a single, authoritative `KnowledgeTools` toolkit. This eliminated over 1000 lines of duplicate code, established a single source of truth for both LightRAG and semantic knowledge operations, and significantly simplified the agent's architecture and maintainability. For a detailed overview, see the [technical summary](./refs/KNOWLEDGE_INGESTION_CONSOLIDATION_SUMMARY.md) and [ADR-063](./refs/adr/063-consolidated-knowledge-ingestion.md).
 
 ### Changed
