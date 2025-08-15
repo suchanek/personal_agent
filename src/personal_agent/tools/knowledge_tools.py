@@ -743,7 +743,7 @@ class KnowledgeTools(Toolkit):
             logger.error(f"Error querying KnowledgeBase knowledge base: {e}")
             return f"❌ Error querying knowledge base: {str(e)}"
 
-    def ingest_semantic_file(self, file_path: str, title: str = None) -> str:
+    def ingest_semantic_file(self, file_path: str, title: str = None, defer_reload: bool = False) -> str:
         """Ingest a file into the local semantic knowledge base.
 
         Args:
@@ -807,16 +807,21 @@ class KnowledgeTools(Toolkit):
             shutil.copy2(file_path, dest_path)
             log_debug(f"Copied file to semantic knowledge directory: {dest_path}")
 
-            # Reload the knowledge base to include the new file
+            # Reload the knowledge base to include the new file (unless deferred)
             try:
                 if self.agno_knowledge:
-                    # Recreate the knowledge base to include new files
-                    self._reload_knowledge_base_sync(self.agno_knowledge)
-
-                    logger.info(
-                        f"Successfully ingested semantic knowledge file: {filename}"
-                    )
-                    return f"✅ Successfully ingested '{filename}' into semantic knowledge base and reloaded vector embeddings."
+                    if not defer_reload:
+                        logger.debug("Recreating semantic KB after single file ingestion: %s", filename)
+                        self._reload_knowledge_base_sync(self.agno_knowledge)
+                        logger.info(
+                            f"Successfully ingested semantic knowledge file: {filename}"
+                        )
+                        return f"✅ Successfully ingested '{filename}' into semantic knowledge base and reloaded vector embeddings."
+                    else:
+                        logger.info(
+                            f"Successfully ingested semantic knowledge file (reload deferred): {filename}"
+                        )
+                        return f"✅ Successfully ingested '{filename}' into semantic knowledge base (reload deferred)."
                 else:
                     logger.warning("No semantic knowledge base available")
                     return f"⚠️ File copied to semantic directory but no knowledge base available for indexing: '{filename}'"
@@ -837,7 +842,7 @@ class KnowledgeTools(Toolkit):
             return f"❌ Error ingesting file: {str(e)}"
 
     def ingest_semantic_text(
-        self, content: str, title: str, file_type: str = "txt"
+        self, content: str, title: str, file_type: str = "txt", defer_reload: bool = False
     ) -> str:
         """Ingest text content directly into the local semantic knowledge base.
 
@@ -887,16 +892,22 @@ class KnowledgeTools(Toolkit):
 
             log_debug(f"Created semantic knowledge file: {file_path}")
 
-            # Reload the knowledge base to include the new content
+            # Reload the knowledge base to include the new content (unless deferred)
             try:
                 if self.agno_knowledge:
-                    # Recreate the knowledge base to include new files
-                    self._reload_knowledge_base_sync(self.agno_knowledge)
+                    if not defer_reload:
+                        logger.debug("Recreating semantic KB after single text ingestion: %s", title)
+                        self._reload_knowledge_base_sync(self.agno_knowledge)
 
-                    logger.info(
-                        f"Successfully ingested semantic knowledge text: {title}"
-                    )
-                    return f"✅ Successfully ingested '{title}' into semantic knowledge base and reloaded vector embeddings."
+                        logger.info(
+                            f"Successfully ingested semantic knowledge text: {title}"
+                        )
+                        return f"✅ Successfully ingested '{title}' into semantic knowledge base and reloaded vector embeddings."
+                    else:
+                        logger.info(
+                            f"Successfully ingested semantic knowledge text (reload deferred): {title}"
+                        )
+                        return f"✅ Successfully ingested '{title}' into semantic knowledge base (reload deferred)."
                 else:
                     logger.warning("No semantic knowledge base available")
                     return f"⚠️ Text saved to semantic directory but no knowledge base available for indexing: '{title}'"
@@ -1049,7 +1060,7 @@ class KnowledgeTools(Toolkit):
 
             for file_path in files:
                 try:
-                    result = self.ingest_semantic_file(str(file_path))
+                    result = self.ingest_semantic_file(str(file_path), defer_reload=True)
                     if "✅" in result:
                         results["success"] += 1
                         log_debug(f"Successfully ingested: {file_path.name}")
@@ -1067,8 +1078,36 @@ class KnowledgeTools(Toolkit):
                     results["errors"].append(error_msg)
                     logger.error(f"Error processing {file_path.name}: {e}")
 
+            # After staging all files, trigger a single recreate if possible
+            recreated = False
+            try:
+                if results["success"] > 0:
+                    if self.agno_knowledge:
+                        logger.debug(
+                            "Recreating semantic knowledge base after staging %d items from '%s'...",
+                            results["success"],
+                            directory_path,
+                        )
+                        self._reload_knowledge_base_sync(self.agno_knowledge)
+                        logger.info(
+                            "Semantic KB recreated successfully after batch ingestion of %d items",
+                            results["success"],
+                        )
+                        recreated = True
+                    else:
+                        logger.warning(
+                            "Semantic KB instance not available to recreate after batch ingestion"
+                        )
+            except Exception as e:
+                logger.error("Failed to recreate semantic KB after batch ingestion: %s", e)
+
             # Format results
             summary = f"📊 Batch semantic ingestion complete: {results['success']} successful, {results['failed']} failed"
+
+            if recreated:
+                summary += "\n\n✅ Semantic knowledge base recreated after batch ingestion."
+            elif results['success'] > 0 and not self.agno_knowledge:
+                summary += "\n\n⚠️ Files ingested but no semantic knowledge base available to recreate."
 
             if results["errors"]:
                 summary += f"\n\nErrors:\n" + "\n".join(
