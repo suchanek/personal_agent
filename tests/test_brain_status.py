@@ -6,8 +6,9 @@ Test script to verify the brain icon status functionality.
 import os
 import sys
 
-# Add the src directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from personal_agent.core.memory import is_weaviate_connected
 

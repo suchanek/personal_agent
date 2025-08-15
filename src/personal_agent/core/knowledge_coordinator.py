@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import aiohttp
 
-from ..config.settings import LIGHTRAG_URL
+from ..config.settings import LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)

@@ -4,14 +4,42 @@ from .mcp_servers import MCP_SERVERS, get_mcp_servers
 from .settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
+    BASE_DIR,
     DATA_DIR,
+    EMBEDDING_TIMEOUT,
     HOME_DIR,
-    LIGHTRAG_SERVER,
-    LIGHTRAG_URL,
+    HTTPX_CONNECT_TIMEOUT,
+    HTTPX_POOL_TIMEOUT,
+    HTTPX_READ_TIMEOUT,
+    HTTPX_TIMEOUT,
+    HTTPX_WRITE_TIMEOUT,
+    LIGHTRAG_INPUTS_DIR,
+    LIGHTRAG_MEMORY_DIR,
+    LIGHTRAG_MEMORY_INPUTS_DIR,
+    LIGHTRAG_MEMORY_PORT,
+    LIGHTRAG_MEMORY_STORAGE_DIR,
     LIGHTRAG_MEMORY_URL,
+    LIGHTRAG_PORT,
+    LIGHTRAG_SERVER,
+    LIGHTRAG_SERVER_DIR,
+    LIGHTRAG_STORAGE_DIR,
+    LIGHTRAG_URL,
     LLM_MODEL,
+    LLM_TIMEOUT,
+    LMSTUDIO_URL,
     LOG_LEVEL,
+    LOG_LEVEL_STR,
+    OLLAMA_KEEP_ALIVE,
+    OLLAMA_NUM_PREDICT,
+    OLLAMA_TEMPERATURE,
+    OLLAMA_TIMEOUT,
     OLLAMA_URL,
+    PDF_CHUNK_SIZE,
+    PERSAG_HOME,
+    PERSAG_ROOT,
+    PORT,
+    PROVIDER,
+    REMOTE_LMSTUDIO_URL,
     REMOTE_OLLAMA_URL,
     REPO_DIR,
     ROOT_DIR,
@@ -19,10 +47,17 @@ from .settings import (
     STORAGE_BACKEND,
     USE_MCP,
     USE_WEAVIATE,
-    USER_ID,
     WEAVIATE_URL,
     get_env_bool,
     get_env_var,
+    get_package_version,
+)
+from .user_id_mgr import (
+    get_current_user_id,
+    get_user_storage_paths,
+    get_userid,
+    load_user_from_file,
+    refresh_user_dependent_settings,
 )
 
 
@@ -30,7 +65,7 @@ from .settings import (
 def get_settings():
     """Get configuration settings as a dictionary."""
     return {
-        "USER_ID": USER_ID,
+        "USER_ID": get_userid(),
         "ROOT_DIR": ROOT_DIR,
         "HOME_DIR": HOME_DIR,
         "DATA_DIR": DATA_DIR,
@@ -56,28 +91,76 @@ def get_settings():
 
 
 __all__ = [
+    # Core configuration constants
     "AGNO_KNOWLEDGE_DIR",
     "AGNO_STORAGE_DIR",
+    "BASE_DIR",
     "DATA_DIR",
     "HOME_DIR",
-    "LIGHTRAG_SERVER",
-    "LIGHTRAG_URL",
-    "LIGHTRAG_MEMORY_URL",
-    "LLM_MODEL",
-    "LOG_LEVEL",
-    "MCP_SERVERS",
-    "OLLAMA_URL",
-    "REMOTE_OLLAMA_URL",
+    "PERSAG_HOME",
+    "PERSAG_ROOT",
     "REPO_DIR",
     "ROOT_DIR",
-    "SHOW_SPLASH_SCREEN",
     "STORAGE_BACKEND",
+    
+    # LightRAG configuration
+    "LIGHTRAG_INPUTS_DIR",
+    "LIGHTRAG_MEMORY_DIR",
+    "LIGHTRAG_MEMORY_INPUTS_DIR",
+    "LIGHTRAG_MEMORY_PORT",
+    "LIGHTRAG_MEMORY_STORAGE_DIR",
+    "LIGHTRAG_MEMORY_URL",
+    "LIGHTRAG_PORT",
+    "LIGHTRAG_SERVER",
+    "LIGHTRAG_SERVER_DIR",
+    "LIGHTRAG_STORAGE_DIR",
+    "LIGHTRAG_URL",
+    
+    # LLM and service URLs
+    "LLM_MODEL",
+    "LMSTUDIO_URL",
+    "OLLAMA_URL",
+    "REMOTE_LMSTUDIO_URL",
+    "REMOTE_OLLAMA_URL",
+    "WEAVIATE_URL",
+    
+    # Timeout and performance settings
+    "EMBEDDING_TIMEOUT",
+    "HTTPX_CONNECT_TIMEOUT",
+    "HTTPX_POOL_TIMEOUT",
+    "HTTPX_READ_TIMEOUT",
+    "HTTPX_TIMEOUT",
+    "HTTPX_WRITE_TIMEOUT",
+    "LLM_TIMEOUT",
+    "OLLAMA_KEEP_ALIVE",
+    "OLLAMA_NUM_PREDICT",
+    "OLLAMA_TEMPERATURE",
+    "OLLAMA_TIMEOUT",
+    "PDF_CHUNK_SIZE",
+    
+    # Logging and display
+    "LOG_LEVEL",
+    "LOG_LEVEL_STR",
+    "PORT",
+    "PROVIDER",
+    "SHOW_SPLASH_SCREEN",
+    
+    # Feature flags
     "USE_MCP",
     "USE_WEAVIATE",
-    "USER_ID",
-    "WEAVIATE_URL",
+    
+    # MCP servers
+    "MCP_SERVERS",
+    
+    # Utility functions
+    "get_current_user_id",
     "get_env_bool",
     "get_env_var",
     "get_mcp_servers",
+    "get_package_version",
     "get_settings",
+    "get_user_storage_paths",
+    "get_userid",
+    "load_user_from_file",
+    "refresh_user_dependent_settings",
 ]

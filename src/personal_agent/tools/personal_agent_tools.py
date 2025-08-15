@@ -121,8 +121,10 @@ class PersonalAgentFilesystemTools(Toolkit):
             if not any(file_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
                 return f"Error: Access denied to {file_path}. Only allowed in home, data, tmp, or current directories."
 
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            # Create directory if it doesn't exist (only if there's a directory path)
+            dir_path = os.path.dirname(file_path)
+            if dir_path:  # Only create directory if there is one
+                os.makedirs(dir_path, exist_ok=True)
 
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
@@ -388,59 +390,3 @@ class PersonalAgentSystemTools(Toolkit):
         except Exception as e:
             logger.error("Error executing command %s: %s", command, e)
             return f"Error executing command: {str(e)}"
-
-
-class PersonalAgentWebTools(Toolkit):
-    """
-    Personal Agent web tools for web operations (placeholder for MCP integration).
-
-    Args:
-        github_search (bool): Enable GitHub search functionality.
-        web_search (bool): Enable web search functionality.
-        fetch_url (bool): Enable URL fetching functionality.
-    """
-
-    def __init__(self, github_search: bool = True, web_search: bool = True, fetch_url: bool = True, **kwargs):
-        tools: List[Any] = []
-
-        if github_search:
-            tools.append(self.github_search)
-        if web_search:
-            tools.append(self.web_search)
-        if fetch_url:
-            tools.append(self.fetch_url)
-
-        super().__init__(name="personal_web", tools=tools, **kwargs)
-
-    def github_search(self, query: str) -> str:
-        """Search GitHub repositories (placeholder - will use MCP server).
-
-        Args:
-            query: Search query for GitHub
-
-        Returns:
-            Search results or message about MCP server usage.
-        """
-        return f"GitHub search for '{query}' - This functionality is provided by the GitHub MCP server. Use the 'use_github_server' tool instead."
-
-    def web_search(self, query: str) -> str:
-        """Search the web (placeholder - will use MCP server).
-
-        Args:
-            query: Search query for the web
-
-        Returns:
-            Search results or message about MCP server usage.
-        """
-        return f"Web search for '{query}' - This functionality is provided by the Brave Search MCP server. Use the 'use_brave_search_server' tool instead."
-
-    def fetch_url(self, url: str) -> str:
-        """Fetch content from a URL (placeholder - will use MCP server).
-
-        Args:
-            url: URL to fetch content from
-
-        Returns:
-            URL content or message about MCP server usage.
-        """
-        return f"URL fetch for '{url}' - This functionality is provided by the Puppeteer MCP server. Use the 'use_puppeteer_server' tool instead."

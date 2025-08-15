@@ -377,8 +377,63 @@ categories:
     - content
     - frustrated
     - disappointed
+    - insecure
+    - secure
+    - confident
+    - nervous
+    - worried
+    - calm
+    - peaceful
+    - uncomfortable
+    - comfortable
+    - vulnerable
+    - strong
+    - weak
+    - emotional
+    - moody
     - feel
     - feeling
+  friends:
+    - friend
+    - friends
+    - acquaintance
+    - acquaintances
+    - colleague
+    - colleagues
+    - neighbor
+    - neighbors
+    - buddy
+    - pal
+    - companion
+    - partner
+    - roommate
+    - classmate
+    - teammate
+    - mentor
+    - mentee
+    - ally
+    - allies
+    - contact
+    - contacts
+    - social
+    - relationship
+    - relationships
+    - know
+    - knows
+    - knew
+    - meet
+    - met
+    - introduce
+    - introduced
+  enemies:
+    - enemy
+    - enemies
+    - rival
+    - opponent
+    - nemesis
+    - foe
+    - adversary
+    - antagonist
 
 phrases:
   academic:
@@ -411,6 +466,14 @@ phrases:
     - observing the night sky
     - galactic cluster
     - solar eclipse
+    - lunar eclipse
+    - observing the planets
+    - observing the moon
+    - solar system
+    - comet
+    - nebula
+    - galaxy
+    - black hole
   automotive:
     - brake upgrade
     - winter driving conditions
@@ -494,3 +557,55 @@ phrases:
     - am excited
     - am anxious
     - am stressed
+    - is insecure
+    - very insecure
+    - feeling insecure
+    - am insecure
+    - feels insecure
+    - is confident
+    - very confident
+    - feeling confident
+    - am confident
+    - feels confident
+    - is nervous
+    - very nervous
+    - feeling nervous
+    - am nervous
+    - feels nervous
+    - is worried
+    - very worried
+    - feeling worried
+    - am worried
+    - feels worried
+    - is vulnerable
+    - feeling vulnerable
+    - am vulnerable
+    - feels vulnerable
+    - carries a blanket
+    - security blanket
+    - comfort object
+  friends:
+    - have a friend
+    - my friend
+    - is my friend
+    - friend named
+    - know someone
+    - met someone
+    - social circle
+    - close friend
+    - best friend
+    - good friend
+    - old friend
+    - childhood friend
+    - work colleague
+    - school friend
+  enemies:
+    - my enemy
+    - is my enemy
+    - enemy named
+    - my nemesis
+    - is my nemesis
+    - nemesis named
+    - my rival
+    - is my rival
+    - rival named

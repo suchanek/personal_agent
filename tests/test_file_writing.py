@@ -12,12 +12,9 @@ import sys
 import tempfile
 from datetime import datetime
 
-# Dynamically determine the project directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(
-    current_dir
-)  # Go up one level from tests/ to project root
-sys.path.append(project_dir)
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 try:
     from personal_agent import (

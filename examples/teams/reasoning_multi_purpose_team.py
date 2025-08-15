@@ -13,8 +13,11 @@ The team consists of:
 """
 
 import asyncio
+import os
 from pathlib import Path
 from textwrap import dedent
+
+from dotenv import load_dotenv
 
 from agno.agent import Agent
 from agno.embedder.openai import OpenAIEmbedder
@@ -34,6 +37,14 @@ from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
 from agno.vectordb.lancedb.lance_db import LanceDb
 from agno.vectordb.search import SearchType
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Debug: Check if GitHub token is loaded
+print(f"GITHUB_TOKEN: {os.getenv('GITHUB_TOKEN', 'NOT SET')}")
+print(f"GITHUB_ACCESS_TOKEN: {os.getenv('GITHUB_ACCESS_TOKEN', 'NOT SET')}")
+print(f"GITHUB_PERSONAL_ACCESS_TOKEN: {os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', 'NOT SET')}")
 
 cwd = Path(__file__).parent.resolve()
 
@@ -154,14 +165,7 @@ github_agent = Agent(
         "Do not create any issues or pull requests unless explicitly asked to do so",
     ],
     tools=[
-        GithubTools(
-            list_pull_requests=True,
-            list_issues=True,
-            list_issue_comments=True,
-            get_pull_request=True,
-            get_issue=True,
-            get_pull_request_comments=True,
-        )
+        GithubTools()
     ],
 )
 

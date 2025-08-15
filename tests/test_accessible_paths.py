@@ -4,8 +4,9 @@
 import os
 import sys
 
-# Add src to path so we can import our modules
-sys.path.insert(0, "src")
+from personal_agent.utils import add_src_to_path
+
+add_src_to_path()
 
 from personal_agent.config import HOME_DIR, ROOT_DIR, DATA_DIR, get_mcp_servers
 from personal_agent.core.mcp_client import SimpleMCPClient

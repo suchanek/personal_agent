@@ -1,10 +1,48 @@
+## Agent Operating Instructions
+
+### AI Persona
+- Give concise responses.
+- Minimize excess summaries.
+- Do not use flowery language.
+- Avoid excessive praise; be objective.
+
+- You MUST answer concisely with fewer than 4 lines.
+- IMPORTANT: You should minimize output tokens as much as possible.
+- Only address the specific query or task at hand, avoiding tangential information.
+- If you can answer in 1-3 sentences or a short paragraph, please do.
+- You should NOT answer with unnecessary preamble or postamble.
+- Assist with defensive security tasks only. Refuse to create, modify, or improve code that may be used maliciously.
+- IMPORTANT: You must NEVER generate or guess URLs.
+- Never introduce code that exposes or logs secrets and keys.
+- When making changes to files, first understand the file's code conventions.
+- Mimic code style, use existing libraries and utilities, and follow existing patterns.
+- NEVER assume that a given library is available.
+- IMPORTANT: DO NOT ADD ANY COMMENTS unless asked.
+- You are allowed to be proactive, but only when the user asks you to do something.
+- NEVER commit changes unless the user explicitly asks you to.
+- Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked.
+
 # Gemini Workspace Context
 
 This document provides context for the Gemini agent to understand and effectively work with this project.
 
 ## Project Overview
 
-This project is a sophisticated personal AI assistant powered by the **Agno Framework** with native MCP integration, semantic memory management, and local Ollama AI. It leverages `agno`, `Ollama`, and `LightRAG` to create a powerful, locally-run AI assistant with memory and other capabilities. The agent is built with a modular architecture, allowing for different configurations and functionalities. It originally started with ``LangChain``, evolved to use ``SmolAgent`` and now is entirely focused on using the ``agno`` agentic framework. The other implementations are legacy.
+## Project Overview
+
+This project is a sophisticated personal AI assistant powered by the **Agno Framework**. It features a **dual knowledge base system**, integrating a remote **LightRAG** graph-based KB for complex, relational data and a local **semantic vector KB** (using LanceDB) for fast, direct retrieval. This hybrid approach, combined with native MCP integration, semantic memory management, and local Ollama AI, creates a powerful and versatile locally-run AI assistant.
+
+## Dynamic Multi-User System
+
+The agent now features a full-stack, dynamic multi-user system that allows for seamless user switching at runtime. This ensures strong data isolation and stable service management. The single source of truth for the current user is the `env.userid` file located in the `~/.persag` directory in the user's home directory. All user-specific configurations, data, and Docker service files are also stored in this centralized location, decoupling them from the project's source code. See [ADR-048](./refs/adr/048-decoupled-user-docker-config.md) and [ADR-058](./refs/adr/058-modular-user-id-management.md) for details.
+
+### Key Components:
+*   **`UserManager`**: The central orchestrator for all user-related operations (creation, switching, deletion).
+*   **`user_id_mgr.py`**: A dedicated module that handles all user ID and user-specific path management, including the automatic creation of the `~/.persag` environment.
+*   **`UserRegistry`**: A JSON-based registry to persistently manage user profiles.
+*   **`LightRAGManager`**: A Python-native manager to control LightRAG Docker services and inject the current `USER_ID` dynamically.
+*   **`smart-restart-lightrag.sh`**: A robust shell script to prevent port conflicts and ensure service stability during user switches. It now operates on the Docker configurations located in `~/.persag`.
+*   **`switch-user.py`**: A CLI script for creating and switching between users.
 
 ## Personal Files
 
@@ -16,17 +54,18 @@ Files specific to the user, such as `eric_facts.json` and `eric_structured_facts
 *   **Poetry**: For dependency management
 *   **Docker**: For optional Weaviate database (if using vector storage) and LightRAG server
 *   **Ollama**: For local LLM inference
+*   **LMStudio**: For running MLX and other local models.
 *   **Node.js**: For MCP servers
 
 ### LightRAG Server
 
-The LightRAG server must be running for the agent to function correctly. It is managed via Docker Compose. To start the LightRAG services, navigate to the project root and run:
+The LightRAG server must be running for the agent to function correctly. It is managed via Docker Compose. To start or restart the LightRAG services with proper user context and port handling, use the new smart restart script:
 
 ```bash
-./restart-lightrag.sh
+./smart-restart-lightrag.sh
 ```
 
-This script uses the `docker-compose.yml` file in the project root to bring up the necessary services.
+This script intelligently stops, cleans up, and restarts the containers, preventing common "port already allocated" errors.
 
 ## Installation and Dependencies
 
@@ -40,13 +79,29 @@ This is a Python project managed with `Poetry`.
     poetry install
     ```
 
-2.  **Start LightRAG Server**
+2.  **First Run & Environment Setup**
 
+    On the first run of any agent command (e.g., `poetry run paga_cli`), the system will automatically create a `.persag` directory in your home directory (`~/.persag`). This directory will be populated with the necessary default configurations, including the Docker configurations for the LightRAG services. You do not need to configure this manually.
+
+3.  **Start LightRAG Server**
+
+    Use the smart restart script to ensure a clean start. This script now automatically finds the Docker configurations in your `~/.persag` directory.
     ```bash
-    docker-compose up -d
+    ./smart-restart-lightrag.sh
     ```
 
-3.  **Manage MCP & Ollama Servers**
+4.  **Manage Users (CLI)**
+    
+    Use the `switch-user.py` script to create or switch between user contexts. This will automatically update configurations and restart services.
+    ```bash
+    # Create and switch to a new user named 'alice'
+    python switch-user.py alice
+    
+    # Switch back to the 'eric' user
+    python switch-user.py eric
+    ```
+
+5.  **Manage MCP & Ollama Servers**
 
     Use the provided scripts to manage your MCP and Ollama servers:
 
@@ -61,7 +116,7 @@ This is a Python project managed with `Poetry`.
     ./switch-ollama.sh status
     ```
 
-4.  **Setup Ollama**
+6.  **Setup Ollama**
 
     ```bash
     # Install Ollama (macOS example)
@@ -78,18 +133,23 @@ This is a Python project managed with `Poetry`.
     ollama pull nomic-embed-text
     ```
 
-5.  **Configure Environment**
+7.  **Configure Environment (`.env` file)**
 
-    Copy `env.example` to `.env` and configure:
+    You can create a `.env` file in the project root for optional settings. The core user-specific paths are now managed automatically.
 
     ```bash
-    # Required: Filesystem paths
+    # Optional: Filesystem paths for MCP server if you need to override defaults
     ROOT_DIR=/Users/your_username
-    DATA_DIR=/Users/your_username/data
+    HOME_DIR=/Users/your_username
+
+    # Optional: Override default data root. 
+    # User-specific data will be stored in PERSAG_ROOT/agno/USER_ID/
+    PERSAG_ROOT=/path/to/your/custom/data/location
 
     # Required: Ollama Configuration
     OLLAMA_URL=http://localhost:11434
     OLLAMA_DOCKER_URL=http://host.docker.internal:11434
+    LMSTUDIO_URL="http://localhost:1234/v1" # LMStudio server
 
     # Optional: API keys for enhanced functionality
     GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
@@ -107,8 +167,23 @@ The project includes several entry points for running different agent configurat
 
 ### Current
 
-*   **Agno-Interface (Streamlit Web UI)**: `poetry run paga_streamlit` or `poetry run paga`
-*   **Agno-Cli**: `poetry run paga_cli`
+*   **Agno-Interface (Streamlit Web UI)**: `poetry run paga_streamlit` or `poetry run paga`. The UI is now a full-featured user management dashboard.
+*   **Agno-Cli**: The CLI has been refactored for improved maintainability and organization. The main entry point remains `poetry run paga_cli`, but its internal structure has been modularized. See [ADR-008](./docs/adr/008-cli-refactor.md) for details.
+    *   **Usage**: The CLI usage remains identical to before the refactor.
+        ```bash
+        # CLI usage remains identical
+        poetry run paga_cli
+        poetry run paga_cli --remote
+        poetry run paga_cli --recreate
+        ```
+
+### Agent Initialization
+
+The `AgnoPersonalAgent` now uses a **lazy initialization** pattern. This means the agent is created instantly without waiting for heavy components like models and memory systems to load. The actual initialization happens automatically and transparently the first time the agent is used (e.g., when `run()` is called).
+
+- **Simplified Creation**: You no longer need to call an `async initialize()` method. Just instantiate the class directly: `agent = AgnoPersonalAgent(...)`.
+- **Backward Compatibility**: The old `create_agno_agent()` factory function is still available but is now deprecated.
+- **`--recreate` flag**: When the `--recreate` flag is used, the agent will clear all existing memories from both the local SQLite database and the LightRAG graph memory server upon its first use. This ensures a clean slate for the knowledge base and memory system.
 
 ## Testing
 
@@ -139,82 +214,39 @@ The project uses a custom testing setup.
 *   **Test MCP servers**: `poetry run test-mcp-servers`
 *   **Test memory system**: `python memory_tests/test_comprehensive_memory_search.py`
 *   **Test tool call detection**: `python tests/test_tool_call_detection.py`
+*   **Test memory synchronization**: `python test_memory_sync_fix.py`
+*   **Test multi-user system**: `python test_user_id_propagation.py`
 
-"""## Key Technologies
+## Key Technologies
+
+## Key Technologies
 
 *   **agno**: Core framework for building the agent.
 *   **Ollama**: For running local language models.
-*   **LanceDB and SQLite**: For vector storage and memory.
-*   **LightRAG**: RAG-enhanced KB tool.
+*   **LMStudio**: For running local MLX and other OpenAI-compatible models.
+*   **Dual Knowledge Base**:
+    *   **LightRAG**: For the remote, graph-based knowledge base, enabling relational and hybrid search.
+    *   **LanceDB & SQLite**: For the local, semantic vector knowledge base and conversational memory.
 *   **Poetry**: For dependency management.
 *   **Streamlit**: For the agent's user interface.
 *   **MCP (Model Context Protocol)**: For integrated servers and tools.
 
-## LightRAG Integration
-
-The project has been updated to integrate with the LightRAG server, a powerful tool for building RAG applications. This integration enhances the agent's knowledge capabilities by providing a robust and scalable solution for managing and querying large document collections.
-
-### Key Changes:
-
-*   **`GEMINI.md`**: This file has been significantly updated to reflect the integration with `LightRAG`. It now includes:
-    *   A detailed overview of `LightRAG`'s features.
-    *   Installation and usage instructions for the `lightrag` package.
-    *   A new section documenting the LightRAG Server API, including its endpoints and key characteristics like authentication and versioning.
-*   **`pyproject.toml`**: The `lightrag-hku` package has been added as a dependency. This is a crucial change that ensures the `LightRAG` library is installed alongside other project dependencies, making its functionality available to the application.
-*   **Docker Configuration (`docker-compose.yml`)**: The Docker configuration has been substantially modified to:
-    *   **Tailor the image for the personal agent:** The `docker-compose.yml` has been updated to create a specialized Docker image that includes all the necessary dependencies and configurations for the personal agent project.
-    *   **Integrate `LightRAG`:** The Docker build process now correctly installs the `lightrag` library, ensuring it's available within the containerized environment.""
-
-## Tools & Capabilities
-
-### Memory Tools
-
-*   **store_user_memory**: Store personal information with topic classification
-*   **query_memory**: Search through stored memories using semantic similarity
-*   **get_recent_memories**: Retrieve recent interactions and stored information
-
-### Knowledge Tools
-
-*   **query_knowledge_base**: Search the RAG knowledge base with multiple modes (hybrid, local, etc.).
-*   **Semantic Search**: Search through SQLite/LanceDB knowledge sources.
-
-### MCP-Powered Tools
-
-*   **Filesystem**: File operations with security restrictions
-*   **GitHub**: Repository search and code analysis
-*   **Web Search**: Real-time information via DuckDuckGo
-*   **Puppeteer**: Web content extraction and automation
-*   **Finance**: Stock analysis with working Yahoo Finance endpoints
-*   **Python**: Safe code execution for calculations
-
-### Built-in Tools
-
-*   **DuckDuckGo Search**: Web search and news retrieval
-*   **Python Execution**: Mathematical calculations and data analysis
-*   **Shell Commands**: System operations with security restrictions
-
-### Utility Scripts
-
-*   **Send File to LightRAG**: `python3 scripts/send_to_lightrag.py <file_path>`
-    This script sends a specified file to the LightRAG server's `/documents/file` endpoint for processing.
-
-## Memory System
-
-The agent uses an advanced semantic memory system that:
-
-*   **Prevents Duplicates**: Intelligent detection of similar content
-*   **Classifies Topics**: Automatic categorization (personal_info, work, education, etc.)
-*   **Enables Search**: Semantic similarity search across all memories
-*   **Provides Analytics**: Memory statistics and usage patterns
-
 ## Configuration
+
+The agent's configuration has been significantly simplified. Core user-specific and Docker-related files are now managed automatically within the `~/.persag` directory in your home directory. 
 
 ### Environment Variables
 
+For most use cases, you will not need to set any environment variables manually. The system uses sensible defaults and manages user-specific paths automatically. However, you can override certain settings by creating a `.env` file in the project root.
+
 ```bash
-# Required
-ROOT_DIR="/Users/your_username"        # Home directory access
-DATA_DIR="/Users/your_username/data"   # Data storage location
+# Optional: Override the default location for all user data.
+# Default is /Users/Shared/personal_agent_data
+PERSAG_ROOT=/path/to/your/custom/data/location
+
+# Optional: Override for MCP server if needed
+ROOT_DIR="/Users/your_username"      
+HOME_DIR="/Users/your_username"
 
 # Optional API Keys
 GITHUB_PERSONAL_ACCESS_TOKEN="token"   # GitHub integration
@@ -229,10 +261,10 @@ WEAVIATE_URL="http://localhost:8080"  # Weaviate (if using)
 
 The agent supports dynamic model switching through the web interface:
 
-*   **qwen2.5:7b-instruct** (recommended)
-*   **llama3.1:8b**
-*   **llama3.2:3b**
-*   **Any Ollama-compatible model**
+*   **qwen3-4b-mlx** (recommended, via LMStudio)
+*   **qwen3:8b** (via Ollama)
+*   **llama3.1:8b** (via Ollama)
+*   **Any Ollama or LMStudio compatible model**
 
 ## Troubleshooting
 
@@ -265,17 +297,32 @@ poetry run python scripts/install_mcp.py
 poetry run test-mcp-servers
 ```
 
-**4. Memory System Issues**
+**4. Docker Restart Issues ("Port already allocated")**
 
+This issue is now largely prevented by the new multi-user system. Use the `smart-restart-lightrag.sh` script to ensure services are restarted cleanly.
 ```bash
-# Clear memory database
-rm -f data/agent_memory.db
-
-# Test memory functionality
-python memory_tests/test_comprehensive_memory_search.py
+./smart-restart-lightrag.sh
 ```
 
-**5. Tool Call Visibility**
+**5. Memory System Issues**
+
+If you encounter issues with the memory system, consider the following:
+
+*   **Clear all memories**: Use the `clear_all_memories.py` script for a unified approach to clear both local and graph memories.
+    ```bash
+    python3 scripts/clear_all_memories.py --no-confirm
+    ```
+*   **Wait for pipeline idle**: If clearing memories after ingestion, use `clear_memory_when_ready.py` to ensure the LightRAG pipeline is idle.
+    ```bash
+    python3 clear_memory_when_ready.py
+    ```
+*   **Test memory functionality**:
+    ```bash
+    python memory_tests/test_comprehensive_memory_search.py
+    ```
+*   **Check memory sync status**: In the Streamlit UI, use the "Memory Sync Status" section to check for inconsistencies between local and graph memories and sync them if needed.
+
+**6. Tool Call Visibility**
 
 If tools are being called but not visible in debug panels:
 
@@ -283,15 +330,22 @@ If tools are being called but not visible in debug panels:
 *   Verify tool call detection is working: `python tests/test_tool_call_detection.py`
 *   Review debug information in the Streamlit interface
 
+## Issue Tracking
+
+When requested to add an issue, add it to the `ISSUES.md` file. Each issue should be on a new line and must include the current git branch, the current date, and a timestamp.
+
 ## Project Structure
 
 ```
 personal_agent/
 ├── src/personal_agent/
-│   ├── core/                 # Core agent and memory systems
+│   ├── cli/                  # CLI commands and parsing
+│   ├── core/                 # Core agent, memory, user management, and initialization
 │   ├── tools/               # Tool implementations
 │   ├── config/              # Configuration management
-│   └── web/                 # Web interface
+│   └── web/                 # Web interface (Streamlit)
+│       ├── components/      # Streamlit UI components
+│       └── utils/           # Streamlit utility functions
 ├── tools/                   # Standalone tools and utilities
 ├── scripts/                 # Installation and utility scripts
 ├── memory_tests/           # Memory system tests

@@ -74,43 +74,37 @@ def create_basic_memory_agent(
     # Create memory system
     agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
     
-    # Create memory tools following AgnoPersonalAgent pattern
+    # Create memory tools using centralized AgentMemoryManager
     def create_memory_tools():
-        """Create memory tools as native async functions."""
+        """Create memory tools using centralized AgentMemoryManager for consistent restatement logic."""
+        # Create centralized memory manager
+        from ..core.agent_memory_manager import AgentMemoryManager
+        memory_manager = AgentMemoryManager(
+            user_id=user_id,
+            storage_dir=storage_dir,
+            agno_memory=agno_memory,
+            enable_memory=True
+        )
+        memory_manager.initialize(agno_memory)
+        
         tools = []
 
         async def store_user_memory(
             content: str, topics: Union[List[str], str, None] = None
         ) -> str:
-            """Store information as a user memory."""
+            """Store information as a user memory using centralized AgentMemoryManager."""
             try:
-                import json
-                from agno.memory.v2.memory import UserMemory
-
-                if topics is None:
-                    topics = ["general"]
-
-                if isinstance(topics, str):
-                    try:
-                        topics = json.loads(topics)
-                    except (json.JSONDecodeError, ValueError):
-                        topics = [topics]
-
-                if not isinstance(topics, list):
-                    topics = [str(topics)]
-
-                memory_obj = UserMemory(memory=content, topics=topics)
-                memory_id = agno_memory.add_user_memory(
-                    memory=memory_obj, user_id=user_id
-                )
-
-                if memory_id == "duplicate-detected-fake-id":
-                    return f"✅ Memory already exists: {content[:50]}..."
-                elif memory_id is None:
-                    return f"❌ Error storing memory: {content[:50]}..."
+                # Use the centralized memory manager which has proper restatement logic
+                result = await memory_manager.store_user_memory(content=content, topics=topics)
+                
+                # Convert MemoryStorageResult to string message
+                if result.is_success:
+                    return f"✅ Successfully stored memory: {content[:50]}... (ID: {result.memory_id})"
+                elif result.is_rejected:
+                    return f"ℹ️ Memory not stored: {result.message}"
                 else:
-                    return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
-
+                    return f"❌ Error storing memory: {result.message}"
+                    
             except Exception as e:
                 return f"❌ Error storing memory: {str(e)}"
 

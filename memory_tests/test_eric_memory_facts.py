@@ -38,7 +38,7 @@ class EricMemoryTester:
         :param use_temp_db: If True, use temporary database for testing
         """
         self.use_temp_db = use_temp_db
-        self.test_user_id = "eric"
+        self.test_user_id = "eric_test"
 
         # Setup database
         if use_temp_db:
@@ -50,7 +50,7 @@ class EricMemoryTester:
 
         # Initialize components
         self.db = SqliteMemoryDb(table_name="agent_memory", db_file=self.db_path)
-        self.model = Ollama(id="llama3.1:8b")
+        self.model = Ollama(id="qwen3:8b")
         self.memory = AntiDuplicateMemory(
             db=self.db,
             model=self.model,

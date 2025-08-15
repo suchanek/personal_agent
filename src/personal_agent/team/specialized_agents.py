@@ -32,6 +32,9 @@ from ..utils import setup_logging
 logger = setup_logging(__name__)
 
 
+# Removed _restate_user_fact function - now using centralized AgentMemoryManager
+
+
 def _create_model(
     model_provider: str = "ollama",
     model_name: str = LLM_MODEL,
@@ -72,79 +75,52 @@ def _create_model(
         raise ValueError(f"Unsupported model provider: {model_provider}")
 
 
-async def _get_memory_tools(agno_memory, user_id: str) -> List:
-    """Create memory tools as native async functions compatible with Agno.
+async def _get_memory_tools(agno_memory, user_id: str, storage_dir: str = "./data/agno") -> List:
+    """Create memory tools using centralized AgentMemoryManager.
 
-    This method creates the crucial store_user_memory and query_memory tools
-    that enable the agent to actually create and retrieve memories.
-
-    This follows the exact pattern from AgnoPersonalAgent._get_memory_tools()
+    This method creates memory tools that delegate to the existing AgentMemoryManager
+    to ensure consistent restatement logic and dual storage across all agents.
     """
     if not agno_memory:
         logger.warning("Memory not initialized")
         return []
+
+    # Create centralized memory manager
+    from ..core.agent_memory_manager import AgentMemoryManager
+    memory_manager = AgentMemoryManager(
+        user_id=user_id,
+        storage_dir=storage_dir,
+        agno_memory=agno_memory,
+        enable_memory=True
+    )
+    memory_manager.initialize(agno_memory)
 
     tools = []
 
     async def store_user_memory(
         content: str, topics: Union[List[str], str, None] = None
     ) -> str:
-        """Store information as a user memory.
+        """Store information as a user memory using centralized AgentMemoryManager.
 
         Args:
             content: The information to store as a memory
-            topics: Optional list of topics/categories for the memory (can be list or JSON string)
+            topics: Optional list of topics/categories for the memory
 
         Returns:
             str: Success or error message
         """
         try:
-            import json
-
-            from agno.memory.v2.memory import UserMemory
-
-            if topics is None:
-                topics = ["general"]
-
-            # Fix: Handle case where topics comes in as string representation of list
-            # This happens when LLM generates topics as '["food preferences"]' instead of ["food preferences"]
-            if isinstance(topics, str):
-                try:
-                    # Try to parse as JSON first
-                    topics = json.loads(topics)
-                    logger.debug("Converted topics from string to list: %s", topics)
-                except (json.JSONDecodeError, ValueError):
-                    # If that fails, treat as a single topic
-                    topics = [topics]
-                    logger.debug("Treating topics string as single topic: %s", topics)
-
-            # Ensure topics is a list
-            if not isinstance(topics, list):
-                topics = [str(topics)]
-
-            memory_obj = UserMemory(memory=content, topics=topics)
-            memory_id = agno_memory.add_user_memory(memory=memory_obj, user_id=user_id)
-
-            if memory_id == "duplicate-detected-fake-id":
-                # Memory was a duplicate but we return success to avoid agent confusion
-                logger.info(
-                    "Memory already exists (duplicate detected): %s...",
-                    content[:50],
-                )
-                return f"✅ Memory already exists: {content[:50]}..."
-            elif memory_id is None:
-                # Unexpected error case
-                logger.warning(
-                    "Memory storage failed unexpectedly: %s...", content[:50]
-                )
-                return f"❌ Error storing memory: {content[:50]}..."
+            # Use the centralized memory manager which has proper restatement logic
+            result = await memory_manager.store_user_memory(content=content, topics=topics)
+            
+            # Convert MemoryStorageResult to string message
+            if result.is_success:
+                return f"✅ Successfully stored memory: {content[:50]}... (ID: {result.memory_id})"
+            elif result.is_rejected:
+                return f"ℹ️ Memory not stored: {result.message}"
             else:
-                # Memory was successfully stored (new memory)
-                logger.info(
-                    "Stored user memory: %s... (ID: %s)", content[:50], memory_id
-                )
-                return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
-
+                return f"❌ Error storing memory: {result.message}"
+                
         except Exception as e:
             logger.error("Error storing user memory: %s", e)
             return f"❌ Error storing memory: {str(e)}"
@@ -321,22 +297,32 @@ async def _get_memory_tools(agno_memory, user_id: str) -> List:
     return tools
 
 
-def _create_memory_tools_sync(agno_memory, user_id: str) -> List:
-    """Create memory tools as synchronous functions for use when already in an event loop.
+def _create_memory_tools_sync(agno_memory, user_id: str, storage_dir: str = "./data/agno") -> List:
+    """Create memory tools using centralized AgentMemoryManager (synchronous version).
 
-    This is a synchronous version of _get_memory_tools() for cases where we're already
-    running in an event loop and can't use asyncio.run().
+    This creates memory tools that delegate to the existing AgentMemoryManager
+    to ensure consistent restatement logic and dual storage across all agents.
     """
     if not agno_memory:
         logger.warning("Memory not initialized")
         return []
+
+    # Create centralized memory manager
+    from ..core.agent_memory_manager import AgentMemoryManager
+    memory_manager = AgentMemoryManager(
+        user_id=user_id,
+        storage_dir=storage_dir,
+        agno_memory=agno_memory,
+        enable_memory=True
+    )
+    memory_manager.initialize(agno_memory)
 
     tools = []
 
     def store_user_memory(
         content: str, topics: Union[List[str], str, None] = None
     ) -> str:
-        """Store information as a user memory (synchronous version).
+        """Store information as a user memory using centralized AgentMemoryManager (sync version).
 
         Args:
             content: The information to store as a memory
@@ -346,38 +332,20 @@ def _create_memory_tools_sync(agno_memory, user_id: str) -> List:
             str: Success or error message
         """
         try:
-            import json
-            from agno.memory.v2.memory import UserMemory
-
-            if topics is None:
-                topics = ["general"]
-
-            # Handle case where topics comes in as string representation of list
-            if isinstance(topics, str):
-                try:
-                    topics = json.loads(topics)
-                    logger.debug("Converted topics from string to list: %s", topics)
-                except (json.JSONDecodeError, ValueError):
-                    topics = [topics]
-                    logger.debug("Treating topics string as single topic: %s", topics)
-
-            # Ensure topics is a list
-            if not isinstance(topics, list):
-                topics = [str(topics)]
-
-            memory_obj = UserMemory(memory=content, topics=topics)
-            memory_id = agno_memory.add_user_memory(memory=memory_obj, user_id=user_id)
-
-            if memory_id == "duplicate-detected-fake-id":
-                logger.info("Memory already exists (duplicate detected): %s...", content[:50])
-                return f"✅ Memory already exists: {content[:50]}..."
-            elif memory_id is None:
-                logger.warning("Memory storage failed unexpectedly: %s...", content[:50])
-                return f"❌ Error storing memory: {content[:50]}..."
+            import asyncio
+            
+            # Use the centralized memory manager which has proper restatement logic
+            # Run the async method in a sync context
+            result = asyncio.run(memory_manager.store_user_memory(content=content, topics=topics))
+            
+            # Convert MemoryStorageResult to string message
+            if result.is_success:
+                return f"✅ Successfully stored memory: {content[:50]}... (ID: {result.memory_id})"
+            elif result.is_rejected:
+                return f"ℹ️ Memory not stored: {result.message}"
             else:
-                logger.info("Stored user memory: %s... (ID: %s)", content[:50], memory_id)
-                return f"✅ Successfully stored memory: {content[:50]}... (ID: {memory_id})"
-
+                return f"❌ Error storing memory: {result.message}"
+                
         except Exception as e:
             logger.error("Error storing user memory: %s", e)
             return f"❌ Error storing memory: {str(e)}"
@@ -546,7 +514,7 @@ def create_memory_agent(
     agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
 
     # Get memory tools following the exact AgnoPersonalAgent pattern
-    memory_tool_functions = asyncio.run(_get_memory_tools(agno_memory, user_id))
+    memory_tool_functions = asyncio.run(_get_memory_tools(agno_memory, user_id, storage_dir))
 
     logger.info(
         "Memory Agent: Created %d memory tools using AgnoPersonalAgent pattern",
@@ -811,11 +779,11 @@ def create_personal_memory_agent(
         loop = asyncio.get_running_loop()
         # If we're in a running loop, we need to handle this differently
         # Use synchronous version to avoid event loop conflicts
-        memory_tool_functions = _create_memory_tools_sync(agno_memory, user_id)
+        memory_tool_functions = _create_memory_tools_sync(agno_memory, user_id, storage_dir)
         logger.info("Using synchronous memory tools (event loop detected)")
     except RuntimeError:
         # No running event loop, safe to use asyncio.run()
-        memory_tool_functions = asyncio.run(_get_memory_tools(agno_memory, user_id))
+        memory_tool_functions = asyncio.run(_get_memory_tools(agno_memory, user_id, storage_dir))
         logger.info("Using async memory tools (no event loop)")
     
     logger.info("Personal Memory Agent: Created %d memory tools using AgnoPersonalAgent pattern", len(memory_tool_functions))
