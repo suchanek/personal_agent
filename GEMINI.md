@@ -28,7 +28,9 @@ This document provides context for the Gemini agent to understand and effectivel
 
 ## Project Overview
 
-This project is a sophisticated personal AI assistant powered by the **Agno Framework** with native MCP integration, semantic memory management, and local Ollama AI. It leverages `agno`, `Ollama`, and `LightRAG` to create a powerful, locally-run AI assistant with memory and other capabilities. The agent is built with a modular architecture, allowing for different configurations and functionalities. It originally started with ``LangChain``, evolved to use ``SmolAgent`` and now is entirely focused on using the ``agno`` agentic framework. The other implementations are legacy.
+## Project Overview
+
+This project is a sophisticated personal AI assistant powered by the **Agno Framework**. It features a **dual knowledge base system**, integrating a remote **LightRAG** graph-based KB for complex, relational data and a local **semantic vector KB** (using LanceDB) for fast, direct retrieval. This hybrid approach, combined with native MCP integration, semantic memory management, and local Ollama AI, creates a powerful and versatile locally-run AI assistant.
 
 ## Dynamic Multi-User System
 
@@ -217,11 +219,14 @@ The project uses a custom testing setup.
 
 ## Key Technologies
 
+## Key Technologies
+
 *   **agno**: Core framework for building the agent.
 *   **Ollama**: For running local language models.
 *   **LMStudio**: For running local MLX and other OpenAI-compatible models.
-*   **LanceDB and SQLite**: For vector storage and memory.
-*   **LightRAG**: RAG-enhanced KB tool.
+*   **Dual Knowledge Base**:
+    *   **LightRAG**: For the remote, graph-based knowledge base, enabling relational and hybrid search.
+    *   **LanceDB & SQLite**: For the local, semantic vector knowledge base and conversational memory.
 *   **Poetry**: For dependency management.
 *   **Streamlit**: For the agent's user interface.
 *   **MCP (Model Context Protocol)**: For integrated servers and tools.

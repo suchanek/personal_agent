@@ -206,6 +206,10 @@ args = [
   { name = "json", options = ["--json"], type = "boolean", help = "Output configuration as JSON" }
 ]
 
+[tool.poe.tasks.show-config]
+help = "Show the current configuration"
+cmd = "python tools/show-config.py"
+
 [tool.poe.tasks.clean]
 help = "Clean up temporary files and caches"
 sequence = [

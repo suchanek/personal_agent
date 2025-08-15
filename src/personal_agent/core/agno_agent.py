@@ -1,9 +1,53 @@
 """
-Refactored Agno-based agent implementation for the Personal AI Agent.
+Agno-powered Personal AI Agent core.
 
-This module provides a cleaner implementation of the AgnoPersonalAgent
-that inherits directly from agno.agent.Agent and uses the proven initialization
-pattern from the working team implementation.
+This module implements a production-ready personal agent built directly on
+agno.agent.Agent with a robust, lazy-initialized runtime and a unified approach
+to storage, knowledge, semantic memory, tools, and instructions while retaining
+backward compatibility with existing integrations.
+
+Highlights:
+- Lazy, thread-safe initialization with asyncio.Lock; eager initialization
+  is available via factory helpers.
+- Pluggable LLM backends (Ollama/OpenAI) managed through a model manager.
+- Per-user storage path resolution with configurable defaults and overrides.
+- Knowledge system:
+  * Combined knowledge base creation and asynchronous loading.
+  * Optional LightRAG integration and a coordinator for unified knowledge queries.
+- Memory system:
+  * SemanticMemoryManager-backed agent memory with LightRAG endpoints.
+  * Public methods for storing, restating, seeding, checking, and clearing memories.
+- Tools:
+  * Curated built-ins (Google Search, Calculator, YFinance, Python, Shell, filesystem).
+  * Consolidated KnowledgeTools and AgnoMemoryTools when memory is enabled.
+  * Optional MCP server tool integration controlled by configuration.
+- Instructions:
+  * Dynamic instruction assembly via an instruction manager and rich introspection.
+
+Public entry points (selected):
+- AgnoPersonalAgent: async initialize and run flows, memory and knowledge helpers,
+  detailed agent info and pretty-printing, and cleanup routines.
+- Factories: create_with_init() (class method) and create_agno_agent() (function)
+  for eager, fully-initialized agent instances.
+- Convenience: create_simple_personal_agent() for a synchronous pattern and
+  load_agent_knowledge() for async knowledge loading.
+
+Initialization order of operations:
+1) Create Agno storage
+2) Create combined knowledge base
+3) Asynchronously load knowledge
+4) Create semantic memory
+5) Initialize managers (model, instructions, memory, knowledge, tools)
+6) Assemble tools
+7) Build instructions
+8) Wire Agent fields (model, tools, instructions, storage/knowledge/memory)
+
+This module is part of personal_agent.core and coordinates with the model,
+instruction, memory, knowledge, and tool managers as well as storage and
+knowledge-coordination utilities.
+
+Author: Eric G. Suchanek, PhD
+Last revision: 2025-08-14 20:09:59
 """
 
 import asyncio
@@ -27,12 +71,12 @@ from ..config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
     DATA_DIR,
-    PERSAG_ROOT,
     LIGHTRAG_MEMORY_URL,
     LIGHTRAG_URL,
     LLM_MODEL,
     LOG_LEVEL,
     OLLAMA_URL,
+    PERSAG_ROOT,
     SHOW_SPLASH_SCREEN,
     STORAGE_BACKEND,
     USE_MCP,
@@ -425,9 +469,7 @@ class AgnoPersonalAgent(Agent):
                     self.memory_tools,
                 ]
                 tools.extend(memory_tools)
-                logger.info(
-                    "Added consolidated KnowledgeTools and AgnoMemoryTools"
-                )
+                logger.info("Added consolidated KnowledgeTools and AgnoMemoryTools")
             else:
                 logger.warning("Memory disabled - no memory tools added")
 
