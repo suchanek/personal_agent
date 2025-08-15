@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`switch-user.py` Script**: Fixed a critical bug in the `switch-user.py` script that prevented it from working correctly with the `~/.persag` home directory structure. The script now correctly locates and manages the LightRAG Docker services, ensuring that user switching is fully functional. See [ADR-065](./refs/adr/065-switch-user-persag-home-fix.md) for details.
+
 ### Changed
 - **Optimized Semantic KB Recreate**: Improved the performance and reliability of the semantic knowledge base by implementing a selective recreate strategy. Batch ingestions now trigger a single, efficient vector embedding reload at the end of the process, while single ingestions continue to reload immediately for instant data availability. This reduces batch processing time and prevents race conditions. See [ADR-064](./refs/adr/064-optimized-semantic-kb-recreate.md) for details.
 

@@ -20,11 +20,17 @@ class LightRAGManager:
         Initialize the LightRAG manager.
 
         Args:
-            project_root: Project root directory (defaults to current working directory)
+            project_root: Project root directory (deprecated, now uses PERSAG_HOME)
         """
+        # Import settings to get the correct PERSAG_HOME-based paths
+        from personal_agent.config.settings import LIGHTRAG_SERVER_DIR, LIGHTRAG_MEMORY_DIR
+        
+        # Use the centralized configuration paths from PERSAG_HOME
+        self.lightrag_server_dir = Path(LIGHTRAG_SERVER_DIR)
+        self.lightrag_memory_dir = Path(LIGHTRAG_MEMORY_DIR)
+        
+        # Keep project_root for backward compatibility, but it's no longer used for docker paths
         self.project_root = Path(project_root) if project_root else Path.cwd()
-        self.lightrag_server_dir = self.project_root / "lightrag_server"
-        self.lightrag_memory_dir = self.project_root / "lightrag_memory_server"
 
     def update_docker_compose_user_id(self, user_id: str) -> Dict[str, Any]:
         """

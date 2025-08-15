@@ -24,7 +24,7 @@ class UserManager:
         Args:
             data_dir: Data directory path (defaults to config DATA_DIR)
             storage_backend: Storage backend (defaults to config STORAGE_BACKEND)
-            project_root: Project root directory (defaults to current working directory)
+            project_root: Project root directory (deprecated, LightRAGManager now uses PERSAG_HOME)
         """
         # Store the configuration for use in methods
         if data_dir is None or storage_backend is None:
@@ -35,7 +35,8 @@ class UserManager:
             self.data_dir = data_dir
             self.storage_backend = storage_backend
             
-        self.registry = UserRegistry(data_dir, storage_backend)
+        self.registry = UserRegistry(self.data_dir, self.storage_backend)
+        # LightRAGManager now uses PERSAG_HOME internally, project_root parameter is deprecated
         self.lightrag_manager = LightRAGManager(project_root)
     
     def get_all_users(self) -> List[Dict[str, Any]]:
