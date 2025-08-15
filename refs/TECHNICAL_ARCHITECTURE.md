@@ -1,23 +1,23 @@
 # Personal AI Agent - Technical Architecture
 
-**Version**: 0.5.1  
-**Date**: June 10, 2025  
+**Version**: 0.6.0  
+**Date**: August 14, 2025  
 **Framework**: Agno (Native Python AI Agent Framework)  
 **Status**: Production Ready ✅
 
 ## Overview
 
-The Personal AI Agent is a sophisticated, self-contained AI assistant built using the Agno framework. It provides intelligent automation, knowledge management, and multi-tool integration with zero external dependencies. The system emphasizes local data control, privacy, and seamless user interaction.
+The Personal AI Agent is a sophisticated, self-contained AI assistant built using the Agno framework. It provides intelligent automation, advanced knowledge management through a **dual knowledge base system**, and multi-tool integration. The system emphasizes local data control, privacy, and seamless user interaction by combining a remote LightRAG graph-based KB with a local semantic vector KB.
 
 ## Core Architecture
 
 ### 🏗️ **System Design Principles**
 
-1. **Local-First**: All data stored locally, no cloud dependencies
-2. **Zero External Services**: Self-contained operation (no Docker, no servers)
-3. **Async/Sync Harmony**: Proper separation of creation (sync) and loading (async)
-4. **Framework Native**: Leverages Agno's built-in capabilities instead of manual implementations
-5. **MCP Integration**: Native support for Model Context Protocol tools
+1. **Hybrid Knowledge System**: Integrates a graph-based (LightRAG) and a vector-based (local semantic) knowledge base for comprehensive understanding.
+2. **Local-First**: All data stored locally, with the LightRAG server being the only external (but locally hosted) service.
+3. **Async/Sync Harmony**: Proper separation of creation (sync) and loading (async).
+4. **Framework Native**: Leverages Agno's built-in capabilities instead of manual implementations.
+5. **MCP Integration**: Native support for Model Context Protocol tools.
 
 ### 📊 **Architecture Diagram**
 
@@ -26,36 +26,32 @@ The Personal AI Agent is a sophisticated, self-contained AI assistant built usin
 │                    Personal AI Agent                        │
 ├─────────────────────────────────────────────────────────────┤
 │  🤖 Agno Agent Core                                         │
-│  ├── Model: Ollama (qwen3:1.7B)                            │
+│  ├── Model: Ollama (qwen3:8b, llama3.1:8b)                 │
 │  ├── Instructions: Comprehensive personal assistant        │
-│  ├── Tools: Auto-managed (KnowledgeTools, MCP, Web, etc.)  │
-│  └── Search: Auto-enabled knowledge search                 │
+│  ├── Tools: Auto-managed (KnowledgeTools, MCP, etc.)       │
+│  └── Coordinator: Unified query across KBs                 │
 ├─────────────────────────────────────────────────────────────┤
-│  🧠 Knowledge System                                        │
-│  ├── TextKnowledgeBase (Personal data: .txt, .md)          │
-│  ├── LanceDB Vector Storage (Hybrid search)                │
-│  ├── Embeddings: nomic-embed-text (768 dimensions)         │
-│  └── Auto-chunking and indexing                            │
+│  🧠 Dual Knowledge System                                   │
+│  ┌──────────────────────────┴───────────────────────────┐   │
+│  │  **LightRAG KB (Graph)**  │  **Semantic KB (Vector)**   │   │
+│  │  - Remote Server (HTTP)   │  - Local LanceDB/Agno       │   │
+│  │  - Knowledge Graph        │  - Vector Embeddings        │   │
+│  │  - Global/Hybrid Search   │  - Similarity Search        │   │
+│  └──────────────────────────┴───────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────┤
 │  💾 Memory & Storage                                        │
 │  ├── SQLite Memory (Conversation persistence)              │
 │  ├── SQLite Sessions (Agent state management)              │
-│  ├── File-based storage (Easy backup/restore)              │
 │  └── Cross-session context retention                       │
 ├─────────────────────────────────────────────────────────────┤
 │  🔧 MCP Tool Integration                                    │
-│  ├── GitHub: Repository access and analysis                │
-│  ├── Filesystem: File operations and management            │
-│  ├── Web Search: Real-time information retrieval           │
-│  ├── Browser: Web automation and scraping                  │
-│  ├── Brave Search: Enhanced web search capabilities        │
+│  ├── GitHub, Filesystem, Web Search, Browser, etc.         │
 │  └── Custom: Extensible tool development                   │
 ├─────────────────────────────────────────────────────────────┤
 │  🌐 Interface Layer                                         │
 │  ├── CLI: Interactive command-line interface               │
-│  ├── Web: Flask-based web interface                        │
-│  ├── API: RESTful endpoints                                │
-│  └── Streaming: Real-time response streaming               │
+│  ├── Web: Streamlit UI                                     │
+│  └── API: RESTful endpoints (via LightRAG/MCP)             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,13 +67,23 @@ The Personal AI Agent is a sophisticated, self-contained AI assistant built usin
 - **Base URL**: `http://localhost:11434/v1`
 - **Pattern**: Simple `Agent(knowledge=kb, search_knowledge=True)`
 
-#### **2. Knowledge Management**
+#### **2. Dual Knowledge Management**
 
-- **Storage**: LanceDB (local, file-based vector database)
-- **Embeddings**: nomic-embed-text (768 dimensions)
-- **Search**: Hybrid (vector similarity + full-text with tantivy)
-- **Formats**: .txt, .md, .json support
-- **Location**: `/Users/egs/data/knowledge/`
+The agent features a dual knowledge base system, managed by the consolidated `KnowledgeTools`, to provide both broad, relational understanding and fast, semantic retrieval.
+
+**A. LightRAG Knowledge Base (Graph-based)**
+- **Technology**: LightRAG Server (via Docker)
+- **Architecture**: Remote server accessed via HTTP API.
+- **Strengths**: Builds a knowledge graph to understand relationships between entities. Ideal for complex, relational queries.
+- **Search Modes**: Global (graph), Local (semantic), Hybrid, and Mix.
+- **Data Location**: Source files are stored in `~/.persag/<user>/knowledge/` and uploaded to the LightRAG server for processing.
+
+**B. Semantic Knowledge Base (Vector-based)**
+- **Technology**: Agno `TextKnowledgeBase` with LanceDB.
+- **Architecture**: Local, file-based vector database integrated directly into the agent.
+- **Strengths**: Fast, efficient vector similarity search for direct questions and fact retrieval.
+- **Search Modes**: Vector similarity search.
+- **Data Location**: Source files are stored in `PERSAG_ROOT/agno/<user>/knowledge/`.
 
 #### **3. Memory System**
 
@@ -120,23 +126,20 @@ MCP Servers (6 active):
     env: DATABASE_URL
 ```
 
-### 📁 **File Structure**
+### 📁 **File Structure (User Data)**
+
+User-specific data is stored centrally in `~/.persag/<user_id>/` and the `PERSAG_ROOT` directory.
 
 ```
-/Users/egs/data/
-├── agno/                          # Agno framework storage
-│   ├── agent_sessions.db          # SQLite: Session management
-│   ├── agent_memory.db            # SQLite: Conversation memory
-│   └── lancedb/                   # LanceDB: Vector storage
-│       ├── personal_knowledge/    # Knowledge vectors
-│       └── _transactions/         # LanceDB transactions
-├── knowledge/                     # Knowledge base files
-│   ├── user_profile.txt          # Personal information
-│   ├── agent_specs.txt           # Technical specifications
-│   ├── facts.txt                 # System facts
-│   └── *.md, *.json             # Additional knowledge
-└── logs/                         # Application logs
-    └── personal_agent.log
+~/.persag/<user_id>/
+├── docker-compose.yml      # User-specific Docker config for LightRAG
+└── knowledge/              # Source files for the LightRAG KB
+
+PERSAG_ROOT/agno/<user_id>/
+├── agent_sessions.db       # SQLite: Session management
+├── agent_memory.db         # SQLite: Conversation memory
+├── knowledge/              # Source files for the Semantic KB
+└── lancedb/                # LanceDB: Vector storage for Semantic KB
 ```
 
 ## Key Capabilities
@@ -335,14 +338,14 @@ response = await agent.arun("What is my name?")
 
 ## Conclusion
 
-The Personal AI Agent represents a successful implementation of modern AI agent architecture using the Agno framework. It achieves the goals of local data control, zero external dependencies, and comprehensive functionality while maintaining simplicity and reliability.
+The Personal AI Agent represents a successful implementation of a modern, hybrid AI agent architecture. By integrating a graph-based LightRAG server with a local semantic knowledge base, the system can leverage the strengths of both for more nuanced and powerful information retrieval. The consolidation of knowledge tools into a single, unified interface simplifies the architecture and enhances maintainability.
 
-The system demonstrates how proper framework usage (following the `knowledge_agent_example.py` pattern) leads to robust, maintainable AI applications that can serve as personal assistants with deep knowledge integration and tool capabilities.
+The system demonstrates a robust, flexible, and powerful approach to building personal assistants that can reason over complex, interconnected data while providing fast, direct access to factual information.
 
-**Status**: ✅ Production Ready - Knowledge search functional, MCP tools operational, architecture stable.
+**Status**: ✅ Production Ready - Dual knowledge base system is operational, tools are consolidated, and the architecture is stable.
 
 ---
 
-*Last Updated: June 10, 2025*  
-*Version: 0.5.1*  
+*Last Updated: August 14, 2025*  
+*Version: 0.6.0*  
 *Author: Eric G. Suchanek*

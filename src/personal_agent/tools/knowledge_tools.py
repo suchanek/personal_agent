@@ -1,14 +1,28 @@
 # src/personal_agent/tools/knowledge_tools.py
 # pylint: disable=C0301, W1203
-"""Knowledge Base Management Tools Module.
+"""Dual Knowledge Base Management Tools Module.
 
-This module provides comprehensive tools for managing a persistent knowledge base system
-built on top of LightRAG (Light Retrieval-Augmented Generation). It enables intelligent
-storage, processing, and retrieval of factual information, documents, and reference
-materials through advanced semantic search and knowledge graph capabilities.
+This module provides comprehensive tools for managing two complementary knowledge base systems:
+a LightRAG-based graph knowledge base and a local semantic vector knowledge base. It enables
+intelligent storage, processing, and retrieval of factual information, documents, and reference
+materials through multiple search strategies and knowledge representation approaches.
 
 Key Components:
-    KnowledgeTools: Main toolkit class providing knowledge base operations
+    KnowledgeTools: Main toolkit class providing dual knowledge base operations
+
+Dual Architecture:
+    1. LightRAG Knowledge Base (Graph-based):
+       - Remote server-based processing via HTTP API
+       - Knowledge graph construction with entity relationships
+       - Global graph queries and local semantic search
+       - Hybrid search combining multiple retrieval strategies
+       - Files stored in AGNO_KNOWLEDGE_DIR and uploaded to server
+
+    2. Semantic Knowledge Base (Vector-based):
+       - Local LanceDB/Agno-based vector storage
+       - Direct vector similarity search
+       - Files stored in DATA_DIR/knowledge directory
+       - Immediate vector embedding and indexing
 
 Core Functionality:
     - Document ingestion from multiple sources (files, URLs, direct text)
@@ -16,14 +30,26 @@ Core Functionality:
     - Multi-modal search with semantic and graph-based retrieval
     - Batch processing capabilities for large document collections
     - Automatic content validation and error handling
+    - Unified querying through KnowledgeCoordinator
 
-Architecture:
-    The module integrates with a LightRAG server backend that handles:
-    - Document parsing and text extraction
-    - Knowledge graph construction from ingested content
-    - Vector embeddings for semantic similarity search
-    - Entity relationship mapping for graph-based queries
-    - Hybrid search combining multiple retrieval strategies
+Available Methods:
+    LightRAG Operations:
+    - ingest_knowledge_file: Upload files to LightRAG server
+    - ingest_knowledge_text: Upload text content to LightRAG server
+    - ingest_knowledge_from_url: Fetch and upload URL content to LightRAG
+    - batch_ingest_directory: Batch upload directory contents to LightRAG
+    - query_lightrag_knowledge_direct: Direct LightRAG server queries
+
+    Semantic Operations:
+    - ingest_semantic_file: Add files to local semantic knowledge base
+    - ingest_semantic_text: Add text content to local semantic knowledge base
+    - ingest_semantic_from_url: Fetch and add URL content to semantic knowledge base
+    - batch_ingest_semantic_directory: Batch add directory contents to semantic KB
+    - query_semantic_knowledge: Direct semantic vector search
+    - recreate_semantic_kb: Rebuild semantic knowledge base indices
+
+    Unified Operations:
+    - query_knowledge_base: Unified querying across both knowledge bases
 
 Supported Content Types:
     - Text documents (.txt, .md, .csv)
@@ -34,11 +60,16 @@ Supported Content Types:
     - Web pages and APIs via URL ingestion
 
 Search Capabilities:
-    - Local Search: Semantic similarity within document chunks
-    - Global Search: Graph-based entity relationship queries
-    - Hybrid Search: Combined semantic and graph approaches
+    LightRAG Search Modes:
+    - Local: Semantic similarity within document chunks
+    - Global: Graph-based entity relationship queries
+    - Hybrid: Combined semantic and graph approaches
     - Auto-routing: Intelligent query mode selection
-    - Custom parameters: Fine-tuned search control
+
+    Semantic Search:
+    - Vector similarity search using embeddings
+    - Direct document retrieval with relevance scoring
+    - Configurable result limits and filtering
 
 Usage Patterns:
     This module is designed for storing and retrieving static factual information
@@ -47,6 +78,7 @@ Usage Patterns:
     - Technical documentation systems
     - Reference material collections
     - Knowledge base construction from multiple sources
+    - Comparative search across different knowledge representations
 
     It should NOT be used for:
     - Personal user information (use memory tools instead)
@@ -55,9 +87,9 @@ Usage Patterns:
     - General conversational AI without knowledge context
 
 Integration:
-    - Requires LightRAG server running at configured endpoint
-    - Integrates with personal agent configuration system
-    - Coordinates with KnowledgeManager for system-wide operations
+    - LightRAG: Requires LightRAG server running at configured endpoint
+    - Semantic: Uses local Agno knowledge base for vector operations
+    - Coordinates with KnowledgeManager and KnowledgeCoordinator
     - Supports both synchronous and asynchronous operations
     - Provides comprehensive logging and error reporting
 
@@ -67,9 +99,11 @@ Performance Considerations:
     - Rate limiting: Built-in delays to prevent server overload
     - Timeout handling: 60-second limits for network operations
     - Unique naming: Automatic conflict resolution for duplicate files
+    - Semantic KB: Automatic vector embedding regeneration on ingestion
 
 Dependencies:
-    - LightRAG server for backend processing
+    - LightRAG server for graph-based knowledge processing
+    - Agno/LanceDB for local semantic vector storage
     - requests/aiohttp for HTTP communication
     - BeautifulSoup for HTML content extraction
     - Standard library modules for file handling and validation
@@ -81,21 +115,29 @@ Example Usage:
 
     # Initialize the tools
     km = KnowledgeManager()
-    tools = KnowledgeTools(km)
+    tools = KnowledgeTools(km, agno_knowledge=agno_kb)
 
-    # Ingest a document
+    # Ingest into LightRAG knowledge base
     result = tools.ingest_knowledge_file("research_paper.pdf", "AI Research")
 
-    # Query the knowledge base
+    # Ingest into semantic knowledge base
+    result = tools.ingest_semantic_file("reference.txt", "Reference Material")
+
+    # Unified query across both knowledge bases
     answer = tools.query_knowledge_base("What is machine learning?")
 
-    # Batch process a directory
-    summary = tools.batch_ingest_directory("./docs", "*.pdf")
+    # Direct semantic search
+    semantic_results = tools.query_semantic_knowledge("neural networks")
+
+    # Batch process directories
+    lightrag_summary = tools.batch_ingest_directory("./docs", "*.pdf")
+    semantic_summary = tools.batch_ingest_semantic_directory("./refs", "*.md")
     ```
 
 Author: Personal Agent Development Team
-Version: Compatible with LightRAG backend
+Version: Compatible with LightRAG backend and Agno semantic knowledge base
 License: See project LICENSE file
+Last revision: 2025-08-14 10:57:57
 """
 import hashlib
 import mimetypes
@@ -113,8 +155,8 @@ from agno.utils.log import log_debug
 from bs4 import BeautifulSoup
 
 from ..config import settings
-from ..core.knowledge_manager import KnowledgeManager
 from ..core.knowledge_coordinator import create_knowledge_coordinator
+from ..core.knowledge_manager import KnowledgeManager
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -141,7 +183,7 @@ class KnowledgeTools(Toolkit):
     def __init__(self, knowledge_manager: KnowledgeManager, agno_knowledge=None):
         self.knowledge_manager = knowledge_manager
         self.agno_knowledge = agno_knowledge
-        
+
         # Initialize knowledge coordinator for unified querying
         self.knowledge_coordinator = None
 
@@ -585,7 +627,7 @@ class KnowledgeTools(Toolkit):
                 self.knowledge_coordinator = create_knowledge_coordinator(
                     agno_knowledge=self.agno_knowledge,
                     lightrag_url=settings.LIGHTRAG_URL,
-                    debug=False
+                    debug=False,
                 )
 
             # Use the knowledge coordinator for unified querying - now properly async
@@ -593,9 +635,9 @@ class KnowledgeTools(Toolkit):
                 query=query.strip(),
                 mode=mode,
                 limit=limit,
-                response_type="Multiple Paragraphs"
+                response_type="Multiple Paragraphs",
             )
-            
+
             logger.info(f"Knowledge query completed: {query[:50]}...")
             return result
 
@@ -770,20 +812,24 @@ class KnowledgeTools(Toolkit):
                 if self.agno_knowledge:
                     # Recreate the knowledge base to include new files
                     self._reload_knowledge_base_sync(self.agno_knowledge)
-                    
-                    logger.info(f"Successfully ingested semantic knowledge file: {filename}")
+
+                    logger.info(
+                        f"Successfully ingested semantic knowledge file: {filename}"
+                    )
                     return f"✅ Successfully ingested '{filename}' into semantic knowledge base and reloaded vector embeddings."
                 else:
                     logger.warning("No semantic knowledge base available")
                     return f"⚠️ File copied to semantic directory but no knowledge base available for indexing: '{filename}'"
-                
+
             except Exception as e:
                 # Clean up the copied file if knowledge base reload failed
                 try:
                     os.remove(dest_path)
                 except OSError:
                     pass
-                logger.error(f"Failed to reload knowledge base after adding {filename}: {e}")
+                logger.error(
+                    f"Failed to reload knowledge base after adding {filename}: {e}"
+                )
                 return f"❌ Failed to ingest '{filename}': Error reloading knowledge base - {str(e)}"
 
         except Exception as e:
@@ -846,20 +892,24 @@ class KnowledgeTools(Toolkit):
                 if self.agno_knowledge:
                     # Recreate the knowledge base to include new files
                     self._reload_knowledge_base_sync(self.agno_knowledge)
-                    
-                    logger.info(f"Successfully ingested semantic knowledge text: {title}")
+
+                    logger.info(
+                        f"Successfully ingested semantic knowledge text: {title}"
+                    )
                     return f"✅ Successfully ingested '{title}' into semantic knowledge base and reloaded vector embeddings."
                 else:
                     logger.warning("No semantic knowledge base available")
                     return f"⚠️ Text saved to semantic directory but no knowledge base available for indexing: '{title}'"
-                
+
             except Exception as e:
                 # Clean up the created file if knowledge base reload failed
                 try:
                     os.remove(file_path)
                 except OSError:
                     pass
-                logger.error(f"Failed to reload knowledge base after adding {title}: {e}")
+                logger.error(
+                    f"Failed to reload knowledge base after adding {title}: {e}"
+                )
                 return f"❌ Failed to ingest '{title}': Error reloading knowledge base - {str(e)}"
 
         except Exception as e:
@@ -1036,9 +1086,7 @@ class KnowledgeTools(Toolkit):
             logger.error(f"Error in batch semantic ingestion: {e}")
             return f"❌ Error in batch semantic ingestion: {str(e)}"
 
-    def query_semantic_knowledge(
-        self, query: str, limit: int = 10
-    ) -> str:
+    def query_semantic_knowledge(self, query: str, limit: int = 10) -> str:
         """Query the local semantic knowledge base to retrieve stored information.
 
         This tool searches the local LanceDB-based semantic knowledge base using vector
@@ -1111,24 +1159,26 @@ class KnowledgeTools(Toolkit):
             try:
                 if not self.agno_knowledge:
                     return "❌ No semantic knowledge base available. Please ensure the knowledge base is properly initialized."
-                
+
                 # Perform semantic search
-                search_results = self.agno_knowledge.search(query.strip(), num_documents=limit)
-                
+                search_results = self.agno_knowledge.search(
+                    query.strip(), num_documents=limit
+                )
+
                 if not search_results:
                     logger.info(f"No semantic search results found for: {query}")
                     return f"🔍 No relevant knowledge found for '{query}'. Try different keywords or add more knowledge to your semantic knowledge base."
 
                 # Format results
                 result = f"🧠 SEMANTIC KNOWLEDGE SEARCH (found {len(search_results)} results):\n\n"
-                
+
                 for i, doc in enumerate(search_results, 1):
                     # Extract content from the document
                     content = str(doc)
                     # Truncate long content for display
                     if len(content) > 200:
                         content = content[:200] + "..."
-                    
+
                     result += f"{i}. {content}\n\n"
 
                 logger.info(f"Semantic knowledge search successful: {query[:50]}...")
@@ -1158,7 +1208,7 @@ class KnowledgeTools(Toolkit):
 
             # Recreate the knowledge base
             self._reload_knowledge_base_sync(self.agno_knowledge)
-            
+
             logger.info("Successfully recreated semantic knowledge base")
             return "✅ Semantic knowledge base has been successfully recreated with updated vector embeddings."
 
