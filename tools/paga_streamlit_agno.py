@@ -105,6 +105,14 @@ from textwrap import dedent
 import requests
 import streamlit as st
 
+# Apply dashboard-style layout but keep original page title/icon
+st.set_page_config(
+    page_title="Personal AI Friend with Memory",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -598,24 +606,26 @@ def render_memory_tab():
         "other",
     ]
     selected_category = st.selectbox("Category:", categories, key="fact_category")
-    if fact_input := st.chat_input(
-        "Enter a fact to store (e.g., I work at Google as a software engineer)"
-    ):
-        if fact_input.strip():
-            topic_list = (
-                None if selected_category == "automatic" else [selected_category]
-            )
-            success, message, memory_id, _ = memory_helper.add_memory(
-                memory_text=fact_input.strip(),
-                topics=topic_list,
-                input_text="Direct fact storage",
-            )
-            if success:
-                st.success("🎉 **Fact Successfully Stored!** 🎉")
-                time.sleep(2)
-                st.rerun()
-            else:
-                st.error(f"❌ Failed to store fact: {message}")
+    # Inline input for storing facts (avoids bottom-anchored chat_input)
+    with st.form("store_fact_form"):
+        fact_input = st.text_input(
+            "Enter a fact to store (e.g., I work at Google as a software engineer)",
+            key="fact_input_text",
+        )
+        submitted = st.form_submit_button("💾 Save Fact")
+    if submitted and fact_input and fact_input.strip():
+        topic_list = None if selected_category == "automatic" else [selected_category]
+        success, message, memory_id, _ = memory_helper.add_memory(
+            memory_text=fact_input.strip(),
+            topics=topic_list,
+            input_text="Direct fact storage",
+        )
+        if success:
+            st.success("🎉 **Fact Successfully Stored!** 🎉")
+            time.sleep(2)
+            st.rerun()
+        else:
+            st.error(f"❌ Failed to store fact: {message}")
 
     # Search Memories Section
     st.markdown("---")
@@ -635,14 +645,20 @@ def render_memory_tab():
         search_limit = st.number_input(
             "Max Results", 1, 50, 10, key="memory_search_limit"
         )
-    if search_query := st.chat_input("Enter keywords to search your memories"):
+    with st.form("memory_search_form"):
+        search_query = st.text_input(
+            "Enter keywords to search your memories",
+            key="memory_search_query_text",
+        )
+        submitted_memory_search = st.form_submit_button("🔎 Search")
+    if submitted_memory_search and search_query and search_query.strip():
         search_results = memory_helper.search_memories(
-            query=search_query,
+            query=search_query.strip(),
             limit=search_limit,
             similarity_threshold=similarity_threshold,
         )
         if search_results:
-            st.subheader(f"🔍 Search Results for: '{search_query}'")
+            st.subheader(f"🔍 Search Results for: '{search_query.strip()}'")
             for i, (memory, score) in enumerate(search_results, 1):
                 with st.expander(
                     f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}..."
@@ -1246,15 +1262,19 @@ def render_knowledge_tab():
     knowledge_search_limit = st.number_input(
         "Max Results", 1, 50, 10, key="knowledge_search_limit"
     )
-    if knowledge_search_query := st.chat_input(
-        "Enter keywords to search the SQLite/LanceDB knowledge base"
-    ):
+    with st.form("knowledge_sqlite_search_form"):
+        knowledge_search_query = st.text_input(
+            "Enter keywords to search the SQLite/LanceDB knowledge base",
+            key="knowledge_search_query_text",
+        )
+        submitted_knowledge_sqlite = st.form_submit_button("🔎 Search")
+    if submitted_knowledge_sqlite and knowledge_search_query and knowledge_search_query.strip():
         search_results = knowledge_helper.search_knowledge(
-            query=knowledge_search_query, limit=knowledge_search_limit
+            query=knowledge_search_query.strip(), limit=knowledge_search_limit
         )
         if search_results:
             st.subheader(
-                f"🔍 SQLite/LanceDB Knowledge Search Results for: '{knowledge_search_query}'"
+                f"🔍 SQLite/LanceDB Knowledge Search Results for: '{knowledge_search_query.strip()}'"
             )
             for i, knowledge_entry in enumerate(search_results, 1):
                 if hasattr(knowledge_entry, "content"):
@@ -1331,16 +1351,20 @@ def render_knowledge_tab():
     with col3:
         query_params["stream"] = st.checkbox("Stream", key="rag_stream")
 
-    if rag_search_query := st.chat_input(
-        "Enter keywords to search the RAG knowledge base"
-    ):
+    with st.form("rag_search_form"):
+        rag_search_query = st.text_input(
+            "Enter keywords to search the RAG knowledge base",
+            key="rag_search_query_text",
+        )
+        submitted_rag_search = st.form_submit_button("🔎 Search RAG")
+    if submitted_rag_search and rag_search_query and rag_search_query.strip():
         # Pass the entire dictionary of parameters to the helper
         search_results = knowledge_helper.search_rag(
-            query=rag_search_query, params=query_params
+            query=rag_search_query.strip(), params=query_params
         )
         # Check if we have actual content (not just empty string or None)
         if search_results is not None and str(search_results).strip():
-            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query}'")
+            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query.strip()}'")
             st.markdown(search_results)
         elif search_results is not None:
             st.warning(f"Query returned empty response. Raw result: '{search_results}'")
@@ -1629,17 +1653,23 @@ def main():
         "*A friendly AI agent that remembers your conversations and learns about you*"
     )
 
-    tab1, tab2, tab3 = st.tabs(["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"])
+    # Sidebar navigation (replaces top-level tabs)
+    st.sidebar.title("🧠 PersonalAgent")
+    selected_tab = st.sidebar.radio(
+        "Navigation",
+        ["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"],
+        index=0,
+    )
 
-    with tab1:
+    # Route content based on sidebar selection
+    if selected_tab == "💬 Chat":
         render_chat_tab()
-
-    with tab2:
+    elif selected_tab == "🧠 Memory Manager":
         render_memory_tab()
-
-    with tab3:
+    elif selected_tab == "📚 Knowledge Base":
         render_knowledge_tab()
 
+    # Append the original sidebar controls (theme/model/debug/etc.)
     render_sidebar()
 
 
