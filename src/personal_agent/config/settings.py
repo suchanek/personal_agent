@@ -8,12 +8,14 @@ from pathlib import Path
 import dotenv
 from dotenv import load_dotenv
 
+from .user_id_mgr import load_user_from_file
+
 # Define the project's base directory.
 # This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 # Default: ~/.persag, overridable via environment variable PERSAG_HOME
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
-
+PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
 # Set up paths for environment files
 dotenv_path = BASE_DIR / ".env"
@@ -25,7 +27,6 @@ dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from .user_id_mgr import load_user_from_file
 
 # Initialize ~/.persag (PERSAG_HOME) and load user ID
 load_user_from_file()
