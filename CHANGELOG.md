@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Secure Remote Access with Tailscale**: Implemented Tailscale across key development and server devices to create a secure, private network. This allows for remote access to the agent's web UI and SSH without exposing services to the public internet, significantly improving development flexibility and security. See [ADR-067](./refs/adr/067-tailscale-remote-access.md) for details.
+
+
 ### Fixed
 - **`switch-user.py` Script**: Fixed a critical bug in the `switch-user.py` script that prevented it from working correctly with the `~/.persag` home directory structure. The script now correctly locates and manages the LightRAG Docker services, ensuring that user switching is fully functional. See [ADR-065](./refs/adr/065-switch-user-persag-home-fix.md) for details.
 
