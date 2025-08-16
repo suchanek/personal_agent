@@ -471,6 +471,14 @@ personal_agent/
 - **Improved Reliability**: Better error handling and service management
 - **User Experience**: Streamlined interfaces and better documentation
 
+## 🚀 Future Directions
+
+- **RESTful API**: A RESTful API is planned to provide a dedicated endpoint for mobile applications and third-party integrations, further enhancing the ability to add memories and interact with the agent from anywhere.
+
+## 🚀 Future Directions
+
+- **RESTful API**: A RESTful API is planned to provide a dedicated endpoint for mobile applications and third-party integrations, further enhancing the ability to add memories and interact with the agent from anywhere.
+
 ## 📄 License
 
 GPL-3.0-only License - See LICENSE file for details.
