@@ -58,7 +58,7 @@ from .utils.pag_logging import (
 )
 
 # Package version (matches pyproject.toml)
-__version__ = "0.11.38dev"  # Defined once to avoid duplication
+__version__ = "0.2.0"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -106,7 +106,6 @@ __all__ = [
     "run_agno_cli",
     "run_agno_cli_wrapper",
     # Utility functions
-    
     # Package info
     "__version__",
 ]

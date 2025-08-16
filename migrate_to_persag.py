@@ -2,7 +2,7 @@
 """
 Migration script for Personal Agent ~/.persag refactoring
 
-This script migrates the existing docker directories and env.userid file
+This script migrates the existing docker directories, .env file, and env.userid file
 from the project root to the new ~/.persag directory structure.
 """
 
@@ -49,7 +49,9 @@ def main():
         old_userid_file = project_root / "env.userid"
         old_lightrag_server = project_root / "lightrag_server"
         old_lightrag_memory_server = project_root / "lightrag_memory_server"
+        old_env = project_root / ".env"
         
+        # Check if old files exist
         migration_needed = []
         if old_userid_file.exists():
             migration_needed.append("env.userid")
@@ -57,6 +59,10 @@ def main():
             migration_needed.append("lightrag_server/")
         if old_lightrag_memory_server.exists():
             migration_needed.append("lightrag_memory_server/")
+        if old_env.exists():
+            migration_needed.append(".env")
+        
+        # Check 
         
         if not migration_needed:
             print("ℹ️  No old files found to migrate.")
@@ -84,6 +90,11 @@ def main():
                 print(f"   {persag_manager.persag_dir}")
                 print(f"   ├── env.userid")
                 
+                # Show .env file if it exists
+                env_file = persag_manager.persag_dir / ".env"
+                if env_file.exists():
+                    print(f"   ├── .env")
+                
                 docker_config = persag_manager.get_docker_config()
                 for name, config in docker_config.items():
                     if config["dir"].exists():
@@ -97,13 +108,8 @@ def main():
                 print(f"\n📋 Next steps:")
                 print(f"   1. Test the system: python -m personal_agent.config.settings")
                 print(f"   2. Verify docker integration works")
-                print(f"   3. If everything works, you can remove old files:")
-                if old_userid_file.exists():
-                    print(f"      rm {old_userid_file}")
-                if old_lightrag_server.exists():
-                    print(f"      rm -rf {old_lightrag_server}")
-                if old_lightrag_memory_server.exists():
-                    print(f"      rm -rf {old_lightrag_memory_server}")
+                print(f"   3. The original files remain as base files in the project root")
+                print(f"   4. The system now uses the migrated files in ~/.persag")
                 
             else:
                 print(f"⚠️  Migration validation issues: {validation_message}")

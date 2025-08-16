@@ -2,7 +2,11 @@
 
 # Smart LightRAG Docker Restart Script
 # Provides intelligent restart with proper port cleanup and waiting periods
-# to prevent "port already allocated" errors
+# to prevent "port already allocated" errors.
+# Assumes ~/.persag exists and that they contain the docker server dirs
+#
+# Last revision: 2025-08-15 18:32:56
+
 
 # Colors for output
 RED='\033[0;31m'

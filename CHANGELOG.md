@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-08-15
+
+### Changed
+- **Complete Configuration Decoupling**: Migrated the `.env` file to the `~/.persag` directory, completing the full decoupling of user-specific configurations from the project repository. This enhances security and portability by consolidating all user data, Docker configurations, and environment settings into a single, well-defined location. See [ADR-066](./refs/adr/066-persag-env-migration.md) for details.
+
 ## [Unreleased]
 
 ### Fixed
