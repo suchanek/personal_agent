@@ -169,11 +169,11 @@ ENV_FILE=".env"
 BACKUP_DIR="backups"
 LOCAL_OLLAMA_URL="http://localhost:11434"
 LOCAL_OLLAMA_DOCKER_URL="http://host.docker.internal:11434"
-REMOTE_OLLAMA_URL="http://tesla.local:11434"
+REMOTE_OLLAMA_URL="http://tesla.tail19187e.ts.net:11434"
 REMOTE_OLLAMA_DOCKER_URL="http://192.168.1.126:11434"
 
 LOCAL_LIGHTRAG_URL="http://localhost:9621"
-REMOTE_LIGHTRAG_URL="http://tesla.local:9621"
+REMOTE_LIGHTRAG_URL="http://tesla.tail19187e.ts.net:9621"
 
 # ... (functions)
 

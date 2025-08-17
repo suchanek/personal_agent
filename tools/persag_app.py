@@ -32,7 +32,7 @@ Key Features
 ⚙️ **System Configuration**
     - Dynamic model selection and switching
     - Ollama server configuration (local/remote)
-    - RAG server location management (localhost/tesla.local)
+    - RAG server location management (localhost/tesla.tail19187e.ts.net)
     - Theme switching (light/dark mode)
     - Debug mode with detailed performance analytics
 
@@ -953,7 +953,7 @@ def render_knowledge_status(knowledge_helper):
             # RAG Server Location Dropdown
             rag_location = st.selectbox(
                 "RAG Server:",
-                ["localhost", "tesla.local"],
+                ["localhost", "tesla.tail19187e.ts.net"],
                 index=(
                     0
                     if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost"
@@ -977,8 +977,8 @@ def render_knowledge_status(knowledge_helper):
                     # Determine the new RAG URL
                     if rag_location == "localhost":
                         new_rag_url = "http://localhost:9621"
-                    else:  # tesla.local
-                        new_rag_url = "http://tesla.local:9621"
+                    else:  # tesla.tail19187e.ts.net
+                        new_rag_url = "http://tesla.tail19187e.ts.net:9621"
 
                     # Trigger rescan on the new server
                     with st.spinner(
@@ -1007,8 +1007,8 @@ def render_knowledge_status(knowledge_helper):
             # Determine the RAG URL based on current session state
             if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost":
                 rag_url = "http://localhost:9621"
-            else:  # tesla.local
-                rag_url = "http://tesla.local:9621"
+            else:  # tesla.tail19187e.ts.net
+                rag_url = "http://tesla.tail19187e.ts.net:9621"
 
             # Check RAG server status with improved reliability and error handling
             try:

@@ -8,7 +8,7 @@ The `switch-ollama.sh` script is a comprehensive bash utility that manages switc
 
 This script enables seamless switching between:
 - **Local Mode**: Uses localhost/host.docker.internal for all services
-- **Remote Mode**: Uses tesla.local for all services
+- **Remote Mode**: Uses tesla.tail19187e.ts.net for all services
 
 ## Configuration Variables
 
@@ -16,12 +16,12 @@ This script enables seamless switching between:
 ```bash
 LOCAL_URL="http://localhost:11434"
 LOCAL_DOCKER_URL="http://host.docker.internal:11434"
-REMOTE_URL="http://tesla.local:11434"
-REMOTE_DOCKER_URL="http://tesla.local:11434"
+REMOTE_URL="http://tesla.tail19187e.ts.net:11434"
+REMOTE_DOCKER_URL="http://tesla.tail19187e.ts.net:11434"
 LOCAL_LIGHTRAG_URL="http://localhost:9621"
-REMOTE_LIGHTRAG_URL="http://tesla.local:9621"
+REMOTE_LIGHTRAG_URL="http://tesla.tail19187e.ts.net:9621"
 LOCAL_EMBEDDING_BINDING_HOST="http://host.docker.internal:11434"
-REMOTE_EMBEDDING_BINDING_HOST="http://tesla.local:11434"
+REMOTE_EMBEDDING_BINDING_HOST="http://tesla.tail19187e.ts.net:11434"
 ```
 
 ### Environment Variables Updated
@@ -30,10 +30,10 @@ When switching modes, the script updates these 4 variables in the `.env` file:
 
 | Variable | Local Value | Remote Value |
 |----------|-------------|--------------|
-| `OLLAMA_URL` | `http://localhost:11434` | `http://tesla.local:11434` |
-| `OLLAMA_DOCKER_URL` | `http://host.docker.internal:11434` | `http://tesla.local:11434` |
-| `LIGHTRAG_URL` | `http://localhost:9621` | `http://tesla.local:9621` |
-| `EMBEDDING_BINDING_HOST` | `http://host.docker.internal:11434` | `http://tesla.local:11434` |
+| `OLLAMA_URL` | `http://localhost:11434` | `http://tesla.tail19187e.ts.net:11434` |
+| `OLLAMA_DOCKER_URL` | `http://host.docker.internal:11434` | `http://tesla.tail19187e.ts.net:11434` |
+| `LIGHTRAG_URL` | `http://localhost:9621` | `http://tesla.tail19187e.ts.net:9621` |
+| `EMBEDDING_BINDING_HOST` | `http://host.docker.internal:11434` | `http://tesla.tail19187e.ts.net:11434` |
 
 ## Commands
 
@@ -45,7 +45,7 @@ When switching modes, the script updates these 4 variables in the `.env` file:
 ### Available Commands
 
 1. **local** - Switch to local Ollama server (host.docker.internal:11434)
-2. **remote** - Switch to remote Ollama server (tesla.local:11434)
+2. **remote** - Switch to remote Ollama server (tesla.tail19187e.ts.net:11434)
 3. **status** - Show current Ollama configuration
 
 ## Key Functions
@@ -168,6 +168,6 @@ The script integrates with:
 
 - Check that `lightrag_server/` directory exists
 - Ensure Docker and docker-compose are installed
-- Verify network connectivity to tesla.local for remote mode
+- Verify network connectivity to tesla.tail19187e.ts.net for remote mode
 - Check that required Python scripts are present
 - Review backup files if rollback is needed

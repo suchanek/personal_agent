@@ -14,7 +14,7 @@ Switches between local and remote Ollama servers and restarts Docker services.
 
 **Commands:**
 - `local` - Switch to local Ollama server (host.docker.internal:11434)
-- `remote` - Switch to remote Ollama server (tesla.local:11434)  
+- `remote` - Switch to remote Ollama server (tesla.tail19187e.ts.net:11434)  
 - `status` - Show current configuration and test connectivity
 
 **Examples:**
@@ -22,7 +22,7 @@ Switches between local and remote Ollama servers and restarts Docker services.
 # Switch to local Ollama
 ./switch-ollama.sh local
 
-# Switch to remote Ollama (tesla.local)
+# Switch to remote Ollama (tesla.tail19187e.ts.net)
 ./switch-ollama.sh remote
 
 # Check current status
@@ -51,9 +51,9 @@ Just restarts Docker services without changing configuration.
   - Uses Docker's special hostname to reach your host machine
   - For when Ollama is running locally on your Mac
   
-- **Remote**: `OLLAMA_URL=http://tesla.local:11434`
+- **Remote**: `OLLAMA_URL=http://tesla.tail19187e.ts.net:11434`
   - Points to your remote Ollama server
-  - For when using your tesla.local server
+  - For when using your tesla.tail19187e.ts.net server
 
 ## Features
 

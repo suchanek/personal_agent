@@ -95,7 +95,7 @@ def test_ollama_memory():
     user_id = "Eric"
 
     agent = Agent(
-        model=Ollama(id="llama3.1:8b", host="http://tesla.local:11434"),
+        model=Ollama(id="llama3.1:8b", host="http://tesla.tail19187e.ts.net:11434"),
         memory=memory,
         storage=SqliteStorage(
             table_name="sessions_ollama", db_file="tmp/sessions_comparison_ollama.db"

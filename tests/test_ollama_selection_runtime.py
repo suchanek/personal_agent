@@ -12,12 +12,14 @@ import sys
 import time
 from pathlib import Path
 
+
 def _add_src_to_syspath():
     # Ensure 'personal_agent' package is importable in src/ layout
     repo_root = Path(__file__).resolve().parents[1]
     src_dir = repo_root / "src"
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
+
 
 _add_src_to_syspath()
 
@@ -78,7 +80,7 @@ def test_ollama_selection_runtime():
     output = run_command_with_timeout(cmd)
 
     # Verify the remote Ollama message is in the output
-    if "Using remote Ollama at: http://tesla.local:11434" in output:
+    if "Using remote Ollama at: http://tesla.tail19187e.ts.net:11434" in output:
         print(
             "\n✅ Successfully verified remote Ollama is used with --remote-ollama flag"
         )

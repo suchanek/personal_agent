@@ -12,12 +12,12 @@ ENV_FILE=".env"
 BACKUP_DIR="backups"
 LOCAL_URL="http://localhost:11434"
 LOCAL_DOCKER_URL="http://host.docker.internal:11434"
-REMOTE_URL="http://tesla.local:11434"
-REMOTE_DOCKER_URL="http://tesla.local:11434"
+REMOTE_URL="http://tesla.tail19187e.ts.net:11434"
+REMOTE_DOCKER_URL="http://tesla.tail19187e.ts.net:11434"
 LOCAL_LIGHTRAG_URL="http://localhost:9621"
-REMOTE_LIGHTRAG_URL="http://tesla.local:9621"
+REMOTE_LIGHTRAG_URL="http://tesla.tail19187e.ts.net:9621"
 LOCAL_EMBEDDING_BINDING_HOST="http://host.docker.internal:11434"
-REMOTE_EMBEDDING_BINDING_HOST="http://tesla.local:11434"
+REMOTE_EMBEDDING_BINDING_HOST="http://tesla.tail19187e.ts.net:11434"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
@@ -28,7 +28,7 @@ show_usage() {
     echo ""
     echo "Commands:"
     echo "  local   - Switch to local Ollama server (host.docker.internal:11434)"
-    echo "  remote  - Switch to remote Ollama server (tesla.local:11434)"
+    echo "  remote  - Switch to remote Ollama server (tesla.tail19187e.ts.net:11434)"
     echo "  status  - Show current Ollama configuration"
     echo ""
     echo "Examples:"
@@ -59,7 +59,7 @@ show_status() {
     if [[ "$current_url" == "$LOCAL_URL" ]]; then
         echo -e "  RAG Mode: ${GREEN}LOCAL${NC} (host.docker.internal)"
     elif [[ "$current_url" == "$REMOTE_URL" ]]; then
-        echo -e "  RAG Mode: ${GREEN}REMOTE${NC} (tesla.local)"
+        echo -e "  RAG Mode: ${GREEN}REMOTE${NC} (tesla.tail19187e.ts.net)"
     else
         echo -e "  RAG Mode: ${YELLOW}CUSTOM${NC}"
     fi
@@ -169,7 +169,7 @@ restart_docker_services() {
         
         if [[ "$current_url" == *"host.docker.internal"* ]]; then
             echo -e "  Mode: ${GREEN}LOCAL${NC}"
-        elif [[ "$current_url" == *"tesla.local"* ]]; then
+        elif [[ "$current_url" == *"tesla.tail19187e.ts.net"* ]]; then
             echo -e "  Mode: ${GREEN}REMOTE${NC}"
         else
             echo -e "  Mode: ${YELLOW}CUSTOM${NC}"
@@ -247,7 +247,7 @@ case "$1" in
         ;;
         
     "remote")
-        echo -e "${BLUE}Switching to REMOTE Ollama server (tesla.local)...${NC}"
+        echo -e "${BLUE}Switching to REMOTE Ollama server (tesla.tail19187e.ts.net)...${NC}"
         
         # Check if already remote
         current_url=$(get_current_url)
