@@ -105,7 +105,7 @@ args = [
   { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
 ]
 
-[tool.poe.tasks.server-persag]
+[tool.poe.tasks.serve-persag]
 help = "Start the Personal Agent Streamlit interface (PAGA)"
 cmd = "streamlit run tools/paga_streamlit_agno.py"
 args = [

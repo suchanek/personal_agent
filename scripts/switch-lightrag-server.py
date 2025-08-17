@@ -29,9 +29,9 @@ CONFIG = {
         "EMBEDDING_BINDING_HOST": "http://host.docker.internal:11434",
     },
     "remote": {
-        "OLLAMA_URL": "http://tesla.local:11434",
+        "OLLAMA_URL": "http://tesla.tail19187e.ts.net:11434",
         "OLLAMA_DOCKER_URL": "http://host.docker.internal:11434",
-        "EMBEDDING_BINDING_HOST": "http://tesla.local:11434",
+        "EMBEDDING_BINDING_HOST": "http://tesla.tail19187e.ts.net:11434",
     },
 }
 
@@ -198,7 +198,7 @@ def main():
         choices=["local", "remote", "status"],
         help=(
             "local   - Switch to local Ollama server (host.docker.internal)\n"
-            "remote  - Switch to remote Ollama server (tesla.local)\n"
+            "remote  - Switch to remote Ollama server (tesla.tail19187e.ts.net)\n"
             "status  - Show the current configuration and service status"
         ),
     )

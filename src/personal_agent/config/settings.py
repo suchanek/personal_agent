@@ -17,6 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
+PROVIDER="ollama"
+LMSTUDIO_URL="https://api.openai.com/v1"
+REMOTE_LMSTUDIO_URL="https:api.openai.com/v1"
+
+OLLAMA_URL=http://localhost:11434
+
 # Set up paths for environment files
 dotenv_path = BASE_DIR / ".env"
 
@@ -95,7 +101,9 @@ LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9622"
 
 # LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")
 LMSTUDIO_URL = "https://api.openai.com/v1"
-REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://tesla.local:1234/v1")
+REMOTE_LMSTUDIO_URL = get_env_var(
+    "REMOTE_LMSTUDIO_URL", "http://tesla.tail19187e.ts.net:1234/v1"
+)
 
 # Docker port configurations
 PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server (internal)
@@ -109,7 +117,9 @@ LIGHTRAG_MEMORY_PORT = get_env_var(
 # Configuration constants - All configurable via environment variables
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
-REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://tesla.local:11434")
+REMOTE_OLLAMA_URL = get_env_var(
+    "REMOTE_OLLAMA_URL", "http://tesla.tail19187e.ts.net:11434"
+)
 
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 USE_MCP = get_env_bool("USE_MCP", True)

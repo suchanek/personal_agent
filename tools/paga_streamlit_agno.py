@@ -32,7 +32,7 @@ Key Features
 ⚙️ **System Configuration**
     - Dynamic model selection and switching
     - Ollama server configuration (local/remote)
-    - RAG server location management (localhost/tesla.local)
+    - RAG server location management (localhost/tesla.tail19187e.ts.net)
     - Theme switching (light/dark mode)
     - Debug mode with detailed performance analytics
 
@@ -672,35 +672,58 @@ def render_memory_tab():
                         f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                     )
                     st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
-                    
+
                     # Memory deletion with confirmation
                     delete_key = f"delete_search_{memory.memory_id}"
-                    if delete_key not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]:
-                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
-                    
-                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key]:
+                    if (
+                        delete_key
+                        not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]
+                    ):
+                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                            delete_key
+                        ] = False
+
+                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                        delete_key
+                    ]:
                         if st.button(f"🗑️ Delete Memory", key=delete_key):
-                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = True
+                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                                delete_key
+                            ] = True
                             st.rerun()
                     else:
-                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                        st.warning(
+                            "⚠️ **Confirm Deletion** - This action cannot be undone!"
+                        )
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
-                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                                    delete_key
+                                ] = False
                                 st.rerun()
                         with col2:
-                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                            if st.button(
+                                "🗑️ Yes, Delete",
+                                key=f"confirm_{delete_key}",
+                                type="primary",
+                            ):
                                 with st.spinner("Deleting memory..."):
-                                    success, message = memory_helper.delete_memory(memory.memory_id)
+                                    success, message = memory_helper.delete_memory(
+                                        memory.memory_id
+                                    )
                                     if success:
                                         st.success(f"Memory deleted: {message}")
                                         # Clear the confirmation state
-                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                        st.session_state[
+                                            SESSION_KEY_DELETE_CONFIRMATIONS
+                                        ][delete_key] = False
                                         st.rerun()
                                     else:
                                         st.error(f"Failed to delete memory: {message}")
-                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                        st.session_state[
+                                            SESSION_KEY_DELETE_CONFIRMATIONS
+                                        ][delete_key] = False
         else:
             st.info("No matching memories found.")
 
@@ -723,35 +746,58 @@ def render_memory_tab():
                     topics = getattr(memory, "topics", [])
                     if topics:
                         st.write(f"**Topics:** {', '.join(topics)}")
-                    
+
                     # Memory deletion with confirmation
                     delete_key = f"delete_browse_{memory.memory_id}"
-                    if delete_key not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]:
-                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
-                    
-                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key]:
+                    if (
+                        delete_key
+                        not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]
+                    ):
+                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                            delete_key
+                        ] = False
+
+                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                        delete_key
+                    ]:
                         if st.button(f"🗑️ Delete", key=delete_key):
-                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = True
+                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                                delete_key
+                            ] = True
                             st.rerun()
                     else:
-                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                        st.warning(
+                            "⚠️ **Confirm Deletion** - This action cannot be undone!"
+                        )
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
-                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
+                                    delete_key
+                                ] = False
                                 st.rerun()
                         with col2:
-                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                            if st.button(
+                                "🗑️ Yes, Delete",
+                                key=f"confirm_{delete_key}",
+                                type="primary",
+                            ):
                                 with st.spinner("Deleting memory..."):
-                                    success, message = memory_helper.delete_memory(memory.memory_id)
+                                    success, message = memory_helper.delete_memory(
+                                        memory.memory_id
+                                    )
                                     if success:
                                         st.success(f"Memory deleted: {message}")
                                         # Clear the confirmation state
-                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                        st.session_state[
+                                            SESSION_KEY_DELETE_CONFIRMATIONS
+                                        ][delete_key] = False
                                         st.rerun()
                                     else:
                                         st.error(f"Failed to delete memory: {message}")
-                                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][delete_key] = False
+                                        st.session_state[
+                                            SESSION_KEY_DELETE_CONFIRMATIONS
+                                        ][delete_key] = False
         else:
             st.info("No memories stored yet.")
 
@@ -907,7 +953,7 @@ def render_knowledge_status(knowledge_helper):
             # RAG Server Location Dropdown
             rag_location = st.selectbox(
                 "RAG Server:",
-                ["localhost", "tesla.local"],
+                ["localhost", "tesla.tail19187e.ts.net"],
                 index=(
                     0
                     if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost"
@@ -931,8 +977,8 @@ def render_knowledge_status(knowledge_helper):
                     # Determine the new RAG URL
                     if rag_location == "localhost":
                         new_rag_url = "http://localhost:9621"
-                    else:  # tesla.local
-                        new_rag_url = "http://tesla.local:9621"
+                    else:  # tesla.tail19187e.ts.net
+                        new_rag_url = "http://tesla.tail19187e.ts.net:9621"
 
                     # Trigger rescan on the new server
                     with st.spinner(
@@ -961,8 +1007,8 @@ def render_knowledge_status(knowledge_helper):
             # Determine the RAG URL based on current session state
             if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost":
                 rag_url = "http://localhost:9621"
-            else:  # tesla.local
-                rag_url = "http://tesla.local:9621"
+            else:  # tesla.tail19187e.ts.net
+                rag_url = "http://tesla.tail19187e.ts.net:9621"
 
             # Check RAG server status with improved reliability and error handling
             try:
@@ -1173,9 +1219,9 @@ def render_knowledge_tab():
                     # Find the knowledge tools (consolidated)
                     knowledge_tools = None
                     for tool in agent.agent.tools:
-                        if hasattr(
-                            tool, "__class__"
-                        ) and "KnowledgeTools" in str(tool.__class__):
+                        if hasattr(tool, "__class__") and "KnowledgeTools" in str(
+                            tool.__class__
+                        ):
                             knowledge_tools = tool
                             break
 
@@ -1226,9 +1272,9 @@ def render_knowledge_tab():
                         # Find the knowledge tools (consolidated)
                         knowledge_tools = None
                         for tool in agent.agent.tools:
-                            if hasattr(
-                                tool, "__class__"
-                            ) and "KnowledgeTools" in str(tool.__class__):
+                            if hasattr(tool, "__class__") and "KnowledgeTools" in str(
+                                tool.__class__
+                            ):
                                 knowledge_tools = tool
                                 break
 
@@ -1268,7 +1314,11 @@ def render_knowledge_tab():
             key="knowledge_search_query_text",
         )
         submitted_knowledge_sqlite = st.form_submit_button("🔎 Search")
-    if submitted_knowledge_sqlite and knowledge_search_query and knowledge_search_query.strip():
+    if (
+        submitted_knowledge_sqlite
+        and knowledge_search_query
+        and knowledge_search_query.strip()
+    ):
         search_results = knowledge_helper.search_knowledge(
             query=knowledge_search_query.strip(), limit=knowledge_search_limit
         )
@@ -1364,7 +1414,9 @@ def render_knowledge_tab():
         )
         # Check if we have actual content (not just empty string or None)
         if search_results is not None and str(search_results).strip():
-            st.subheader(f"🤖 RAG Knowledge Search Results for: '{rag_search_query.strip()}'")
+            st.subheader(
+                f"🤖 RAG Knowledge Search Results for: '{rag_search_query.strip()}'"
+            )
             st.markdown(search_results)
         elif search_results is not None:
             st.warning(f"Query returned empty response. Raw result: '{search_results}'")
