@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Unified Agent and Team UI**: Refactored the Streamlit application (`paga_streamlit_agno.py`) to integrate both the single `AgnoPersonalAgent` and the multi-agent `PersonalAgentTeam` into a single, unified interface. Users can now dynamically switch between "single" and "team" modes at runtime, providing a seamless experience for all conversational AI interactions. See [ADR-068](./refs/adr/068-unified-agent-team-streamlit-ui.md) for details.
+
 ### Added
 - **Secure Remote Access with Tailscale**: Implemented Tailscale across key development and server devices to create a secure, private network. This allows for remote access to the agent's web UI and SSH without exposing services to the public internet, significantly improving development flexibility and security. See [ADR-067](./refs/adr/067-tailscale-remote-access.md) for details.
 

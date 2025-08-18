@@ -80,8 +80,8 @@ from ..config.settings import (
     SHOW_SPLASH_SCREEN,
     STORAGE_BACKEND,
     USE_MCP,
-    get_userid,
 )
+from ..config.user_id_mgr import get_userid
 from ..tools.knowledge_tools import KnowledgeTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,

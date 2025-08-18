@@ -90,7 +90,7 @@ The application maintains persistent session state across interactions:
 
 Author: Personal Agent Development Team
 Version: v0.2.0
-Last Revision: 2025-08-17 15:12:05
+Last Revision: 2025-08-17 20:34:33
 """
 
 import argparse
@@ -606,7 +606,12 @@ def render_memory_tab():
         "other",
     ]
     selected_category = st.selectbox("Category:", categories, key="fact_category")
-    # Inline input for storing facts (avoids bottom-anchored chat_input)
+    # Inline input for storing facts (uniform with knowledge tools)
+    # Clear-on-success using a flag to avoid Streamlit key mutation errors
+    if st.session_state.get("clear_fact_input_text", False):
+        st.session_state["fact_input_text"] = ""
+        st.session_state["clear_fact_input_text"] = False
+
     with st.form("store_fact_form"):
         fact_input = st.text_input(
             "Enter a fact to store (e.g., I work at Google as a software engineer)",
@@ -621,8 +626,17 @@ def render_memory_tab():
             input_text="Direct fact storage",
         )
         if success:
-            st.success("🎉 **Fact Successfully Stored!** 🎉")
-            time.sleep(2)
+            # Transient success popup/toast with short delay before rerun
+            try:
+                st.toast("🎉 Fact saved to memory", icon="✅")
+                time.sleep(1.25)
+            except Exception:
+                _popup = st.empty()
+                _popup.success("🎉 Fact saved to memory")
+                time.sleep(1.25)
+                _popup.empty()
+            # Defer clearing the input to the next run to comply with Streamlit rules
+            st.session_state["clear_fact_input_text"] = True
             st.rerun()
         else:
             st.error(f"❌ Failed to store fact: {message}")
@@ -1296,6 +1310,7 @@ def render_knowledge_tab():
 
 def render_sidebar():
     with st.sidebar:
+        # Theme selector at the very top
         st.header("🎨 Theme")
         is_dark = st.session_state.get(SESSION_KEY_DARK_THEME, False)
         theme_icon = "🌙" if is_dark else "☀️"
@@ -1305,9 +1320,6 @@ def render_sidebar():
                 SESSION_KEY_DARK_THEME
             ]
             st.rerun()
-
-        st.header("👤 Current User")
-        st.write(f"**🆔 {USER_ID}**")
 
         st.header("Model Selection")
         new_ollama_url = st.text_input(
@@ -1602,7 +1614,7 @@ def main():
     )
 
     # Sidebar navigation (replaces top-level tabs)
-    st.sidebar.title("🤖 PersonalAgent Team")
+    st.sidebar.title(f"🤖 {USER_ID}'s Personal Agent")
     selected_tab = st.sidebar.radio(
         "Navigation",
         ["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"],

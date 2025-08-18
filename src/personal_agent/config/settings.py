@@ -7,8 +7,7 @@ from pathlib import Path
 
 import dotenv
 from dotenv import load_dotenv
-
-from .user_id_mgr import load_user_from_file
+from .user_id_mgr import get_user_storage_paths, load_user_from_file
 
 # Define the project's base directory.
 # This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
@@ -17,11 +16,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
-PROVIDER="ollama"
-LMSTUDIO_URL="https://api.openai.com/v1"
-REMOTE_LMSTUDIO_URL="https:api.openai.com/v1"
+PROVIDER = "ollama"
+LMSTUDIO_URL = "https://localhost:1234/v1"
 
-OLLAMA_URL=http://localhost:11434
+# see below for the ollama server urls
 
 # Set up paths for environment files
 dotenv_path = BASE_DIR / ".env"
@@ -91,19 +89,11 @@ def get_env_bool(key: str, fallback: bool = True) -> bool:
     return value.lower() in ("true", "1", "yes", "on")
 
 
-PROVIDER = "ollama"
-PROVIDER = get_env_var("PROVIDER", "ollama")  # DEPRECATED
-
 # LighRAG server
 LIGHTRAG_SERVER = get_env_var("LIGHTRAG_SERVER", "http://localhost:9621")  # DEPRECATED
 LIGHTRAG_URL = get_env_var("LIGHTRAG_URL", "http://localhost:9621")
 LIGHTRAG_MEMORY_URL = get_env_var("LIGHTRAG_MEMORY_URL", "http://localhost:9622")
 
-# LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")
-LMSTUDIO_URL = "https://api.openai.com/v1"
-REMOTE_LMSTUDIO_URL = get_env_var(
-    "REMOTE_LMSTUDIO_URL", "http://tesla.tail19187e.ts.net:1234/v1"
-)
 
 # Docker port configurations
 PORT = get_env_var("PORT", "9621")  # Default port for lightrag_server (internal)
@@ -116,12 +106,16 @@ LIGHTRAG_MEMORY_PORT = get_env_var(
 
 # Configuration constants - All configurable via environment variables
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
+USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
+
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
 REMOTE_OLLAMA_URL = get_env_var(
     "REMOTE_OLLAMA_URL", "http://tesla.tail19187e.ts.net:11434"
 )
+REMOTE_LMSTUDIO_URL = get_env_var(
+    "REMOTE_LMSTUDIO_URL", "http://tesla.tail19187e.ts.net:11434"
+)
 
-USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 USE_MCP = get_env_bool("USE_MCP", True)
 
 # Directory configurations
@@ -137,7 +131,6 @@ STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
 
 
 # Import user-specific functions
-from .user_id_mgr import get_user_storage_paths, get_userid
 
 # Get initial storage paths (these will be dynamic)
 _storage_paths = get_user_storage_paths()
@@ -181,10 +174,6 @@ EMBEDDING_TIMEOUT = get_env_var("EMBEDDING_TIMEOUT", "3600")
 
 # Display configuration
 SHOW_SPLASH_SCREEN = get_env_bool("SHOW_SPLASH_SCREEN", False)
-
-
-# Import remaining user-specific functions
-from .user_id_mgr import get_current_user_id, refresh_user_dependent_settings
 
 
 def get_package_version():
