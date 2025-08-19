@@ -24,6 +24,7 @@ from .specialized_agents import (
     create_knowledge_memory_agent,
     create_pubmed_agent,
     create_web_research_agent,
+    create_writer_agent,
 )
 
 logger = setup_logging(__name__)
@@ -126,6 +127,13 @@ def create_personal_agent_team(
         debug=debug,
     )
 
+    writer_agent = create_writer_agent(
+        model_provider=model_provider,
+        model_name=model_name,
+        ollama_base_url=ollama_base_url,
+        debug=debug,
+    )
+
     # Create knowledge/memory agent using PersonalAgnoAgent
     knowledge_agent = create_knowledge_memory_agent(
         model_provider=model_provider,
@@ -136,6 +144,7 @@ def create_personal_agent_team(
         user_id=user_id,
         debug=debug,
     )
+
 
     # Create coordinator model
     coordinator_model = _create_coordinator_model(
@@ -160,6 +169,7 @@ def create_personal_agent_team(
         - "Calculator Agent": Math calculations, data analysis
         - "File Operations Agent": File operations, shell commands
         - "PubMed Research Agent": Biomedical literature, scientific papers, medical research
+        - "Writer Agent": Writing, editing, content creation, document formatting
         
         ## ROUTING RULES:
         1. **Memory/Knowledge Tasks**: ALWAYS route to "Knowledge Agent"
@@ -194,6 +204,13 @@ def create_personal_agent_team(
             - Biomedical information → route to "PubMed Research Agent"
             - Research paper searches → route to "PubMed Research Agent"
         
+        7. **Writing Tasks**: ALWAYS route to "Writer Agent"
+            - "Write an article about..." → route to "Writer Agent"
+            - "Edit this text..." → route to "Writer Agent"
+            - "Create a document..." → route to "Writer Agent"
+            - "Proofread this..." → route to "Writer Agent"
+            - ANY writing, editing, or content creation tasks → route to "Writer Agent"
+        
         ## COORDINATION PRINCIPLES:
         - Be a helpful coordinator who ensures users get expert help
         - Provide brief, friendly context when routing requests
@@ -216,6 +233,7 @@ def create_personal_agent_team(
             calculator_agent,
             file_operations_agent,
             pubmed_agent,
+            writer_agent,
         ],
         instructions=team_instructions,
         markdown=True,
