@@ -1,7 +1,50 @@
-/* Dark theme styles */
+/* Simplified Dark Theme */
 .stApp {
     background-color: #0e1117 !important;
     color: #fafafa !important;
+}
+
+/* Fix header and footer areas */
+.stApp > header,
+.stApp header[data-testid="stHeader"],
+.stApp > div:first-child,
+.stApp [data-testid="stToolbar"],
+.stApp [data-testid="stStatusWidget"] {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Fix footer and bottom areas specifically */
+.stApp > div:last-child,
+.stApp footer,
+.stApp [data-testid="stFooter"],
+.stApp .stBottom,
+.stApp [class*="bottom"],
+.stApp [class*="Bottom"],
+.stApp [class*="footer"],
+.stApp [class*="Footer"],
+.stApp [style*="position: fixed"][style*="bottom"],
+.stApp [style*="bottom: 0"] {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Aggressive footer targeting for Safari */
+body,
+html,
+#root,
+.stApp *:last-child,
+.stApp div[style*="position: absolute"],
+.stApp div[style*="position: fixed"],
+.stApp div[style*="z-index"],
+.stApp > div > div:last-child,
+.stApp > div > div > div:last-child {
+    background-color: #0e1117 !important;
+}
+
+/* Universal bottom element targeting */
+*[class*="streamlit"] {
+    background-color: #0e1117 !important;
 }
 
 /* Main content area */
@@ -10,133 +53,65 @@
     color: #fafafa !important;
 }
 
-/* Header area */
-.stApp > header {
-    background-color: #0e1117 !important;
+/* Sidebar with better text contrast */
+[data-testid="stSidebar"] {
+    background-color: #1a1b26 !important;
 }
 
-/* Main content wrapper */
-.stMainBlockContainer {
-    background-color: #0e1117 !important;
-}
-
-/* Bottom toolbar/footer */
-.stBottom {
-    background-color: #0e1117 !important;
-}
-
-
-/* Restore other interactive elements */
-button {
-    background-color: #262730 !important;
+.stSidebar .stMarkdown,
+.stSidebar .stText,
+.stSidebar h1,
+.stSidebar h2,
+.stSidebar h3,
+.stSidebar p,
+.stSidebar div,
+.stSidebar span,
+.stSidebar label {
     color: #fafafa !important;
 }
 
-/* Sidebar */
-.stSidebar {
-    background-color: #262730 !important;
-}
-
-.stSidebar .stMarkdown {
-    color: #fafafa !important;
-}
-
-.stSidebar .stSelectbox > div > div {
-    background-color: #262730 !important;
-    color: #fafafa !important;
-}
-
-/* Text inputs */
-.stTextInput > div > div > input {
-    background-color: #262730 !important;
-    color: #fafafa !important;
-    border: 1px solid #4a4a4a !important;
-}
-
-.stTextInput > div > div > input:focus {
-    border-color: #6a6a6a !important;
-    box-shadow: 0 0 0 1px #6a6a6a !important;
-}
-
-/* Buttons */
 .stButton > button {
+    background-color: #4f8bf9;
+    color: white;
+}
+
+input, textarea, select, .stSelectbox div {
     background-color: #262730 !important;
     color: #fafafa !important;
-    border: 1px solid #4a4a4a !important;
+    border: 1px solid #4f4f4f !important;
 }
 
-.stButton > button:hover {
-    background-color: #3a3a3a !important;
-    border: 1px solid #6a6a6a !important;
+/* Chat input specific targeting for Safari */
+.stApp div[data-testid="stChatInput"],
+.stApp div[data-testid="stChatInput"] textarea,
+.stApp div[data-testid="stChatInput"] input,
+.stApp [data-testid="stChatInput"] > div,
+.stApp [data-testid="stChatInput"] > div > div,
+.stApp [data-testid="stChatInput"] > div > div > textarea {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border: 1px solid #4f4f4f !important;
 }
 
-/* Expanders */
-.stExpander {
-    background-color: #1e1e1e !important;
-    border: 1px solid #4a4a4a !important;
-}
-
-.stExpander > div > div > div > div {
-    background-color: #1e1e1e !important;
+.stMarkdown, .stText {
+    color: #fafafa;
 }
 
 /* Chat messages */
 .stChatMessage {
-    background-color: #1e1e1e !important;
+    background-color: #1e1e1e;
 }
 
-.stChatMessage > div {
-    background-color: #1e1e1e !important;
+/* Expanders */
+.stExpander {
+    background-color: #1e1e1e;
+    border: 1px solid #4a4a4a;
 }
 
 /* Metrics */
 .stMetric {
-    background-color: #1e1e1e !important;
-    border: 1px solid #4a4a4a !important;
-    border-radius: 5px !important;
-    padding: 10px !important;
-}
-
-/* Alerts */
-.stAlert {
-    background-color: #1e1e1e !important;
-    border: 1px solid #4a4a4a !important;
-}
-
-/* Selectbox */
-.stSelectbox > div > div {
-    background-color: #262730 !important;
-    color: #fafafa !important;
-}
-
-/* Checkbox */
-.stCheckbox > label {
-    color: #fafafa !important;
-}
-
-/* Headers and text */
-h1, h2, h3, h4, h5, h6 {
-    color: #fafafa !important;
-}
-
-p, div, span {
-    color: #fafafa !important;
-}
-
-/* Custom scrollbar for dark theme */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #262730;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #4a4a4a;
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #6a6a6a;
+    background-color: #1e1e1e;
+    border: 1px solid #4a4a4a;
+    border-radius: 5px;
+    padding: 10px;
 }

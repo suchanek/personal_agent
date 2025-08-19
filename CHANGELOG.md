@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Personal Agent Team Refactor**: Refactored the `PersonalAgentTeam` to enforce a clean separation of concerns. The coordinator agent's sole responsibility is now routing, while a new, dedicated `Knowledge Agent` (an `AgnoPersonalAgent` instance) handles all memory and knowledge operations. This improves modularity, maintainability, and architectural clarity. See [ADR-069](./refs/adr/069-personal-agent-team-refactor.md) for details.
 - **Unified Agent and Team UI**: Refactored the Streamlit application (`paga_streamlit_agno.py`) to integrate both the single `AgnoPersonalAgent` and the multi-agent `PersonalAgentTeam` into a single, unified interface. Users can now dynamically switch between "single" and "team" modes at runtime, providing a seamless experience for all conversational AI interactions. See [ADR-068](./refs/adr/068-unified-agent-team-streamlit-ui.md) for details.
 
 ### Added

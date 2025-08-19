@@ -272,11 +272,28 @@ class AgnoPersonalAgent(Agent):
         )
 
         logger.info(
-            "Created AgnoPersonalAgent with model=%s, memory=%s, user_id=%s (lazy initialization)",
+            "Created AgnoPersonalAgent with model=%s, memory=%s, user_id=%s (lazy initialization=%s)",
             f"{model_provider}:{model_name}",
             self.enable_memory,
             self.user_id,
+            not self._force_init,
         )
+
+        # Force initialization if requested
+        if self._force_init:
+            logger.info("Force initialization requested - initializing agent synchronously")
+            try:
+                # Try to get the current event loop
+                loop = asyncio.get_running_loop()
+                # If we're in a running loop, we can't use asyncio.run()
+                logger.warning("Event loop detected - agent will initialize on first use")
+            except RuntimeError:
+                # No running event loop, safe to initialize now
+                try:
+                    asyncio.run(self.initialize())
+                    logger.info("Agent initialized synchronously with %d tools", len(self.tools) if self.tools else 0)
+                except Exception as e:
+                    logger.error("Failed to force initialize agent: %s", e)
 
     def _setup_storage_paths(
         self, storage_dir: str, knowledge_dir: str, user_id: str
@@ -437,6 +454,8 @@ class AgnoPersonalAgent(Agent):
             tools = []
             # 8. Prepare tools list
             tools = []
+            
+            # Add built-in tools if alltools is enabled
             if self.alltools:
                 all_tools = [
                     GoogleSearchTools(),
@@ -460,16 +479,19 @@ class AgnoPersonalAgent(Agent):
                     PersonalAgentFilesystemTools(),
                 ]
                 tools.extend(all_tools)
-                logger.info(f"Added {len(all_tools)} tools")
+                logger.info(f"Added {len(all_tools)} built-in tools")
 
-            # Add memory tools if enabled
+            # ALWAYS add memory tools if memory is enabled, regardless of alltools setting
             if self.enable_memory:
-                memory_tools = [
-                    self.knowledge_tools,  # Now contains all knowledge functionality
-                    self.memory_tools,
-                ]
-                tools.extend(memory_tools)
-                logger.info("Added consolidated KnowledgeTools and AgnoMemoryTools")
+                if self.knowledge_tools and self.memory_tools:
+                    memory_tools = [
+                        self.knowledge_tools,  # Now contains all knowledge functionality
+                        self.memory_tools,
+                    ]
+                    tools.extend(memory_tools)
+                    logger.info("Added consolidated KnowledgeTools and AgnoMemoryTools")
+                else:
+                    logger.warning("Memory enabled but memory tools not properly initialized")
             else:
                 logger.warning("Memory disabled - no memory tools added")
 

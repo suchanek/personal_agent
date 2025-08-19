@@ -1,52 +1,49 @@
-/* Light theme - only override essential elements, preserve interaction icons */
+/* Simplified Light Theme */
 .stApp {
-    background-color: white !important;
+    background-color: #ffffff;
+    color: #262730;
 }
 
-.main .block-container {
-    background-color: white !important;
+[data-testid="stSidebar"] {
+    background-color: #f0f2f6;
 }
 
-.stSidebar {
-    background-color: #f0f2f6 !important;
+.stButton > button {
+    background-color: #ffffff;
+    color: #262730;
+    border: 1px solid #d1d5db;
 }
 
-.stSidebar .stMarkdown, .main .stMarkdown {
-    color: black !important;
+.stButton > button:hover {
+    background-color: #f9fafb;
+    border: 1px solid #9ca3af;
 }
 
-/* Only target specific input elements to avoid breaking icons */
-.stTextInput > div > div > input {
-    background-color: white !important;
-    color: black !important;
-    border: 1px solid #e0e0e0 !important;
+input, textarea, select, .stSelectbox div {
+    background-color: #ffffff;
+    color: #262730;
+    border: 1px solid #d1d5db;
 }
 
-.stTextInput > div > div > input:focus {
-    border-color: #0066cc !important;
-    box-shadow: 0 0 0 1px #0066cc !important;
+.stMarkdown, .stText {
+    color: #374151;
 }
 
-/* Headers and main text only */
-h1, h2, h3, h4, h5, h6 {
-    color: black !important;
+/* Chat messages */
+.stChatMessage {
+    background-color: #f9fafb;
 }
 
-
-/* Reset custom scrollbar to default */
-::-webkit-scrollbar {
-    width: unset;
+/* Expanders */
+.stExpander {
+    background-color: #f9fafb;
+    border: 1px solid #d1d5db;
 }
 
-::-webkit-scrollbar-track {
-    background: unset;
-}
-
-::-webkit-scrollbar-thumb {
-    background: unset;
-    border-radius: unset;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: unset;
+/* Metrics */
+.stMetric {
+    background-color: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    padding: 10px;
 }
