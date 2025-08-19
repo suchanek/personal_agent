@@ -153,10 +153,12 @@ class StreamlitMemoryHelper:
             )
 
         try:
-            # Call the async method from the agent - this returns a MemoryStorageResult object
-            result = asyncio.run(
-                self.agent.store_user_memory(content=memory_text, topics=topics)
-            )
+            # Try calling the method - it might be sync or async
+            result = self.agent.store_user_memory(content=memory_text, topics=topics)
+            
+            # Check if result is a coroutine (async)
+            if asyncio.iscoroutine(result):
+                result = asyncio.run(result)
 
             # Handle MemoryStorageResult object properly (like the CLI does)
             if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or \

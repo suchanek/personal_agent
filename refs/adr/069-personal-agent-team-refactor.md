@@ -28,6 +28,8 @@ To address this, we will refactor the `PersonalAgentTeam` to enforce a clean sep
 2.  **Introduce a Dedicated Knowledge Agent**: A new agent, an instance of `AgnoPersonalAgent`, will be added to the team. This "Knowledge Agent" will be the exclusive handler for all memory and knowledge-related operations, including storage, retrieval, and querying.
 
 3.  **Update Team Structure**: The Knowledge Agent will be the first member of the team to ensure it has priority for memory-related tasks.
+-   **TeamWrapper Memory Handling**: The `TeamWrapper`'s `store_user_memory` method will now explicitly delegate memory storage to the dedicated `Knowledge Agent` (the first team member). This ensures that all memory operations within the team context leverage the `Knowledge Agent`'s capabilities, including fact restatement and LLM processing. A fallback mechanism is implemented to directly use the `SemanticMemoryManager` if the `Knowledge Agent`'s `store_user_memory` method is unavailable, bypassing LLM processing.
+-   **Robust Streamlit UI Integration**: The Streamlit UI's memory helper (`StreamlitMemoryHelper`) and the `render_memory_tab` function will be updated to gracefully handle both synchronous and asynchronous `store_user_memory` calls and to process various return types (e.g., `MemoryStorageResult` objects and legacy tuples) for improved robustness and backward compatibility.
 
 The new, refactored architecture:
 ```

@@ -319,13 +319,34 @@ def create_team_wrapper(team):
             return getattr(self.team, "agno_memory", None)
 
         def store_user_memory(self, content, topics=None):
-            # Use team's memory functionality if available
-            if self.agno_memory:
-                return self.agno_memory.store_user_memory(
-                    user_id=self.user_id, memory_text=content, topics=topics
+            # Use the knowledge agent (first team member) for memory storage with fact restating
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[
+                    0
+                ]  # First member is the knowledge agent
+                if hasattr(knowledge_agent, "store_user_memory"):
+                    import asyncio
+
+                    # This will properly restate facts and process them through the LLM
+                    return asyncio.run(
+                        knowledge_agent.store_user_memory(
+                            content=content, topics=topics
+                        )
+                    )
+
+            # Fallback to direct memory storage (bypasses LLM processing)
+            if self.agno_memory and hasattr(self.agno_memory, "memory_manager"):
+                # Use the SemanticMemoryManager's add_memory method directly
+                result = self.agno_memory.memory_manager.add_memory(
+                    memory_text=content,
+                    db=self.agno_memory.db,
+                    user_id=self.user_id,
+                    topics=topics,
                 )
-            else:
-                raise Exception("Team memory not available")
+                logger.warning(f"Memory stored in team memory: {result}")
+                return result
+
+            raise Exception("Team memory not available")
 
     return TeamWrapper(team)
 
@@ -820,11 +841,28 @@ def render_memory_tab():
         submitted = st.form_submit_button("💾 Save Fact")
     if submitted and fact_input and fact_input.strip():
         topic_list = None if selected_category == "automatic" else [selected_category]
-        success, message, memory_id, _ = memory_helper.add_memory(
+        result = memory_helper.add_memory(
             memory_text=fact_input.strip(),
             topics=topic_list,
             input_text="Direct fact storage",
         )
+
+        # Handle both MemoryStorageResult objects and legacy tuple returns
+        if hasattr(result, "is_success"):
+            # MemoryStorageResult object
+            success = result.is_success
+            message = result.message
+            memory_id = getattr(result, "memory_id", None)
+        elif isinstance(result, tuple) and len(result) >= 2:
+            # Legacy tuple format (success, message, memory_id, topics)
+            success, message = result[0], result[1]
+            memory_id = result[2] if len(result) > 2 else None
+        else:
+            # Fallback
+            success = False
+            message = f"Unexpected result format: {result}"
+            memory_id = None
+
         if success:
             # Show a transient popup/toast and delay before rerun
             try:
@@ -1699,8 +1737,10 @@ def render_sidebar():
     with st.sidebar:
         # Theme selector at the very top
         st.header("🎨 Theme")
-        dark_mode = st.toggle("Dark Mode", value=st.session_state.get(SESSION_KEY_DARK_THEME, False))
-        
+        dark_mode = st.toggle(
+            "Dark Mode", value=st.session_state.get(SESSION_KEY_DARK_THEME, False)
+        )
+
         if dark_mode != st.session_state.get(SESSION_KEY_DARK_THEME, False):
             st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
             st.rerun()
