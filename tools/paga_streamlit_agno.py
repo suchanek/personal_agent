@@ -179,18 +179,28 @@ def parse_args():
     parser.add_argument(
         "--remote", action="store_true", help="Use remote Ollama URL instead of local"
     )
+
     parser.add_argument(
         "--debug",
         action="store_true",
         help="Set debug mode",
-        default=True,
+        default=False,
     )
+
     parser.add_argument(
         "--recreate",
         action="store_true",
         help="Recreate the knowledge base and clear all memories",
         default=True,
     )
+
+    parser.add_argument(
+        "--team",
+        action="store_true",
+        help="Launch the team-based mode",
+        default=True,
+    )
+
     return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
 
 
@@ -199,6 +209,7 @@ args, unknown = parse_args()
 EFFECTIVE_OLLAMA_URL = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
 RECREATE_FLAG = args.recreate
 DEBUG_FLAG = args.debug
+TEAM_FLAG = args.team
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
@@ -259,13 +270,24 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
             debug=True,
         )
 
-        # Create memory system for Streamlit compatibility
-        from personal_agent.core.agno_storage import create_agno_memory
+        # The refactored team now has a knowledge agent as the first member
+        # which contains the memory system, so we don't need to create it separately
+        # But we'll add a fallback for backward compatibility
+        if hasattr(team, "members") and team.members:
+            knowledge_agent = team.members[0]
+            if hasattr(knowledge_agent, "agno_memory"):
+                # Expose the knowledge agent's memory for Streamlit compatibility
+                team.agno_memory = knowledge_agent.agno_memory
+            else:
+                # Fallback: create memory system for compatibility
+                from personal_agent.core.agno_storage import create_agno_memory
 
-        agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
+                team.agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
+        else:
+            # Fallback: create memory system for compatibility
+            from personal_agent.core.agno_storage import create_agno_memory
 
-        # Attach memory to team for Streamlit access
-        team.agno_memory = agno_memory
+            team.agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
 
         return team
     except Exception as e:
@@ -280,12 +302,26 @@ def create_team_wrapper(team):
         def __init__(self, team):
             self.team = team
             self.user_id = USER_ID
-            self.agno_memory = getattr(team, "agno_memory", None)
+            # Try to get memory from the knowledge agent (first team member)
+            self.agno_memory = self._get_team_memory()
+
+        def _get_team_memory(self):
+            """Get memory system from the knowledge agent in the team."""
+            if hasattr(self.team, "members") and self.team.members:
+                # The first member should be the knowledge agent (PersonalAgnoAgent)
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "agno_memory"):
+                    return knowledge_agent.agno_memory
+                elif hasattr(knowledge_agent, "memory"):
+                    return knowledge_agent.memory
+
+            # Fallback: check if team has direct memory access
+            return getattr(self.team, "agno_memory", None)
 
         def store_user_memory(self, content, topics=None):
             # Use team's memory functionality if available
-            if hasattr(self.team, "agno_memory") and self.team.agno_memory:
-                return self.team.agno_memory.store_user_memory(
+            if self.agno_memory:
+                return self.agno_memory.store_user_memory(
                     user_id=self.user_id, memory_text=content, topics=topics
                 )
             else:
@@ -313,9 +349,9 @@ def initialize_session_state():
     if SESSION_KEY_DARK_THEME not in st.session_state:
         st.session_state[SESSION_KEY_DARK_THEME] = False
 
-    # Initialize agent mode - default to single agent
+    # Initialize agent mode - use --team flag if provided, otherwise default to single agent
     if SESSION_KEY_AGENT_MODE not in st.session_state:
-        st.session_state[SESSION_KEY_AGENT_MODE] = "single"
+        st.session_state[SESSION_KEY_AGENT_MODE] = "team" if TEAM_FLAG else "single"
 
     # Initialize based on mode
     if st.session_state[SESSION_KEY_AGENT_MODE] == "team":
@@ -335,9 +371,18 @@ def initialize_session_state():
             )
 
         if SESSION_KEY_KNOWLEDGE_HELPER not in st.session_state:
-            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(
-                st.session_state[SESSION_KEY_TEAM]
-            )
+            # For team mode, pass the knowledge agent (first team member) to the knowledge helper
+            team = st.session_state[SESSION_KEY_TEAM]
+            if hasattr(team, "members") and team.members:
+                knowledge_agent = team.members[0]  # First member is the knowledge agent
+                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                    StreamlitKnowledgeHelper(knowledge_agent)
+                )
+            else:
+                # Fallback: create with team object
+                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                    StreamlitKnowledgeHelper(team)
+                )
     else:
         # Single agent mode initialization (default)
         if SESSION_KEY_AGENT not in st.session_state:
@@ -1085,34 +1130,64 @@ def render_knowledge_status(knowledge_helper):
             st.caption(f"**Data Dir:** {USER_DATA_DIR}")
             st.caption(f"**Knowledge Dir:** {AGNO_KNOWLEDGE_DIR}")
 
-            # FORCE AGENT INITIALIZATION TO CHECK REAL STATUS
+            # FORCE AGENT/TEAM INITIALIZATION TO CHECK REAL STATUS
             try:
-                # Trigger lazy initialization by accessing agent properties
-                agent = st.session_state[SESSION_KEY_AGENT]
+                current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
 
-                # Show initialization status
-                if not getattr(agent, "_initialized", False):
-                    with st.spinner("Initializing knowledge system..."):
-                        if hasattr(agent, "_ensure_initialized"):
-                            # This will trigger initialization if not already done
-                            asyncio.run(agent._ensure_initialized())
+                if current_mode == "team":
+                    # Handle team mode
+                    team = st.session_state.get(SESSION_KEY_TEAM)
+                    if team:
+                        # For team mode, we don't need to trigger initialization
+                        # as the team should already be initialized
+                        km = (
+                            knowledge_helper.knowledge_manager
+                        )  # This will trigger fresh check
+                        if km:
+                            st.success("✅ Ready")
+                            # Show additional info if available
+                            if hasattr(km, "vector_db") and km.vector_db:
+                                st.caption("Vector DB: Connected")
+                            elif hasattr(km, "search"):
+                                st.caption("Knowledge base loaded")
+                        else:
+                            st.warning("⚠️ Offline")
+                            st.caption("Knowledge manager not available")
+                    else:
+                        st.error("❌ Error: Team not initialized")
+                        st.caption("Failed to initialize team")
                 else:
-                    # Agent already initialized, just ensure knowledge helper is updated
-                    if hasattr(agent, "_ensure_initialized"):
-                        asyncio.run(agent._ensure_initialized())
+                    # Handle single agent mode
+                    agent = st.session_state.get(SESSION_KEY_AGENT)
+                    if agent:
+                        # Show initialization status
+                        if not getattr(agent, "_initialized", False):
+                            with st.spinner("Initializing knowledge system..."):
+                                if hasattr(agent, "_ensure_initialized"):
+                                    # This will trigger initialization if not already done
+                                    asyncio.run(agent._ensure_initialized())
+                        else:
+                            # Agent already initialized, just ensure knowledge helper is updated
+                            if hasattr(agent, "_ensure_initialized"):
+                                asyncio.run(agent._ensure_initialized())
 
-                # Now check the real status after ensuring initialization
-                km = knowledge_helper.knowledge_manager  # This will trigger fresh check
-                if km:
-                    st.success("✅ Ready")
-                    # Show additional info if available
-                    if hasattr(km, "vector_db") and km.vector_db:
-                        st.caption("Vector DB: Connected")
-                    elif hasattr(km, "search"):
-                        st.caption("Knowledge base loaded")
-                else:
-                    st.warning("⚠️ Offline")
-                    st.caption("Knowledge manager not available")
+                        # Now check the real status after ensuring initialization
+                        km = (
+                            knowledge_helper.knowledge_manager
+                        )  # This will trigger fresh check
+                        if km:
+                            st.success("✅ Ready")
+                            # Show additional info if available
+                            if hasattr(km, "vector_db") and km.vector_db:
+                                st.caption("Vector DB: Connected")
+                            elif hasattr(km, "search"):
+                                st.caption("Knowledge base loaded")
+                        else:
+                            st.warning("⚠️ Offline")
+                            st.caption("Knowledge manager not available")
+                    else:
+                        st.error("❌ Error: Agent not initialized")
+                        st.caption("Failed to initialize agent")
 
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
@@ -1247,11 +1322,40 @@ def render_knowledge_status(knowledge_helper):
         # Add debug information in an expander if debug mode is enabled
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
             with st.expander("🔍 Debug Status Info"):
-                agent = st.session_state[SESSION_KEY_AGENT]
-                st.write(
-                    f"**Agent Initialized:** {getattr(agent, '_initialized', False)}"
-                )
-                st.write(f"**Agent Type:** {type(agent).__name__}")
+                current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
+                st.write(f"**Current Mode:** {current_mode}")
+
+                if current_mode == "team":
+                    # Debug info for team mode
+                    team = st.session_state.get(SESSION_KEY_TEAM)
+                    if team:
+                        st.write(f"**Team Type:** {type(team).__name__}")
+                        st.write(
+                            f"**Team Members:** {len(getattr(team, 'members', []))}"
+                        )
+                        if hasattr(team, "agno_memory"):
+                            st.write(f"**Team Memory:** {team.agno_memory is not None}")
+                    else:
+                        st.write("**Team:** Not initialized")
+                else:
+                    # Debug info for single agent mode
+                    agent = st.session_state.get(SESSION_KEY_AGENT)
+                    if agent:
+                        st.write(
+                            f"**Agent Initialized:** {getattr(agent, '_initialized', False)}"
+                        )
+                        st.write(f"**Agent Type:** {type(agent).__name__}")
+                        if hasattr(agent, "agno_knowledge"):
+                            st.write(
+                                f"**Agent Knowledge:** {agent.agno_knowledge is not None}"
+                            )
+                        if hasattr(agent, "agno_memory"):
+                            st.write(
+                                f"**Agent Memory:** {agent.agno_memory is not None}"
+                            )
+                    else:
+                        st.write("**Agent:** Not initialized")
+
                 st.write(
                     f"**Knowledge Manager:** {knowledge_helper.knowledge_manager is not None}"
                 )
@@ -1259,10 +1363,6 @@ def render_knowledge_status(knowledge_helper):
                 st.write(
                     f"**RAG Location:** {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
                 )
-                if hasattr(agent, "agno_knowledge"):
-                    st.write(f"**Agent Knowledge:** {agent.agno_knowledge is not None}")
-                if hasattr(agent, "agno_memory"):
-                    st.write(f"**Agent Memory:** {agent.agno_memory is not None}")
 
 
 def render_knowledge_tab():
@@ -1599,13 +1699,10 @@ def render_sidebar():
     with st.sidebar:
         # Theme selector at the very top
         st.header("🎨 Theme")
-        is_dark = st.session_state.get(SESSION_KEY_DARK_THEME, False)
-        theme_icon = "🌙" if is_dark else "☀️"
-        theme_text = "Dark" if is_dark else "Light"
-        if st.button(f"{theme_icon} {theme_text} Mode", key="sidebar_theme_toggle"):
-            st.session_state[SESSION_KEY_DARK_THEME] = not st.session_state[
-                SESSION_KEY_DARK_THEME
-            ]
+        dark_mode = st.toggle("Dark Mode", value=st.session_state.get(SESSION_KEY_DARK_THEME, False))
+        
+        if dark_mode != st.session_state.get(SESSION_KEY_DARK_THEME, False):
+            st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
             st.rerun()
 
         # Agent/Team Mode Selection
@@ -1659,9 +1756,20 @@ def render_sidebar():
                         st.session_state[SESSION_KEY_MEMORY_HELPER] = (
                             StreamlitMemoryHelper(team_wrapper)
                         )
-                        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                            StreamlitKnowledgeHelper(st.session_state[SESSION_KEY_TEAM])
-                        )
+                        # For team mode, pass the knowledge agent (first team member) to the knowledge helper
+                        team = st.session_state[SESSION_KEY_TEAM]
+                        if hasattr(team, "members") and team.members:
+                            knowledge_agent = team.members[
+                                0
+                            ]  # First member is the knowledge agent
+                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                StreamlitKnowledgeHelper(knowledge_agent)
+                            )
+                        else:
+                            # Fallback: create with team object
+                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                StreamlitKnowledgeHelper(team)
+                            )
                         print(
                             f"✅ TEAM READY: Team initialized successfully with {len(getattr(st.session_state[SESSION_KEY_TEAM], 'members', []))} members"
                         )
