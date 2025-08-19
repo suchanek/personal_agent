@@ -864,17 +864,9 @@ def render_memory_tab():
             memory_id = None
 
         if success:
-            # Show a transient popup/toast and delay before rerun
-            try:
-                # Available in newer Streamlit versions
-                st.toast("🎉 Fact saved to memory", icon="✅")
-                time.sleep(1.25)
-            except Exception:
-                # Fallback for older versions: temporary success box
-                _popup = st.empty()
-                _popup.success("🎉 Fact saved to memory")
-                time.sleep(1.25)
-                _popup.empty()
+            # Show success notification
+            st.toast("🎉 Fact saved to memory", icon="✅")
+            time.sleep(2.0)  # 2 second delay
             # Defer clearing the input to the next run to comply with Streamlit rules
             st.session_state["clear_fact_input_text"] = True
             st.rerun()
@@ -1448,8 +1440,33 @@ def render_knowledge_tab():
                         tmp_file_path = tmp_file.name
 
                     try:
+                        # Get the appropriate agent/team based on current mode
+                        current_mode = st.session_state.get(
+                            SESSION_KEY_AGENT_MODE, "single"
+                        )
+
+                        if current_mode == "team":
+                            # Team mode - get the knowledge agent (first team member)
+                            team = st.session_state.get(SESSION_KEY_TEAM)
+                            if team and hasattr(team, "members") and team.members:
+                                agent = team.members[
+                                    0
+                                ]  # First member is the knowledge agent
+                            else:
+                                results.append(
+                                    f"**{uploaded_file.name}**: ❌ Team not properly initialized"
+                                )
+                                continue
+                        else:
+                            # Single agent mode
+                            agent = st.session_state.get(SESSION_KEY_AGENT)
+                            if not agent:
+                                results.append(
+                                    f"**{uploaded_file.name}**: ❌ Agent not initialized"
+                                )
+                                continue
+
                         # Use the knowledge ingestion tools from the agent
-                        agent = st.session_state[SESSION_KEY_AGENT]
                         if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
                             # Find the knowledge tools (consolidated)
                             knowledge_tools = None
@@ -1472,6 +1489,7 @@ def render_knowledge_tab():
                                 )
                         else:
                             results.append(
+                                f"**{uploaded_file.name}**: ❌ Agent tools not accessible"
                                 f"**{uploaded_file.name}**: ❌ Agent tools not accessible"
                             )
 
@@ -1502,6 +1520,12 @@ def render_knowledge_tab():
     st.subheader("📝 Add Text Knowledge")
     st.markdown("*Add text content directly to your knowledge base*")
 
+    # Clear-on-success using a flag to avoid Streamlit key mutation errors
+    if st.session_state.get("clear_knowledge_input_text", False):
+        st.session_state["knowledge_title"] = ""
+        st.session_state["knowledge_content"] = ""
+        st.session_state["clear_knowledge_input_text"] = False
+
     col1, col2 = st.columns([3, 1])
     with col1:
         knowledge_title = st.text_input(
@@ -1522,8 +1546,25 @@ def render_knowledge_tab():
     if st.button("💾 Save Text Knowledge", key="save_text_knowledge", type="primary"):
         if knowledge_title and knowledge_content:
             try:
+                # Get the appropriate agent/team based on current mode
+                current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
+
+                if current_mode == "team":
+                    # Team mode - get the knowledge agent (first team member)
+                    team = st.session_state.get(SESSION_KEY_TEAM)
+                    if team and hasattr(team, "members") and team.members:
+                        agent = team.members[0]  # First member is the knowledge agent
+                    else:
+                        st.error("❌ Team not properly initialized")
+                        return
+                else:
+                    # Single agent mode
+                    agent = st.session_state.get(SESSION_KEY_AGENT)
+                    if not agent:
+                        st.error("❌ Agent not initialized")
+                        return
+
                 # Use the knowledge ingestion tools from the agent
-                agent = st.session_state[SESSION_KEY_AGENT]
                 if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
                     # Find the knowledge tools (consolidated)
                     knowledge_tools = None
@@ -1541,11 +1582,12 @@ def render_knowledge_tab():
                             title=knowledge_title,
                             file_type=file_type,
                         )
-                        st.success(result)
+                        # Show success notification
+                        st.toast("🎉 Knowledge saved successfully!", icon="✅")
+                        time.sleep(2.0)  # 2 second delay
 
-                        # Clear the form
-                        st.session_state.knowledge_title = ""
-                        st.session_state.knowledge_content = ""
+                        # Clear the form using flag-based approach
+                        st.session_state["clear_knowledge_input_text"] = True
                         st.rerun()
                     else:
                         st.error("❌ Knowledge tools not available")
@@ -1561,6 +1603,12 @@ def render_knowledge_tab():
     st.subheader("🌐 Add Knowledge from URL")
     st.markdown("*Extract and add content from web pages*")
 
+    # Clear-on-success using a flag to avoid Streamlit key mutation errors
+    if st.session_state.get("clear_url_input_text", False):
+        st.session_state["knowledge_url"] = ""
+        st.session_state["url_title"] = ""
+        st.session_state["clear_url_input_text"] = False
+
     col1, col2 = st.columns([3, 1])
     with col1:
         knowledge_url = st.text_input(
@@ -1575,8 +1623,29 @@ def render_knowledge_tab():
         if knowledge_url:
             try:
                 with st.spinner("Extracting content from URL..."):
+                    # Get the appropriate agent/team based on current mode
+                    current_mode = st.session_state.get(
+                        SESSION_KEY_AGENT_MODE, "single"
+                    )
+
+                    if current_mode == "team":
+                        # Team mode - get the knowledge agent (first team member)
+                        team = st.session_state.get(SESSION_KEY_TEAM)
+                        if team and hasattr(team, "members") and team.members:
+                            agent = team.members[
+                                0
+                            ]  # First member is the knowledge agent
+                        else:
+                            st.error("❌ Team not properly initialized")
+                            return
+                    else:
+                        # Single agent mode
+                        agent = st.session_state.get(SESSION_KEY_AGENT)
+                        if not agent:
+                            st.error("❌ Agent not initialized")
+                            return
+
                     # Use the knowledge ingestion tools from the agent
-                    agent = st.session_state[SESSION_KEY_AGENT]
                     if hasattr(agent, "agent") and hasattr(agent.agent, "tools"):
                         # Find the knowledge tools (consolidated)
                         knowledge_tools = None
@@ -1593,11 +1662,12 @@ def render_knowledge_tab():
                                 url=knowledge_url,
                                 title=url_title if url_title else None,
                             )
-                            st.success(result)
+                            # Show success notification
+                            st.toast("🎉 Knowledge from URL saved successfully!", icon="✅")
+                            time.sleep(2.0)  # 2 second delay
 
-                            # Clear the form
-                            st.session_state.knowledge_url = ""
-                            st.session_state.url_title = ""
+                            # Clear the form using flag-based approach
+                            st.session_state["clear_url_input_text"] = True
                             st.rerun()
                         else:
                             st.error("❌ Knowledge tools not available")

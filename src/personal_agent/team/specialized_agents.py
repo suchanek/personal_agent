@@ -43,12 +43,14 @@ def _create_model(
     model_provider: str = "ollama",
     model_name: str = LLM_MODEL,
     ollama_base_url: str = OLLAMA_URL,
+    temperature: float = 0.3,
 ) -> Union[OpenAIChat, Ollama]:
     """Create the appropriate model instance based on provider.
 
     :param model_provider: LLM provider ('ollama' or 'openai')
     :param model_name: Model name to use
     :param ollama_base_url: Base URL for Ollama API
+    :param temperature: Model Temperature
     :return: Configured model instance
     :raises ValueError: If unsupported model provider is specified
     """
@@ -73,7 +75,7 @@ def _create_model(
             host=ollama_base_url,
             options={
                 "num_ctx": context_size,
-                "temperature": 0.7,
+                "temperature": temperature,
             },
         )
     else:
@@ -343,6 +345,70 @@ def create_pubmed_agent(
     )
 
     logger.info("Created PubMed Research Agent")
+    return agent
+
+
+def create_writer_agent(
+    model_provider: str = "ollama",
+    model_name: str = LLM_MODEL,
+    ollama_base_url: str = OLLAMA_URL,
+    debug: bool = False,
+) -> Agent:
+    """Create a specialized writing agent.
+
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param ollama_base_url: Base URL for Ollama API
+    :param debug: Enable debug mode
+    :return: Configured writing agent
+    """
+    model = _create_model(model_provider, model_name, ollama_base_url)
+
+    agent = Agent(
+        name="Writer Agent",
+        role="Create, edit, and improve written content",
+        model=model,
+        debug_mode=debug,
+        tools=[FileTools()],  # File tools for reading/writing documents
+        instructions=[
+            "You are a specialized writing agent focused on creating, editing, and improving written content.",
+            "Your primary functions are:",
+            "1. Write original content (articles, essays, reports, stories, etc.)",
+            "2. Edit and improve existing text for clarity, style, and grammar",
+            "3. Adapt writing style for different audiences and purposes",
+            "4. Create structured documents with proper formatting",
+            "5. Proofread and provide feedback on written content",
+            "",
+            "WRITING GUIDELINES:",
+            "- Always consider the target audience and purpose",
+            "- Use clear, concise, and engaging language",
+            "- Maintain consistent tone and style throughout",
+            "- Structure content logically with proper headings and paragraphs",
+            "- Check for grammar, spelling, and punctuation errors",
+            "- Provide constructive feedback when editing others' work",
+            "- Use appropriate formatting (markdown, headings, lists, etc.)",
+            "",
+            "CONTENT TYPES YOU CAN HELP WITH:",
+            "- Business documents (reports, proposals, emails)",
+            "- Academic writing (essays, research papers, summaries)",
+            "- Creative writing (stories, poems, scripts)",
+            "- Technical documentation (guides, manuals, README files)",
+            "- Marketing content (copy, descriptions, social media posts)",
+            "- Personal writing (letters, journals, blogs)",
+            "",
+            "IMPORTANT GUIDELINES:",
+            "- Always maintain originality and avoid plagiarism",
+            "- Respect copyright and intellectual property",
+            "- Provide citations when referencing sources",
+            "- Ask for clarification on requirements when needed",
+            "- Offer multiple options or approaches when appropriate",
+        ],
+        markdown=True,
+        show_tool_calls=False,  # Always hide tool calls for clean responses
+        add_name_to_instructions=True,
+    )
+
+    logger.info("Created Writer Agent")
     return agent
 
 
