@@ -41,12 +41,11 @@ Note:
 
 Author:
     Eric G. Suchanek, PhD.
-    Last Revision: 2025-07-30 19:31:54
+    Last Revision: 2025-08-19 15:22:58
 """
 
 import asyncio
-import time
-from datetime import datetime
+import logging
 
 import streamlit as st
 
@@ -56,6 +55,9 @@ try:
 except ImportError:
     # Fallback if import fails
     MemoryStorageResult = None
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class StreamlitMemoryHelper:
@@ -72,17 +74,19 @@ class StreamlitMemoryHelper:
 
         # Check if agent is already initialized to avoid redundant initialization
         is_initialized = getattr(self.agent, "_initialized", False)
-        
+
         # Only initialize if not already initialized
         if not is_initialized and hasattr(self.agent, "_ensure_initialized"):
             try:
-                print(f"DEBUG: Agent not initialized, triggering lazy initialization...")
+                logger.warning(
+                    "Agent not initialized, triggering lazy initialization..."
+                )
                 asyncio.run(self.agent._ensure_initialized())
             except Exception as e:
-                print(f"Failed to initialize agent: {e}")
+                logger.error(f"Failed to initialize agent: {e}")
                 return None, None
         elif is_initialized:
-            print(f"DEBUG: Agent already initialized, skipping initialization")
+            logger.info("Agent already initialized, skipping initialization")
 
         # Now check for memory components
         if hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
@@ -155,20 +159,21 @@ class StreamlitMemoryHelper:
         try:
             # Try calling the method - it might be sync or async
             result = self.agent.store_user_memory(content=memory_text, topics=topics)
-            
+
             # Check if result is a coroutine (async)
             if asyncio.iscoroutine(result):
                 result = asyncio.run(result)
 
             # Handle MemoryStorageResult object properly (like the CLI does)
-            if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or \
-               (hasattr(result, 'is_success') and hasattr(result, 'message')):
+            if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or (
+                hasattr(result, "is_success") and hasattr(result, "message")
+            ):
                 # This is a MemoryStorageResult object
                 success = result.is_success
                 message = result.message
-                memory_id = getattr(result, 'memory_id', None)
-                generated_topics = getattr(result, 'topics', topics)
-                
+                memory_id = getattr(result, "memory_id", None)
+                generated_topics = getattr(result, "topics", topics)
+
                 return success, message, memory_id, generated_topics
             else:
                 # Fallback: treat as string (legacy behavior)
@@ -215,19 +220,21 @@ class StreamlitMemoryHelper:
         """Delete a memory using the agent's built-in tool."""
         if not self.agent:
             return False, "Agent not available"
-        
+
         try:
             # Add diagnostic logging
-            print(f"DEBUG: Attempting to delete memory {memory_id} using agent's memory tools")
-            print(f"DEBUG: Agent available: {self.agent is not None}")
-            print(f"DEBUG: User ID: {self.agent.user_id}")
-            
+            logger.info(
+                f"Attempting to delete memory {memory_id} using agent's memory tools"
+            )
+            logger.info(f"Agent available: {self.agent is not None}")
+            logger.info(f"User ID: {self.agent.user_id}")
+
             # Use the agent's memory_tools directly (deletes from both SQLite and LightRAG)
-            if hasattr(self.agent, 'memory_tools') and self.agent.memory_tools:
-                print(f"DEBUG: Using agent.memory_tools.delete_memory()")
+            if hasattr(self.agent, "memory_tools") and self.agent.memory_tools:
+                logger.info("Using agent.memory_tools.delete_memory()")
                 result = asyncio.run(self.agent.memory_tools.delete_memory(memory_id))
-                print(f"DEBUG: Memory tools deletion result: {result}")
-                
+                logger.info(f"Memory tools deletion result: {result}")
+
                 # Parse the result - the tool returns a string with ✅ or ❌
                 if isinstance(result, str):
                     if "✅" in result or "Successfully deleted" in result:
@@ -238,9 +245,9 @@ class StreamlitMemoryHelper:
                     return False, f"Unexpected result type: {type(result)}"
             else:
                 return False, "Memory tools not available"
-                
+
         except Exception as e:
-            print(f"DEBUG: Exception in delete_memory: {e}")
+            logger.error(f"Exception in delete_memory: {e}")
             return False, f"Error deleting memory: {e}"
 
     def update_memory(
@@ -329,17 +336,19 @@ class StreamlitKnowledgeHelper:
 
         # Check if agent is already initialized to avoid redundant initialization
         is_initialized = getattr(self.agent, "_initialized", False)
-        
+
         # Only initialize if not already initialized
         if not is_initialized and hasattr(self.agent, "_ensure_initialized"):
             try:
-                print(f"DEBUG: Agent not initialized, triggering lazy initialization for knowledge...")
+                logger.info(
+                    "Agent not initialized, triggering lazy initialization for knowledge..."
+                )
                 asyncio.run(self.agent._ensure_initialized())
             except Exception as e:
-                print(f"Failed to initialize agent: {e}")
+                logger.error(f"Failed to initialize agent: {e}")
                 return None
         elif is_initialized:
-            print(f"DEBUG: Agent already initialized, skipping knowledge initialization")
+            logger.info("Agent already initialized, skipping knowledge initialization")
 
         # Now check for knowledge manager
         if hasattr(self.agent, "agno_knowledge") and self.agent.agno_knowledge:
