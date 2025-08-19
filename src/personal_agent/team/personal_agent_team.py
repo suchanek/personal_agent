@@ -22,6 +22,7 @@ from .specialized_agents import (
     create_file_operations_agent,
     create_finance_agent,
     create_knowledge_memory_agent,
+    create_pubmed_agent,
     create_web_research_agent,
 )
 
@@ -118,6 +119,13 @@ def create_personal_agent_team(
         debug=debug,
     )
 
+    pubmed_agent = create_pubmed_agent(
+        model_provider=model_provider,
+        model_name=model_name,
+        ollama_base_url=ollama_base_url,
+        debug=debug,
+    )
+
     # Create knowledge/memory agent using PersonalAgnoAgent
     knowledge_agent = create_knowledge_memory_agent(
         model_provider=model_provider,
@@ -151,6 +159,7 @@ def create_personal_agent_team(
         - "Finance Agent": Stock prices, market data, financial information
         - "Calculator Agent": Math calculations, data analysis
         - "File Operations Agent": File operations, shell commands
+        - "PubMed Research Agent": Biomedical literature, scientific papers, medical research
         
         ## ROUTING RULES:
         1. **Memory/Knowledge Tasks**: ALWAYS route to "Knowledge Agent"
@@ -176,8 +185,14 @@ def create_personal_agent_team(
            - Financial information → route to "Finance Agent"
         
         5. **File Operations**: ALWAYS route to "File Operations Agent"
-           - File operations → route to "File Operations Agent"
-           - Shell commands → route to "File Operations Agent"
+            - File operations → route to "File Operations Agent"
+            - Shell commands → route to "File Operations Agent"
+        
+        6. **PubMed Research**: ALWAYS route to "PubMed Research Agent"
+            - Medical research queries → route to "PubMed Research Agent"
+            - Scientific literature searches → route to "PubMed Research Agent"
+            - Biomedical information → route to "PubMed Research Agent"
+            - Research paper searches → route to "PubMed Research Agent"
         
         ## COORDINATION PRINCIPLES:
         - Be a helpful coordinator who ensures users get expert help
@@ -200,6 +215,7 @@ def create_personal_agent_team(
             finance_agent,
             calculator_agent,
             file_operations_agent,
+            pubmed_agent,
         ],
         instructions=team_instructions,
         markdown=True,

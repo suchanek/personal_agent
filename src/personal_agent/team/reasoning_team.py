@@ -125,8 +125,8 @@ try:
         OLLAMA_URL,
         REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
-        get_userid,
     )
+    from ..config.user_id_mgr import get_userid
     from ..core.agent_model_manager import AgentModelManager
     from ..core.agno_agent import AgnoPersonalAgent
 except ImportError:
@@ -145,8 +145,8 @@ except ImportError:
         OLLAMA_URL,
         REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
-        get_userid,
     )
+    from personal_agent.config.user_id_mgr import get_userid
     from personal_agent.core.agent_model_manager import AgentModelManager
     from personal_agent.core.agno_agent import AgnoPersonalAgent
 

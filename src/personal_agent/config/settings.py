@@ -16,7 +16,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
-PROVIDER = "ollama"
 LMSTUDIO_URL = "https://localhost:1234/v1"
 
 # see below for the ollama server urls
@@ -105,6 +104,7 @@ LIGHTRAG_MEMORY_PORT = get_env_var(
 )  # Explicit port for lightrag_memory_server
 
 # Configuration constants - All configurable via environment variables
+PROVIDER = get_env_var("PROVIDER", "ollama")
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 
