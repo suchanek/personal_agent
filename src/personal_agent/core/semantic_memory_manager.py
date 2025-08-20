@@ -651,6 +651,23 @@ class SemanticMemoryManager:
         :return: Tuple of (success, message)
         """
         try:
+            # Get current user ID if not provided
+            if user_id is None:
+                user_id = get_current_user_id()
+                
+            # First check if the memory exists
+            memory_rows = db.read_memories(user_id=user_id)
+            memory_exists = False
+            for row in memory_rows:
+                if row.id == memory_id and row.user_id == user_id:
+                    memory_exists = True
+                    break
+            
+            if not memory_exists:
+                logger.warning("Memory %s not found for user %s", memory_id, user_id)
+                return False, f"Memory {memory_id} not found"
+            
+            # Delete the memory
             db.delete_memory(memory_id)
 
             self.memories_updated = True
@@ -659,10 +676,10 @@ class SemanticMemoryManager:
             if self.config.debug_mode:
                 print(f"🗑️ DELETED: {memory_id}")
 
-            return True, "Memory deleted successfully"
+            return True, f"Memory {memory_id} deleted successfully"
 
         except Exception as e:
-            error_msg = f"Error deleting memory: {e}"
+            error_msg = f"Error deleting memory {memory_id}: {e}"
             logger.error(error_msg)
             return False, error_msg
 

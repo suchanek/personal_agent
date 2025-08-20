@@ -14,7 +14,7 @@ Key Components:
 
 Specialized Agents:
     - **Memory Agent**: Manages personal information and factual knowledge storage/retrieval
-    - **Web Agent**: Performs web searches using DuckDuckGo
+    - **Web Agent**: Performs web searches using Google Search
     - **Finance Agent**: Retrieves and analyzes financial data using YFinance
     - **Writer Agent**: Creates content, articles, and creative writing
     - **Calculator Agent**: Performs mathematical calculations and operations
@@ -103,7 +103,7 @@ from agno.models.ollama.tools import OllamaTools
 from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
-from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.file import FileTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
@@ -444,7 +444,7 @@ web_agent = Agent(
     name="Web Agent",
     role="Search the web for information",
     model=create_model(provider=PROVIDER),
-    tools=[DuckDuckGoTools(cache_results=True)],
+    tools=[GoogleSearchTools()],
     instructions=["Always include sources"],
     show_tool_calls=True,
 )
