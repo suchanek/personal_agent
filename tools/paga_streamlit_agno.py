@@ -302,21 +302,91 @@ def create_team_wrapper(team):
         def __init__(self, team):
             self.team = team
             self.user_id = USER_ID
-            # Try to get memory from the knowledge agent (first team member)
+            # Force initialization of the knowledge agent first
+            self._force_knowledge_agent_init()
+            # Now get memory and tools after initialization
             self.agno_memory = self._get_team_memory()
+            self.memory_tools = self._get_memory_tools()
+            
+            # Add debugging info
+            logger.info(f"TeamWrapper initialized:")
+            logger.info(f"  - Team available: {self.team is not None}")
+            logger.info(f"  - Team members: {len(getattr(self.team, 'members', []))}")
+            logger.info(f"  - Memory available: {self.agno_memory is not None}")
+            logger.info(f"  - Memory tools available: {self.memory_tools is not None}")
+
+        def _force_knowledge_agent_init(self):
+            """Force initialization of the knowledge agent (first team member)."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                logger.info(f"Knowledge agent type: {type(knowledge_agent).__name__}")
+                # Force initialization if not already done
+                if hasattr(knowledge_agent, "_ensure_initialized"):
+                    try:
+                        import asyncio
+                        asyncio.run(knowledge_agent._ensure_initialized())
+                        logger.info("Knowledge agent initialized successfully")
+                    except Exception as e:
+                        logger.error(f"Failed to initialize knowledge agent: {e}")
+                else:
+                    logger.warning("Knowledge agent has no _ensure_initialized method")
+            else:
+                logger.error("No team members available for initialization")
 
         def _get_team_memory(self):
             """Get memory system from the knowledge agent in the team."""
             if hasattr(self.team, "members") and self.team.members:
                 # The first member should be the knowledge agent (PersonalAgnoAgent)
                 knowledge_agent = self.team.members[0]
+                logger.info(f"Getting memory from knowledge agent: {type(knowledge_agent).__name__}")
+                
                 if hasattr(knowledge_agent, "agno_memory"):
+                    logger.info("Found agno_memory on knowledge agent")
                     return knowledge_agent.agno_memory
                 elif hasattr(knowledge_agent, "memory"):
+                    logger.info("Found memory on knowledge agent")
                     return knowledge_agent.memory
+                else:
+                    logger.warning("No memory found on knowledge agent")
 
             # Fallback: check if team has direct memory access
-            return getattr(self.team, "agno_memory", None)
+            team_memory = getattr(self.team, "agno_memory", None)
+            if team_memory:
+                logger.info("Found memory on team directly")
+            else:
+                logger.warning("No memory found on team")
+            return team_memory
+
+        def _get_memory_tools(self):
+            """Get memory tools from the knowledge agent in the team."""
+            if hasattr(self.team, "members") and self.team.members:
+                # The first member should be the knowledge agent (PersonalAgnoAgent)
+                knowledge_agent = self.team.members[0]
+                logger.info(f"Getting memory tools from knowledge agent: {type(knowledge_agent).__name__}")
+                
+                if hasattr(knowledge_agent, "memory_tools"):
+                    logger.info("Found memory_tools on knowledge agent")
+                    return knowledge_agent.memory_tools
+                else:
+                    logger.warning("No memory_tools found on knowledge agent")
+                    # Try to get tools from the agent's tools list
+                    if hasattr(knowledge_agent, 'agent') and hasattr(knowledge_agent.agent, 'tools'):
+                        for tool in knowledge_agent.agent.tools:
+                            if hasattr(tool, '__class__') and 'AgnoMemoryTools' in str(tool.__class__):
+                                logger.info("Found AgnoMemoryTools in agent tools")
+                                return tool
+                        logger.warning("No AgnoMemoryTools found in agent tools")
+            else:
+                logger.error("No team members available for memory tools")
+            return None
+
+        def _ensure_initialized(self):
+            """Ensure the knowledge agent is initialized."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "_ensure_initialized"):
+                    return knowledge_agent._ensure_initialized()
+            return None
 
         def store_user_memory(self, content, topics=None):
             # Use the knowledge agent (first team member) for memory storage with fact restating
@@ -919,57 +989,42 @@ def render_memory_tab():
                     )
                     st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
 
-                    # Memory deletion with confirmation
+                    # Memory deletion with confirmation (simplified approach like dashboard)
                     delete_key = f"delete_search_{memory.memory_id}"
-                    if (
-                        delete_key
-                        not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]
-                    ):
-                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                            delete_key
-                        ] = False
-
-                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                        delete_key
-                    ]:
+                    
+                    if not st.session_state.get(f"show_delete_confirm_{delete_key}", False):
                         if st.button(f"🗑️ Delete Memory", key=delete_key):
-                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                                delete_key
-                            ] = True
+                            st.session_state[f"show_delete_confirm_{delete_key}"] = True
                             st.rerun()
                     else:
-                        st.warning(
-                            "⚠️ **Confirm Deletion** - This action cannot be undone!"
-                        )
+                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                        st.write(f"Memory: {memory.memory[:100]}{'...' if len(memory.memory) > 100 else ''}")
+                        
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
-                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                                    delete_key
-                                ] = False
+                                st.session_state[f"show_delete_confirm_{delete_key}"] = False
                                 st.rerun()
                         with col2:
-                            if st.button(
-                                "🗑️ Yes, Delete",
-                                key=f"confirm_{delete_key}",
-                                type="primary",
-                            ):
+                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
                                 with st.spinner("Deleting memory..."):
-                                    success, message = memory_helper.delete_memory(
-                                        memory.memory_id
-                                    )
-                                    if success:
-                                        st.success(f"Memory deleted: {message}")
-                                        # Clear the confirmation state
-                                        st.session_state[
-                                            SESSION_KEY_DELETE_CONFIRMATIONS
-                                        ][delete_key] = False
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Failed to delete memory: {message}")
-                                        st.session_state[
-                                            SESSION_KEY_DELETE_CONFIRMATIONS
-                                        ][delete_key] = False
+                                    try:
+                                        success, message = memory_helper.delete_memory(memory.memory_id)
+                                        
+                                        # Clear confirmation state
+                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
+                                        
+                                        if success:
+                                            st.success(f"✅ Memory deleted successfully: {message}")
+                                            # Clear any caches and refresh
+                                            st.cache_resource.clear()
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ Failed to delete memory: {message}")
+                                            
+                                    except Exception as e:
+                                        st.error(f"❌ Exception during delete: {str(e)}")
+                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
         else:
             st.info("No matching memories found.")
 
@@ -977,7 +1032,9 @@ def render_memory_tab():
     st.markdown("---")
     st.subheader("📚 Browse All Memories")
     st.markdown("*View, edit, and manage all stored memories*")
-    if st.button("📋 Load All Memories", key="load_all_memories_btn"):
+    
+    # Auto-load memories like the dashboard does (no button required)
+    try:
         memories = memory_helper.get_all_memories()
         if memories:
             st.info(f"Found {len(memories)} total memories")
@@ -993,59 +1050,46 @@ def render_memory_tab():
                     if topics:
                         st.write(f"**Topics:** {', '.join(topics)}")
 
-                    # Memory deletion with confirmation
+                    # Memory deletion with confirmation (simplified approach like dashboard)
                     delete_key = f"delete_browse_{memory.memory_id}"
-                    if (
-                        delete_key
-                        not in st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS]
-                    ):
-                        st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                            delete_key
-                        ] = False
-
-                    if not st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                        delete_key
-                    ]:
+                    
+                    if not st.session_state.get(f"show_delete_confirm_{delete_key}", False):
                         if st.button(f"🗑️ Delete", key=delete_key):
-                            st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                                delete_key
-                            ] = True
+                            st.session_state[f"show_delete_confirm_{delete_key}"] = True
                             st.rerun()
                     else:
-                        st.warning(
-                            "⚠️ **Confirm Deletion** - This action cannot be undone!"
-                        )
+                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
+                        st.write(f"Memory: {memory.memory[:100]}{'...' if len(memory.memory) > 100 else ''}")
+                        
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
-                                st.session_state[SESSION_KEY_DELETE_CONFIRMATIONS][
-                                    delete_key
-                                ] = False
+                                st.session_state[f"show_delete_confirm_{delete_key}"] = False
                                 st.rerun()
                         with col2:
-                            if st.button(
-                                "🗑️ Yes, Delete",
-                                key=f"confirm_{delete_key}",
-                                type="primary",
-                            ):
+                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
                                 with st.spinner("Deleting memory..."):
-                                    success, message = memory_helper.delete_memory(
-                                        memory.memory_id
-                                    )
-                                    if success:
-                                        st.success(f"Memory deleted: {message}")
-                                        # Clear the confirmation state
-                                        st.session_state[
-                                            SESSION_KEY_DELETE_CONFIRMATIONS
-                                        ][delete_key] = False
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Failed to delete memory: {message}")
-                                        st.session_state[
-                                            SESSION_KEY_DELETE_CONFIRMATIONS
-                                        ][delete_key] = False
+                                    try:
+                                        success, message = memory_helper.delete_memory(memory.memory_id)
+                                        
+                                        # Clear confirmation state
+                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
+                                        
+                                        if success:
+                                            st.success(f"✅ Memory deleted successfully: {message}")
+                                            # Clear any caches and refresh
+                                            st.cache_resource.clear()
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ Failed to delete memory: {message}")
+                                            
+                                    except Exception as e:
+                                        st.error(f"❌ Exception during delete: {str(e)}")
+                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
         else:
             st.info("No memories stored yet.")
+    except Exception as e:
+        st.error(f"Error loading memories: {str(e)}")
 
     # Memory Statistics Section
     st.markdown("---")
@@ -1489,7 +1533,6 @@ def render_knowledge_tab():
                                 )
                         else:
                             results.append(
-                                f"**{uploaded_file.name}**: ❌ Agent tools not accessible"
                                 f"**{uploaded_file.name}**: ❌ Agent tools not accessible"
                             )
 
@@ -2065,27 +2108,31 @@ def render_sidebar():
                 st.write(f"**Mode:** 🤖 Team of Agents")
                 st.write(f"**Framework:** agno")
 
-                # Show team composition
-                members = getattr(team, "members", [])
-                st.write(f"**Team Members:** {len(members)}")
+                # Make team information collapsible
+                with st.expander("🤖 Team Details", expanded=True):
+                    # Show team composition
+                    members = getattr(team, "members", [])
+                    st.write(f"**Team Members:** {len(members)}")
 
-                if members:
-                    st.write("**Specialized Agents:**")
-                    for member in members:
-                        member_name = getattr(member, "name", "Unknown")
-                        member_role = getattr(member, "role", "Unknown")
-                        member_tools = len(getattr(member, "tools", []))
-                        st.write(
-                            f"• **{member_name}**: {member_role} ({member_tools} tools)"
-                        )
+                    if members:
+                        st.write("**Specialized Agents:**")
+                        for member in members:
+                            member_name = getattr(member, "name", "Unknown")
+                            member_role = getattr(member, "role", "Unknown")
+                            member_tools = len(getattr(member, "tools", []))
+                            st.write(
+                                f"• **{member_name}**: {member_role} ({member_tools} tools)"
+                            )
 
-                # Show team capabilities
-                st.write("**Team Capabilities:**")
-                st.write("• 🧠 Memory Management")
-                st.write("• 📚 Knowledge Base Access")
-                st.write("• 🌐 Web Research")
-                st.write("• 💰 Finance & Calculations")
-                st.write("• 📁 File Operations")
+                    # Show team capabilities
+                    st.write("**Team Capabilities:**")
+                    st.write("• 🧠 Memory Management")
+                    st.write("• 📚 Knowledge Base Access")
+                    st.write("• 🌐 Web Research")
+                    st.write("• ✍️ Writing & Content Creation")
+                    st.write("• 🔬 PubMed Research")
+                    st.write("• 💰 Finance & Calculations")
+                    st.write("• 📁 File Operations")
             else:
                 st.write(f"**Mode:** 🤖 Team of Agents")
                 st.warning("⚠️ Team not initialized")

@@ -217,25 +217,73 @@ class StreamlitMemoryHelper:
             return {"error": f"Error getting memory stats: {e}"}
 
     def delete_memory(self, memory_id: str):
-        """Delete a memory using the agent's built-in tool."""
+        """Delete a memory using the agent's built-in tool with comprehensive debugging."""
         if not self.agent:
+            logger.error("No agent available for memory deletion")
             return False, "Agent not available"
 
         try:
-            # Add diagnostic logging
-            logger.info(
-                f"Attempting to delete memory {memory_id} using agent's memory tools"
-            )
+            # Enhanced diagnostic logging
+            logger.info(f"🗑️ Starting memory deletion for ID: {memory_id}")
+            logger.info(f"Agent type: {type(self.agent).__name__}")
             logger.info(f"Agent available: {self.agent is not None}")
-            logger.info(f"User ID: {self.agent.user_id}")
+            logger.info(f"User ID: {getattr(self.agent, 'user_id', 'Unknown')}")
 
-            # Use the agent's memory_tools directly (deletes from both SQLite and LightRAG)
+            # Check if this is a team wrapper
+            is_team_wrapper = hasattr(self.agent, 'team') and hasattr(self.agent, '_get_memory_tools')
+            logger.info(f"Is team wrapper: {is_team_wrapper}")
+
+            # Ensure agent is initialized first
+            if hasattr(self.agent, "_ensure_initialized"):
+                try:
+                    logger.info("Ensuring agent initialization...")
+                    asyncio.run(self.agent._ensure_initialized())
+                    logger.info("Agent initialization completed")
+                except Exception as e:
+                    logger.error(f"Failed to initialize agent: {e}")
+                    return False, f"Failed to initialize agent: {e}"
+
+            # Strategy 1: Try using agent's memory_tools directly
+            memory_tools = None
             if hasattr(self.agent, "memory_tools") and self.agent.memory_tools:
-                logger.info("Using agent.memory_tools.delete_memory()")
-                result = asyncio.run(self.agent.memory_tools.delete_memory(memory_id))
+                memory_tools = self.agent.memory_tools
+                logger.info("Found memory_tools on agent directly")
+            elif is_team_wrapper and hasattr(self.agent, '_get_memory_tools'):
+                memory_tools = self.agent._get_memory_tools()
+                logger.info("Found memory_tools via team wrapper method")
+            elif is_team_wrapper and hasattr(self.agent, 'team') and hasattr(self.agent.team, 'members'):
+                # Try to get memory tools from the knowledge agent (first team member)
+                if self.agent.team.members:
+                    knowledge_agent = self.agent.team.members[0]
+                    if hasattr(knowledge_agent, 'memory_tools') and knowledge_agent.memory_tools:
+                        memory_tools = knowledge_agent.memory_tools
+                        logger.info("Found memory_tools from knowledge agent (team[0])")
+
+            if memory_tools:
+                logger.info("Using memory_tools.delete_memory()")
+                result = asyncio.run(memory_tools.delete_memory(memory_id))
                 logger.info(f"Memory tools deletion result: {result}")
 
                 # Parse the result - the tool returns a string with ✅ or ❌
+                if isinstance(result, str):
+                    if "✅" in result or "Successfully deleted" in result:
+                        logger.info(f"✅ Memory deletion successful: {result}")
+                        return True, result
+                    else:
+                        logger.warning(f"❌ Memory deletion failed: {result}")
+                        return False, result
+                else:
+                    logger.error(f"Unexpected result type: {type(result)}")
+                    return False, f"Unexpected result type: {type(result)}"
+
+            # Strategy 2: Try using CLI-style tool finding
+            logger.info("Memory tools not found, trying CLI-style tool finding...")
+            delete_tool = self._find_tool_by_name("delete_memory")
+            if delete_tool:
+                logger.info("Found delete_memory tool via CLI-style search")
+                result = asyncio.run(delete_tool(memory_id))
+                logger.info(f"CLI-style tool deletion result: {result}")
+                
                 if isinstance(result, str):
                     if "✅" in result or "Successfully deleted" in result:
                         return True, result
@@ -243,12 +291,71 @@ class StreamlitMemoryHelper:
                         return False, result
                 else:
                     return False, f"Unexpected result type: {type(result)}"
+
+            # Strategy 3: Fallback to memory manager directly
+            logger.warning("No memory tools found, trying memory manager directly")
+            if self.memory_manager and self.db:
+                try:
+                    logger.info("Using memory manager delete_memory directly")
+                    success, message = self.memory_manager.delete_memory(
+                        memory_id=memory_id,
+                        db=self.db,
+                        user_id=self.agent.user_id
+                    )
+                    if success:
+                        logger.info(f"✅ Memory manager deletion successful: {message}")
+                        return True, f"✅ {message}"
+                    else:
+                        logger.error(f"❌ Memory manager deletion failed: {message}")
+                        return False, f"❌ {message}"
+                except Exception as e:
+                    logger.error(f"Memory manager delete failed: {e}")
+                    return False, f"Memory manager delete failed: {e}"
             else:
-                return False, "Memory tools not available"
+                logger.error("Memory manager or database not available")
+                return False, "Memory manager or database not available"
 
         except Exception as e:
-            logger.error(f"Exception in delete_memory: {e}")
+            logger.error(f"Exception in delete_memory: {e}", exc_info=True)
             return False, f"Error deleting memory: {e}"
+
+    def _find_tool_by_name(self, tool_name: str):
+        """Find a tool function by name from the agent's tools, similar to CLI approach."""
+        try:
+            # Handle team wrapper case
+            if hasattr(self.agent, 'team') and hasattr(self.agent.team, 'members'):
+                # Search in the knowledge agent (first team member)
+                if self.agent.team.members:
+                    knowledge_agent = self.agent.team.members[0]
+                    if hasattr(knowledge_agent, 'agent') and hasattr(knowledge_agent.agent, 'tools'):
+                        for toolkit in knowledge_agent.agent.tools:
+                            # Check if the toolkit itself is a callable tool
+                            if getattr(toolkit, "__name__", "") == tool_name:
+                                return toolkit
+
+                            # Check for tools within the toolkit
+                            if hasattr(toolkit, "tools") and isinstance(toolkit.tools, list):
+                                for tool in toolkit.tools:
+                                    if hasattr(tool, "__name__") and tool.__name__ == tool_name:
+                                        return tool
+            
+            # Handle direct agent case
+            elif hasattr(self.agent, 'agent') and hasattr(self.agent.agent, 'tools'):
+                for toolkit in self.agent.agent.tools:
+                    # Check if the toolkit itself is a callable tool
+                    if getattr(toolkit, "__name__", "") == tool_name:
+                        return toolkit
+
+                    # Check for tools within the toolkit
+                    if hasattr(toolkit, "tools") and isinstance(toolkit.tools, list):
+                        for tool in toolkit.tools:
+                            if hasattr(tool, "__name__") and tool.__name__ == tool_name:
+                                return tool
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error finding tool {tool_name}: {e}")
+            return None
 
     def update_memory(
         self,
