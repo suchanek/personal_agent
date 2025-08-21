@@ -70,12 +70,13 @@ Usage
 -----
 Run the application with:
     ```bash
-    streamlit run tools/paga_streamlit_agno.py [--remote] [--recreate] [--team]
+    streamlit run tools/paga_streamlit_agno.py [--remote] [--recreate] [--single]
     ```
 
 Command Line Arguments:
     --remote: Use remote Ollama URL instead of local.
     --recreate: Recreate the knowledge base and clear all memories.
+    --single: Launch in single-agent mode (default is team mode).
 
 Environment Variables:
     - AGNO_STORAGE_DIR: Directory for agent storage.
@@ -195,10 +196,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--team",
+        "--single",
         action="store_true",
-        help="Launch the team-based mode",
-        default=True,
+        help="Launch the single-agent mode (default is team mode)",
+        default=False,
     )
 
     return parser.parse_known_args()  # Use parse_known_args to ignore Streamlit's args
@@ -209,7 +210,7 @@ args, unknown = parse_args()
 EFFECTIVE_OLLAMA_URL = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
 RECREATE_FLAG = args.recreate
 DEBUG_FLAG = args.debug
-TEAM_FLAG = args.team
+SINGLE_FLAG = args.single
 
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
@@ -260,6 +261,8 @@ def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False
 def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
     """Initialize the team using the standard agno Team class."""
     try:
+        logger.info(f"Initializing team with model {model_name} at {ollama_url}")
+        
         # Create team using the factory function
         team = create_personal_agent_team(
             model_provider="ollama",
@@ -270,28 +273,55 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
             debug=True,
         )
 
+        # Validate team creation
+        if not team:
+            logger.error("Team creation returned None")
+            st.error("❌ Team creation failed - returned None")
+            return None
+            
+        if not hasattr(team, "members"):
+            logger.error("Team has no members attribute")
+            st.error("❌ Team creation failed - no members attribute")
+            return None
+            
+        if not team.members:
+            logger.error("Team has empty members list")
+            st.error("❌ Team creation failed - empty members list")
+            return None
+            
+        logger.info(f"Team created successfully with {len(team.members)} members")
+
         # The refactored team now has a knowledge agent as the first member
         # which contains the memory system, so we don't need to create it separately
         # But we'll add a fallback for backward compatibility
         if hasattr(team, "members") and team.members:
             knowledge_agent = team.members[0]
+            logger.info(f"Knowledge agent type: {type(knowledge_agent).__name__}")
+            
             if hasattr(knowledge_agent, "agno_memory"):
                 # Expose the knowledge agent's memory for Streamlit compatibility
                 team.agno_memory = knowledge_agent.agno_memory
+                logger.info("Exposed knowledge agent's memory to team")
             else:
                 # Fallback: create memory system for compatibility
+                logger.warning("Knowledge agent has no agno_memory, creating fallback")
                 from personal_agent.core.agno_storage import create_agno_memory
 
                 team.agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
         else:
             # Fallback: create memory system for compatibility
+            logger.warning("No team members found, creating fallback memory")
             from personal_agent.core.agno_storage import create_agno_memory
 
             team.agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
 
+        logger.info("Team initialization completed successfully")
         return team
     except Exception as e:
-        st.error(f"Failed to initialize team: {str(e)}")
+        logger.error(f"Exception during team initialization: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        st.error(f"❌ Failed to initialize team: {str(e)}")
         return None
 
 
@@ -424,9 +454,14 @@ def create_team_wrapper(team):
 def apply_custom_theme():
     """Apply custom CSS for theme switching."""
     is_dark_theme = st.session_state.get(SESSION_KEY_DARK_THEME, False)
-    css_file = "tools/dark_theme.css" if is_dark_theme else "tools/light_theme.css"
-    with open(css_file) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    
+    if is_dark_theme:
+        # Apply dark theme styling
+        css_file = "tools/dark_theme.css"
+        with open(css_file) as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    # Light mode: use default Streamlit styling (no additional CSS needed)
+    # This removes any previously applied dark mode styling by not applying any custom CSS
 
 
 def initialize_session_state():
@@ -440,9 +475,9 @@ def initialize_session_state():
     if SESSION_KEY_DARK_THEME not in st.session_state:
         st.session_state[SESSION_KEY_DARK_THEME] = False
 
-    # Initialize agent mode - use --team flag if provided, otherwise default to single agent
+    # Initialize agent mode - use --single flag if provided, otherwise default to team mode
     if SESSION_KEY_AGENT_MODE not in st.session_state:
-        st.session_state[SESSION_KEY_AGENT_MODE] = "team" if TEAM_FLAG else "single"
+        st.session_state[SESSION_KEY_AGENT_MODE] = "single" if SINGLE_FLAG else "team"
 
     # Initialize based on mode
     if st.session_state[SESSION_KEY_AGENT_MODE] == "team":
@@ -1858,106 +1893,6 @@ def render_sidebar():
             st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
             st.rerun()
 
-        # Agent/Team Mode Selection
-        st.header("🤖 Agent Mode")
-        current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
-        mode_options = ["single", "team"]
-        mode_index = (
-            mode_options.index(current_mode) if current_mode in mode_options else 0
-        )
-
-        selected_mode = st.selectbox(
-            "Select Mode:",
-            mode_options,
-            index=mode_index,
-            format_func=lambda x: (
-                "🧠 Single Agent" if x == "single" else "🤖 Team of Agents"
-            ),
-            key="agent_mode_selector",
-        )
-
-        if st.button("🔄 Switch Mode", key="switch_mode_btn"):
-            if selected_mode != st.session_state[SESSION_KEY_AGENT_MODE]:
-                old_mode = st.session_state[SESSION_KEY_AGENT_MODE]
-                print(
-                    f"🔄 MODE SWITCH: Switching from {old_mode} to {selected_mode} mode"
-                )
-
-                with st.spinner(f"Switching to {selected_mode} mode..."):
-                    # Update mode
-                    st.session_state[SESSION_KEY_AGENT_MODE] = selected_mode
-
-                    # Clear messages when switching modes
-                    st.session_state[SESSION_KEY_MESSAGES] = []
-
-                    # Initialize the appropriate system
-                    if selected_mode == "team":
-                        print(
-                            f"🤖 TEAM INIT: Initializing team with model {st.session_state[SESSION_KEY_CURRENT_MODEL]}"
-                        )
-                        # Initialize team
-                        st.session_state[SESSION_KEY_TEAM] = initialize_team(
-                            st.session_state[SESSION_KEY_CURRENT_MODEL],
-                            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
-                            recreate=False,
-                        )
-
-                        # Update helpers for team
-                        team_wrapper = create_team_wrapper(
-                            st.session_state[SESSION_KEY_TEAM]
-                        )
-                        st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                            StreamlitMemoryHelper(team_wrapper)
-                        )
-                        # For team mode, pass the knowledge agent (first team member) to the knowledge helper
-                        team = st.session_state[SESSION_KEY_TEAM]
-                        if hasattr(team, "members") and team.members:
-                            knowledge_agent = team.members[
-                                0
-                            ]  # First member is the knowledge agent
-                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                StreamlitKnowledgeHelper(knowledge_agent)
-                            )
-                        else:
-                            # Fallback: create with team object
-                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                StreamlitKnowledgeHelper(team)
-                            )
-                        print(
-                            f"✅ TEAM READY: Team initialized successfully with {len(getattr(st.session_state[SESSION_KEY_TEAM], 'members', []))} members"
-                        )
-                    else:
-                        logger.info(
-                            f"🧠 AGENT INIT: Initializing single agent with model {st.session_state[SESSION_KEY_CURRENT_MODEL]}"
-                        )
-                        # Initialize single agent
-                        st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-                            st.session_state[SESSION_KEY_CURRENT_MODEL],
-                            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
-                            recreate=False,
-                        )
-
-                        # Update helpers for agent
-                        st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                            StreamlitMemoryHelper(st.session_state[SESSION_KEY_AGENT])
-                        )
-                        st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                            StreamlitKnowledgeHelper(
-                                st.session_state[SESSION_KEY_AGENT]
-                            )
-                        )
-                        logger.info(
-                            "✅ AGENT READY: Single agent initialized successfully"
-                        )
-
-                    logger.info(
-                        f"🎯 MODE SWITCH COMPLETE: Successfully switched from {old_mode} to {selected_mode}"
-                    )
-                    st.success(f"✅ Switched to {selected_mode} mode!")
-                    st.rerun()
-            else:
-                st.info("Already in selected mode")
-
         st.header("Model Selection")
         new_ollama_url = st.text_input(
             "Ollama URL:", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
@@ -2109,7 +2044,7 @@ def render_sidebar():
                 st.write(f"**Framework:** agno")
 
                 # Make team information collapsible
-                with st.expander("🤖 Team Details", expanded=True):
+                with st.expander("🤖 Team Details", expanded=False):
                     # Show team composition
                     members = getattr(team, "members", [])
                     st.write(f"**Team Members:** {len(members)}")

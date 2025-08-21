@@ -157,13 +157,6 @@ cwd = Path(__file__).parent.resolve()
 
 PROVIDER = "ollama"
 
-# Add diagnostic logging to validate configuration
-print(f"🔍 DEBUG: PROVIDER set to: {PROVIDER}")
-print(f"🔍 DEBUG: LMSTUDIO_URL from settings: {LMSTUDIO_URL}")
-print(f"🔍 DEBUG: REMOTE_LMSTUDIO_URL from settings: {REMOTE_LMSTUDIO_URL}")
-print(f"🔍 DEBUG: OLLAMA_URL from settings: {OLLAMA_URL}")
-print(f"🔍 DEBUG: REMOTE_OLLAMA_URL from settings: {REMOTE_OLLAMA_URL}")
-print(f"🔍 DEBUG: LLM_MODEL from settings: {LLM_MODEL}")
 
 _instructions = dedent(
     """\

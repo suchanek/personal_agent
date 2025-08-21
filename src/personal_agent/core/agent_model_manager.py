@@ -190,7 +190,7 @@ class AgentModelManager:
                 "o1-preview",
                 "o1-mini",  # OpenAI reasoning models
                 "qwen3:8b",
-                "qwen3:1.7B",
+                "qwen3:1.7b",  # Fixed: lowercase 'b' to match model_contexts.py
                 "qwen3:4b",
                 "qwq",  # Qwen reasoning models
                 "deepseek-r1",
