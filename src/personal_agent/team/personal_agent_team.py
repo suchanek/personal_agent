@@ -12,9 +12,10 @@ from typing import Any, Dict, List, Optional, Union
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.team.team import Team
+from agno.tools.file import FileTools
 from agno.tools.reasoning import ReasoningTools
 
-from ..config import LLM_MODEL, OLLAMA_URL, AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR
+from ..config import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL
 from ..config.model_contexts import get_model_context_size_sync
 from ..utils import setup_logging
 from .specialized_agents import (
@@ -145,7 +146,6 @@ def create_personal_agent_team(
         debug=debug,
     )
 
-
     # Create coordinator model
     coordinator_model = _create_coordinator_model(
         model_provider, model_name, ollama_base_url
@@ -161,6 +161,7 @@ def create_personal_agent_team(
         - Provide brief context when delegating
         - Coordinate responses from multiple agents when needed
         - Be warm and friendly while ensuring users get expert help
+        - Greet the user with a friendly greeting by name {user_id}
         
         ## TEAM MEMBERS (delegate to these agents):
         - "Knowledge Agent": Personal information, memories, user data, knowledge queries
@@ -225,7 +226,7 @@ def create_personal_agent_team(
         name="Personal Agent Team",
         mode="route",  # Enable routing to team members
         model=coordinator_model,
-        tools=[],  # Coordinator has no tools - only routes to specialists
+        tools=[FileTools()],  # Coordinator has no tools - only routes to specialists
         members=[
             knowledge_agent,  # New PersonalAgnoAgent for memory/knowledge
             web_research_agent,
@@ -238,12 +239,12 @@ def create_personal_agent_team(
         instructions=team_instructions,
         markdown=True,
         show_tool_calls=debug,  # Only show tool calls in debug mode
-        show_members_responses=False,  # Hide member responses for clean output
+        show_members_responses=True,  # Hide member responses for clean output
     )
 
     logger.info(
         "Created Personal Agent Team - Coordinator routes to %d specialists including Knowledge Agent",
-        len(team.members)
+        len(team.members),
     )
     return team
 
@@ -323,23 +324,29 @@ class PersonalAgentTeamWrapper:
                 user_id=self.user_id,
                 debug=self.debug,
             )
-            
+
             # Initialize memory system for Streamlit compatibility
             # Get the memory system from the knowledge agent for compatibility
-            if hasattr(self.team, 'members') and len(self.team.members) > 0:
+            if hasattr(self.team, "members") and len(self.team.members) > 0:
                 # The first member should be the knowledge agent (PersonalAgnoAgent)
                 knowledge_agent = self.team.members[0]
-                if hasattr(knowledge_agent, 'agno_memory'):
+                if hasattr(knowledge_agent, "agno_memory"):
                     self.agno_memory = knowledge_agent.agno_memory
                 else:
                     # Fallback: create memory system directly
                     from ..core.agno_storage import create_agno_memory
-                    self.agno_memory = create_agno_memory(self.storage_dir, debug_mode=self.debug)
+
+                    self.agno_memory = create_agno_memory(
+                        self.storage_dir, debug_mode=self.debug
+                    )
             else:
                 # Fallback: create memory system directly
                 from ..core.agno_storage import create_agno_memory
-                self.agno_memory = create_agno_memory(self.storage_dir, debug_mode=self.debug)
-            
+
+                self.agno_memory = create_agno_memory(
+                    self.storage_dir, debug_mode=self.debug
+                )
+
             logger.info("Personal Agent Team initialized successfully")
             return True
         except Exception as e:
@@ -360,7 +367,7 @@ class PersonalAgentTeamWrapper:
             # NOTE: Removed direct memory routing patch - now using route mode for proper routing
             # The team coordinator in route mode should preserve original user context
             logger.info("Running query through team coordinator: %s", query)
-            
+
             # Use team coordination with route mode for all queries
             response = await self.team.arun(query, user_id=self.user_id)
             self._last_response = response

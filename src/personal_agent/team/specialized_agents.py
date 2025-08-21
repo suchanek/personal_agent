@@ -14,9 +14,9 @@ from agno.agent import Agent
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
-from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.file import FileTools
 from agno.tools.github import GithubTools
+from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.knowledge import KnowledgeTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
@@ -29,6 +29,7 @@ from ..config import (
     HOME_DIR,
     LLM_MODEL,
     OLLAMA_URL,
+    USE_MCP,
 )
 from ..config.model_contexts import get_model_context_size_sync
 from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
@@ -54,32 +55,33 @@ def _create_model(
     :return: Configured model instance
     :raises ValueError: If unsupported model provider is specified
     """
-    if model_provider == "openai":
-        logger.info("Using OpenAI model %s", model_name)
-        return OpenAIChat(id=model_name)
-    elif model_provider == "ollama":
-        # Get dynamic context size for this model
-        context_size, detection_method = get_model_context_size_sync(
-            model_name, ollama_base_url
-        )
+    match model_provider:
+        case "openai":
+            logger.info("Using OpenAI model %s", model_name)
+            return OpenAIChat(id=model_name)
+        case "ollama":
+            # Get dynamic context size for this model
+            context_size, detection_method = get_model_context_size_sync(
+                model_name, ollama_base_url
+            )
 
-        logger.info(
-            "Using context size %d for model %s (detected via: %s)",
-            context_size,
-            model_name,
-            detection_method,
-        )
+            logger.info(
+                "Using context size %d for model %s (detected via: %s)",
+                context_size,
+                model_name,
+                detection_method,
+            )
 
-        return Ollama(
-            id=model_name,
-            host=ollama_base_url,
-            options={
-                "num_ctx": context_size,
-                "temperature": temperature,
-            },
-        )
-    else:
-        raise ValueError(f"Unsupported model provider: {model_provider}")
+            return Ollama(
+                id=model_name,
+                host=ollama_base_url,
+                options={
+                    "num_ctx": context_size,
+                    "temperature": temperature,
+                },
+            )
+        case _:
+            raise ValueError(f"Unsupported model provider: {model_provider}")
 
 
 def create_web_research_agent(
@@ -129,7 +131,7 @@ def create_web_research_agent(
 
 def create_finance_agent(
     model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
+    model_name: str = SMALL_QWEN,
     ollama_base_url: str = OLLAMA_URL,
     debug: bool = False,
 ) -> Agent:
@@ -147,6 +149,7 @@ def create_finance_agent(
         name="Finance Agent",
         role="Get financial data and perform market analysis",
         model=model,
+        debug_mode=debug,
         tools=[
             YFinanceTools(
                 stock_price=True,
@@ -173,7 +176,7 @@ def create_finance_agent(
             "- Always specify the data source and timestamp",
         ],
         markdown=True,
-        show_tool_calls=False,  # Always hide tool calls for clean responses
+        show_tool_calls=True,  # Always hide tool calls for clean responses
         add_name_to_instructions=True,
     )
 
@@ -201,6 +204,7 @@ def create_calculator_agent(
         name="Calculator Agent",
         role="Perform calculations and data analysis",
         model=model,
+        debug_mode=debug,
         tools=[
             CalculatorTools(
                 add=True,
@@ -236,7 +240,7 @@ def create_calculator_agent(
             "- If asked about memories or personal info, decline and suggest asking the Memory Agent",
         ],
         markdown=True,
-        show_tool_calls=False,  # Always hide tool calls for clean responses
+        show_tool_calls=True,  # Always hide tool calls for clean responses
         add_name_to_instructions=True,
     )
 
@@ -285,7 +289,7 @@ def create_file_operations_agent(
             "- Explain what file operations will do before performing them",
         ],
         markdown=True,
-        show_tool_calls=False,  # Always hide tool calls for clean responses
+        show_tool_calls=True,  # Always hide tool calls for clean responses
         add_name_to_instructions=True,
     )
 
@@ -340,7 +344,7 @@ def create_pubmed_agent(
             "- Clearly indicate when information is preliminary or requires further research",
         ],
         markdown=True,
-        show_tool_calls=False,  # Always hide tool calls for clean responses
+        show_tool_calls=True,  # Always hide tool calls for clean responses
         add_name_to_instructions=True,
     )
 
@@ -350,7 +354,7 @@ def create_pubmed_agent(
 
 def create_writer_agent(
     model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
+    model_name: str = "llama3.1:8b",
     ollama_base_url: str = OLLAMA_URL,
     debug: bool = False,
 ) -> Agent:
@@ -366,10 +370,12 @@ def create_writer_agent(
 
     agent = Agent(
         name="Writer Agent",
-        role="Create, edit, and improve written content",
+        role="Create, edit, read, write and improve written content",
         model=model,
         debug_mode=debug,
-        tools=[FileTools()],  # File tools for reading/writing documents
+        tools=[
+            FileTools(HOME_DIR, save_files=True, read_files=True, list_files=True)
+        ],  # File tools for reading/writing documents
         instructions=[
             "You are a specialized writing agent focused on creating, editing, and improving written content.",
             "Your primary functions are:",
@@ -421,6 +427,9 @@ def create_knowledge_memory_agent(
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
     user_id: str = "default_user",
     debug: bool = False,
+    recreate: bool = False,
+    all_tools: bool = False,
+    **kwargs: Any,
 ) -> "AgnoPersonalAgent":
     """Create a knowledge/memory agent using PersonalAgnoAgent with all_tools=False.
 
@@ -435,6 +444,8 @@ def create_knowledge_memory_agent(
     :param knowledge_dir: Directory containing knowledge files to load
     :param user_id: User identifier for memory operations
     :param debug: Enable debug mode
+    :param recreate: Recreate the knowledge base
+    :param all_tools: Include all tools in the agent
     :return: Configured PersonalAgnoAgent instance for knowledge/memory operations
     """
     from ..core.agno_agent import AgnoPersonalAgent
@@ -448,14 +459,14 @@ def create_knowledge_memory_agent(
         model_provider=model_provider,
         model_name=model_name,
         enable_memory=True,  # Enable memory system
-        enable_mcp=False,  # Disable MCP to avoid conflicts
+        enable_mcp=USE_MCP,  # Disable MCP to avoid conflicts
         storage_dir=storage_dir,
         knowledge_dir=knowledge_dir,
         debug=debug,
         ollama_base_url=ollama_base_url,
         user_id=user_id,
-        recreate=False,
-        alltools=False,  # Disable built-in tools for team context
+        recreate=recreate,
+        alltools=all_tools,  # Disable built-in tools for team context
         initialize_agent=True,  # Force initialization to ensure proper model setup
     )
 

@@ -106,11 +106,24 @@ args = [
 ]
 
 [tool.poe.tasks.serve-persag]
-help = "Start the Personal Agent Streamlit interface (PAGA)"
-cmd = "streamlit run tools/paga_streamlit_agno.py"
+help = "Start the Personal Agent Streamlit interface (PAGA) - defaults to team mode"
+shell = """
+streamlit run tools/paga_streamlit_agno.py \
+  ${port:+--server.port $port} \
+  ${host:+--server.address $host} \
+  -- \
+  ${remote:+--remote} \
+  ${debug:+--debug} \
+  ${recreate:+--recreate} \
+  ${single:+--single}
+"""
 args = [
-  { name = "port", options = ["--server.port"], default = "8501", help = "Port to serve on" },
-  { name = "host", options = ["--server.address"], default = "localhost", help = "Host to bind to" }
+  { name = "port", options = ["--port"], help = "Port to serve on (default: 8501)" },
+  { name = "host", options = ["--host"], help = "Host to bind to (default: localhost)" },
+  { name = "remote", options = ["--remote"], type = "boolean", help = "Use remote Ollama URL instead of local" },
+  { name = "debug", options = ["--debug"], type = "boolean", help = "Enable debug mode" },
+  { name = "recreate", options = ["--recreate"], type = "boolean", help = "Recreate the knowledge base and clear all memories" },
+  { name = "single", options = ["--single"], type = "boolean", help = "Launch in single-agent mode (default is team mode)" }
 ]
 
 [tool.poe.tasks.serve-persag-team]
