@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Script to systematically feed individual facts to the Personal Agent one by one.
-This script sends each fact separately and monitors success for each individual fact.
+Script to systematically store individual facts directly in the Personal Agent's memory.
+This script uses direct memory storage (bypassing agent inference) to efficiently store
+facts with categorization and monitors success for each individual fact.
 """
 
 import argparse
@@ -18,7 +19,7 @@ from personal_agent.config import (
     LLM_MODEL,
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
-    USER_ID,
+    get_userid,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 
@@ -174,7 +175,7 @@ async def initialize_agent(use_remote=False):
         model_provider="ollama",
         model_name=LLM_MODEL,
         ollama_base_url=ollama_url,
-        user_id=USER_ID,
+        user_id=get_userid(),
         debug=True,
         enable_memory=True,
         enable_mcp=True,
@@ -212,75 +213,103 @@ async def send_warmup_greeting(agent):
         return False
 
 
-async def condition_agent_for_fact_storage(agent):
-    """Condition the agent with instructions for efficient fact storage."""
-    print("\n🎯 Conditioning agent for fact storage...")
-
-    conditioning_message = """I'm going to share a series of personal facts about myself that I want you to store in your memory. For each fact I share:
-
-1. Store the fact exactly as I state it without interpretation or elaboration
-2. Do not ask questions or provide commentary about the facts
-3. Simply respond with "Stored" or "Got it" to confirm you've saved the fact
-4. Keep your responses brief - just acknowledge that you've stored the information
-
-This will help me efficiently build your knowledge about me. Are you ready to receive my personal facts?"""
+async def prepare_direct_storage(agent):
+    """Prepare the agent for direct memory storage by ensuring memory system is ready."""
+    print("\n🎯 Preparing direct memory storage...")
 
     try:
-        start_time = time.time()
-        response = await agent.run(conditioning_message)
-        end_time = time.time()
-
-        response_time = end_time - start_time
-
-        if response and len(response) > 0:
-            print(f"✅ Agent conditioned successfully in {response_time:.2f}s")
-            print(f"🤖 Response: {response[:200]}...")
-            return True
-        else:
-            print(f"⚠️ Empty response to conditioning")
+        # Ensure agent is initialized
+        if not hasattr(agent, "agno_memory") or not agent.agno_memory:
+            print("❌ Memory system not available")
             return False
+            
+        memory_manager = agent.agno_memory.memory_manager
+        db = agent.agno_memory.db
+        
+        if not memory_manager or not db:
+            print("❌ Memory manager or database not available")
+            return False
+            
+        print("✅ Direct memory storage system ready")
+        print(f"💾 Memory manager: {type(memory_manager).__name__}")
+        print(f"🗄️ Database: {type(db).__name__}")
+        return True
 
     except Exception as e:
-        print(f"❌ Error conditioning agent: {str(e)}")
+        print(f"❌ Error preparing direct storage: {str(e)}")
         return False
 
 
-async def send_individual_fact(agent, fact_data, fact_number, total_facts):
-    """Send a single fact to the agent and monitor success."""
+async def store_individual_fact_complete(agent, fact_data, fact_number, total_facts):
+    """Store a single fact using the complete memory storage system (semantic + knowledge graph)."""
     fact_id = fact_data["id"]
     category = fact_data["category"]
     fact = fact_data["fact"]
 
-    # Create a message for this individual fact
-    message = f"Please remember this fact about me: {fact}"
-
-    print(f"\n📝 [{fact_number}/{total_facts}] Sending fact #{fact_id} ({category})")
+    print(f"\n📝 [{fact_number}/{total_facts}] Storing fact #{fact_id} ({category})")
     print(f"💬 Fact: {fact}")
 
     try:
         start_time = time.time()
-        response = await agent.run(message)
-        end_time = time.time()
+        
+        # Use the same approach as Streamlit app - call agent.store_user_memory()
+        # This ensures storage in both semantic memory AND knowledge graph
+        if not hasattr(agent, "store_user_memory"):
+            print(f"❌ Agent store_user_memory method not available")
+            return False, 0, "Agent store_user_memory method not available"
 
+        # Store fact using agent's complete storage method
+        topics = [category] if category != "automatic" else None
+        result = await agent.store_user_memory(content=fact, topics=topics)
+        
+        end_time = time.time()
         response_time = end_time - start_time
 
-        if response and len(response) > 0:
-            print(f"✅ Success in {response_time:.2f}s")
-            print(f"🤖 Response: {response[:100]}...")
+        # Check if storage was successful
+        if result and hasattr(result, 'is_success'):
+            # MemoryStorageResult object
+            success = result.is_success
+            message = result.message
+            memory_id = getattr(result, 'memory_id', None)
+        elif isinstance(result, tuple) and len(result) >= 2:
+            # Legacy tuple format
+            success, message = result[0], result[1]
+            memory_id = result[2] if len(result) > 2 else None
+        else:
+            # Fallback - assume success if we got a result
+            success = result is not None
+            message = str(result) if result else "Unknown result"
+            memory_id = None
 
-            # Check memory count after each fact
-            if hasattr(agent, "agno_memory") and agent.agno_memory:
-                try:
-                    memories = agent.agno_memory.get_user_memories(user_id=USER_ID)
-                    memory_count = len(memories) if memories else 0
-                    print(f"💾 Total memories: {memory_count}")
-                except Exception as memory_error:
-                    print(f"⚠️ Could not check memory: {str(memory_error)}")
+        if success:
+            print(f"✅ Success in {response_time:.2f}s")
+            print(f"💾 Stored: {message}")
+            if memory_id:
+                print(f"🆔 Memory ID: {memory_id}")
+
+            # Check memory count after each fact using direct access
+            try:
+                if hasattr(agent, "agno_memory") and agent.agno_memory:
+                    memory_manager = agent.agno_memory.memory_manager
+                    db = agent.agno_memory.db
+                    if memory_manager and db:
+                        memories = memory_manager.search_memories(
+                            query="",
+                            db=db,
+                            user_id=get_userid(),
+                            limit=None,
+                            similarity_threshold=0.0,
+                            search_topics=False,
+                        )
+                        memory_count = len(memories) if memories else 0
+                        print(f"💾 Total memories: {memory_count}")
+            except Exception as memory_error:
+                print(f"⚠️ Could not check memory count: {str(memory_error)}")
 
             return True, response_time, None
         else:
-            print(f"❌ Empty response from agent")
-            return False, response_time, "Empty response"
+            print(f"❌ Storage failed: {message}")
+            return False, response_time, message
 
     except Exception as e:
         end_time = time.time()
@@ -317,7 +346,7 @@ async def feed_facts_systematically(agent, facts_to_send=None, delay_between_fac
     fact_results = []
 
     for i, fact_data in enumerate(facts_list, 1):
-        success, response_time, error = await send_individual_fact(
+        success, response_time, error = await store_individual_fact_complete(
             agent, fact_data, i, total_facts
         )
 
@@ -355,19 +384,36 @@ async def feed_facts_systematically(agent, facts_to_send=None, delay_between_fac
 
 
 async def verify_final_memory_state(agent):
-    """Verify the final state of the agent's memory."""
+    """Verify the final state of the agent's memory using direct memory access."""
     print("\n🔍 Verifying final memory state...")
 
     try:
         if hasattr(agent, "agno_memory") and agent.agno_memory:
-            memories = agent.agno_memory.get_user_memories(user_id=USER_ID)
+            memory_manager = agent.agno_memory.memory_manager
+            db = agent.agno_memory.db
+            
+            if not memory_manager or not db:
+                print("❌ Memory manager or database not available")
+                return False
+
+            # Get all memories using direct memory manager access
+            memories = memory_manager.search_memories(
+                query="",
+                db=db,
+                user_id=get_userid(),
+                limit=None,
+                similarity_threshold=0.0,
+                search_topics=False,
+            )
 
             if memories:
-                print(f"✅ Final memory count: {len(memories)} memories stored")
+                # Extract just the memory objects from the (memory, score) tuples
+                memory_objects = [memory for memory, score in memories]
+                print(f"✅ Final memory count: {len(memory_objects)} memories stored")
 
                 # Group memories by category if possible
                 category_counts = {}
-                for memory in memories:
+                for memory in memory_objects:
                     memory_content = getattr(memory, "memory", "")
                     # Try to identify category from content
                     for category in [
@@ -473,10 +519,11 @@ async def main():
         if not warmup_success:
             print("⚠️ Warm-up greeting failed, but continuing...")
 
-        # Condition agent for efficient fact storage
-        conditioning_success = await condition_agent_for_fact_storage(agent)
-        if not conditioning_success:
-            print("⚠️ Agent conditioning failed, but continuing...")
+        # Prepare direct memory storage
+        storage_ready = await prepare_direct_storage(agent)
+        if not storage_ready:
+            print("❌ Direct storage preparation failed, cannot continue")
+            return
 
         # Parse categories and mode
         categories_to_send = None
@@ -571,32 +618,50 @@ async def main():
 
 
 if __name__ == "__main__":
-    print("Usage:")
-    print(
-        "  python feed_individual_facts.py                    # Feed essential facts individually"
-    )
-    print(
-        "  python feed_individual_facts.py --remote           # Use remote Ollama server"
-    )
-    print(
-        "  python feed_individual_facts.py all                # Feed ALL facts individually"
-    )
-    print(
-        "  python feed_individual_facts.py --remote all       # Feed ALL facts using remote server"
-    )
-    print(
-        "  python feed_individual_facts.py test               # Test with basic facts only"
-    )
-    print(
-        "  python feed_individual_facts.py fast               # Fast mode (0.5s delay)"
-    )
-    print("  python feed_individual_facts.py slow               # Slow mode (2s delay)")
-    print(
-        "  python feed_individual_facts.py basic_info education  # Specific categories"
-    )
-    print(
-        "  python feed_individual_facts.py --remote basic_info education  # Remote + specific categories"
-    )
+    print("Eric's Personal Agent Memory Initialization Script")
+    print("=" * 60)
+    print("Systematically stores individual facts about Eric directly in the Personal Agent's memory.")
+    print("Uses complete memory storage (semantic + knowledge graph) with categorization and verification.")
+    print()
+    print("CAPABILITIES:")
+    print("• Stores 100+ individual facts across 11 categories")
+    print("• Uses both semantic memory and knowledge graph storage")
+    print("• Provides real-time progress tracking and success monitoring")
+    print("• Includes memory verification and fact recall testing")
+    print("• Supports local and remote Ollama servers")
+    print("• Configurable delays to prevent system overload")
+    print()
+    print("AVAILABLE FACT CATEGORIES:")
+    print("• basic_info - Name, contact info, current projects")
+    print("• professional_identity - Career goals and expertise")
+    print("• education - Academic background and achievements")
+    print("• technical_skills - Programming languages and tools")
+    print("• current_work - Current employment and responsibilities")
+    print("• major_achievements - Key accomplishments and innovations")
+    print("• previous_work - Detailed work history")
+    print("• publications - Academic and professional publications")
+    print("• management_experience - Leadership and team management")
+    print("• customer_service - Customer interaction experience")
+    print("• personal_characteristics - Professional traits and abilities")
+    print()
+    print("USAGE:")
+    print("  python initialize_eric_memories.py                           # Default: essential facts (basic_info, professional_identity, education)")
+    print("  python initialize_eric_memories.py --remote                  # Use remote Ollama server")
+    print("  python initialize_eric_memories.py all                       # Feed ALL 100+ facts")
+    print("  python initialize_eric_memories.py --remote all              # Feed ALL facts using remote server")
+    print("  python initialize_eric_memories.py test                      # Test mode: basic_info + professional_identity only")
+    print("  python initialize_eric_memories.py fast                      # Fast mode: all facts with 0.5s delay")
+    print("  python initialize_eric_memories.py slow                      # Slow mode: all facts with 2s delay")
+    print("  python initialize_eric_memories.py basic_info education      # Specific categories only")
+    print("  python initialize_eric_memories.py --remote technical_skills # Remote server + specific category")
+    print()
+    print("FEATURES:")
+    print("• Real-time success/failure tracking for each fact")
+    print("• Progress updates every 10 facts")
+    print("• Final memory state verification")
+    print("• Random fact recall testing")
+    print("• Detailed statistics and error reporting")
+    print("• Automatic memory count monitoring")
     print()
 
     asyncio.run(main())
