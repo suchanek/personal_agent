@@ -84,6 +84,7 @@ def get_all_individual_facts():
             "I provide front-line technical support to customers at BestBuy.",
             "I troubleshoot, diagnose, and recommend strategies to meet customer needs.",
             "I do software development across many areas primarily in Python",
+            "I am currently working on PersonalAgent, an AI-powered personal memory/knowledge agent running with Ollama.",
         ],
         "major_achievements": [
             "I developed one of the first real-time molecular visualization programs deployed on a personal computer (Commodore Amiga).",
@@ -126,6 +127,7 @@ def get_all_individual_facts():
             "I co-authored 'An engineered intersubunit disulfide enhances the stability and DNA binding of the N-terminal domain of lambda repressor' published in Biochemistry 25 (20), pp 5992–599, 1986.",
             "I co-authored 'Computer-aided model-building strategies for protein design' published in Biochemistry 25 (20), pp 5987–599 1986.",
             "I co-authored 'Introduction of Intersubunit Disulfide Bonds In the Membrane-Distal Region of the Influenza Hemagglutinin Abolishes Membrane Fusion Activity' published in Cell 68:635-645 1992.",
+            "I recently authored 'proteusPy a package for the analysis of Disulfide Bonds in the RCSB"
         ],
         "management_experience": [
             "I was Section Leader of the Research Computing and Informatics group within P&G Pharmaceuticals.",
@@ -143,6 +145,7 @@ def get_all_individual_facts():
             "I achieved top customer feedback scores at Apple.",
             "I have excellent problem solving and difficult customer interaction management skills.",
             "I currently provide front-line technical support at GeekSquad.",
+            "I have received numerous awards for highest NPS scores at BestBuy"
         ],
         "personal_characteristics": [
             "I am a veteran P&G employee with understanding of high-performing corporate culture.",
@@ -222,14 +225,14 @@ async def prepare_direct_storage(agent):
         if not hasattr(agent, "agno_memory") or not agent.agno_memory:
             print("❌ Memory system not available")
             return False
-            
+
         memory_manager = agent.agno_memory.memory_manager
         db = agent.agno_memory.db
-        
+
         if not memory_manager or not db:
             print("❌ Memory manager or database not available")
             return False
-            
+
         print("✅ Direct memory storage system ready")
         print(f"💾 Memory manager: {type(memory_manager).__name__}")
         print(f"🗄️ Database: {type(db).__name__}")
@@ -251,7 +254,7 @@ async def store_individual_fact_complete(agent, fact_data, fact_number, total_fa
 
     try:
         start_time = time.time()
-        
+
         # Use the same approach as Streamlit app - call agent.store_user_memory()
         # This ensures storage in both semantic memory AND knowledge graph
         if not hasattr(agent, "store_user_memory"):
@@ -261,16 +264,16 @@ async def store_individual_fact_complete(agent, fact_data, fact_number, total_fa
         # Store fact using agent's complete storage method
         topics = [category] if category != "automatic" else None
         result = await agent.store_user_memory(content=fact, topics=topics)
-        
+
         end_time = time.time()
         response_time = end_time - start_time
 
         # Check if storage was successful
-        if result and hasattr(result, 'is_success'):
+        if result and hasattr(result, "is_success"):
             # MemoryStorageResult object
             success = result.is_success
             message = result.message
-            memory_id = getattr(result, 'memory_id', None)
+            memory_id = getattr(result, "memory_id", None)
         elif isinstance(result, tuple) and len(result) >= 2:
             # Legacy tuple format
             success, message = result[0], result[1]
@@ -391,7 +394,7 @@ async def verify_final_memory_state(agent):
         if hasattr(agent, "agno_memory") and agent.agno_memory:
             memory_manager = agent.agno_memory.memory_manager
             db = agent.agno_memory.db
-            
+
             if not memory_manager or not db:
                 print("❌ Memory manager or database not available")
                 return False
@@ -620,8 +623,12 @@ async def main():
 if __name__ == "__main__":
     print("Eric's Personal Agent Memory Initialization Script")
     print("=" * 60)
-    print("Systematically stores individual facts about Eric directly in the Personal Agent's memory.")
-    print("Uses complete memory storage (semantic + knowledge graph) with categorization and verification.")
+    print(
+        "Systematically stores individual facts about Eric directly in the Personal Agent's memory."
+    )
+    print(
+        "Uses complete memory storage (semantic + knowledge graph) with categorization and verification."
+    )
     print()
     print("CAPABILITIES:")
     print("• Stores 100+ individual facts across 11 categories")
@@ -645,15 +652,33 @@ if __name__ == "__main__":
     print("• personal_characteristics - Professional traits and abilities")
     print()
     print("USAGE:")
-    print("  python initialize_eric_memories.py                           # Default: essential facts (basic_info, professional_identity, education)")
-    print("  python initialize_eric_memories.py --remote                  # Use remote Ollama server")
-    print("  python initialize_eric_memories.py all                       # Feed ALL 100+ facts")
-    print("  python initialize_eric_memories.py --remote all              # Feed ALL facts using remote server")
-    print("  python initialize_eric_memories.py test                      # Test mode: basic_info + professional_identity only")
-    print("  python initialize_eric_memories.py fast                      # Fast mode: all facts with 0.5s delay")
-    print("  python initialize_eric_memories.py slow                      # Slow mode: all facts with 2s delay")
-    print("  python initialize_eric_memories.py basic_info education      # Specific categories only")
-    print("  python initialize_eric_memories.py --remote technical_skills # Remote server + specific category")
+    print(
+        "  python initialize_eric_memories.py                           # Default: essential facts (basic_info, professional_identity, education)"
+    )
+    print(
+        "  python initialize_eric_memories.py --remote                  # Use remote Ollama server"
+    )
+    print(
+        "  python initialize_eric_memories.py all                       # Feed ALL 100+ facts"
+    )
+    print(
+        "  python initialize_eric_memories.py --remote all              # Feed ALL facts using remote server"
+    )
+    print(
+        "  python initialize_eric_memories.py test                      # Test mode: basic_info + professional_identity only"
+    )
+    print(
+        "  python initialize_eric_memories.py fast                      # Fast mode: all facts with 0.5s delay"
+    )
+    print(
+        "  python initialize_eric_memories.py slow                      # Slow mode: all facts with 2s delay"
+    )
+    print(
+        "  python initialize_eric_memories.py basic_info education      # Specific categories only"
+    )
+    print(
+        "  python initialize_eric_memories.py --remote technical_skills # Remote server + specific category"
+    )
     print()
     print("FEATURES:")
     print("• Real-time success/failure tracking for each fact")

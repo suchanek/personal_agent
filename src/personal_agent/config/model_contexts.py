@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 # Model context size database - curated list of known models and their context windows
 MODEL_CONTEXT_SIZES: Dict[str, int] = {
     # Qwen models
-    "qwen3:1.7b": 32768,
-    "qwen3:7b": 32768,
-    "qwen3:8b": 32768,
-    "qwen3:14b": 32768,
+    "qwen3:1.7b": 40960,  # Updated from 32768 via ollama show verification
+    "qwen3:7b": 40960,  # Updated to match other qwen3 models
+    "qwen3:8b": 40960,  # Updated from 32768 via ollama show verification
+    "qwen3:14b": 40960,  # Updated from 32768 via ollama show verification
+    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M": 262144,
     "qwen2.5:0.5b": 32768,
     "qwen2.5:1.5b": 32768,
     "qwen2.5:3b": 32768,
@@ -30,16 +31,16 @@ MODEL_CONTEXT_SIZES: Dict[str, int] = {
     "qwen2.5:14b": 32768,
     "qwen2.5:32b": 32768,
     "qwen2.5:72b": 32768,
-    # Llama 3.1 models (128K context)
-    "llama3.1:8b": 32768,
-    "llama3.1:8b-instruct-q8_0": 32768,
-    "llama3.1:70b": 32768,
-    "llama3.1:405b": 32768,
-    # Llama 3.2 models (128K context)
-    "llama3.2:1b": 32768,
-    "llama3.2:3b": 32768,
-    "llama3.2:11b": 32768,
-    "llama3.2:90b": 32768,
+    # Llama 3.1 models (128K context) - Updated via ollama show verification
+    "llama3.1:8b": 131072,  # Updated from 32768
+    "llama3.1:8b-instruct-q8_0": 131072,  # Updated from 32768
+    "llama3.1:70b": 131072,  # Updated from 32768 (estimated based on verified models)
+    "llama3.1:405b": 131072,  # Updated from 32768 (estimated based on verified models)
+    # Llama 3.2 models (128K context) - Updated via ollama show verification
+    "llama3.2:1b": 131072,  # Updated from 32768 (estimated based on verified models)
+    "llama3.2:3b": 131072,  # Updated from 32768
+    "llama3.2:11b": 131072,  # Updated from 32768 (estimated based on verified models)
+    "llama3.2:90b": 131072,  # Updated from 32768 (estimated based on verified models)
     # Llama 3.3 models (131K context)
     "llama3.3:latest": 131072,
     "llama3.3:70b": 131072,
@@ -325,6 +326,15 @@ async def get_model_context_size(
         return name_context, "model_name_pattern"
 
     # 4. Look up in our curated database
+    # First try the original model name (for case-sensitive models like HuggingFace)
+    if model_name in MODEL_CONTEXT_SIZES:
+        db_context = MODEL_CONTEXT_SIZES[model_name]
+        logger.info(
+            "Found context size in database for %s: %d tokens", model_name, db_context
+        )
+        return db_context, "database_lookup"
+
+    # Then try the normalized name for standard models
     normalized_name = normalize_model_name(model_name)
     if normalized_name in MODEL_CONTEXT_SIZES:
         db_context = MODEL_CONTEXT_SIZES[normalized_name]
@@ -379,6 +389,15 @@ def get_model_context_size_sync(
         return name_context, "model_name_pattern"
 
     # 3. Look up in our curated database
+    # First try the original model name (for case-sensitive models like HuggingFace)
+    if model_name in MODEL_CONTEXT_SIZES:
+        db_context = MODEL_CONTEXT_SIZES[model_name]
+        logger.info(
+            "Found context size in database for %s: %d tokens", model_name, db_context
+        )
+        return db_context, "database_lookup"
+
+    # Then try the normalized name for standard models
     normalized_name = normalize_model_name(model_name)
     if normalized_name in MODEL_CONTEXT_SIZES:
         db_context = MODEL_CONTEXT_SIZES[normalized_name]
