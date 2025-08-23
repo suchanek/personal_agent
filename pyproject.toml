@@ -65,6 +65,7 @@ anthropic = "^0.59.0"
 e2b-code-interpreter = "^1.5.2"
 openai-harmony = "^0.0.3"
 psutil = "^7.0.0"
+langfuse = "^3.3.0"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"

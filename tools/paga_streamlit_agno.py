@@ -100,6 +100,8 @@ Version: v0.2.1
 Last Revision: 2025-08-17
 """
 
+# pylint: disable=c0413, c0301, c0415, w0718,
+
 import argparse
 import asyncio
 import logging
@@ -136,6 +138,8 @@ from personal_agent.config import (
     REMOTE_OLLAMA_URL,
     USER_DATA_DIR,
     get_current_user_id,
+    get_qwen_instruct_settings,
+    get_qwen_thinking_settings,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 from personal_agent.team.personal_agent_team import create_personal_agent_team
@@ -262,7 +266,7 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
     """Initialize the team using the standard agno Team class."""
     try:
         logger.info(f"Initializing team with model {model_name} at {ollama_url}")
-        
+
         # Create team using the factory function
         team = create_personal_agent_team(
             model_provider="ollama",
@@ -278,17 +282,17 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
             logger.error("Team creation returned None")
             st.error("❌ Team creation failed - returned None")
             return None
-            
+
         if not hasattr(team, "members"):
             logger.error("Team has no members attribute")
             st.error("❌ Team creation failed - no members attribute")
             return None
-            
+
         if not team.members:
             logger.error("Team has empty members list")
             st.error("❌ Team creation failed - empty members list")
             return None
-            
+
         logger.info(f"Team created successfully with {len(team.members)} members")
 
         # The refactored team now has a knowledge agent as the first member
@@ -297,7 +301,7 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
         if hasattr(team, "members") and team.members:
             knowledge_agent = team.members[0]
             logger.info(f"Knowledge agent type: {type(knowledge_agent).__name__}")
-            
+
             if hasattr(knowledge_agent, "agno_memory"):
                 # Expose the knowledge agent's memory for Streamlit compatibility
                 team.agno_memory = knowledge_agent.agno_memory
@@ -320,6 +324,7 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
     except Exception as e:
         logger.error(f"Exception during team initialization: {str(e)}")
         import traceback
+
         logger.error(f"Traceback: {traceback.format_exc()}")
         st.error(f"❌ Failed to initialize team: {str(e)}")
         return None
@@ -337,7 +342,7 @@ def create_team_wrapper(team):
             # Now get memory and tools after initialization
             self.agno_memory = self._get_team_memory()
             self.memory_tools = self._get_memory_tools()
-            
+
             # Add debugging info
             logger.info(f"TeamWrapper initialized:")
             logger.info(f"  - Team available: {self.team is not None}")
@@ -353,7 +358,6 @@ def create_team_wrapper(team):
                 # Force initialization if not already done
                 if hasattr(knowledge_agent, "_ensure_initialized"):
                     try:
-                        import asyncio
                         asyncio.run(knowledge_agent._ensure_initialized())
                         logger.info("Knowledge agent initialized successfully")
                     except Exception as e:
@@ -368,8 +372,10 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 # The first member should be the knowledge agent (PersonalAgnoAgent)
                 knowledge_agent = self.team.members[0]
-                logger.info(f"Getting memory from knowledge agent: {type(knowledge_agent).__name__}")
-                
+                logger.info(
+                    f"Getting memory from knowledge agent: {type(knowledge_agent).__name__}"
+                )
+
                 if hasattr(knowledge_agent, "agno_memory"):
                     logger.info("Found agno_memory on knowledge agent")
                     return knowledge_agent.agno_memory
@@ -392,17 +398,23 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 # The first member should be the knowledge agent (PersonalAgnoAgent)
                 knowledge_agent = self.team.members[0]
-                logger.info(f"Getting memory tools from knowledge agent: {type(knowledge_agent).__name__}")
-                
+                logger.info(
+                    f"Getting memory tools from knowledge agent: {type(knowledge_agent).__name__}"
+                )
+
                 if hasattr(knowledge_agent, "memory_tools"):
                     logger.info("Found memory_tools on knowledge agent")
                     return knowledge_agent.memory_tools
                 else:
                     logger.warning("No memory_tools found on knowledge agent")
                     # Try to get tools from the agent's tools list
-                    if hasattr(knowledge_agent, 'agent') and hasattr(knowledge_agent.agent, 'tools'):
+                    if hasattr(knowledge_agent, "agent") and hasattr(
+                        knowledge_agent.agent, "tools"
+                    ):
                         for tool in knowledge_agent.agent.tools:
-                            if hasattr(tool, '__class__') and 'AgnoMemoryTools' in str(tool.__class__):
+                            if hasattr(tool, "__class__") and "AgnoMemoryTools" in str(
+                                tool.__class__
+                            ):
                                 logger.info("Found AgnoMemoryTools in agent tools")
                                 return tool
                         logger.warning("No AgnoMemoryTools found in agent tools")
@@ -425,7 +437,6 @@ def create_team_wrapper(team):
                     0
                 ]  # First member is the knowledge agent
                 if hasattr(knowledge_agent, "store_user_memory"):
-                    import asyncio
 
                     # This will properly restate facts and process them through the LLM
                     return asyncio.run(
@@ -454,7 +465,7 @@ def create_team_wrapper(team):
 def apply_custom_theme():
     """Apply custom CSS for theme switching."""
     is_dark_theme = st.session_state.get(SESSION_KEY_DARK_THEME, False)
-    
+
     if is_dark_theme:
         # Apply dark theme styling
         css_file = "tools/dark_theme.css"
@@ -561,16 +572,16 @@ def initialize_session_state():
         st.session_state[SESSION_KEY_SHOW_DEBUG] = DEBUG_FLAG
 
 
-def display_tool_calls(container, tools):
-    """Display tool calls in real-time during streaming."""
-    if not tools:
+def display_tool_calls(container, tool_call_details):
+    """Display tool calls using extracted and standardized tool call details."""
+    if not tool_call_details:
         return
 
     with container.container():
         st.markdown("**🔧 Tool Calls:**")
-        for i, tool in enumerate(tools, 1):
-            tool_name = getattr(tool, "name", "Unknown Tool")
-            tool_args = getattr(tool, "arguments", {})
+        for i, tool_info in enumerate(tool_call_details, 1):
+            tool_name = tool_info.get("name", "Unknown Tool")
+            tool_args = tool_info.get("arguments", {})
 
             with st.expander(f"Tool {i}: {tool_name}", expanded=False):
                 if tool_args:
@@ -579,8 +590,60 @@ def display_tool_calls(container, tools):
                     st.write("No arguments")
 
 
+def extract_tool_calls_and_metrics(response_obj):
+    """
+    Unified tool call and metrics extraction using the proper RunResponse pattern.
+
+    This method follows the pattern:
+    if agent.run_response.messages:
+        for message in agent.run_response.messages:
+            if message.role == "assistant":
+                if message.content:
+                    print(f"Message: {message.content}")
+                elif message.tool_calls:
+                    print(f"Tool calls: {message.tool_calls}")
+                print("---" * 5, "Metrics", "---" * 5)
+                pprint(message.metrics)
+                print("---" * 20)
+    """
+    tool_calls_made = 0
+    tool_call_details = []
+    metrics_data = {}
+
+    if hasattr(response_obj, "messages") and response_obj.messages:
+        for message in response_obj.messages:
+            if hasattr(message, "role") and message.role == "assistant":
+                # Extract metrics directly from the message
+                if hasattr(message, "metrics") and message.metrics:
+                    metrics_data = message.metrics
+                    logger.info(f"Extracted metrics from message: {metrics_data}")
+
+                # Handle tool calls using the proper pattern
+                if hasattr(message, "tool_calls") and message.tool_calls:
+                    tool_calls_made += len(message.tool_calls)
+                    logger.info(
+                        f"Found {len(message.tool_calls)} tool calls in message"
+                    )
+
+                    for tool_call in message.tool_calls:
+                        tool_info = {
+                            "name": getattr(tool_call, "name", "unknown"),
+                            "arguments": getattr(
+                                tool_call, "arguments", getattr(tool_call, "input", {})
+                            ),
+                            "result": getattr(tool_call, "result", None),
+                            "status": "success",
+                        }
+                        tool_call_details.append(tool_info)
+
+    return tool_calls_made, tool_call_details, metrics_data
+
+
 def format_tool_call_for_debug(tool_call):
-    """Standardize tool call format for consistent storage and display."""
+    """
+    Legacy function kept for backward compatibility.
+    New code should use extract_tool_calls_and_metrics() instead.
+    """
     if hasattr(tool_call, "name"):
         # Direct tool object
         return {
@@ -651,85 +714,122 @@ def render_chat_tab():
                         team = st.session_state[SESSION_KEY_TEAM]
 
                         if team:
+                            # DIAGNOSTIC: Log team information
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Team has %d members",
+                                len(getattr(team, "members", [])),
+                            )
+                            if hasattr(team, "members"):
+                                for i, member in enumerate(team.members):
+                                    member_name = getattr(member, "name", "Unknown")
+                                    member_model = getattr(
+                                        getattr(member, "model", None), "id", "Unknown"
+                                    )
+                                    logger.info(
+                                        "🔍 DIAGNOSTIC: Member %d: %s (model: %s)",
+                                        i,
+                                        member_name,
+                                        member_model,
+                                    )
+
                             # Use the standard agno Team arun method (async)
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Running team query: %s", prompt[:50]
+                            )
                             response_obj = asyncio.run(
                                 team.arun(prompt, user_id=USER_ID)
                             )
+
+                            # DIAGNOSTIC: Log response structure
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Response type: %s",
+                                type(response_obj).__name__,
+                            )
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Response has content: %s",
+                                hasattr(response_obj, "content"),
+                            )
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Response has messages: %s",
+                                hasattr(response_obj, "messages"),
+                            )
+                            if (
+                                hasattr(response_obj, "messages")
+                                and response_obj.messages
+                            ):
+                                logger.info(
+                                    "🔍 DIAGNOSTIC: Number of messages: %d",
+                                    len(response_obj.messages),
+                                )
+                                for i, msg in enumerate(response_obj.messages):
+                                    logger.info(
+                                        "🔍 DIAGNOSTIC: Message %d: role=%s, content_length=%d",
+                                        i,
+                                        getattr(msg, "role", "unknown"),
+                                        len(getattr(msg, "content", "")),
+                                    )
+
                             response = (
                                 response_obj.content
                                 if hasattr(response_obj, "content")
                                 else str(response_obj)
                             )
 
-                            # Extract tool call information from response
-                            if (
-                                hasattr(response_obj, "messages")
-                                and response_obj.messages
-                            ):
-                                for message in response_obj.messages:
-                                    if (
-                                        hasattr(message, "tool_calls")
-                                        and message.tool_calls
-                                    ):
-                                        tool_calls_made += len(message.tool_calls)
-                                        for tool_call in message.tool_calls:
-                                            tool_info = {
-                                                "name": getattr(
-                                                    tool_call, "name", "unknown"
-                                                ),
-                                                "arguments": getattr(
-                                                    tool_call, "input", {}
-                                                ),
-                                                "status": "success",
-                                            }
-                                            tool_call_details.append(tool_info)
-                                            all_tools_used.append(tool_call)
+                            # Use the unified extraction method for team mode
+                            (
+                                tool_calls_made,
+                                tool_call_details,
+                                metrics_data,
+                            ) = extract_tool_calls_and_metrics(response_obj)
 
                             # Display tool calls if any
-                            if all_tools_used:
-                                display_tool_calls(tool_calls_container, all_tools_used)
+                            if tool_call_details:
+                                display_tool_calls(
+                                    tool_calls_container, tool_call_details
+                                )
                         else:
                             response = "Team not initialized properly"
                     else:
                         # Single agent mode handling
                         agent = st.session_state[SESSION_KEY_AGENT]
 
-                        # Handle AgnoPersonalAgent with simplified response handling
+                        # Handle AgnoPersonalAgent with new RunResponse pattern
                         if isinstance(agent, AgnoPersonalAgent):
 
                             async def run_agent_with_streaming():
                                 nonlocal response, tool_calls_made, tool_call_details, all_tools_used
 
                                 try:
-                                    # Use the simplified agent.run() method
+                                    # Use the new run() method with stream=False for string response
                                     response_content = await agent.run(
-                                        prompt, add_thought_callback=None
+                                        prompt, stream=False, add_thought_callback=None
                                     )
 
-                                    # Get tool calls using the new method that collects from streaming events
-                                    tools_used = agent.get_last_tool_calls()
+                                    # Get the RunResponse object to extract tool calls and metrics
+                                    run_response = agent.run_response
+                                    if run_response:
+                                        # Use the unified extraction method for single agent mode
+                                        (
+                                            tool_calls_made,
+                                            tool_call_details,
+                                            metrics_data,
+                                        ) = extract_tool_calls_and_metrics(run_response)
 
-                                    # Process and display tool calls
-                                    if tools_used:
-                                        print(
-                                            f"DEBUG: Processing {len(tools_used)} tool calls from streaming events"
-                                        )
-                                        for i, tool_call in enumerate(tools_used):
-                                            print(f"DEBUG: Tool call {i}: {tool_call}")
-                                            formatted_tool = format_tool_call_for_debug(
-                                                tool_call
+                                        # Display tool calls if any
+                                        if tool_call_details:
+                                            display_tool_calls(
+                                                tool_calls_container, tool_call_details
                                             )
-                                            tool_call_details.append(formatted_tool)
-                                            all_tools_used.append(tool_call)
-                                            tool_calls_made += 1
-
-                                        # Display tool calls
-                                        display_tool_calls(
-                                            tool_calls_container, all_tools_used
-                                        )
+                                            logger.info(
+                                                f"Displayed {len(tool_call_details)} tool calls using unified method"
+                                            )
+                                        else:
+                                            logger.info(
+                                                "No tool calls found in RunResponse using unified method"
+                                            )
                                     else:
-                                        print(
-                                            "DEBUG: No tool calls collected from streaming events"
+                                        logger.info(
+                                            "No RunResponse available from agent"
                                         )
 
                                     return response_content
@@ -1026,40 +1126,64 @@ def render_memory_tab():
 
                     # Memory deletion with confirmation (simplified approach like dashboard)
                     delete_key = f"delete_search_{memory.memory_id}"
-                    
-                    if not st.session_state.get(f"show_delete_confirm_{delete_key}", False):
+
+                    if not st.session_state.get(
+                        f"show_delete_confirm_{delete_key}", False
+                    ):
                         if st.button(f"🗑️ Delete Memory", key=delete_key):
                             st.session_state[f"show_delete_confirm_{delete_key}"] = True
                             st.rerun()
                     else:
-                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
-                        st.write(f"Memory: {memory.memory[:100]}{'...' if len(memory.memory) > 100 else ''}")
-                        
+                        st.warning(
+                            "⚠️ **Confirm Deletion** - This action cannot be undone!"
+                        )
+                        st.write(
+                            f"Memory: {memory.memory[:100]}{'...' if len(memory.memory) > 100 else ''}"
+                        )
+
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
-                                st.session_state[f"show_delete_confirm_{delete_key}"] = False
+                                st.session_state[
+                                    f"show_delete_confirm_{delete_key}"
+                                ] = False
                                 st.rerun()
                         with col2:
-                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                            if st.button(
+                                "🗑️ Yes, Delete",
+                                key=f"confirm_{delete_key}",
+                                type="primary",
+                            ):
                                 with st.spinner("Deleting memory..."):
                                     try:
-                                        success, message = memory_helper.delete_memory(memory.memory_id)
-                                        
+                                        success, message = memory_helper.delete_memory(
+                                            memory.memory_id
+                                        )
+
                                         # Clear confirmation state
-                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
-                                        
+                                        st.session_state[
+                                            f"show_delete_confirm_{delete_key}"
+                                        ] = False
+
                                         if success:
-                                            st.success(f"✅ Memory deleted successfully: {message}")
+                                            st.success(
+                                                f"✅ Memory deleted successfully: {message}"
+                                            )
                                             # Clear any caches and refresh
                                             st.cache_resource.clear()
                                             st.rerun()
                                         else:
-                                            st.error(f"❌ Failed to delete memory: {message}")
-                                            
+                                            st.error(
+                                                f"❌ Failed to delete memory: {message}"
+                                            )
+
                                     except Exception as e:
-                                        st.error(f"❌ Exception during delete: {str(e)}")
-                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
+                                        st.error(
+                                            f"❌ Exception during delete: {str(e)}"
+                                        )
+                                        st.session_state[
+                                            f"show_delete_confirm_{delete_key}"
+                                        ] = False
         else:
             st.info("No matching memories found.")
 
@@ -1067,7 +1191,7 @@ def render_memory_tab():
     st.markdown("---")
     st.subheader("📚 Browse All Memories")
     st.markdown("*View, edit, and manage all stored memories*")
-    
+
     # Auto-load memories like the dashboard does (no button required)
     try:
         memories = memory_helper.get_all_memories()
@@ -1087,40 +1211,64 @@ def render_memory_tab():
 
                     # Memory deletion with confirmation (simplified approach like dashboard)
                     delete_key = f"delete_browse_{memory.memory_id}"
-                    
-                    if not st.session_state.get(f"show_delete_confirm_{delete_key}", False):
+
+                    if not st.session_state.get(
+                        f"show_delete_confirm_{delete_key}", False
+                    ):
                         if st.button(f"🗑️ Delete", key=delete_key):
                             st.session_state[f"show_delete_confirm_{delete_key}"] = True
                             st.rerun()
                     else:
-                        st.warning("⚠️ **Confirm Deletion** - This action cannot be undone!")
-                        st.write(f"Memory: {memory.memory[:100]}{'...' if len(memory.memory) > 100 else ''}")
-                        
+                        st.warning(
+                            "⚠️ **Confirm Deletion** - This action cannot be undone!"
+                        )
+                        st.write(
+                            f"Memory: {memory.memory[:100]}{'...' if len(memory.memory) > 100 else ''}"
+                        )
+
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("❌ Cancel", key=f"cancel_{delete_key}"):
-                                st.session_state[f"show_delete_confirm_{delete_key}"] = False
+                                st.session_state[
+                                    f"show_delete_confirm_{delete_key}"
+                                ] = False
                                 st.rerun()
                         with col2:
-                            if st.button("🗑️ Yes, Delete", key=f"confirm_{delete_key}", type="primary"):
+                            if st.button(
+                                "🗑️ Yes, Delete",
+                                key=f"confirm_{delete_key}",
+                                type="primary",
+                            ):
                                 with st.spinner("Deleting memory..."):
                                     try:
-                                        success, message = memory_helper.delete_memory(memory.memory_id)
-                                        
+                                        success, message = memory_helper.delete_memory(
+                                            memory.memory_id
+                                        )
+
                                         # Clear confirmation state
-                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
-                                        
+                                        st.session_state[
+                                            f"show_delete_confirm_{delete_key}"
+                                        ] = False
+
                                         if success:
-                                            st.success(f"✅ Memory deleted successfully: {message}")
+                                            st.success(
+                                                f"✅ Memory deleted successfully: {message}"
+                                            )
                                             # Clear any caches and refresh
                                             st.cache_resource.clear()
                                             st.rerun()
                                         else:
-                                            st.error(f"❌ Failed to delete memory: {message}")
-                                            
+                                            st.error(
+                                                f"❌ Failed to delete memory: {message}"
+                                            )
+
                                     except Exception as e:
-                                        st.error(f"❌ Exception during delete: {str(e)}")
-                                        st.session_state[f"show_delete_confirm_{delete_key}"] = False
+                                        st.error(
+                                            f"❌ Exception during delete: {str(e)}"
+                                        )
+                                        st.session_state[
+                                            f"show_delete_confirm_{delete_key}"
+                                        ] = False
         else:
             st.info("No memories stored yet.")
     except Exception as e:
@@ -1308,7 +1456,7 @@ def render_knowledge_status(knowledge_helper):
             # RAG Server Location Dropdown
             rag_location = st.selectbox(
                 "RAG Server:",
-                ["localhost", "tesla.tail19187e.ts.net"],
+                ["localhost", "100.100.248.61"],
                 index=(
                     0
                     if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost"
@@ -1332,8 +1480,8 @@ def render_knowledge_status(knowledge_helper):
                     # Determine the new RAG URL
                     if rag_location == "localhost":
                         new_rag_url = "http://localhost:9621"
-                    else:  # tesla.tail19187e.ts.net
-                        new_rag_url = "http://tesla.tail19187e.ts.net:9621"
+                    else:  # 100.100.248.61
+                        new_rag_url = "http://100.100.248.61:9621"
 
                     # Trigger rescan on the new server
                     with st.spinner(
@@ -1362,8 +1510,8 @@ def render_knowledge_status(knowledge_helper):
             # Determine the RAG URL based on current session state
             if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost":
                 rag_url = "http://localhost:9621"
-            else:  # tesla.tail19187e.ts.net
-                rag_url = "http://tesla.tail19187e.ts.net:9621"
+            else:  # 100.100.248.61
+                rag_url = "http://100.100.248.61:9621"
 
             # Check RAG server status with improved reliability and error handling
             try:
@@ -1741,7 +1889,9 @@ def render_knowledge_tab():
                                 title=url_title if url_title else None,
                             )
                             # Show success notification
-                            st.toast("🎉 Knowledge from URL saved successfully!", icon="✅")
+                            st.toast(
+                                "🎉 Knowledge from URL saved successfully!", icon="✅"
+                            )
                             time.sleep(2.0)  # 2 second delay
 
                             # Clear the form using flag-based approach
@@ -2088,6 +2238,31 @@ def render_sidebar():
             else:
                 st.write(f"**Mode:** 🧠 Single Agent")
                 st.warning("⚠️ Agent not initialized")
+
+        # Show Qwen model settings if using Qwen model
+        current_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
+        if "qwen" in current_model.lower():
+            with st.expander("⚙️ Qwen Model Settings", expanded=False):
+                try:
+                    instruct_settings = get_qwen_instruct_settings()
+                    thinking_settings = get_qwen_thinking_settings()
+
+                    st.write("**Instruct Model Settings:**")
+                    st.write(f"• Temperature: {instruct_settings['temperature']}")
+                    st.write(f"• Min_P: {instruct_settings['min_p']}")
+                    st.write(f"• Top_P: {instruct_settings['top_p']}")
+                    st.write(f"• Top_K: {instruct_settings['top_k']}")
+
+                    st.write("**Thinking Model Settings:**")
+                    st.write(f"• Temperature: {thinking_settings['temperature']}")
+                    st.write(f"• Min_P: {thinking_settings['min_p']}")
+                    st.write(f"• Top_P: {thinking_settings['top_p']}")
+
+                    st.caption(
+                        "These settings are configured in src/personal_agent/config/settings.py"
+                    )
+                except Exception as e:
+                    st.error(f"Error loading Qwen settings: {e}")
 
         # Show debug info about URL configuration
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):

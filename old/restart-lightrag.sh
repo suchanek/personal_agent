@@ -79,7 +79,7 @@ restart_server() {
         
         if [[ "$current_url" == *"host.docker.internal"* ]]; then
             echo -e "  Mode: ${GREEN}LOCAL${NC}"
-        elif [[ "$current_url" == *"tesla.tail19187e.ts.net"* ]]; then
+        elif [[ "$current_url" == *"100.100.248.61"* ]]; then
             echo -e "  Mode: ${GREEN}REMOTE${NC}"
         else
             echo -e "  Mode: ${YELLOW}CUSTOM${NC}"
@@ -153,7 +153,7 @@ restart_memory() {
         
         if [[ "$current_url" == *"host.docker.internal"* ]]; then
             echo -e "  Mode: ${GREEN}LOCAL${NC}"
-        elif [[ "$current_url" == *"tesla.tail19187e.ts.net"* ]]; then
+        elif [[ "$current_url" == *"100.100.248.61"* ]]; then
             echo -e "  Mode: ${GREEN}REMOTE${NC}"
         else
             echo -e "  Mode: ${YELLOW}CUSTOM${NC}"

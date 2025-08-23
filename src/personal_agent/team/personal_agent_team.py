@@ -5,9 +5,11 @@ This module creates a team of specialized agents that work together,
 following the pattern from examples/teams/reasoning_multi_purpose_team.py
 """
 
-import asyncio
+# pylint disable=C0415
+
+from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict
 
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
@@ -15,7 +17,7 @@ from agno.team.team import Team
 from agno.tools.file import FileTools
 from agno.tools.reasoning import ReasoningTools
 
-from ..config import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, LLM_MODEL, OLLAMA_URL
+from ..config import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, HOME_DIR, LLM_MODEL, OLLAMA_URL
 from ..config.model_contexts import get_model_context_size_sync
 from ..utils import setup_logging
 from .specialized_agents import (
@@ -128,12 +130,16 @@ def create_personal_agent_team(
         debug=debug,
     )
 
+    # DIAGNOSTIC: Create writer agent with explicit llama model
+    logger.info("🔍 DIAGNOSTIC: Creating writer agent with model_name=%s (should be llama3.1:8b)", model_name)
     writer_agent = create_writer_agent(
         model_provider=model_provider,
-        model_name=model_name,
+        model_name="llama3.1:8b",  # Force the llama model explicitly
         ollama_base_url=ollama_base_url,
         debug=debug,
     )
+    logger.info("🔍 DIAGNOSTIC: Writer agent created with model: %s",
+                getattr(getattr(writer_agent, 'model', None), 'id', 'Unknown'))
 
     # Create knowledge/memory agent using PersonalAgnoAgent
     knowledge_agent = create_knowledge_memory_agent(
@@ -226,7 +232,7 @@ def create_personal_agent_team(
         name="Personal Agent Team",
         mode="route",  # Enable routing to team members
         model=coordinator_model,
-        tools=[FileTools()],  # Coordinator has no tools - only routes to specialists
+        tools=[FileTools(base_dir=Path(HOME_DIR))],  # Coordinator has basic file tools with proper Path object
         members=[
             knowledge_agent,  # New PersonalAgnoAgent for memory/knowledge
             web_research_agent,

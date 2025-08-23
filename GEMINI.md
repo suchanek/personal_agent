@@ -254,7 +254,7 @@ BRAVE_API_KEY="key"                   # Brave search (if using)
 
 # Service URLs (optional overrides)
 OLLAMA_URL="http://localhost:11434"   # Ollama server
-# With Tailscale, the Ollama server on `tesla` is accessible at: http://tesla.tail19187e.ts.net:11434
+# With Tailscale, the Ollama server on `tesla` is accessible at: http://100.100.248.61:11434
 WEAVIATE_URL="http://localhost:8080"  # Weaviate (if using)
 ```
 

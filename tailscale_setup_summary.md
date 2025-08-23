@@ -42,14 +42,14 @@ We configured **Tailscale** on your Mac Mini (`tesla`) so you can securely acces
 - Tailnet domain: `tail19187e.ts.net` (can be renamed to something cleaner).  
 - Hostname for Mac Mini:
   ```
-  tesla.tail19187e.ts.net
+  100.100.248.61
   ```
 
 ---
 
 ### 5. DNS Resolution Issue
-- `dig @100.100.100.100 tesla.tail19187e.ts.net` worked (MagicDNS functional).  
-- But `ping tesla.tail19187e.ts.net` failed → macOS/iPhone weren’t using Tailscale DNS.  
+- `dig @100.100.100.100 100.100.248.61` worked (MagicDNS functional).  
+- But `ping 100.100.248.61` failed → macOS/iPhone weren’t using Tailscale DNS.  
 - Cause: **Override local DNS** is a Premium feature (greyed out on Free plan).
 
 ---
@@ -69,18 +69,18 @@ We configured **Tailscale** on your Mac Mini (`tesla`) so you can securely acces
 2. Add `100.100.100.100`.  
 3. Toggle Airplane mode to refresh.
 
-Result: `tesla.tail19187e.ts.net` resolves correctly.
+Result: `100.100.248.61` resolves correctly.
 
 ---
 
 ### 7. Access Methods
 - **SSH**:
   ```bash
-  ssh egs@tesla.tail19187e.ts.net
+  ssh egs@100.100.248.61
   ```
 - **Web app** (example Streamlit):
   ```
-  http://tesla.tail19187e.ts.net:8501
+  http://100.100.248.61:8501
   ```
 - **Fallback (by IP)**:
   ```
@@ -119,7 +119,7 @@ Result: `tesla.tail19187e.ts.net` resolves correctly.
 
 ## ✅ Final State
 - `tesla` auto-joins Tailscale at boot (`brew services`).  
-- Reachable securely via `tesla.tail19187e.ts.net` (or IP).  
+- Reachable securely via `100.100.248.61` (or IP).  
 - Accessible from iPhone and Kepler with manual DNS override.  
 - SSH hardened (keys only, no passwords).  
 - Web apps reachable inside tailnet without public exposure.

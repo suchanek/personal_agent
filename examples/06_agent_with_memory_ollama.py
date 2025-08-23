@@ -30,8 +30,8 @@ logging.getLogger("agno.agent").setLevel(logging.DEBUG)
 logging.getLogger("agno.models").setLevel(logging.DEBUG)
 
 # Use your Ollama configuration
-OLLAMA_URL = "http://tesla.tail19187e.ts.net:11434"
-LLM_MODEL = "qwen3:1.7B"  # Available model on tesla.tail19187e.ts.net
+OLLAMA_URL = "http://localhost:11434"
+LLM_MODEL = "qwen3:1.7B" 
 
 memory_db = SqliteMemoryDb(table_name="memory", db_file="tmp/memory_ollama.db")
 
