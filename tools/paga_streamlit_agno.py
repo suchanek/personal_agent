@@ -412,12 +412,12 @@ def create_team_wrapper(team):
                         knowledge_agent.agent, "tools"
                     ):
                         for tool in knowledge_agent.agent.tools:
-                            if hasattr(tool, "__class__") and "AgnoMemoryTools" in str(
-                                tool.__class__
-                            ):
-                                logger.info("Found AgnoMemoryTools in agent tools")
+                            if hasattr(
+                                tool, "__class__"
+                            ) and "PersagMemoryTools" in str(tool.__class__):
+                                logger.info("Found PersagMemoryTools in agent tools")
                                 return tool
-                        logger.warning("No AgnoMemoryTools found in agent tools")
+                        logger.warning("No PersagMemoryTools found in agent tools")
             else:
                 logger.error("No team members available for memory tools")
             return None
@@ -582,17 +582,45 @@ def display_tool_calls(container, tool_call_details):
         for i, tool_info in enumerate(tool_call_details, 1):
             tool_name = tool_info.get("name", "Unknown Tool")
             tool_args = tool_info.get("arguments", {})
+            tool_source = tool_info.get("source", "unknown")
 
-            with st.expander(f"Tool {i}: {tool_name}", expanded=False):
+            # Add source indicator to the tool name
+            source_icon = (
+                "🎯"
+                if tool_source == "coordinator"
+                else "🤖" if tool_source.startswith("member_") else "❓"
+            )
+            source_label = (
+                tool_source.replace("_", " ").title()
+                if tool_source != "unknown"
+                else "Unknown Source"
+            )
+
+            with st.expander(
+                f"Tool {i}: ✅ {tool_name} ({source_icon} {source_label})",
+                expanded=False,
+            ):
                 if tool_args:
                     st.json(tool_args)
                 else:
                     st.write("No arguments")
 
+                # Show additional tool info if available
+                if tool_info.get("result"):
+                    st.write("**Result:**")
+                    result = tool_info.get("result")
+                    if isinstance(result, str) and len(result) > 200:
+                        st.write(f"{result[:200]}...")
+                    else:
+                        st.write(str(result))
+
 
 def extract_tool_calls_and_metrics(response_obj):
     """
     Unified tool call and metrics extraction using the proper RunResponse pattern.
+
+    This method handles both single agent responses and team responses with member_responses.
+    For teams in coordinate mode, it extracts tool calls from both the coordinator and all team members.
 
     This method follows the pattern:
     if agent.run_response.messages:
@@ -605,37 +633,156 @@ def extract_tool_calls_and_metrics(response_obj):
                 print("---" * 5, "Metrics", "---" * 5)
                 pprint(message.metrics)
                 print("---" * 20)
+
+    For teams with member_responses:
+    if team.run_response.member_responses:
+        for member_response in team.run_response.member_responses:
+            if member_response.messages:
+                for message in member_response.messages:
+                    if message.role == "assistant":
+                        # Extract tool calls from member
     """
     tool_calls_made = 0
     tool_call_details = []
     metrics_data = {}
 
-    if hasattr(response_obj, "messages") and response_obj.messages:
-        for message in response_obj.messages:
-            if hasattr(message, "role") and message.role == "assistant":
-                # Extract metrics directly from the message
-                if hasattr(message, "metrics") and message.metrics:
-                    metrics_data = message.metrics
-                    logger.info(f"Extracted metrics from message: {metrics_data}")
+    def extract_tool_calls_from_message(message, source="main"):
+        """Helper function to extract tool calls from a single message."""
+        nonlocal tool_calls_made, tool_call_details, metrics_data
 
-                # Handle tool calls using the proper pattern
-                if hasattr(message, "tool_calls") and message.tool_calls:
-                    tool_calls_made += len(message.tool_calls)
-                    logger.info(
-                        f"Found {len(message.tool_calls)} tool calls in message"
+        if hasattr(message, "role") and message.role == "assistant":
+            # Extract metrics directly from the message
+            if hasattr(message, "metrics") and message.metrics:
+                metrics_data = message.metrics
+                logger.info(f"Extracted metrics from {source} message: {metrics_data}")
+
+            # Handle tool calls using the proper pattern
+            if hasattr(message, "tool_calls") and message.tool_calls:
+                tool_calls_made += len(message.tool_calls)
+                logger.info(
+                    f"Found {len(message.tool_calls)} tool calls in {source} message"
+                )
+
+                for tool_call in message.tool_calls:
+                    # Try multiple approaches to extract the tool name
+                    tool_name = "unknown"
+                    tool_args = {}
+
+                    # Handle dictionary-based tool calls first (most common case)
+                    if isinstance(tool_call, dict):
+                        # Dictionary-based tool call extraction
+                        tool_name = "unknown"
+                        tool_args = {}
+
+                        # Try different name keys
+                        if tool_call.get("name"):
+                            tool_name = tool_call.get("name")
+                        elif tool_call.get("tool_name"):
+                            tool_name = tool_call.get("tool_name")
+                        elif isinstance(
+                            tool_call.get("function"), dict
+                        ) and tool_call.get("function", {}).get("name"):
+                            tool_name = tool_call.get("function", {}).get("name")
+
+                        # Try different argument keys
+                        if tool_call.get("arguments"):
+                            tool_args = tool_call.get("arguments")
+                        elif tool_call.get("input"):
+                            tool_args = tool_call.get("input")
+                        elif tool_call.get("tool_args"):
+                            tool_args = tool_call.get("tool_args")
+                        elif isinstance(
+                            tool_call.get("function"), dict
+                        ) and tool_call.get("function", {}).get("arguments"):
+                            tool_args = tool_call.get("function", {}).get("arguments")
+
+                        logger.debug(f"Dictionary tool call from {source}: {tool_call}")
+                        logger.debug(f"Extracted name from dict: {tool_name}")
+                        logger.debug(f"Extracted args from dict: {tool_args}")
+
+                    else:
+                        # Object-based tool call extraction (fallback)
+                        # Method 1: Check for 'name' attribute (most common)
+                        if hasattr(tool_call, "name") and tool_call.name:
+                            tool_name = tool_call.name
+                        # Method 2: Check for 'tool_name' attribute (ToolExecution objects)
+                        elif hasattr(tool_call, "tool_name") and tool_call.tool_name:
+                            tool_name = tool_call.tool_name
+                        # Method 3: Check for function.name (OpenAI-style)
+                        elif hasattr(tool_call, "function") and hasattr(
+                            tool_call.function, "name"
+                        ):
+                            tool_name = tool_call.function.name
+                        # Method 4: Check for type name as fallback
+                        elif hasattr(tool_call, "__class__"):
+                            tool_name = tool_call.__class__.__name__
+
+                        # Try multiple approaches to extract arguments
+                        # Method 1: Check for 'arguments' attribute
+                        if hasattr(tool_call, "arguments") and tool_call.arguments:
+                            tool_args = tool_call.arguments
+                        # Method 2: Check for 'input' attribute (agno style)
+                        elif hasattr(tool_call, "input") and tool_call.input:
+                            tool_args = tool_call.input
+                        # Method 3: Check for 'tool_args' attribute (ToolExecution objects)
+                        elif hasattr(tool_call, "tool_args") and tool_call.tool_args:
+                            tool_args = tool_call.tool_args
+                        # Method 4: Check for function.arguments (OpenAI-style)
+                        elif hasattr(tool_call, "function") and hasattr(
+                            tool_call.function, "arguments"
+                        ):
+                            tool_args = tool_call.function.arguments
+
+                    # Log debugging information
+                    logger.debug(
+                        f"Tool call object type from {source}: {type(tool_call).__name__}"
+                    )
+                    if hasattr(tool_call, "__dict__"):
+                        logger.debug(
+                            f"Tool call attributes: {[attr for attr in dir(tool_call) if not attr.startswith('_')]}"
+                        )
+                    logger.debug(
+                        f"Final extracted tool name from {source}: {tool_name}"
+                    )
+                    logger.debug(
+                        f"Final extracted tool args from {source}: {tool_args}"
                     )
 
-                    for tool_call in message.tool_calls:
-                        tool_info = {
-                            "name": getattr(tool_call, "name", "unknown"),
-                            "arguments": getattr(
-                                tool_call, "arguments", getattr(tool_call, "input", {})
-                            ),
-                            "result": getattr(tool_call, "result", None),
-                            "status": "success",
-                        }
-                        tool_call_details.append(tool_info)
+                    tool_info = {
+                        "name": tool_name,
+                        "arguments": tool_args,
+                        "result": (
+                            tool_call.get("result")
+                            if isinstance(tool_call, dict)
+                            else getattr(tool_call, "result", None)
+                        ),
+                        "status": "success",
+                        "source": source,  # Track whether this came from coordinator or member
+                    }
+                    tool_call_details.append(tool_info)
 
+    # Extract tool calls from main/coordinator messages
+    if hasattr(response_obj, "messages") and response_obj.messages:
+        logger.info("Extracting tool calls from coordinator messages")
+        for message in response_obj.messages:
+            extract_tool_calls_from_message(message, "coordinator")
+
+    # Extract tool calls from team member responses (coordinate mode)
+    if hasattr(response_obj, "member_responses") and response_obj.member_responses:
+        logger.info(f"Found {len(response_obj.member_responses)} member responses")
+        for i, member_response in enumerate(response_obj.member_responses):
+            if hasattr(member_response, "messages") and member_response.messages:
+                logger.info(f"Extracting tool calls from member {i+1} messages")
+                for message in member_response.messages:
+                    extract_tool_calls_from_message(message, f"member_{i+1}")
+            else:
+                logger.debug(f"Member response {i+1} has no messages")
+    else:
+        logger.debug("No member_responses found in response object")
+
+    logger.info(
+        f"Total tool calls extracted: {tool_calls_made} from {len(tool_call_details)} tool call details"
+    )
     return tool_calls_made, tool_call_details, metrics_data
 
 
@@ -644,29 +791,80 @@ def format_tool_call_for_debug(tool_call):
     Legacy function kept for backward compatibility.
     New code should use extract_tool_calls_and_metrics() instead.
     """
-    if hasattr(tool_call, "name"):
-        # Direct tool object
+    tool_name = "Unknown"
+    tool_args = {}
+
+    # Handle dictionary-based tool calls first (most common case)
+    if isinstance(tool_call, dict):
+        # Dictionary-based tool call extraction
+        tool_name = "Unknown"
+        tool_args = {}
+
+        # Try different name keys
+        if tool_call.get("name"):
+            tool_name = tool_call.get("name")
+        elif tool_call.get("tool_name"):
+            tool_name = tool_call.get("tool_name")
+        elif isinstance(tool_call.get("function"), dict) and tool_call.get(
+            "function", {}
+        ).get("name"):
+            tool_name = tool_call.get("function", {}).get("name")
+
+        # Try different argument keys
+        if tool_call.get("arguments"):
+            tool_args = tool_call.get("arguments")
+        elif tool_call.get("input"):
+            tool_args = tool_call.get("input")
+        elif tool_call.get("tool_args"):
+            tool_args = tool_call.get("tool_args")
+        elif isinstance(tool_call.get("function"), dict) and tool_call.get(
+            "function", {}
+        ).get("arguments"):
+            tool_args = tool_call.get("function", {}).get("arguments")
+
         return {
-            "name": getattr(tool_call, "name", "Unknown"),
-            "arguments": getattr(tool_call, "arguments", {}),
-            "result": getattr(tool_call, "result", None),
+            "name": tool_name,
+            "arguments": tool_args,
+            "result": tool_call.get("result"),
             "status": "success",
         }
-    elif hasattr(tool_call, "function"):
-        # Tool call with function attribute
-        return {
-            "name": getattr(tool_call.function, "name", "Unknown"),
-            "arguments": getattr(tool_call.function, "arguments", {}),
-            "result": getattr(tool_call, "result", None),
-            "status": "success",
-        }
+
     else:
-        # Fallback for unknown format
+        # Object-based tool call extraction (fallback)
+        # Method 1: Check for 'name' attribute (most common)
+        if hasattr(tool_call, "name") and tool_call.name:
+            tool_name = tool_call.name
+        # Method 2: Check for 'tool_name' attribute (ToolExecution objects)
+        elif hasattr(tool_call, "tool_name") and tool_call.tool_name:
+            tool_name = tool_call.tool_name
+        # Method 3: Check for function.name (OpenAI-style)
+        elif hasattr(tool_call, "function") and hasattr(tool_call.function, "name"):
+            tool_name = tool_call.function.name
+        # Method 4: Check for type name as fallback
+        elif hasattr(tool_call, "__class__"):
+            tool_name = tool_call.__class__.__name__
+
+        # Try multiple approaches to extract arguments
+        # Method 1: Check for 'arguments' attribute
+        if hasattr(tool_call, "arguments") and tool_call.arguments:
+            tool_args = tool_call.arguments
+        # Method 2: Check for 'input' attribute (agno style)
+        elif hasattr(tool_call, "input") and tool_call.input:
+            tool_args = tool_call.input
+        # Method 3: Check for 'tool_args' attribute (ToolExecution objects)
+        elif hasattr(tool_call, "tool_args") and tool_call.tool_args:
+            tool_args = tool_call.tool_args
+        # Method 4: Check for function.arguments (OpenAI-style)
+        elif hasattr(tool_call, "function") and hasattr(
+            tool_call.function, "arguments"
+        ):
+            tool_args = tool_call.function.arguments
+
         return {
-            "name": str(type(tool_call).__name__),
-            "arguments": {},
-            "result": str(tool_call),
-            "status": "unknown",
+            "name": tool_name,
+            "arguments": tool_args,
+            "result": getattr(tool_call, "result", None),
+            "status": "success",
         }
 
 
@@ -782,6 +980,68 @@ def render_chat_tab():
                                 metrics_data,
                             ) = extract_tool_calls_and_metrics(response_obj)
 
+                            # Enhanced diagnostic logging for writer agent issues
+                            logger.info(
+                                f"🔍 STREAMLIT DIAGNOSTIC: Team response content: {response[:200]}..."
+                            )
+                            logger.info(
+                                f"🔍 STREAMLIT DIAGNOSTIC: Tool calls extracted: {tool_calls_made}"
+                            )
+                            logger.info(
+                                f"🔍 STREAMLIT DIAGNOSTIC: Tool call details: {len(tool_call_details)}"
+                            )
+
+                            # Check if this looks like a writer agent response with tool call syntax
+                            if (
+                                "write_original_content(" in response
+                                or "<|python_tag|>" in response
+                            ):
+                                logger.warning(
+                                    "🔍 STREAMLIT DIAGNOSTIC: Writer agent response contains tool call syntax!"
+                                )
+                                logger.warning(
+                                    f"🔍 STREAMLIT DIAGNOSTIC: Full response: {response}"
+                                )
+
+                                # Try to extract actual content from response_obj
+                                actual_content_found = False
+                                if (
+                                    hasattr(response_obj, "member_responses")
+                                    and response_obj.member_responses
+                                ):
+                                    for i, member_resp in enumerate(
+                                        response_obj.member_responses
+                                    ):
+                                        if (
+                                            hasattr(member_resp, "messages")
+                                            and member_resp.messages
+                                        ):
+                                            for msg in member_resp.messages:
+                                                if (
+                                                    hasattr(msg, "content")
+                                                    and msg.content
+                                                    and "write_original_content("
+                                                    not in msg.content
+                                                    and "<|python_tag|>"
+                                                    not in msg.content
+                                                    and len(msg.content.strip()) > 50
+                                                ):  # Ensure it's substantial content
+                                                    logger.info(
+                                                        f"🔍 STREAMLIT DIAGNOSTIC: Found actual content in member {i}: {msg.content[:200]}..."
+                                                    )
+                                                    response = (
+                                                        msg.content
+                                                    )  # Override the response with actual content
+                                                    actual_content_found = True
+                                                    break
+                                        if actual_content_found:
+                                            break
+
+                                if not actual_content_found:
+                                    logger.warning(
+                                        "🔍 STREAMLIT DIAGNOSTIC: Could not find actual content in member responses"
+                                    )
+
                             # Display tool calls if any
                             if tool_call_details:
                                 display_tool_calls(
@@ -800,36 +1060,55 @@ def render_chat_tab():
                                 nonlocal response, tool_calls_made, tool_call_details, all_tools_used
 
                                 try:
-                                    # Use the new run() method with stream=False for string response
-                                    response_content = await agent.run(
+                                    # Use agent.arun() instead of agent.run() for async tool compatibility
+                                    # The arun() method returns a RunResponse object directly, not a string
+                                    run_response = await agent.arun(
                                         prompt, stream=False, add_thought_callback=None
                                     )
 
-                                    # Get the RunResponse object to extract tool calls and metrics
-                                    run_response = agent.run_response
-                                    if run_response:
-                                        # Use the unified extraction method for single agent mode
-                                        (
-                                            tool_calls_made,
-                                            tool_call_details,
-                                            metrics_data,
-                                        ) = extract_tool_calls_and_metrics(run_response)
+                                    # Extract content from the RunResponse object
+                                    if (
+                                        hasattr(run_response, "content")
+                                        and run_response.content
+                                    ):
+                                        response_content = run_response.content
+                                    elif (
+                                        hasattr(run_response, "messages")
+                                        and run_response.messages
+                                    ):
+                                        # Extract content from the last assistant message
+                                        response_content = ""
+                                        for message in run_response.messages:
+                                            if (
+                                                hasattr(message, "role")
+                                                and message.role == "assistant"
+                                            ):
+                                                if (
+                                                    hasattr(message, "content")
+                                                    and message.content
+                                                ):
+                                                    response_content += message.content
+                                    else:
+                                        response_content = str(run_response)
 
-                                        # Display tool calls if any
-                                        if tool_call_details:
-                                            display_tool_calls(
-                                                tool_calls_container, tool_call_details
-                                            )
-                                            logger.info(
-                                                f"Displayed {len(tool_call_details)} tool calls using unified method"
-                                            )
-                                        else:
-                                            logger.info(
-                                                "No tool calls found in RunResponse using unified method"
-                                            )
+                                    # Use the unified extraction method for single agent mode
+                                    (
+                                        tool_calls_made,
+                                        tool_call_details,
+                                        metrics_data,
+                                    ) = extract_tool_calls_and_metrics(run_response)
+
+                                    # Display tool calls if any
+                                    if tool_call_details:
+                                        display_tool_calls(
+                                            tool_calls_container, tool_call_details
+                                        )
+                                        logger.info(
+                                            f"Displayed {len(tool_call_details)} tool calls using unified method"
+                                        )
                                     else:
                                         logger.info(
-                                            "No RunResponse available from agent"
+                                            "No tool calls found in RunResponse using unified method"
                                         )
 
                                     return response_content

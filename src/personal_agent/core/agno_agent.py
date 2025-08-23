@@ -19,7 +19,7 @@ Highlights:
   * Public methods for storing, restating, seeding, checking, and clearing memories.
 - Tools:
   * Curated built-ins (Google Search, Calculator, YFinance, Python, Shell, filesystem).
-  * Consolidated KnowledgeTools and AgnoMemoryTools when memory is enabled.
+  * Consolidated KnowledgeTools and PersagMemoryTools when memory is enabled.
   * Optional MCP server tool integration controlled by configuration.
 - Instructions:
   * Dynamic instruction assembly via an instruction manager and rich introspection.
@@ -90,7 +90,7 @@ from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
-from ..tools.refactored_memory_tools import AgnoMemoryTools
+from ..tools.refactored_memory_tools import PersagMemoryTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -254,12 +254,18 @@ class AgnoPersonalAgent(Agent):
         self._collected_tool_calls = []
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
 
-        # Initialize base Agent with minimal setup - will be updated in _do_initialization()
+        # Create the model immediately to avoid agno defaulting to OpenAI
+        temp_model_manager = AgentModelManager(
+            model_provider, model_name, ollama_base_url, seed
+        )
+        initial_model = temp_model_manager.create_model()
+
+        # Initialize base Agent with proper model to prevent OpenAI default
         super().__init__(
             name="Personal AI Agent",
-            model=None,  # Will be set in _do_initialization()
-            tools=[],  # Will be set in _do_initialization()
-            instructions=[],  # Will be set in _do_initialization()
+            model=initial_model,  # Set proper model immediately
+            tools=[],  # Will be updated in _do_initialization()
+            instructions=[],  # Will be updated in _do_initialization()
             markdown=True,
             show_tool_calls=debug,
             agent_id="personal-agent",  # Use hyphen to match team expectations
@@ -456,7 +462,7 @@ class AgnoPersonalAgent(Agent):
                 self.knowledge_tools = KnowledgeTools(
                     self.knowledge_manager, self.agno_knowledge
                 )
-                self.memory_tools = AgnoMemoryTools(self.memory_manager)
+                self.memory_tools = PersagMemoryTools(self.memory_manager)
 
             # 7. Create the model
             model = self.model_manager.create_model()
@@ -499,7 +505,9 @@ class AgnoPersonalAgent(Agent):
                         self.memory_tools,
                     ]
                     tools.extend(memory_tools)
-                    logger.info("Added consolidated KnowledgeTools and AgnoMemoryTools")
+                    logger.info(
+                        "Added consolidated KnowledgeTools and PersagMemoryTools"
+                    )
                 else:
                     logger.warning(
                         "Memory enabled but memory tools not properly initialized"
@@ -590,17 +598,17 @@ class AgnoPersonalAgent(Agent):
             # Collect all chunks from the stream for backward compatibility
             content_parts = []
             self._collected_tool_calls = []
-            
+
             for chunk in run_stream:  # Use regular for loop, not async for
                 # Store the last response for tool call extraction
                 self._last_response = chunk
-                
+
                 # Collect content from chunks
-                if hasattr(chunk, 'content') and chunk.content:
+                if hasattr(chunk, "content") and chunk.content:
                     content_parts.append(chunk.content)
 
             # Join all content parts
-            content = ''.join(content_parts)
+            content = "".join(content_parts)
 
             # Extract tool calls from the final run_response using the proper pattern
             if self.run_response and self.run_response.messages:
@@ -626,17 +634,17 @@ class AgnoPersonalAgent(Agent):
         return self._collected_tool_calls
 
     def print_run_response(
-        self, 
-        run_response: Union[Iterator[RunResponse], RunResponse], 
-        markdown: bool = True, 
-        show_time: bool = True
+        self,
+        run_response: Union[Iterator[RunResponse], RunResponse],
+        markdown: bool = True,
+        show_time: bool = True,
     ) -> None:
         """Print a run response using agno's pprint_run_response function.
-        
+
         This method provides easy access to the agno pprint functionality for
         displaying run responses with proper formatting, including metrics
         per message and tool calls as shown in the example pattern.
-        
+
         Args:
             run_response: The RunResponse or Iterator[RunResponse] to print
             markdown: Whether to format output as markdown
@@ -646,18 +654,18 @@ class AgnoPersonalAgent(Agent):
 
     def print_run_response_with_metrics(self) -> None:
         """Print the last run response with detailed metrics per message.
-        
+
         This method implements the pattern shown in the task description for
         printing metrics per message, including tool calls and message content.
         """
         if not self.run_response or not self.run_response.messages:
             logger.warning("No run response available to print metrics for")
             return
-            
+
         print("=" * 60)
         print("RUN RESPONSE METRICS")
         print("=" * 60)
-        
+
         # Print metrics per message
         for message in self.run_response.messages:
             if message.role == "assistant":
@@ -666,8 +674,9 @@ class AgnoPersonalAgent(Agent):
                 elif message.tool_calls:
                     print(f"Tool calls: {message.tool_calls}")
                 print("---" * 5, "Metrics", "---" * 5)
-                if hasattr(message, 'metrics') and message.metrics:
+                if hasattr(message, "metrics") and message.metrics:
                     from pprint import pprint
+
                     pprint(message.metrics)
                 else:
                     print("No metrics available for this message")
@@ -1220,15 +1229,14 @@ def create_simple_personal_agent(
     # Create knowledge base (synchronous creation)
     knowledge_base = create_combined_knowledge_base(storage_dir, knowledge_dir)
 
-    # Create the model
-    if model_provider == "openai":
-        model = OpenAIChat(id=model_name)
-    elif model_provider == "ollama":
-        from agno.models.ollama.tools import OllamaTools
-
-        model = OllamaTools(id=model_name)
-    else:
-        raise ValueError(f"Unsupported model provider: {model_provider}")
+    # Always use AgentModelManager to ensure consistent model creation
+    model_manager = AgentModelManager(
+        model_provider=model_provider,
+        model_name=model_name,
+        ollama_base_url=OLLAMA_URL,
+        seed=None,
+    )
+    model = model_manager.create_model()
 
     # Create agent with simple pattern
     agent = Agent(

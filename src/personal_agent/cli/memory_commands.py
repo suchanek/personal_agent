@@ -27,10 +27,11 @@ across both storage systems.
 """
 
 import logging
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
+
     from ..core.agno_agent import AgnoPersonalAgent
 
 # Configure logging
@@ -40,17 +41,17 @@ logger = logging.getLogger(__name__)
 def find_tool_by_name(agent: "AgnoPersonalAgent", tool_name: str) -> Optional[Callable]:
     """
     Find a tool function by name from the agent's tools, including nested toolkits.
-    
+
     Args:
         agent: The AgnoPersonalAgent instance
         tool_name: The name of the tool to find
-        
+
     Returns:
         The tool function if found, None otherwise
     """
     if not agent.agent or not hasattr(agent.agent, "tools"):
         return None
-        
+
     for toolkit in agent.agent.tools:
         # Check if the toolkit itself is a callable tool (for standalone functions)
         if getattr(toolkit, "__name__", "") == tool_name:
@@ -61,7 +62,7 @@ def find_tool_by_name(agent: "AgnoPersonalAgent", tool_name: str) -> Optional[Ca
             for tool in toolkit.tools:
                 if hasattr(tool, "__name__") and tool.__name__ == tool_name:
                     return tool
-    
+
     return None
 
 
@@ -74,7 +75,7 @@ async def show_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
 
         # Find the get_all_memories tool function
         get_all_memories_func = find_tool_by_name(agent, "get_all_memories")
-        
+
         if get_all_memories_func:
             # Use the tool function that provides consistent results
             result = await get_all_memories_func()
@@ -82,7 +83,7 @@ async def show_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
             logger.info("Retrieved all memories using agent tool function")
         else:
             # Fallback to direct memory manager call
-            results = agent.agno_memory.memory_manager.get_memories_by_topic(
+            results = agent.agno_memory.memory_manager.get_all_memories(
                 db=agent.agno_memory.db,
                 user_id=agent.user_id,
                 topics=None,
@@ -98,15 +99,19 @@ async def show_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
                 console.print(f"  {i}. {memory.memory}")
                 if memory.topics:
                     console.print(f"     Topics: {', '.join(memory.topics)}")
-            
-            logger.info(f"Retrieved {len(results)} memories using direct memory manager")
+
+            logger.info(
+                f"Retrieved {len(results)} memories using direct memory manager"
+            )
 
     except Exception as e:
         console.print(f"❌ Error retrieving memories: {e}")
         logger.exception(f"Exception while retrieving all memories: {e}")
 
 
-async def show_memories_by_topic_cli(agent: "AgnoPersonalAgent", topic: str, console: "Console"):
+async def show_memories_by_topic_cli(
+    agent: "AgnoPersonalAgent", topic: str, console: "Console"
+):
     """Show memories by topic via the CLI, using the agent's memory tools when available."""
     try:
         if not agent.agno_memory:
@@ -115,12 +120,14 @@ async def show_memories_by_topic_cli(agent: "AgnoPersonalAgent", topic: str, con
 
         # Find the get_memories_by_topic tool function
         get_memories_by_topic_func = find_tool_by_name(agent, "get_memories_by_topic")
-        
+
         if get_memories_by_topic_func:
             # Use the tool function that provides consistent results
             result = await get_memories_by_topic_func(topic)
             console.print(result)
-            logger.info(f"Retrieved memories for topic '{topic}' using agent tool function")
+            logger.info(
+                f"Retrieved memories for topic '{topic}' using agent tool function"
+            )
         else:
             # Fallback to direct memory manager call
             topics = [t.strip() for t in topic.split(",")]
@@ -140,12 +147,16 @@ async def show_memories_by_topic_cli(agent: "AgnoPersonalAgent", topic: str, con
                 console.print(f"  {i}. {memory.memory}")
                 if memory.topics:
                     console.print(f"     Topics: {', '.join(memory.topics)}")
-            
-            logger.info(f"Retrieved {len(results)} memories for topic '{topic}' using direct memory manager")
+
+            logger.info(
+                f"Retrieved {len(results)} memories for topic '{topic}' using direct memory manager"
+            )
 
     except Exception as e:
         console.print(f"❌ Error retrieving memories by topic: {e}")
-        logger.exception(f"Exception while retrieving memories for topic '{topic}': {e}")
+        logger.exception(
+            f"Exception while retrieving memories for topic '{topic}': {e}"
+        )
 
 
 async def show_memory_analysis(agent: "AgnoPersonalAgent", console: "Console"):
@@ -157,7 +168,7 @@ async def show_memory_analysis(agent: "AgnoPersonalAgent", console: "Console"):
 
         # Find the get_memory_stats tool function
         get_memory_stats_func = find_tool_by_name(agent, "get_memory_stats")
-        
+
         if get_memory_stats_func:
             # Use the tool function that provides comprehensive stats
             result = await get_memory_stats_func()
@@ -178,7 +189,9 @@ async def show_memory_analysis(agent: "AgnoPersonalAgent", console: "Console"):
             console.print(
                 f"Average memory length: {stats.get('average_memory_length', 0):.1f} characters"
             )
-            console.print(f"Recent memories (24h): {stats.get('recent_memories_24h', 0)}")
+            console.print(
+                f"Recent memories (24h): {stats.get('recent_memories_24h', 0)}"
+            )
 
             if stats.get("most_common_topic"):
                 console.print(f"Most common topic: {stats['most_common_topic']}")
@@ -187,7 +200,7 @@ async def show_memory_analysis(agent: "AgnoPersonalAgent", console: "Console"):
                 console.print("\nTopic distribution:")
                 for topic, count in stats["topic_distribution"].items():
                     console.print(f"  - {topic}: {count}")
-            
+
             logger.info("Retrieved memory analysis using direct memory manager")
 
     except Exception as e:
@@ -204,7 +217,7 @@ async def show_memory_stats(agent: "AgnoPersonalAgent", console: "Console"):
 
         # Find the get_memory_stats tool function
         get_memory_stats_func = find_tool_by_name(agent, "get_memory_stats")
-        
+
         if get_memory_stats_func:
             # Use the tool function that provides comprehensive stats
             result = await get_memory_stats_func()
@@ -236,8 +249,8 @@ async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
             return
 
         # Find the clear_memories tool function that handles both storage systems
-        clear_memories_func = find_tool_by_name(agent, "clear_memories")
-        
+        clear_memories_func = find_tool_by_name(agent, "clear_all_memories")
+
         if clear_memories_func:
             # Use the tool function that handles both storage systems
             result = await clear_memories_func()
@@ -245,14 +258,18 @@ async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
             logger.info("Cleared all memories using dual storage tool function")
         else:
             # Fallback to direct memory manager call (SQLite only)
-            success, message = agent.agno_memory.memory_manager.clear_memories(
+            success, message = agent.agno_memory.memory_manager.clear_semantic_memories(
                 db=agent.agno_memory.db, user_id=agent.user_id
             )
-            
+
             if success:
                 console.print(f"✅ {message} (SQLite only)")
-                console.print("⚠️ Warning: Could not clear graph memory (tool not found)")
-                logger.warning("Cleared memories from SQLite only - graph memory tool not found")
+                console.print(
+                    "⚠️ Warning: Could not clear graph memory (tool not found)"
+                )
+                logger.warning(
+                    "Cleared memories from SQLite only - graph memory tool not found"
+                )
             else:
                 console.print(f"❌ Error clearing memories: {message}")
                 logger.error(f"Failed to clear memories: {message}")
@@ -262,10 +279,12 @@ async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
         logger.exception(f"Exception while clearing memories: {e}")
 
 
-async def store_immediate_memory(agent: "AgnoPersonalAgent", content: str, console: "Console"):
+async def store_immediate_memory(
+    agent: "AgnoPersonalAgent", content: str, console: "Console"
+):
     """
     Store content immediately as a memory in both SQLite and LightRAG storage.
-    
+
     This function uses the agent's store_user_memory method which already handles
     dual storage in both SQLite and LightRAG graph memory systems.
     """
@@ -284,7 +303,9 @@ async def store_immediate_memory(agent: "AgnoPersonalAgent", content: str, conso
         logger.exception(f"Exception while storing memory: {e}")
 
 
-async def delete_memory_by_id_cli(agent: "AgnoPersonalAgent", memory_id: str, console: "Console"):
+async def delete_memory_by_id_cli(
+    agent: "AgnoPersonalAgent", memory_id: str, console: "Console"
+):
     """Delete a single memory by its ID from both SQLite and LightRAG storage."""
     try:
         if not agent.agno_memory:
@@ -293,7 +314,7 @@ async def delete_memory_by_id_cli(agent: "AgnoPersonalAgent", memory_id: str, co
 
         # Find the delete_memory tool function that handles both storage systems
         delete_memory_func = find_tool_by_name(agent, "delete_memory")
-        
+
         if delete_memory_func:
             # Use the tool function that handles both storage systems
             result = await delete_memory_func(memory_id)
@@ -304,11 +325,17 @@ async def delete_memory_by_id_cli(agent: "AgnoPersonalAgent", memory_id: str, co
             success, message = agent.agno_memory.memory_manager.delete_memory(
                 memory_id=memory_id, db=agent.agno_memory.db, user_id=agent.user_id
             )
-            
+
             if success:
-                console.print(f"✅ Successfully deleted memory from SQLite: {memory_id}")
-                console.print("⚠️ Warning: Could not delete from graph memory (tool not found)")
-                logger.warning(f"Deleted memory {memory_id} from SQLite only - graph memory tool not found")
+                console.print(
+                    f"✅ Successfully deleted memory from SQLite: {memory_id}"
+                )
+                console.print(
+                    "⚠️ Warning: Could not delete from graph memory (tool not found)"
+                )
+                logger.warning(
+                    f"Deleted memory {memory_id} from SQLite only - graph memory tool not found"
+                )
             else:
                 console.print(f"❌ Error deleting memory: {message}")
                 logger.error(f"Failed to delete memory {memory_id}: {message}")
@@ -318,7 +345,9 @@ async def delete_memory_by_id_cli(agent: "AgnoPersonalAgent", memory_id: str, co
         logger.exception(f"Exception while deleting memory {memory_id}: {e}")
 
 
-async def delete_memories_by_topic_cli(agent: "AgnoPersonalAgent", topic: str, console: "Console"):
+async def delete_memories_by_topic_cli(
+    agent: "AgnoPersonalAgent", topic: str, console: "Console"
+):
     """Delete memories by topic from both SQLite and LightRAG storage."""
     try:
         if not agent.agno_memory:
@@ -327,26 +356,36 @@ async def delete_memories_by_topic_cli(agent: "AgnoPersonalAgent", topic: str, c
 
         # Find the delete_memories_by_topic tool function that handles both storage systems
         delete_topic_func = find_tool_by_name(agent, "delete_memories_by_topic")
-        
+
         if delete_topic_func:
             # Use the tool function that handles both storage systems
             result = await delete_topic_func(topic)
             console.print(result)
-            logger.info(f"Deleted memories for topic '{topic}' using dual storage tool function")
+            logger.info(
+                f"Deleted memories for topic '{topic}' using dual storage tool function"
+            )
         else:
             # Fallback to direct memory manager call (SQLite only)
             topics = [t.strip() for t in topic.split(",")]
-            success, message = agent.agno_memory.memory_manager.delete_memories_by_topic(
-                topics=topics, db=agent.agno_memory.db, user_id=agent.user_id
+            success, message = (
+                agent.agno_memory.memory_manager.delete_memories_by_topic(
+                    topics=topics, db=agent.agno_memory.db, user_id=agent.user_id
+                )
             )
-            
+
             if success:
                 console.print(f"✅ {message} (SQLite only)")
-                console.print("⚠️ Warning: Could not delete from graph memory (tool not found)")
-                logger.warning(f"Deleted memories for topic '{topic}' from SQLite only - graph memory tool not found")
+                console.print(
+                    "⚠️ Warning: Could not delete from graph memory (tool not found)"
+                )
+                logger.warning(
+                    f"Deleted memories for topic '{topic}' from SQLite only - graph memory tool not found"
+                )
             else:
                 console.print(f"❌ Error deleting memories by topic: {message}")
-                logger.error(f"Failed to delete memories for topic '{topic}': {message}")
+                logger.error(
+                    f"Failed to delete memories for topic '{topic}': {message}"
+                )
 
     except Exception as e:
         console.print(f"❌ Error deleting memories by topic: {e}")

@@ -103,8 +103,8 @@ from agno.models.ollama.tools import OllamaTools
 from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
-from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.file import FileTools
+from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
@@ -130,6 +130,10 @@ try:
     from ..config.user_id_mgr import get_userid
     from ..core.agent_model_manager import AgentModelManager
     from ..core.agno_agent import AgnoPersonalAgent
+    from ..tools.personal_agent_tools import (
+        PersonalAgentFilesystemTools,
+        PersonalAgentSystemTools,
+    )
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import os
@@ -470,13 +474,17 @@ finance_agent = Agent(
 # Writer agent that can write content
 medical_agent = Agent(
     name="Medical Agent",
-    role="Write content",
+    role="Search pubmed for medical information",
     model=create_model(provider=PROVIDER),
-    description="You are an AI agent that can write content.",
+    description="You are an AI agent that search PubMed for medical information.",
     tools=[PubmedTools()],
     instructions=[
         "You are a medical agent that can answer questions about medical topics.",
+        "Search PubMed for medical information and write about it.",
+        "Use tables to display data. You can save files and list files.",
+        "You can use your file tools to save files when requested",
     ],
+    show_tool_calls=True,
 )
 
 # Writer agent using Ollama
@@ -571,10 +579,10 @@ async def create_memory_agent(
 
     try:
         from ..tools.knowledge_tools import KnowledgeTools
-        from ..tools.refactored_memory_tools import AgnoMemoryTools
+        from ..tools.refactored_memory_tools import PersagMemoryTools
     except ImportError:
         from personal_agent.tools.knowledge_tools import KnowledgeTools
-        from personal_agent.tools.refactored_memory_tools import AgnoMemoryTools
+        from personal_agent.tools.refactored_memory_tools import PersagMemoryTools
 
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
@@ -679,7 +687,7 @@ async def create_team(use_remote: bool = False):
         model=create_model(provider=PROVIDER, use_remote=use_remote),
         memory=None,  # No team-level memory - only memory agent handles memory
         tools=[
-            # ReasoningTools(add_instructions=True, add_few_shot=True),
+            ReasoningTools(add_instructions=True, add_few_shot=True),
         ],
         members=[
             memory_agent,  # Memory agent with your managers
@@ -709,7 +717,7 @@ async def create_team(use_remote: bool = False):
         markdown=True,
         show_tool_calls=True,
         show_members_responses=True,
-        enable_agentic_context=True,  # Disable shared context - memory agent handles this
+        enable_agentic_context=True,
         share_member_interactions=True,  # Disable shared interactions - memory agent handles this
         enable_user_memories=False,  # Disable team-level memory - memory agent handles this
     )
@@ -918,7 +926,7 @@ async def main(use_remote: bool = False):
             )
         )
 
-        console.print(f"🖥️  Using Ollama at: {OLLAMA_URL}")
+        console.print(f"🖥️  Using Ollama model {LLM_MODEL} at: {OLLAMA_URL}")
 
         # Enhanced interactive chat loop with command parsing
         while True:

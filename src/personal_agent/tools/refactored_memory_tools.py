@@ -10,7 +10,7 @@ from ..utils import setup_logging
 logger = setup_logging(__name__)
 
 
-class AgnoMemoryTools(Toolkit):
+class PersagMemoryTools(Toolkit):
     """Personal Memory Management Tools - For storing and retrieving information ABOUT THE USER.
 
     Use these tools when you need to:
@@ -52,14 +52,14 @@ class AgnoMemoryTools(Toolkit):
             self.store_graph_memory,
             self.query_graph_memory,
             self.get_memory_graph_labels,
-            self.clear_memories,
+            self.clear_semantic_memories,
             self.delete_memories_by_topic,
             self.clear_all_memories,
         ]
 
         # Initialize the Toolkit
         super().__init__(
-            name="agno_memory_tools",
+            name="persag_memory_tools",
             tools=tools,
             instructions="""Use these tools to remember personal information ABOUT THE USER. 
             Store user preferences, interests, and personal facts they share with you.
@@ -160,8 +160,8 @@ class AgnoMemoryTools(Toolkit):
         """Get the list of all entity and relation labels from the memory graph."""
         return await self.memory_manager.get_memory_graph_labels()
 
-    async def clear_memories(self) -> str:
-        """Clear all memories for the user using direct SemanticMemoryManager calls."""
+    async def clear_semantic_memories(self) -> str:
+        """Clear all semantic memories for the user using direct SemanticMemoryManager calls."""
         try:
             # Direct call to SemanticMemoryManager.clear_memories()
             success, message = (

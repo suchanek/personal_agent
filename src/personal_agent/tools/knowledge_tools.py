@@ -205,7 +205,7 @@ class KnowledgeTools(Toolkit):
 
         # Initialize the Toolkit
         super().__init__(
-            name="knowledge_tools",
+            name="persag_knowledge_tools",
             tools=tools,
             instructions="""Use these tools to manage factual information and documents in both knowledge bases.
             Store reference materials, facts, and documents that don't change.

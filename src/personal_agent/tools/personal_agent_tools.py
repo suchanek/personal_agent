@@ -7,6 +7,7 @@ following the same pattern as YFinanceTools and DuckDuckGoTools.
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Any, List
 
 from agno.tools import Toolkit
@@ -16,6 +17,9 @@ from ..config import DATA_DIR, HOME_DIR
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
+
+# Global allowed directories for security checks
+ALLOWED_DIRS = [HOME_DIR, DATA_DIR, "/tmp", ".", "/"]
 
 
 class PersonalAgentFilesystemTools(Toolkit):
@@ -37,10 +41,11 @@ class PersonalAgentFilesystemTools(Toolkit):
         list_directory: bool = True,
         create_and_save_file: bool = True,
         intelligent_file_search: bool = True,
+        base_dir: str = Path(HOME_DIR),
         **kwargs,
     ):
         tools: List[Any] = []
-
+        self.base_dir = base_dir
         if read_file:
             tools.append(self.read_file)
         if write_file:
@@ -71,10 +76,11 @@ class PersonalAgentFilesystemTools(Toolkit):
                 file_path = os.path.abspath(file_path)
 
             # Security check - ensure file is within allowed directories
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             file_abs_path = os.path.abspath(file_path)
 
-            if not any(file_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                file_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {file_path}. Only allowed in home, data, tmp, or current directories."
 
             if not os.path.exists(file_path):
@@ -83,10 +89,12 @@ class PersonalAgentFilesystemTools(Toolkit):
             if not os.path.isfile(file_path):
                 return f"Error: {file_path} is not a file."
 
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            log_debug(f"Successfully read file: {file_path} ({len(content)} characters)")
+            log_debug(
+                f"Successfully read file: {file_path} ({len(content)} characters)"
+            )
             return content
 
         except PermissionError:
@@ -115,10 +123,11 @@ class PersonalAgentFilesystemTools(Toolkit):
                 file_path = os.path.abspath(file_path)
 
             # Security check - ensure file is within allowed directories
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             file_abs_path = os.path.abspath(file_path)
 
-            if not any(file_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                file_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {file_path}. Only allowed in home, data, tmp, or current directories."
 
             # Create directory if it doesn't exist (only if there's a directory path)
@@ -126,10 +135,12 @@ class PersonalAgentFilesystemTools(Toolkit):
             if dir_path:  # Only create directory if there is one
                 os.makedirs(dir_path, exist_ok=True)
 
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
-            log_debug(f"Successfully wrote file: {file_path} ({len(content)} characters)")
+            log_debug(
+                f"Successfully wrote file: {file_path} ({len(content)} characters)"
+            )
             return f"Successfully wrote {len(content)} characters to {file_path}"
 
         except PermissionError:
@@ -138,7 +149,7 @@ class PersonalAgentFilesystemTools(Toolkit):
             logger.error("Error writing file %s: %s", file_path, e)
             return f"Error writing file: {str(e)}"
 
-    def list_directory(self, directory_path: str = ".") -> str:
+    def list_directory(self, directory_path: str = HOME_DIR) -> str:
         """List contents of a directory.
 
         Args:
@@ -155,10 +166,11 @@ class PersonalAgentFilesystemTools(Toolkit):
                 directory_path = os.path.abspath(directory_path)
 
             # Security check - ensure directory is within allowed directories
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             dir_abs_path = os.path.abspath(directory_path)
 
-            if not any(dir_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                dir_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {directory_path}. Only allowed in home, data, tmp, or current directories."
 
             if not os.path.exists(directory_path):
@@ -199,7 +211,9 @@ class PersonalAgentFilesystemTools(Toolkit):
             logger.error("Error listing directory %s: %s", directory_path, e)
             return f"Error listing directory: {str(e)}"
 
-    def create_and_save_file(self, filename: str, content: str, directory: str = "./") -> str:
+    def create_and_save_file(
+        self, filename: str, content: str, directory: str = "./"
+    ) -> str:
         """Create a new file with content in specified directory.
 
         Args:
@@ -227,7 +241,9 @@ class PersonalAgentFilesystemTools(Toolkit):
             logger.error("Error creating file %s: %s", filename, e)
             return f"Error creating file: {str(e)}"
 
-    def intelligent_file_search(self, search_term: str, directory: str = ".", file_extensions: str = "") -> str:
+    def intelligent_file_search(
+        self, search_term: str, directory: str = ".", file_extensions: str = ""
+    ) -> str:
         """Search for files containing specific content or matching patterns.
 
         Args:
@@ -246,10 +262,11 @@ class PersonalAgentFilesystemTools(Toolkit):
                 directory = os.path.abspath(directory)
 
             # Security check
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             dir_abs_path = os.path.abspath(directory)
 
-            if not any(dir_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                dir_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {directory}. Only allowed in home, data, tmp, or current directories."
 
             if not os.path.exists(directory):
@@ -271,7 +288,9 @@ class PersonalAgentFilesystemTools(Toolkit):
 
                     # Check file extension filter
                     if extensions:
-                        file_ext = os.path.splitext(file)[1][1:].lower()  # Remove the dot
+                        file_ext = os.path.splitext(file)[1][
+                            1:
+                        ].lower()  # Remove the dot
                         if file_ext not in extensions:
                             continue
 
@@ -281,8 +300,12 @@ class PersonalAgentFilesystemTools(Toolkit):
 
                     # Check content match for text files
                     try:
-                        if os.path.getsize(file_path) < 10 * 1024 * 1024:  # Only search files < 10MB
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        if (
+                            os.path.getsize(file_path) < 10 * 1024 * 1024
+                        ):  # Only search files < 10MB
+                            with open(
+                                file_path, "r", encoding="utf-8", errors="ignore"
+                            ) as f:
                                 content = f.read()
                                 if search_term_lower in content.lower():
                                     content_match = True
@@ -296,12 +319,17 @@ class PersonalAgentFilesystemTools(Toolkit):
                         if content_match:
                             match_type.append("content")
 
-                        matches.append(f"📄 {relative_path} (match: {', '.join(match_type)})")
+                        matches.append(
+                            f"📄 {relative_path} (match: {', '.join(match_type)})"
+                        )
 
             if not matches:
                 return f"No files found containing '{search_term}' in {directory}"
 
-            result = f"Found {len(matches)} file(s) matching '{search_term}':\n" + "\n".join(matches[:20])
+            result = (
+                f"Found {len(matches)} file(s) matching '{search_term}':\n"
+                + "\n".join(matches[:20])
+            )
             if len(matches) > 20:
                 result += f"\n... and {len(matches) - 20} more files"
 
@@ -342,9 +370,20 @@ class PersonalAgentSystemTools(Toolkit):
         try:
             # Security check - block dangerous commands
             dangerous_commands = [
-                "rm -rf", "rmdir", "del", "format", "fdisk",
-                "mkfs", "dd", "sudo", "su", "chmod 777",
-                "curl", "wget", "nc", "netcat"
+                "rm -rf",
+                "rmdir",
+                "del",
+                "format",
+                "fdisk",
+                "mkfs",
+                "dd",
+                "sudo",
+                "su",
+                "chmod 777",
+                "curl",
+                "wget",
+                "nc",
+                "netcat",
             ]
 
             command_lower = command.lower()
@@ -359,10 +398,11 @@ class PersonalAgentSystemTools(Toolkit):
                 working_directory = os.path.abspath(working_directory)
 
             # Security check for working directory
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             dir_abs_path = os.path.abspath(working_directory)
 
-            if not any(dir_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                dir_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {working_directory}. Only allowed in home, data, tmp, or current directories."
 
             # Execute command with timeout
@@ -372,7 +412,7 @@ class PersonalAgentSystemTools(Toolkit):
                 cwd=working_directory,
                 capture_output=True,
                 text=True,
-                timeout=30  # 30 second timeout
+                timeout=30,  # 30 second timeout
             )
 
             output = ""
