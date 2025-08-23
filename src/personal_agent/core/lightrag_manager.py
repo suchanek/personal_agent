@@ -460,7 +460,7 @@ class LightRAGManager:
                                         # Determine mode
                                         if "host.docker.internal" in ollama_url:
                                             status["ollama_config"]["mode"] = "LOCAL"
-                                        elif "tesla.tail19187e.ts.net" in ollama_url:
+                                        elif "100.100.248.61" in ollama_url:
                                             status["ollama_config"]["mode"] = "REMOTE"
                                         else:
                                             status["ollama_config"]["mode"] = "CUSTOM"

@@ -53,16 +53,18 @@ Last revision: 2025-08-14 20:09:59
 import asyncio
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import aiohttp
-from agno.agent import Agent
+from agno.agent import Agent, RunResponse
 from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
+from agno.utils.pprint import pprint_run_response
 from rich.console import Console
 from rich.table import Table
 
@@ -71,6 +73,7 @@ from ..config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
     DATA_DIR,
+    HOME_DIR,
     LIGHTRAG_MEMORY_URL,
     LIGHTRAG_URL,
     LLM_MODEL,
@@ -281,17 +284,24 @@ class AgnoPersonalAgent(Agent):
 
         # Force initialization if requested
         if self._force_init:
-            logger.info("Force initialization requested - initializing agent synchronously")
+            logger.info(
+                "Force initialization requested - initializing agent synchronously"
+            )
             try:
                 # Try to get the current event loop
                 loop = asyncio.get_running_loop()
                 # If we're in a running loop, we can't use asyncio.run()
-                logger.warning("Event loop detected - agent will initialize on first use")
+                logger.warning(
+                    "Event loop detected - agent will initialize on first use"
+                )
             except RuntimeError:
                 # No running event loop, safe to initialize now
                 try:
                     asyncio.run(self.initialize())
-                    logger.info("Agent initialized synchronously with %d tools", len(self.tools) if self.tools else 0)
+                    logger.info(
+                        "Agent initialized synchronously with %d tools",
+                        len(self.tools) if self.tools else 0,
+                    )
                 except Exception as e:
                     logger.error("Failed to force initialize agent: %s", e)
 
@@ -454,7 +464,7 @@ class AgnoPersonalAgent(Agent):
             tools = []
             # 8. Prepare tools list
             tools = []
-            
+
             # Add built-in tools if alltools is enabled
             if self.alltools:
                 all_tools = [
@@ -475,7 +485,7 @@ class AgnoPersonalAgent(Agent):
                         read_files=True,
                         uv_pip_install=True,
                     ),
-                    ShellTools(base_dir="~"),
+                    ShellTools(base_dir=Path(HOME_DIR)),
                     PersonalAgentFilesystemTools(),
                 ]
                 tools.extend(all_tools)
@@ -491,7 +501,9 @@ class AgnoPersonalAgent(Agent):
                     tools.extend(memory_tools)
                     logger.info("Added consolidated KnowledgeTools and AgnoMemoryTools")
                 else:
-                    logger.warning("Memory enabled but memory tools not properly initialized")
+                    logger.warning(
+                        "Memory enabled but memory tools not properly initialized"
+                    )
             else:
                 logger.warning("Memory disabled - no memory tools added")
 
@@ -545,44 +557,65 @@ class AgnoPersonalAgent(Agent):
             return False
 
     async def run(
-        self, query: str, stream: bool = False, add_thought_callback=None
-    ) -> str:
-        """Run a query through the agent and capture the final response and tool calls.
+        self, query: str, stream: bool = True, add_thought_callback=None, **kwargs
+    ) -> Union[Iterator[RunResponse], str]:
+        """Run a query through the agent following the proper RunResponse pattern.
 
-        This method uses the native `arun` from the superclass with streaming disabled
-        to get a final response object, which is the cleanest way to ensure the full
-        response and tool calls are captured without manual stream iteration.
+        This method follows the proper pattern for handling RunResponse as shown in the
+        agno documentation example. When stream=True, it returns an Iterator[RunResponse].
+        When stream=False, it collects the response and returns a string.
 
         Args:
             query: User query to process.
-            stream: Kept for compatibility, but forced to False for this implementation.
+            stream: Whether to return streaming Iterator[RunResponse] or collected string.
             add_thought_callback: Optional callback for adding thoughts.
 
         Returns:
-            The agent's final string response.
+            Iterator[RunResponse] when stream=True, str when stream=False.
         """
         await self._ensure_initialized()
 
         if add_thought_callback:
             add_thought_callback("🚀 Executing agent...")
 
-        # arun with stream=False returns the final RunResponse object directly.
-        response = await super().arun(query, user_id=self.user_id, stream=False)
-
-        # After the run, the agent object holds the last run's response details.
-        if self.run_response and self.run_response.tools:
-            self._collected_tool_calls = self.run_response.tools
-        else:
-            self._collected_tool_calls = []
-
-        if add_thought_callback:
-            add_thought_callback("✅ Agent execution complete.")
-
-        return (
-            response.content
-            if response
-            else "I apologize, but I didn't generate a proper response."
+        # Use the proper pattern: call super().run() with stream parameter
+        run_stream: Iterator[RunResponse] = super().run(
+            query, user_id=self.user_id, stream=stream, **kwargs
         )
+
+        if stream:
+            # Return the stream directly for proper RunResponse handling
+            return run_stream
+        else:
+            # Collect all chunks from the stream for backward compatibility
+            content_parts = []
+            self._collected_tool_calls = []
+            
+            for chunk in run_stream:  # Use regular for loop, not async for
+                # Store the last response for tool call extraction
+                self._last_response = chunk
+                
+                # Collect content from chunks
+                if hasattr(chunk, 'content') and chunk.content:
+                    content_parts.append(chunk.content)
+
+            # Join all content parts
+            content = ''.join(content_parts)
+
+            # Extract tool calls from the final run_response using the proper pattern
+            if self.run_response and self.run_response.messages:
+                for message in self.run_response.messages:
+                    if message.role == "assistant" and message.tool_calls:
+                        self._collected_tool_calls.extend(message.tool_calls)
+                        if self.debug:
+                            logger.debug(f"Tool calls found: {message.tool_calls}")
+
+            if add_thought_callback:
+                add_thought_callback("✅ Agent execution complete.")
+
+            # Validate and return content
+            validated_content = self._validate_response_content(content, query)
+            return validated_content
 
     def get_last_tool_calls(self) -> List[Any]:
         """Get tool calls from the last agent run.
@@ -591,6 +624,54 @@ class AgnoPersonalAgent(Agent):
             List of ToolExecution objects from the most recent run.
         """
         return self._collected_tool_calls
+
+    def print_run_response(
+        self, 
+        run_response: Union[Iterator[RunResponse], RunResponse], 
+        markdown: bool = True, 
+        show_time: bool = True
+    ) -> None:
+        """Print a run response using agno's pprint_run_response function.
+        
+        This method provides easy access to the agno pprint functionality for
+        displaying run responses with proper formatting, including metrics
+        per message and tool calls as shown in the example pattern.
+        
+        Args:
+            run_response: The RunResponse or Iterator[RunResponse] to print
+            markdown: Whether to format output as markdown
+            show_time: Whether to show timing information
+        """
+        pprint_run_response(run_response, markdown=markdown, show_time=show_time)
+
+    def print_run_response_with_metrics(self) -> None:
+        """Print the last run response with detailed metrics per message.
+        
+        This method implements the pattern shown in the task description for
+        printing metrics per message, including tool calls and message content.
+        """
+        if not self.run_response or not self.run_response.messages:
+            logger.warning("No run response available to print metrics for")
+            return
+            
+        print("=" * 60)
+        print("RUN RESPONSE METRICS")
+        print("=" * 60)
+        
+        # Print metrics per message
+        for message in self.run_response.messages:
+            if message.role == "assistant":
+                if message.content:
+                    print(f"Message: {message.content}")
+                elif message.tool_calls:
+                    print(f"Tool calls: {message.tool_calls}")
+                print("---" * 5, "Metrics", "---" * 5)
+                if hasattr(message, 'metrics') and message.metrics:
+                    from pprint import pprint
+                    pprint(message.metrics)
+                else:
+                    print("No metrics available for this message")
+                print("---" * 20)
 
     def _validate_response_content(self, content: str, query: str) -> str:
         """Validate and potentially fix response content.

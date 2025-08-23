@@ -7,6 +7,7 @@ from pathlib import Path
 
 import dotenv
 from dotenv import load_dotenv
+
 from .user_id_mgr import get_user_storage_paths, load_user_from_file
 
 # Define the project's base directory.
@@ -109,12 +110,8 @@ WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
-REMOTE_OLLAMA_URL = get_env_var(
-    "REMOTE_OLLAMA_URL", "http://tesla.tail19187e.ts.net:11434"
-)
-REMOTE_LMSTUDIO_URL = get_env_var(
-    "REMOTE_LMSTUDIO_URL", "http://tesla.tail19187e.ts.net:11434"
-)
+REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://100.100.248.61:11434")
+REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://100.100.248.61:11434")
 
 USE_MCP = get_env_bool("USE_MCP", True)
 
@@ -151,7 +148,46 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 logger.setLevel(LOG_LEVEL)
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
+LLM_MODEL = get_env_var("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M")
+
+# Qwen Model Settings - Instruct Model Parameters
+QWEN_INSTRUCT_TEMPERATURE = get_env_var("QWEN_INSTRUCT_TEMPERATURE", "0.7")
+QWEN_INSTRUCT_MIN_P = get_env_var("QWEN_INSTRUCT_MIN_P", "0.00")
+QWEN_INSTRUCT_TOP_P = get_env_var("QWEN_INSTRUCT_TOP_P", "0.80")
+QWEN_INSTRUCT_TOP_K = get_env_var("QWEN_INSTRUCT_TOP_K", "20")
+
+# Qwen Model Settings - Thinking Model Parameters
+QWEN_THINKING_TEMPERATURE = get_env_var("QWEN_THINKING_TEMPERATURE", "0.6")
+QWEN_THINKING_MIN_P = get_env_var("QWEN_THINKING_MIN_P", "0.00")
+QWEN_THINKING_TOP_P = get_env_var("QWEN_THINKING_TOP_P", "0.95")
+
+
+def get_qwen_instruct_settings() -> dict:
+    """Get Qwen instruct model settings as a dictionary.
+
+    Returns:
+        dict: Dictionary containing instruct model parameters
+    """
+    return {
+        "temperature": float(QWEN_INSTRUCT_TEMPERATURE),
+        "min_p": float(QWEN_INSTRUCT_MIN_P),
+        "top_p": float(QWEN_INSTRUCT_TOP_P),
+        "top_k": int(QWEN_INSTRUCT_TOP_K),
+    }
+
+
+def get_qwen_thinking_settings() -> dict:
+    """Get Qwen thinking model settings as a dictionary.
+
+    Returns:
+        dict: Dictionary containing thinking model parameters
+    """
+    return {
+        "temperature": float(QWEN_THINKING_TEMPERATURE),
+        "min_p": float(QWEN_THINKING_MIN_P),
+        "top_p": float(QWEN_THINKING_TOP_P),
+    }
+
 
 # Docker environment variables for LightRAG containers
 # HTTP timeout configurations

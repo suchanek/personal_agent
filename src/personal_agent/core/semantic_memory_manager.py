@@ -800,17 +800,31 @@ class SemanticMemoryManager:
         :param topic_boost: Score boost for topic matches (default: 0.5)
         :return: List of (UserMemory, combined_score) tuples
         """
+        import time
+        
+        # LATENCY DEBUG: Start timing memory search
+        search_start_time = time.perf_counter()
+        logger.info("🔍 MEMORY LATENCY: Starting search_memories for query: %s", query[:50])
+        
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
             
         try:
-            # Enhanced query expansion for better semantic matching
+            # LATENCY DEBUG: Time query expansion
+            expand_start = time.perf_counter()
             expanded_queries = self._expand_query(query)
+            expand_time = time.perf_counter() - expand_start
+            logger.info("🔍 MEMORY LATENCY: Query expansion took %.3f seconds (%d queries)", expand_time, len(expanded_queries))
 
-            # Get all memories for the user
+            # LATENCY DEBUG: Time database read
+            db_start = time.perf_counter()
             memory_rows = db.read_memories(user_id=user_id)
+            db_time = time.perf_counter() - db_start
+            logger.info("🔍 MEMORY LATENCY: Database read took %.3f seconds (%d rows)", db_time, len(memory_rows))
 
+            # LATENCY DEBUG: Time memory conversion
+            convert_start = time.perf_counter()
             user_memories = []
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
@@ -821,8 +835,11 @@ class SemanticMemoryManager:
                         logger.warning(
                             "Failed to convert memory row to UserMemory: %s", e
                         )
+            convert_time = time.perf_counter() - convert_start
+            logger.info("🔍 MEMORY LATENCY: Memory conversion took %.3f seconds (%d memories)", convert_time, len(user_memories))
 
-            # Calculate similarities and topic matches
+            # LATENCY DEBUG: Time similarity calculations
+            similarity_start = time.perf_counter()
             results = []
             query_lower = query.lower().strip()
 
@@ -895,8 +912,20 @@ class SemanticMemoryManager:
                             keyword_score,
                         )
 
-            # Sort by combined score (descending) and limit
+            similarity_time = time.perf_counter() - similarity_start
+            logger.info("🔍 MEMORY LATENCY: Similarity calculations took %.3f seconds (%d memories processed)", similarity_time, len(user_memories))
+
+            # LATENCY DEBUG: Time sorting
+            sort_start = time.perf_counter()
             results.sort(key=lambda x: x[1], reverse=True)
+            sort_time = time.perf_counter() - sort_start
+            logger.info("🔍 MEMORY LATENCY: Sorting took %.3f seconds", sort_time)
+
+            # LATENCY DEBUG: Total timing
+            total_time = time.perf_counter() - search_start_time
+            logger.info("🔍 MEMORY LATENCY: Total search_memories time: %.3f seconds (expand: %.3f, db: %.3f, convert: %.3f, similarity: %.3f, sort: %.3f)",
+                       total_time, expand_time, db_time, convert_time, similarity_time, sort_time)
+
             return results[:limit]
 
         except Exception as e:

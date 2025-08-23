@@ -118,9 +118,7 @@ def main():
 
     # Test Ollama
     try:
-        ollama_model = Ollama(
-            id="qwen3:1.7b", host="http://tesla.tail19187e.ts.net:11434"
-        )
+        ollama_model = Ollama(id="qwen3:1.7b", host="http://100.100.248.61:11434")
         ollama_results = test_model_memory_behavior("Ollama", ollama_model, test_input)
         results.append(ollama_results)
     except Exception as e:

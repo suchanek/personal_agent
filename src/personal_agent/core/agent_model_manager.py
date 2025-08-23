@@ -14,6 +14,7 @@ from agno.models.openai import OpenAIChat
 
 from ..config import settings
 from ..config.model_contexts import get_model_context_size_sync
+from ..config.settings import get_qwen_instruct_settings, get_qwen_thinking_settings
 
 logger = logging.getLogger(__name__)
 
@@ -151,19 +152,39 @@ class AgentModelManager:
                     "Using optimized configuration for Qwen model: %s",
                     self.model_name,
                 )
-                model_options.update(
-                    {
-                        "num_predict": 32768,  # Set specific prediction length for qwen
-                        "temperature": 0.3,  # Lower temperature for better instruction following
-                        "top_k": 20,
-                        "top_p": 0.95,
-                        "min_p": 0,
-                        "repeat_penalty": 1.1,
-                    }
-                )
-                logger.info(
-                    f"🔧 QWEN CONFIG: Using temperature={model_options['temperature']} for better instruction following"
-                )
+                
+                # Get Qwen settings from configuration
+                try:
+                    qwen_settings = get_qwen_instruct_settings()
+                    logger.info(f"🔧 QWEN CONFIG: Using configured settings: {qwen_settings}")
+                    
+                    model_options.update(
+                        {
+                            "num_predict": 32768,  # Set specific prediction length for qwen
+                            "temperature": qwen_settings["temperature"],
+                            "top_k": qwen_settings["top_k"],
+                            "top_p": qwen_settings["top_p"],
+                            "min_p": qwen_settings["min_p"],
+                            "repeat_penalty": 1.1,
+                        }
+                    )
+                    logger.info(
+                        f"🔧 QWEN CONFIG: Applied settings - temperature={qwen_settings['temperature']}, "
+                        f"top_k={qwen_settings['top_k']}, top_p={qwen_settings['top_p']}, min_p={qwen_settings['min_p']}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to load Qwen settings, using defaults: {e}")
+                    # Fallback to original hardcoded values
+                    model_options.update(
+                        {
+                            "num_predict": 32768,
+                            "temperature": 0.3,
+                            "top_k": 20,
+                            "top_p": 0.95,
+                            "min_p": 0,
+                            "repeat_penalty": 1.1,
+                        }
+                    )
 
             if (
                 "llama3.1" in self.model_name.lower()
@@ -192,6 +213,8 @@ class AgentModelManager:
                 "qwen3:8b",
                 "qwen3:1.7b",  # Fixed: lowercase 'b' to match model_contexts.py
                 "qwen3:4b",
+                "qwen3-4b-instruct",  # New Qwen model variants
+                "hf.co/unsloth/qwen3-4b-instruct",  # HuggingFace Qwen model from settings
                 "qwq",  # Qwen reasoning models
                 "deepseek-r1",
                 "deepseek-reasoner",  # DeepSeek reasoning models

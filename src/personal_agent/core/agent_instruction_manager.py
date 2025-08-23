@@ -66,19 +66,21 @@ class AgentInstructionManager:
         parts = []
 
         if level == InstructionLevel.NONE:
-            # Minimal includes basic identity rules and tool list
+            # NONE includes basic identity rules, base memory instructions, and tool list
             parts = [
                 header,
                 identity,  # Now includes the critical grammar conversion rule
+                self.get_base_memory_instructions(),  # CRITICAL: Include base memory rules
                 "You are a helpful AI assistant. Use your tools to answer the user's request.",
                 tool_list,
             ]
 
         if level == InstructionLevel.MINIMAL:
-            # Minimal includes basic identity rules and tool list
+            # MINIMAL includes basic identity rules, base memory instructions, and tool list
             parts = [
                 header,
                 identity,  # Now includes the critical grammar conversion rule
+                self.get_base_memory_instructions(),  # CRITICAL: Include base memory rules
                 "You are a helpful AI assistant. Use your tools to answer the user's request.",
                 tool_list,
             ]
@@ -251,14 +253,42 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - **Be Concise**: Present results clearly without excessive commentary
         """
 
+    def get_base_memory_instructions(self) -> str:
+        """Returns the unified base memory instruction set used across ALL instruction levels."""
+        return f"""
+            ## CRITICAL MEMORY SYSTEM RULES - APPLIES TO ALL INSTRUCTION LEVELS
+
+            **PERFORMANCE-CRITICAL TOOL SELECTION:**
+            - "what do you know about me" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list everything you know" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "show me all memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "tell me everything" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "what have I told you" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all my information" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - **CRITICAL: USE get_all_memories() FOR COMPLETE RETRIEVAL - NEVER query_memory() FOR FULL LISTS**
+
+            **SPECIFIC SEARCH QUERIES:**
+            - "do you remember..." → `query_memory(query="specific keywords")` RIGHT NOW
+            - "tell me about my..." → `query_memory(query="specific keywords")` RIGHT NOW
+            - Questions about user's past → `query_memory(query="relevant keywords")` RIGHT NOW
+            - "recent memories" → `get_recent_memories(limit=10)` RIGHT NOW
+            - "memories about [topic]" → `get_memories_by_topic(topics=["topic"])` RIGHT NOW
+
+            **MEMORY STORAGE:**
+            - `store_user_memory(content="fact about user", topics=["optional"])` - Store new user info
+            - Store facts ABOUT the user, not your actions FOR the user
+            - Convert "I like skiing" → store as "I like skiing" (system handles conversion)
+
+            **MEMORY PRESENTATION:**
+            - When presenting memories, convert third person to second person
+            - "{self.user_id} likes skiing" → "you like skiing"
+            - "{self.user_id}'s pet" → "your pet"
+            - Always use "you/your" when talking to the user about their information
+        """
+
     def get_concise_memory_rules(self) -> str:
         """Returns concise rules for the unified memory and knowledge system."""
-        return f"""
-            **Memory Tools (for user-specific information):**
-            - Use `store_user_memory` to save new information about the user.
-            - Use `query_memory` to retrieve information about the user.
-            - Use `get_all_memories` or `get_recent_memories` for broad queries.
-            - Use `list_memories` for a simple overview of all memories.
+        return self.get_base_memory_instructions() + f"""
             
             **Knowledge Tools (for factual information):**
             - Use `query_knowledge_base` to search stored documents and facts.
@@ -267,22 +297,27 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             **Key Rules:**
             - Always check memory first when asked about the user.
             - Use knowledge base for general factual questions.
-            - **CRITICAL**: When presenting memories, convert third person to second person (e.g., "{self.user_id} was born" → "you were born").
             - Do not output internal chain-of-thought or hidden reasoning; present answers directly.
             - Do not narrate storage conversion; the system handles it automatically.
         """
 
     def get_detailed_memory_rules(self) -> str:
         """Returns detailed, refined rules for the unified memory and knowledge system."""
-        return f"""
-            ## UNIFIED MEMORY & KNOWLEDGE SYSTEM - GUIDING PRINCIPLES
+        return self.get_base_memory_instructions() + f"""
 
-            You have access to TWO complementary systems: **Memory** (for user-specific information) and **Knowledge** (for factual information).
+            ## EXTENDED MEMORY & KNOWLEDGE SYSTEM DETAILS
 
             ### MEMORY SYSTEM (User-Specific Information)
             Your primary function is to remember information ABOUT the user who is a PERSON. You must be discerning and accurate.
 
-            ## CRITICAL: MEMORY STORAGE AND PRESENTATION PROCESS
+            ## CRITICAL: PERFORMANCE BYPASS RULE (HIGHEST PRIORITY)
+            **WHEN USER EXPLICITLY REQUESTS RAW LISTING:**
+            - If user says "do not interpret", "just list", "just show", "raw list", or similar explicit listing requests
+            - **BYPASS ALL MEMORY PRESENTATION RULES BELOW**
+            - **RETURN TOOL RESULTS DIRECTLY WITHOUT ANY PROCESSING**
+            - **DO NOT CONVERT, RESTATE, OR INTERPRET THE MEMORIES**
+            - **PRESENT EXACTLY WHAT THE TOOL RETURNS**
+            - This prevents unnecessary inference and ensures fast response times
 
             **THE THREE-STAGE MEMORY PROCESS (FOLLOW EXACTLY):**
 
@@ -304,12 +339,6 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - STORED: "{self.user_id} has a pet dog named Snoopy" → PRESENT AS: "you have a pet dog named Snoopy"
             - STORED: "{self.user_id}'s favorite color is blue" → PRESENT AS: "your favorite color is blue"
 
-            **SIMPLE RULE FOR YOU:**
-            - When user says "I attended Maplewood School" → Use store_user_memory("I attended Maplewood School")
-            - When retrieving memories → Always present them using "you/your" when talking to the user
-            - The system handles the storage conversion automatically - you just focus on natural presentation
-            - Do not narrate storage conversion or internal reasoning; never output chain-of-thought. Present results directly.
-
             **WHAT TO REMEMBER (These are USER facts):**
             - **Explicit Information**: Any fact the user explicitly tells you about themselves (e.g., "I like to ski," "My dog's name is Fido," "I work at Google").
             - **Preferences & Interests**: Their hobbies, favorite things, opinions, and goals when clearly stated.
@@ -322,26 +351,6 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - Do NOT store conversational filler (e.g., "that's interesting," "I see," "Okay").
             - Do NOT store your own thoughts or internal monologue.
             - Do NOT store questions the user asks, unless the question itself reveals a new fact about them.
-
-            **MEMORY STORAGE TOOLS**:
-            - `store_user_memory(content="the fact to remember", topics=["optional", "topics"])` - Store new user information
-            - `update_memory(memory_id="...", content="...", topics=["..."])` - Update existing memory
-            - `store_graph_memory(content="...", topics=["..."], memory_id="...")` - Store in LightRAG graph for relationships
-
-            **MEMORY RETRIEVAL TOOLS**:
-            - `get_all_memories()` - For "list everything you know", "what do you know about me" (NO PARAMETERS)
-            - `query_memory(query="specific keywords", limit=10)` - For specific questions about the user
-            - `get_recent_memories(limit=10)` - For recent interactions (default limit=10)
-            - `list_memories()` - Simple overview of all memories (NO PARAMETERS)
-            - `get_memories_by_topic(topics=["topic1", "topic2"], limit=10)` - Filter by specific topics
-            - `query_graph_memory(query="...", mode="mix", top_k=5)` - Explore relationships between memories
-
-            **MEMORY MANAGEMENT TOOLS**:
-            - `delete_memory(memory_id="...")` - Delete a specific memory
-            - `clear_memories()` - Clear all memories (NO PARAMETERS)
-            - `delete_memories_by_topic(topics=["..."])` - Delete memories by topic
-            - `get_memory_stats()` - Get memory statistics (NO PARAMETERS)
-            - `get_memory_graph_labels()` - Get graph entity/relation labels (NO PARAMETERS)
 
             ### KNOWLEDGE SYSTEM (Factual Information)
             For storing and retrieving general factual information, documents, and reference materials.
@@ -366,21 +375,6 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             8. **User wants to store personal info** → Use MEMORY storage tools
             9. **User wants to store factual info** → Use KNOWLEDGE storage tools
             10. **Complex requests** → Combine multiple tools as needed
-
-            **HOW TO RESPOND - CRITICAL IDENTITY RULES**:
-            - You are an AI assistant, NOT the user.
-            - When you retrieve a memory, present it in the second person.
-            - **MEMORY PRESENTATION RULE**: Always convert stored memories to second person when presenting to user
-            - CORRECT: "I remember you were born on 4/11/1965"
-            - CORRECT: "I remember you have a pet beagle named Snoopy"
-            - CORRECT: "I remember you told me you enjoy hiking."
-            - INCORRECT: "I remember {self.user_id} was born on 4/11/1965" (using third person)
-            - INCORRECT: "I enjoy hiking." (claiming user's attributes as your own)
-            - **KEY CONVERSION PATTERNS FOR PRESENTATION**:
-              - "{self.user_id} was/is" → "you were/are"
-              - "{self.user_id} has/had" → "you have/had"
-              - "{self.user_id}'s [noun]" → "your [noun]"
-              - Always use second person pronouns (you, your, yours) when presenting user information
         """
 
     def get_concise_tool_rules(self) -> str:
@@ -477,6 +471,11 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             **MEMORY QUERIES - USE IMMEDIATELY**:
             - "what do you know about me" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
             - "list everything you know" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "show me all memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "tell me everything" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "what have I told you" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all my information" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - **CRITICAL: USE get_all_memories() FOR COMPLETE RETRIEVAL - NEVER query_memory() FOR FULL LISTS**
             - "do you remember..." → `query_memory(query="specific keywords")` RIGHT NOW
             - "tell me about my..." → `query_memory(query="specific keywords")` RIGHT NOW
             - Questions about user's past → `query_memory(query="relevant keywords")` RIGHT NOW
@@ -773,6 +772,15 @@ You are a sophisticated personal AI assistant and companion to {self.user_id}. Y
 - **Respectful Interaction**: Maintain appropriate boundaries while being genuinely helpful
 
 ## COMPREHENSIVE MEMORY MANAGEMENT SYSTEM
+
+## CRITICAL: PERFORMANCE BYPASS RULE (HIGHEST PRIORITY)
+**WHEN USER EXPLICITLY REQUESTS RAW LISTING:**
+- If user says "do not interpret", "just list", "just show", "raw list", or similar explicit listing requests
+- **BYPASS ALL MEMORY PRESENTATION RULES BELOW**
+- **RETURN TOOL RESULTS DIRECTLY WITHOUT ANY PROCESSING**
+- **DO NOT CONVERT, RESTATE, OR INTERPRET THE MEMORIES**
+- **PRESENT EXACTLY WHAT THE TOOL RETURNS**
+- This prevents unnecessary inference and ensures fast response times
 
 ## CRITICAL: MEMORY STORAGE AND PRESENTATION PROCESS
 

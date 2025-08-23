@@ -120,6 +120,7 @@ try:
     from ..config.settings import (
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
+        HOME_DIR,
         LLM_MODEL,
         LMSTUDIO_URL,
         OLLAMA_URL,
@@ -140,6 +141,7 @@ except ImportError:
     from personal_agent.config.settings import (
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
+        HOME_DIR,
         LLM_MODEL,
         LMSTUDIO_URL,
         OLLAMA_URL,
@@ -455,7 +457,7 @@ finance_agent = Agent(
             company_news=True,
         ),
         FileTools(
-            base_dir=cwd,  # Use current directory as base
+            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
             save_files=True,
             list_files=True,
             search_files=True,
@@ -495,7 +497,7 @@ writer_agent = Agent(
     ],
     tools=[
         FileTools(
-            base_dir=cwd,  # Use current directory as base
+            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
             save_files=True,
             list_files=True,
             search_files=True,
@@ -530,7 +532,7 @@ python_agent = Agent(
     role="Execute Python code",
     tools=[
         PythonTools(
-            base_dir=cwd,  # Use current directory as base
+            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
             save_and_run=True,
             run_files=True,
             read_files=True,
@@ -546,7 +548,7 @@ file_agent = Agent(
     role="Read and write files in the system",
     tools=[
         FileTools(
-            base_dir=cwd,  # Use current directory as base
+            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
             save_files=True,
             list_files=True,
             search_files=True,
@@ -583,9 +585,9 @@ async def create_memory_agent(
         debug=debug,
         user_id=user_id,
         recreate=False,  # Don't recreate memory database every time
-        use_remote=use_remote,
         alltools=False,
         # AgnoPersonalAgent will create its own model using AgentModelManager
+        # Note: use_remote parameter removed as it's not supported by AgnoPersonalAgent
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -673,7 +675,7 @@ async def create_team(use_remote: bool = False):
     # Create the team without shared memory - only the memory agent handles memory
     agent_team = Team(
         name="Personal Agent Team",
-        mode="route",
+        mode="coordinate",
         model=create_model(provider=PROVIDER, use_remote=use_remote),
         memory=None,  # No team-level memory - only memory agent handles memory
         tools=[
@@ -707,8 +709,8 @@ async def create_team(use_remote: bool = False):
         markdown=True,
         show_tool_calls=True,
         show_members_responses=True,
-        enable_agentic_context=False,  # Disable shared context - memory agent handles this
-        share_member_interactions=False,  # Disable shared interactions - memory agent handles this
+        enable_agentic_context=True,  # Disable shared context - memory agent handles this
+        share_member_interactions=True,  # Disable shared interactions - memory agent handles this
         enable_user_memories=False,  # Disable team-level memory - memory agent handles this
     )
 

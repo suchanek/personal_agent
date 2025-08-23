@@ -587,12 +587,26 @@ class AgentMemoryManager:
                 "list everything you know",
             ]
 
-            if stripped_query in get_all_phrases:
+            # Check for explicit "do not interpret" or "just list" requests
+            no_interpret_phrases = [
+                "do not interpret",
+                "don't interpret",
+                "just list",
+                "just show",
+                "raw list",
+                "simple list",
+                "list them",
+                "show them"
+            ]
+            
+            should_skip_interpretation = any(phrase in query.lower() for phrase in no_interpret_phrases)
+
+            if stripped_query in get_all_phrases or "list all memories" in query.lower():
                 logger.info(
-                    "Generic query '%s' detected. Delegating to get_all_memories.",
+                    "Generic/list query '%s' detected. Using optimized list_memories for performance.",
                     query,
                 )
-                return await self.get_all_memories()
+                return await self.list_memories()
 
             # Validate query parameter
             if not query or not query.strip():
@@ -618,17 +632,31 @@ class AgentMemoryManager:
             display_memories = results[:limit] if limit else results
             result_note = f"🧠 MEMORY RETRIEVAL (found {len(results)} matches via semantic search)"
 
-            result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user:\n\n"
+            if should_skip_interpretation:
+                # PERFORMANCE OPTIMIZED: Skip interpretation instructions for explicit listing requests
+                result = f"{result_note}: The following memories were found for '{query}':\n\n"
+                
+                for i, (memory, score) in enumerate(display_memories, 1):
+                    result += f"{i}. {memory.memory} (similarity: {score:.2f})\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
+                    
+                logger.info("Found %d matching memories for query: %s (no interpretation mode)", len(results), query)
+            else:
+                # Standard mode with interpretation instructions
+                result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user:\n\n"
 
-            for i, (memory, score) in enumerate(display_memories, 1):
-                result += f"{i}. {memory.memory} (similarity: {score:.2f})\n"
-                if memory.topics:
-                    result += f"   Topics: {', '.join(memory.topics)}\n"
-                result += "\n"
+                for i, (memory, score) in enumerate(display_memories, 1):
+                    result += f"{i}. {memory.memory} (similarity: {score:.2f})\n"
+                    if memory.topics:
+                        result += f"   Topics: {', '.join(memory.topics)}\n"
+                    result += "\n"
 
-            result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
+                result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
+                
+                logger.info("Found %d matching memories for query: %s (standard mode)", len(results), query)
 
-            logger.info("Found %d matching memories for query: %s", len(results), query)
             return result
 
         except Exception as e:
@@ -1114,9 +1142,12 @@ class AgentMemoryManager:
 
         This method provides a more concise view of all memories compared to get_all_memories,
         focusing on just the content and topics without additional metadata.
+        
+        PERFORMANCE OPTIMIZED: Returns raw memory data without interpretation instructions
+        to avoid unnecessary LLM inference when user requests simple listing.
 
         Returns:
-            str: Simplified list of all memories
+            str: Simplified list of all memories without interpretation instructions
         """
         try:
             # Direct call to SemanticMemoryManager.get_all_memories()
@@ -1135,7 +1166,7 @@ class AgentMemoryManager:
                 reverse=True,
             )
 
-            # Format results in a simplified way
+            # Format results in a simplified way - NO INTERPRETATION INSTRUCTIONS
             result = f"📝 MEMORY LIST ({len(memories)} total):\n\n"
 
             for i, memory in enumerate(sorted_memories, 1):
@@ -1154,7 +1185,7 @@ class AgentMemoryManager:
                 result += "\n"
 
             logger.info(
-                "Listed all %d memories for user %s in simplified format",
+                "Listed all %d memories for user %s in simplified format (performance optimized)",
                 len(memories),
                 self.user_id,
             )

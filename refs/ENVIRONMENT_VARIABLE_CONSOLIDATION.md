@@ -32,7 +32,7 @@ DATA_DIR=/Users/Shared/personal_agent_data     # Data directory for vector datab
 # USER CONFIGURATION
 USER_ID=Eric
 
-#OLLAMA_URL=http://tesla.tail19187e.ts.net:11434
+#OLLAMA_URL=http://100.100.248.61:11434
 OLLAMA_URL=http://localhost:11434
 OLLAMA_DOCKER_URL=http://host.docker.internal:11434
 

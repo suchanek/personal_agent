@@ -16,7 +16,7 @@ source .venv/bin/activate
 python -m personal_agent.agno_main --cli
 ```
 
-To run the agent with a remote Ollama server (on tesla.tail19187e.ts.net):
+To run the agent with a remote Ollama server (on 100.100.248.61):
 
 ```bash
 # Activate virtual environment
@@ -38,7 +38,7 @@ source .venv/bin/activate
 python -m personal_agent.agno_main
 ```
 
-To run the web interface with a remote Ollama server (on tesla.tail19187e.ts.net):
+To run the web interface with a remote Ollama server (on 100.100.248.61):
 
 ```bash
 # Activate virtual environment
@@ -50,7 +50,7 @@ python -m personal_agent.agno_main --remote-ollama
 
 ## Configuration
 
-The remote Ollama URL is configured to use `http://tesla.tail19187e.ts.net:11434` when the `--remote-ollama` flag is specified. The local Ollama URL is determined by the `OLLAMA_URL` environment variable, which defaults to `http://localhost:11434` if not set.
+The remote Ollama URL is configured to use `http://100.100.248.61:11434` when the `--remote-ollama` flag is specified. The local Ollama URL is determined by the `OLLAMA_URL` environment variable, which defaults to `http://localhost:11434` if not set.
 
 You can modify these values in the following ways:
 
