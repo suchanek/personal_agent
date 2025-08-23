@@ -111,7 +111,9 @@ class AgentInstructionManager:
 
         elif level == InstructionLevel.EXPLICIT:
             # Explicit is like Standard but adds anti-hesitation rules for tool usage
-            logger.warning("🔧 EXPLICIT LEVEL: Adding anti-hesitation rules to prevent overthinking")
+            logger.warning(
+                "🔧 EXPLICIT LEVEL: Adding anti-hesitation rules to prevent overthinking"
+            )
             parts = [
                 header,
                 identity,
@@ -122,7 +124,9 @@ class AgentInstructionManager:
                 tool_list,
                 principles,
             ]
-            logger.warning(f"🔧 EXPLICIT LEVEL: Generated {len(parts)} instruction sections")
+            logger.warning(
+                f"🔧 EXPLICIT LEVEL: Generated {len(parts)} instruction sections"
+            )
 
         elif level == InstructionLevel.EXPERIMENTAL:
             # Experimental level to test strict rule prioritization
@@ -139,12 +143,16 @@ class AgentInstructionManager:
 
         elif level == InstructionLevel.LLAMA3:
             # Unified optimized instructions specifically for Llama3 models
-            logger.warning("🔧 INSTRUCTION OVERRIDE: Using LLAMA3-specific instructions instead of EXPLICIT level")
+            logger.warning(
+                "🔧 INSTRUCTION OVERRIDE: Using LLAMA3-specific instructions instead of EXPLICIT level"
+            )
             return self.get_llama3_instructions()
 
         elif level == InstructionLevel.QWEN:
             # Comprehensive single-set instructions optimized for Qwen models
-            logger.warning("🔧 INSTRUCTION OVERRIDE: Using QWEN-specific instructions instead of EXPLICIT level")
+            logger.warning(
+                "🔧 INSTRUCTION OVERRIDE: Using QWEN-specific instructions instead of EXPLICIT level"
+            )
             return self.get_qwen_instructions()
 
         # Join all parts and log for debugging
@@ -154,13 +162,17 @@ class AgentInstructionManager:
         logger.warning(
             f"🔧 INSTRUCTION GENERATION: Level {level.name} generated {len(instructions)} characters"
         )
-        
+
         # Check if anti-hesitation rules were included for EXPLICIT level
         if level == InstructionLevel.EXPLICIT:
             if "NO OVERTHINKING RULE" in instructions:
-                logger.warning("✅ EXPLICIT LEVEL: Anti-hesitation rules successfully included")
+                logger.warning(
+                    "✅ EXPLICIT LEVEL: Anti-hesitation rules successfully included"
+                )
             else:
-                logger.error("❌ EXPLICIT LEVEL: Anti-hesitation rules MISSING from instructions!")
+                logger.error(
+                    "❌ EXPLICIT LEVEL: Anti-hesitation rules MISSING from instructions!"
+                )
 
         # Basic validation - only check for extremely short instructions
         if len(instructions) < 100:
@@ -288,7 +300,9 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
 
     def get_concise_memory_rules(self) -> str:
         """Returns concise rules for the unified memory and knowledge system."""
-        return self.get_base_memory_instructions() + f"""
+        return (
+            self.get_base_memory_instructions()
+            + f"""
             
             **Knowledge Tools (for factual information):**
             - Use `query_knowledge_base` to search stored documents and facts.
@@ -300,10 +314,13 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - Do not output internal chain-of-thought or hidden reasoning; present answers directly.
             - Do not narrate storage conversion; the system handles it automatically.
         """
+        )
 
     def get_detailed_memory_rules(self) -> str:
         """Returns detailed, refined rules for the unified memory and knowledge system."""
-        return self.get_base_memory_instructions() + f"""
+        return (
+            self.get_base_memory_instructions()
+            + f"""
 
             ## EXTENDED MEMORY & KNOWLEDGE SYSTEM DETAILS
 
@@ -376,6 +393,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             9. **User wants to store factual info** → Use KNOWLEDGE storage tools
             10. **Complex requests** → Combine multiple tools as needed
         """
+        )
 
     def get_concise_tool_rules(self) -> str:
         """Returns concise rules for general tool usage."""
@@ -393,7 +411,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
               - `KnowledgeIngestionTools`: `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`, `batch_ingest_directory`
               - `SemanticKnowledgeIngestionTools`: Advanced semantic knowledge ingestion
             - **Memory Tools**:
-              - `AgnoMemoryTools`: `store_user_memory(content, topics)`, `query_memory(query, limit)`, `get_all_memories()`, `get_recent_memories(limit)`, `list_memories()`, `get_memories_by_topic(topics, limit)`, `query_graph_memory(query, mode)`
+              - `PersagMemoryTools`: `store_user_memory(content, topics)`, `query_memory(query, limit)`, `get_all_memories()`, `get_recent_memories(limit)`, `list_memories()`, `get_memories_by_topic(topics, limit)`, `query_graph_memory(query, mode)`
         """
 
     def get_detailed_tool_rules(self) -> str:
@@ -569,7 +587,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             "- **KnowledgeIngestionTools**: Basic knowledge ingestion operations including:",
             "  - `ingest_knowledge_text`, `ingest_knowledge_file`, `ingest_knowledge_from_url`, `batch_ingest_directory`",
             "- **SemanticKnowledgeIngestionTools**: Advanced semantic knowledge ingestion operations",
-            "- **AgnoMemoryTools**: Memory operations including:",
+            "- **PersagMemoryTools**: Memory operations including:",
             "  - `store_user_memory`, `query_memory`, `get_all_memories`, `get_recent_memories`, `list_memories`, `get_memories_by_topic`, `query_graph_memory`, `update_memory`, `store_graph_memory`",
         ]
 
@@ -714,7 +732,7 @@ You are a powerful personal AI assistant and friend to {self.user_id}. You have 
 - **PythonTools**: Advanced calculations and data analysis
 - **ShellTools**: System operations and commands
 - **PersonalAgentFilesystemTools**: File operations
-- **AgnoMemoryTools**: Memory storage and retrieval
+- **PersagMemoryTools**: Memory storage and retrieval
 - **KnowledgeTools**: Knowledge base querying
 - **KnowledgeIngestionTools**: Knowledge storage
 
@@ -938,7 +956,7 @@ You are a sophisticated personal AI assistant and companion to {self.user_id}. Y
 - **SemanticKnowledgeIngestionTools**: Advanced knowledge processing
 
 ### MEMORY & RELATIONSHIP TOOLS
-- **AgnoMemoryTools**: Personal information storage and retrieval
+- **PersagMemoryTools**: Personal information storage and retrieval
 - **Memory Graph Operations**: Relationship mapping and contextual search
 
 ## OPERATIONAL EXCELLENCE PRINCIPLES

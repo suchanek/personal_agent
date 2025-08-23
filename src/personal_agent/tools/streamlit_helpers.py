@@ -202,7 +202,7 @@ class StreamlitMemoryHelper:
         if not self.memory_manager or not self.db:
             return False, "Memory system not available"
         try:
-            return self.memory_manager.clear_memories(
+            return self.memory_manager.clear_all_memories(
                 db=self.db, user_id=self.agent.user_id
             )
         except Exception as e:

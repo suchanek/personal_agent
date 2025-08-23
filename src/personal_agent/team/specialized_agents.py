@@ -21,8 +21,8 @@ from agno.tools.knowledge import KnowledgeTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
-from agno.tools.yfinance import YFinanceTools
 from agno.tools.toolkit import Toolkit
+from agno.tools.yfinance import YFinanceTools
 from agno.utils.log import logger as agno_logger
 
 from ..config import (
@@ -63,17 +63,29 @@ def _create_model(
             return OpenAIChat(id=model_name)
         case "ollama":
             # DIAGNOSTIC: Log model loading attempt
-            logger.info("🔍 DIAGNOSTIC: Attempting to load Ollama model: %s at %s", model_name, ollama_base_url)
-            
+            logger.info(
+                "🔍 DIAGNOSTIC: Attempting to load Ollama model: %s at %s",
+                model_name,
+                ollama_base_url,
+            )
+
             # Get dynamic context size for this model
             try:
                 context_size, detection_method = get_model_context_size_sync(
                     model_name, ollama_base_url
                 )
-                logger.info("🔍 DIAGNOSTIC: Context size detection successful for %s: %d (method: %s)",
-                           model_name, context_size, detection_method)
+                logger.info(
+                    "🔍 DIAGNOSTIC: Context size detection successful for %s: %d (method: %s)",
+                    model_name,
+                    context_size,
+                    detection_method,
+                )
             except Exception as e:
-                logger.error("🔍 DIAGNOSTIC: Context size detection failed for %s: %s", model_name, e)
+                logger.error(
+                    "🔍 DIAGNOSTIC: Context size detection failed for %s: %s",
+                    model_name,
+                    e,
+                )
                 raise
 
             logger.info(
@@ -92,10 +104,17 @@ def _create_model(
                         "temperature": temperature,
                     },
                 )
-                logger.info("🔍 DIAGNOSTIC: Successfully created Ollama model instance for %s", model_name)
+                logger.info(
+                    "🔍 DIAGNOSTIC: Successfully created Ollama model instance for %s",
+                    model_name,
+                )
                 return model
             except Exception as e:
-                logger.error("🔍 DIAGNOSTIC: Failed to create Ollama model instance for %s: %s", model_name, e)
+                logger.error(
+                    "🔍 DIAGNOSTIC: Failed to create Ollama model instance for %s: %s",
+                    model_name,
+                    e,
+                )
                 raise
         case _:
             raise ValueError(f"Unsupported model provider: {model_provider}")
@@ -284,7 +303,7 @@ def create_file_operations_agent(
     agent = Agent(
         name="File Operations Agent",
         role="Handle file system operations and shell commands",
-        model=model,
+        # model=model,
         debug_mode=debug,
         tools=[
             PersonalAgentFilesystemTools(),
@@ -378,30 +397,30 @@ def create_pubmed_agent(
 
 class WritingTools(Toolkit):
     """Custom writing tools for the writer agent."""
-    
+
     def __init__(self):
         super().__init__(name="writing_tools")
         self.register(self.write_original_content)
         self.register(self.edit_content)
         self.register(self.proofread_content)
-    
+
     def write_original_content(
         self,
         content_type: str,
         topic: str,
         length: int = 3,
         style: str = "informative",
-        audience: str = "general"
+        audience: str = "general",
     ) -> str:
         """Write original content based on the specified parameters.
-        
+
         Args:
             content_type: Type of content (e.g., 'article', 'poem', 'story', 'essay', 'limerick')
             topic: The main topic or subject to write about
             length: Length specification (paragraphs for articles, lines for poems, etc.)
             style: Writing style (e.g., 'formal', 'casual', 'humorous', 'limerick', 'informative')
             audience: Target audience (e.g., 'general', 'children', 'professionals')
-            
+
         Returns:
             The written content as a string
         """
@@ -416,7 +435,7 @@ So fine and so wonderfully epic,
 With rhythm and rhyme,
 It passes the time,
 And makes every reader quite tropic!"""
-            
+
             elif content_type.lower() == "poem":
                 # Generate a poem
                 lines = []
@@ -428,7 +447,7 @@ And makes every reader quite tropic!"""
                     else:
                         lines.append(f"Line {i+1} about {topic} so fine")
                 content = "\n".join(lines)
-            
+
             elif content_type.lower() == "story":
                 content = f"""# A Story About {topic}
 
@@ -437,35 +456,41 @@ Once upon a time, there was a fascinating subject called {topic}. This {style} t
 The story unfolds with rich details and engaging narrative, bringing {topic} to life in ways that captivate the reader's imagination.
 
 And so, our story about {topic} comes to a satisfying conclusion, leaving the reader with new insights and appreciation."""
-            
+
             else:  # Default to article/essay format
                 paragraphs = []
                 paragraphs.append(f"# {topic.title()}")
                 paragraphs.append(f"")
-                paragraphs.append(f"This {content_type} explores the fascinating subject of {topic}, written in a {style} style for {audience} readers.")
-                
+                paragraphs.append(
+                    f"This {content_type} explores the fascinating subject of {topic}, written in a {style} style for {audience} readers."
+                )
+
                 for i in range(length):
                     paragraphs.append(f"")
                     paragraphs.append(f"## Section {i+1}")
-                    paragraphs.append(f"This section delves deeper into {topic}, providing valuable insights and information that will help readers understand this important subject better.")
-                
+                    paragraphs.append(
+                        f"This section delves deeper into {topic}, providing valuable insights and information that will help readers understand this important subject better."
+                    )
+
                 content = "\n".join(paragraphs)
-            
-            logger.info(f"🔍 DIAGNOSTIC: Generated {content_type} about {topic} ({len(content)} characters)")
+
+            logger.info(
+                f"🔍 DIAGNOSTIC: Generated {content_type} about {topic} ({len(content)} characters)"
+            )
             return content
-            
+
         except Exception as e:
             error_msg = f"Error generating content: {str(e)}"
             logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
             return error_msg
-    
+
     def edit_content(self, original_content: str, editing_instructions: str) -> str:
         """Edit existing content based on provided instructions.
-        
+
         Args:
             original_content: The original text to edit
             editing_instructions: Instructions for how to edit the content
-            
+
         Returns:
             The edited content
         """
@@ -478,13 +503,13 @@ And so, our story about {topic} comes to a satisfying conclusion, leaving the re
             error_msg = f"Error editing content: {str(e)}"
             logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
             return error_msg
-    
+
     def proofread_content(self, content: str) -> str:
         """Proofread content and provide feedback.
-        
+
         Args:
             content: The content to proofread
-            
+
         Returns:
             Proofreading feedback and suggestions
         """
@@ -504,7 +529,7 @@ And so, our story about {topic} comes to a satisfying conclusion, leaving the re
 - Review for consistency in tone
 - Check for proper formatting
 - Ensure clarity of main points"""
-            
+
             logger.info(f"🔍 DIAGNOSTIC: Proofread content ({len(content)} characters)")
             return feedback
         except Exception as e:
@@ -517,7 +542,7 @@ def create_writer_agent(
     model_provider: str = "ollama",
     model_name: str = "llama3.1:8b",
     ollama_base_url: str = OLLAMA_URL,
-    debug: bool = False,
+    debug: bool = True,
 ) -> Agent:
     """Create a specialized writing agent.
 
@@ -536,7 +561,12 @@ def create_writer_agent(
         debug_mode=debug,
         tools=[
             WritingTools(),  # Custom writing tools with write_original_content
-            FileTools(base_dir=Path(HOME_DIR), save_files=True, read_files=True, list_files=True)
+            FileTools(
+                base_dir=Path(HOME_DIR),
+                save_files=True,
+                read_files=True,
+                list_files=True,
+            ),
         ],  # File tools for reading/writing documents
         instructions=[
             "You are a specialized writing agent focused on creating, editing, and improving written content.",
@@ -582,7 +612,7 @@ def create_writer_agent(
             "- Offer multiple options or approaches when appropriate",
         ],
         markdown=True,
-        show_tool_calls=False,  # Always hide tool calls for clean responses
+        show_tool_calls=True,  # Enable tool calls to ensure proper execution in team context
         add_name_to_instructions=True,
     )
 
@@ -643,20 +673,20 @@ def create_knowledge_memory_agent(
     )
 
     # Force initialization to ensure tools are properly loaded
-    import asyncio
+    # import asyncio
 
-    try:
-        # Try to get the current event loop
-        asyncio.get_running_loop()
-        # If we're in a running loop, we need to handle this differently
-        logger.warning("Event loop detected - agent will initialize lazily")
-    except RuntimeError:
-        # No running event loop, safe to initialize now
-        asyncio.run(agent.initialize())
-        logger.info(
-            "Agent initialized synchronously with %d tools",
-            len(agent.tools) if agent.tools else 0,
-        )
+    # try:
+    # Try to get the current event loop
+    #    asyncio.get_running_loop()
+    #    # If we're in a running loop, we need to handle this differently
+    #    logger.warning("Event loop detected - agent will initialize lazily")
+    # except RuntimeError:
+    #    # No running event loop, safe to initialize now
+    #    asyncio.run(agent.initialize())
+    logger.info(
+        "Agent initialized synchronously with %d tools",
+        len(agent.tools) if agent.tools else 0,
+    )
 
     # Override the agent name and role for team context
     agent.name = "Personal Memory and Knowledge Agent"

@@ -1,12 +1,12 @@
 """
 Ollama-based Multi-Purpose Reasoning Team
 
-This example demonstrates a team of agents using local Ollama models that can answer 
+This example demonstrates a team of agents using local Ollama models that can answer
 a variety of questions with memory and knowledge capabilities.
 
 The team consists of:
 - A web agent that can search the web for information
-- A finance agent that can get financial data  
+- A finance agent that can get financial data
 - A writer agent that can write content
 - A calculator agent that can calculate
 - A memory agent that can store and retrieve personal information and knowledge
@@ -17,8 +17,6 @@ import os
 from pathlib import Path
 from textwrap import dedent
 
-from dotenv import load_dotenv
-
 from agno.agent import Agent
 from agno.models.ollama.tools import OllamaTools
 from agno.team.team import Team
@@ -27,13 +25,14 @@ from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
+from dotenv import load_dotenv
 
 # Import your personal agent components
 from src.personal_agent.config.settings import (
     AGNO_KNOWLEDGE_DIR,
     AGNO_STORAGE_DIR,
-    LIGHTRAG_URL,
     LIGHTRAG_MEMORY_URL,
+    LIGHTRAG_URL,
     LLM_MODEL,
     OLLAMA_URL,
     USER_ID,
@@ -48,12 +47,13 @@ from src.personal_agent.core.agno_storage import (
     load_combined_knowledge_base,
 )
 from src.personal_agent.tools.knowledge_tools import KnowledgeTools
-from src.personal_agent.tools.refactored_memory_tools import AgnoMemoryTools
+from src.personal_agent.tools.refactored_memory_tools import PersagMemoryTools
 
 # Load environment variables
 load_dotenv()
 
 cwd = Path(__file__).parent.resolve()
+
 
 def create_ollama_model(model_name: str = LLM_MODEL) -> OllamaTools:
     """Create an Ollama model using your AgentModelManager."""
@@ -61,9 +61,10 @@ def create_ollama_model(model_name: str = LLM_MODEL) -> OllamaTools:
         model_provider="ollama",
         model_name=model_name,
         ollama_base_url=OLLAMA_URL,
-        seed=None
+        seed=None,
     )
     return model_manager.create_model()
+
 
 # Web search agent using Ollama
 web_agent = Agent(
@@ -130,6 +131,7 @@ calculator_agent = Agent(
     show_tool_calls=True,
 )
 
+
 async def create_memory_agent(
     storage_dir: str = AGNO_STORAGE_DIR,
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
@@ -137,22 +139,22 @@ async def create_memory_agent(
     debug: bool = False,
 ) -> Agent:
     """Create a memory agent following the exact AgnoPersonalAgent initialization pattern."""
-    
+
     # 1. Create Agno storage (CRITICAL: Must be done first)
     agno_storage = create_agno_storage(storage_dir)
-    
+
     # 2. Create combined knowledge base (CRITICAL: Must be done before loading)
     agno_knowledge = create_combined_knowledge_base(
         storage_dir, knowledge_dir, agno_storage
     )
-    
+
     # 3. Load knowledge base content (CRITICAL: Must be async)
     if agno_knowledge:
         await load_combined_knowledge_base(agno_knowledge, recreate=False)
-    
+
     # 4. Create memory with SemanticMemoryManager (CRITICAL: Must be done after storage)
     agno_memory = create_agno_memory(storage_dir, debug_mode=debug)
-    
+
     # 5. Initialize managers (CRITICAL: Must be done after agno_memory creation)
     memory_manager = AgentMemoryManager(
         user_id=user_id,
@@ -162,21 +164,21 @@ async def create_memory_agent(
         lightrag_memory_url=LIGHTRAG_MEMORY_URL,
         enable_memory=True,
     )
-    
+
     # Initialize the memory manager with the created agno_memory
     memory_manager.initialize(agno_memory)
-    
+
     knowledge_manager = AgentKnowledgeManager(
         user_id=user_id,
         storage_dir=storage_dir,
         lightrag_url=LIGHTRAG_URL,
         lightrag_memory_url=LIGHTRAG_MEMORY_URL,
     )
-    
+
     # 6. Create tool instances (CRITICAL: Must be done after managers)
     knowledge_tools = KnowledgeTools(knowledge_manager)
-    memory_tools = AgnoMemoryTools(memory_manager)
-    
+    memory_tools = PersagMemoryTools(memory_manager)
+
     # 7. Create the Agent (CRITICAL: Must be done last)
     agent = Agent(
         name="Memory Agent",
@@ -195,21 +197,22 @@ async def create_memory_agent(
         show_tool_calls=True,
         user_id=user_id,
         enable_agentic_memory=False,  # Disable to avoid conflicts
-        enable_user_memories=False,   # Use our custom tools instead
+        enable_user_memories=False,  # Use our custom tools instead
         storage=agno_storage,
         knowledge=agno_knowledge,
         memory=agno_memory,
     )
-    
+
     return agent
+
 
 # Create the team
 async def create_team():
     """Create the team with all agents including the memory agent."""
-    
+
     # Create memory agent (must be async)
     memory_agent = await create_memory_agent()
-    
+
     # Create the team
     agent_team = Team(
         name="Ollama Multi-Purpose Team",
@@ -239,16 +242,17 @@ async def create_team():
         enable_agentic_context=True,
         share_member_interactions=True,
     )
-    
+
     return agent_team
+
 
 # Main execution
 async def main():
     """Main function to run the team."""
-    
+
     # Create the team
     team = await create_team()
-    
+
     # Example queries
     queries = [
         "Hi! What are you capable of doing?",
@@ -258,19 +262,21 @@ async def main():
         "Calculate the square root of 144",
         "Write a short poem about AI agents working together",
     ]
-    
+
     # Run example queries
     for query in queries:
         print(f"\n{'='*60}")
         print(f"Query: {query}")
-        print('='*60)
-        
+        print("=" * 60)
+
         await team.aprint_response(query, stream=True)
         print("\n")
+
 
 def cli_main():
     """Synchronous entrypoint for Poetry scripts."""
     asyncio.run(main())
+
 
 if __name__ == "__main__":
     # Run the main function

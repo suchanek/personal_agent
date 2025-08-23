@@ -17,7 +17,13 @@ from agno.team.team import Team
 from agno.tools.file import FileTools
 from agno.tools.reasoning import ReasoningTools
 
-from ..config import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, HOME_DIR, LLM_MODEL, OLLAMA_URL
+from ..config import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    HOME_DIR,
+    LLM_MODEL,
+    OLLAMA_URL,
+)
 from ..config.model_contexts import get_model_context_size_sync
 from ..utils import setup_logging
 from .specialized_agents import (
@@ -65,9 +71,6 @@ def _create_coordinator_model(
             host=ollama_base_url,
             options={
                 "num_ctx": context_size,
-                "temperature": 0.3,  # Lower temperature for more consistent function execution
-                "top_p": 0.9,
-                "repeat_penalty": 1.1,
             },
         )
     else:
@@ -131,15 +134,20 @@ def create_personal_agent_team(
     )
 
     # DIAGNOSTIC: Create writer agent with explicit llama model
-    logger.info("🔍 DIAGNOSTIC: Creating writer agent with model_name=%s (should be llama3.1:8b)", model_name)
+    logger.info(
+        "🔍 DIAGNOSTIC: Creating writer agent with model_name=%s (should be llama3.1:8b)",
+        model_name,
+    )
     writer_agent = create_writer_agent(
         model_provider=model_provider,
-        model_name="llama3.1:8b",  # Force the llama model explicitly
+        model_name=model_name, 
         ollama_base_url=ollama_base_url,
         debug=debug,
     )
-    logger.info("🔍 DIAGNOSTIC: Writer agent created with model: %s",
-                getattr(getattr(writer_agent, 'model', None), 'id', 'Unknown'))
+    logger.info(
+        "🔍 DIAGNOSTIC: Writer agent created with model: %s",
+        getattr(getattr(writer_agent, "model", None), "id", "Unknown"),
+    )
 
     # Create knowledge/memory agent using PersonalAgnoAgent
     knowledge_agent = create_knowledge_memory_agent(
@@ -157,82 +165,46 @@ def create_personal_agent_team(
         model_provider, model_name, ollama_base_url
     )
 
-    # Create team instructions - Coordinator routes to specialized agents
-    team_instructions = dedent(
-        f"""\
-        You are a team coordinator that routes requests to specialized team members.
-        
-        ## YOUR ROLE
-        - Route user requests to the appropriate team member
-        - Provide brief context when delegating
-        - Coordinate responses from multiple agents when needed
-        - Be warm and friendly while ensuring users get expert help
-        - Greet the user with a friendly greeting by name {user_id}
-        
-        ## TEAM MEMBERS (delegate to these agents):
-        - "Knowledge Agent": Personal information, memories, user data, knowledge queries
-        - "Web Research Agent": Web searches, current events, news
-        - "Finance Agent": Stock prices, market data, financial information
-        - "Calculator Agent": Math calculations, data analysis
-        - "File Operations Agent": File operations, shell commands
-        - "PubMed Research Agent": Biomedical literature, scientific papers, medical research
-        - "Writer Agent": Writing, editing, content creation, document formatting
-        
-        ## ROUTING RULES:
-        1. **Memory/Knowledge Tasks**: ALWAYS route to "Knowledge Agent"
-           - "What do you remember about me?" → route to "Knowledge Agent"
-           - "Do you know my preferences?" → route to "Knowledge Agent"
-           - "Remember that I..." → route to "Knowledge Agent"
-           - ANY personal information queries → route to "Knowledge Agent"
-           - Knowledge base questions → route to "Knowledge Agent"
-        
-        2. **Math/Calculations**: ALWAYS route to "Calculator Agent"
-           - "Calculate 15% of 250" → route to "Calculator Agent"
-           - "What's 2+2?" → route to "Calculator Agent"
-           - ANY mathematical operation → route to "Calculator Agent"
-        
-        3. **Web Research**: ALWAYS route to "Web Research Agent"
-           - Web searches → route to "Web Research Agent"
-           - Current events → route to "Web Research Agent"
-           - News queries → route to "Web Research Agent"
-        
-        4. **Finance**: ALWAYS route to "Finance Agent"
-           - Stock prices → route to "Finance Agent"
-           - Market data → route to "Finance Agent"
-           - Financial information → route to "Finance Agent"
-        
-        5. **File Operations**: ALWAYS route to "File Operations Agent"
-            - File operations → route to "File Operations Agent"
-            - Shell commands → route to "File Operations Agent"
-        
-        6. **PubMed Research**: ALWAYS route to "PubMed Research Agent"
-            - Medical research queries → route to "PubMed Research Agent"
-            - Scientific literature searches → route to "PubMed Research Agent"
-            - Biomedical information → route to "PubMed Research Agent"
-            - Research paper searches → route to "PubMed Research Agent"
-        
-        7. **Writing Tasks**: ALWAYS route to "Writer Agent"
-            - "Write an article about..." → route to "Writer Agent"
-            - "Edit this text..." → route to "Writer Agent"
-            - "Create a document..." → route to "Writer Agent"
-            - "Proofread this..." → route to "Writer Agent"
-            - ANY writing, editing, or content creation tasks → route to "Writer Agent"
-        
-        ## COORDINATION PRINCIPLES:
-        - Be a helpful coordinator who ensures users get expert help
-        - Provide brief, friendly context when routing requests
-        - For complex multi-step tasks, coordinate between multiple agents
-        - Always route to the most appropriate specialist
-        - Don't try to handle specialized tasks yourself - delegate them
-        """
-    )
+    # Create team instructions - Coordinator delegates to specialized agents (following working examples)
+    team_instructions = [
+        "You are a team coordinator that can delegate requests to specialized team members.",
+        "You can use your member agents to answer questions that require their expertise.",
+        "You can also answer directly for simple questions, you don't HAVE to forward every question to a member agent.",
+        "Use reasoning to decide which agent is best suited for each request.",
+        "If the user is only being conversational, don't use any tools, just answer directly.",
+        "",
+        "## TEAM MEMBERS:",
+        "- Personal Memory and Knowledge Agent: Personal information, memories, user data, knowledge queries",
+        "- Web Research Agent: Web searches, current events, news",
+        "- Finance Agent: Stock prices, market data, financial information",
+        "- Calculator Agent: Math calculations, data analysis",
+        "- File Operations Agent: File operations, shell commands",
+        "- PubMed Research Agent: Biomedical literature, scientific papers, medical research",
+        "- Writer Agent: Writing, editing, content creation, document formatting, poems, stories, limericks",
+        "",
+        "## DELEGATION GUIDELINES:",
+        "- Writing Tasks (poems, stories, articles, limericks, creative writing): Use Writer Agent",
+        "- Memory/Knowledge Tasks: Use Personal Memory and Knowledge Agent",
+        "- Math/Calculations: Use Calculator Agent",
+        "- Web Research: Use Web Research Agent",
+        "- Finance: Use Finance Agent",
+        "- File Operations: Use File Operations Agent",
+        "- PubMed Research: Use PubMed Research Agent",
+    ]
 
-    # Create team with route mode for proper delegation
+    # Create team with coordinate mode and reasoning tools for proper delegation
     team = Team(
         name="Personal Agent Team",
-        mode="route",  # Enable routing to team members
+        mode="coordinate",  # Use coordinate mode with reasoning for delegation
         model=coordinator_model,
-        tools=[FileTools(base_dir=Path(HOME_DIR))],  # Coordinator has basic file tools with proper Path object
+        tools=[
+            ReasoningTools(
+                add_instructions=True, add_few_shot=True
+            ),  # Critical for delegation decisions
+            FileTools(
+                base_dir=Path(HOME_DIR)
+            ),  # Coordinator has basic file tools with proper Path object
+        ],
         members=[
             knowledge_agent,  # New PersonalAgnoAgent for memory/knowledge
             web_research_agent,
@@ -245,7 +217,7 @@ def create_personal_agent_team(
         instructions=team_instructions,
         markdown=True,
         show_tool_calls=debug,  # Only show tool calls in debug mode
-        show_members_responses=True,  # Hide member responses for clean output
+        show_members_responses=True,  # Show member responses for clean output
     )
 
     logger.info(
@@ -375,8 +347,91 @@ class PersonalAgentTeamWrapper:
             logger.info("Running query through team coordinator: %s", query)
 
             # Use team coordination with route mode for all queries
+            logger.info("🔍 DIAGNOSTIC: Sending query to team coordinator")
             response = await self.team.arun(query, user_id=self.user_id)
             self._last_response = response
+
+            # Enhanced diagnostic logging for response analysis
+            logger.info(f"🔍 DIAGNOSTIC: Team response type: {type(response)}")
+            logger.info(
+                f"🔍 DIAGNOSTIC: Response content length: {len(response.content) if response.content else 0}"
+            )
+            logger.info(
+                f"🔍 DIAGNOSTIC: Response content preview: {response.content[:200] if response.content else 'None'}..."
+            )
+
+            # Check for RunResponse structure
+            if hasattr(response, "messages"):
+                logger.info(
+                    f"🔍 DIAGNOSTIC: Response has {len(response.messages)} messages"
+                )
+                for i, msg in enumerate(response.messages):
+                    logger.info(
+                        f"🔍 DIAGNOSTIC: Message {i}: role={getattr(msg, 'role', 'unknown')}, content_length={len(getattr(msg, 'content', ''))}"
+                    )
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        logger.info(
+                            f"🔍 DIAGNOSTIC: Message {i} has {len(msg.tool_calls)} tool calls"
+                        )
+
+            # Check for member responses (route mode)
+            if hasattr(response, "member_responses") and response.member_responses:
+                logger.info(
+                    f"🔍 DIAGNOSTIC: Response has {len(response.member_responses)} member responses"
+                )
+                for i, member_resp in enumerate(response.member_responses):
+                    logger.info(
+                        f"🔍 DIAGNOSTIC: Member response {i}: type={type(member_resp)}"
+                    )
+                    if hasattr(member_resp, "messages") and member_resp.messages:
+                        for j, msg in enumerate(member_resp.messages):
+                            logger.info(
+                                f"🔍 DIAGNOSTIC: Member {i} message {j}: role={getattr(msg, 'role', 'unknown')}, content_length={len(getattr(msg, 'content', ''))}"
+                            )
+                            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                logger.info(
+                                    f"🔍 DIAGNOSTIC: Member {i} message {j} has {len(msg.tool_calls)} tool calls"
+                                )
+                                for k, tool_call in enumerate(msg.tool_calls):
+                                    tool_name = getattr(
+                                        tool_call,
+                                        "name",
+                                        getattr(tool_call, "tool_name", "unknown"),
+                                    )
+                                    logger.info(
+                                        f"🔍 DIAGNOSTIC: Tool call {k}: {tool_name}"
+                                    )
+
+            # Check if response contains tool call syntax instead of actual content
+            if response.content and "write_original_content(" in response.content:
+                logger.warning(
+                    "🔍 DIAGNOSTIC: Response contains tool call syntax instead of executed content!"
+                )
+                logger.warning(f"🔍 DIAGNOSTIC: Full response: {response.content}")
+
+                # Try to extract actual content from member responses
+                actual_content_found = False
+                if hasattr(response, "member_responses") and response.member_responses:
+                    for i, member_resp in enumerate(response.member_responses):
+                        if hasattr(member_resp, "messages") and member_resp.messages:
+                            for msg in member_resp.messages:
+                                if (
+                                    hasattr(msg, "content")
+                                    and msg.content
+                                    and "write_original_content(" not in msg.content
+                                    and "<|python_tag|>" not in msg.content
+                                    and len(msg.content.strip()) > 50
+                                ):  # Ensure it's substantial content
+                                    logger.info(
+                                        f"🔍 DIAGNOSTIC: Found actual content in member {i} response: {msg.content[:200]}..."
+                                    )
+                                    return msg.content
+
+                if not actual_content_found:
+                    logger.warning(
+                        "🔍 DIAGNOSTIC: Could not find actual content in member responses, returning original"
+                    )
+
             return response.content
         except Exception as e:
             logger.error("Error running team query: %s", e)

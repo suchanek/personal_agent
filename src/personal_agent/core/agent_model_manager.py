@@ -15,8 +15,9 @@ from agno.models.openai import OpenAIChat
 from ..config import settings
 from ..config.model_contexts import get_model_context_size_sync
 from ..config.settings import get_qwen_instruct_settings, get_qwen_thinking_settings
+from ..utils import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 
 class AgentModelManager:
@@ -139,25 +140,17 @@ class AgentModelManager:
                 "seed": self.seed,
             }
 
-            logger.info(
-                f"🔧 OLLAMA CONFIG: Model {self.model_name} using temperature={model_options['temperature']}"
-            )
-            logger.info(
-                f"🔧 OLLAMA CONFIG: top_k={model_options['top_k']}, top_p={model_options['top_p']}"
-            )
-
             # Special handling for qwen models with optimized parameters
             if "qwen" in self.model_name.lower():
                 logger.info(
                     "Using optimized configuration for Qwen model: %s",
                     self.model_name,
                 )
-                
+
                 # Get Qwen settings from configuration
                 try:
                     qwen_settings = get_qwen_instruct_settings()
-                    logger.info(f"🔧 QWEN CONFIG: Using configured settings: {qwen_settings}")
-                    
+
                     model_options.update(
                         {
                             "num_predict": 32768,  # Set specific prediction length for qwen
@@ -167,10 +160,6 @@ class AgentModelManager:
                             "min_p": qwen_settings["min_p"],
                             "repeat_penalty": 1.1,
                         }
-                    )
-                    logger.info(
-                        f"🔧 QWEN CONFIG: Applied settings - temperature={qwen_settings['temperature']}, "
-                        f"top_k={qwen_settings['top_k']}, top_p={qwen_settings['top_p']}, min_p={qwen_settings['min_p']}"
                     )
                 except Exception as e:
                     logger.warning(f"Failed to load Qwen settings, using defaults: {e}")
@@ -229,17 +218,6 @@ class AgentModelManager:
                 reasoning_model in self.model_name.lower()
                 for reasoning_model in reasoning_models
             )
-
-            if model_supports_reasoning:
-                logger.info(
-                    "Model %s supports reasoning - using standard Ollama configuration",
-                    self.model_name,
-                )
-            else:
-                logger.info(
-                    "Model %s does not appear to support reasoning - using standard configuration",
-                    self.model_name,
-                )
 
             model = Ollama(
                 id=self.model_name,

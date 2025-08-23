@@ -17,6 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
+
 LMSTUDIO_URL = "https://localhost:1234/v1"
 
 # see below for the ollama server urls
@@ -140,6 +141,8 @@ LIGHTRAG_MEMORY_INPUTS_DIR = _storage_paths["LIGHTRAG_MEMORY_INPUTS_DIR"]
 DATA_DIR = _storage_paths["DATA_DIR"]
 USER_DATA_DIR = _storage_paths["USER_DATA_DIR"]
 
+ALLOWED_DIRS = [HOME_DIR, DATA_DIR, "/tmp", ".", "/"]
+
 # Logging configuration
 LOG_LEVEL_STR = get_env_var("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
@@ -148,7 +151,7 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 logger.setLevel(LOG_LEVEL)
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M")
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
 
 # Qwen Model Settings - Instruct Model Parameters
 QWEN_INSTRUCT_TEMPERATURE = get_env_var("QWEN_INSTRUCT_TEMPERATURE", "0.7")
@@ -201,7 +204,9 @@ HTTPX_POOL_TIMEOUT = get_env_var("HTTPX_POOL_TIMEOUT", "600")
 OLLAMA_TIMEOUT = get_env_var("OLLAMA_TIMEOUT", "7200")
 OLLAMA_KEEP_ALIVE = get_env_var("OLLAMA_KEEP_ALIVE", "3600")
 OLLAMA_NUM_PREDICT = get_env_var("OLLAMA_NUM_PREDICT", "16384")
-OLLAMA_TEMPERATURE = get_env_var("OLLAMA_TEMPERATURE", "0.1")
+OLLAMA_TEMPERATURE = get_env_var("OLLAMA_TEMPERATURE", "0.4")
+OLLAMA_MAX_LOADED_MODELS = 2
+OLLAMA_NUM_PARALLEL = 2
 
 # Processing configurations
 PDF_CHUNK_SIZE = get_env_var("PDF_CHUNK_SIZE", "1024")

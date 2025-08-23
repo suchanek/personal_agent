@@ -12,9 +12,10 @@ from typing import Dict, Optional, Tuple
 
 import requests
 
+from ..utils import setup_logging
 from .settings import OLLAMA_URL, get_env_var
 
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 # Model context size database - curated list of known models and their context windows
 MODEL_CONTEXT_SIZES: Dict[str, int] = {
