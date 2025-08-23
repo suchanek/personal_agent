@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### Changed
+- **Tool Naming**: Renamed `AgnoMemoryTools` to `PersagMemoryTools` and `KnowledgeTools` to `PersagKnowledgeTools` to better reflect their roles within the personal agent (`persag`) ecosystem.
+
+### Fixed
+- **Tool Call Extraction and Response Handling**: Overhauled the response handling logic to correctly parse and display tool calls and their results. This resolves a critical bug where the Streamlit UI would show raw tool call syntax instead of the executed content from the writer agent. The new `extract_tool_calls_and_metrics` function now robustly handles various tool call formats from different models and agents.
+- **Team Delegation and Reasoning**: Switched the `personal_agent_team` from `route` to `coordinate` mode and integrated `ReasoningTools` to significantly improve the coordinator's ability to delegate tasks to the correct specialized agents.
+- **Streamlit `arun` Compatibility**: Fixed a bug that caused the Streamlit app to crash when using `agent.arun()` with asynchronous tools in single-agent mode.
+
+
 ### Added
 - **Qwen Model Settings**: Implemented specific, environment-configurable settings for the Qwen model, including parameters for temperature, `min_p`, `top_p`, and `top_k`. These settings are now applied during model initialization and are displayed in the Streamlit UI for transparency. This is documented in [QWEN_MODEL_SETTINGS_IMPLEMENTATION.md](./refs/QWEN_MODEL_SETTINGS_IMPLEMENTATION.md).
 
