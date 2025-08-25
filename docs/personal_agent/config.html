@@ -43,6 +43,9 @@
                     <a class="variable" href="#DATA_DIR">DATA_DIR</a>
             </li>
             <li>
+                    <a class="variable" href="#USER_DATA_DIR">USER_DATA_DIR</a>
+            </li>
+            <li>
                     <a class="variable" href="#HOME_DIR">HOME_DIR</a>
             </li>
             <li>
@@ -187,6 +190,12 @@
                     <a class="function" href="#get_package_version">get_package_version</a>
             </li>
             <li>
+                    <a class="function" href="#get_qwen_instruct_settings">get_qwen_instruct_settings</a>
+            </li>
+            <li>
+                    <a class="function" href="#get_qwen_thinking_settings">get_qwen_thinking_settings</a>
+            </li>
+            <li>
                     <a class="function" href="#get_settings">get_settings</a>
             </li>
             <li>
@@ -273,123 +282,122 @@
 </span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a>    <span class="n">STORAGE_BACKEND</span><span class="p">,</span>
 </span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a>    <span class="n">USE_MCP</span><span class="p">,</span>
 </span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a>    <span class="n">USE_WEAVIATE</span><span class="p">,</span>
-</span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a>    <span class="n">WEAVIATE_URL</span><span class="p">,</span>
-</span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a>    <span class="n">get_env_bool</span><span class="p">,</span>
-</span><span id="L-52"><a href="#L-52"><span class="linenos"> 52</span></a>    <span class="n">get_env_var</span><span class="p">,</span>
-</span><span id="L-53"><a href="#L-53"><span class="linenos"> 53</span></a>    <span class="n">get_package_version</span><span class="p">,</span>
-</span><span id="L-54"><a href="#L-54"><span class="linenos"> 54</span></a><span class="p">)</span>
-</span><span id="L-55"><a href="#L-55"><span class="linenos"> 55</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">.user_id_mgr</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a>    <span class="n">get_current_user_id</span><span class="p">,</span>
-</span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a>    <span class="n">get_user_storage_paths</span><span class="p">,</span>
-</span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a>    <span class="n">get_userid</span><span class="p">,</span>
-</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a>    <span class="n">load_user_from_file</span><span class="p">,</span>
-</span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a>    <span class="n">refresh_user_dependent_settings</span><span class="p">,</span>
-</span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a><span class="p">)</span>
-</span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a>
-</span><span id="L-63"><a href="#L-63"><span class="linenos"> 63</span></a>
-</span><span id="L-64"><a href="#L-64"><span class="linenos"> 64</span></a><span class="c1"># Create a simple get_settings function for compatibility</span>
-</span><span id="L-65"><a href="#L-65"><span class="linenos"> 65</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_settings</span><span class="p">():</span>
-</span><span id="L-66"><a href="#L-66"><span class="linenos"> 66</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get configuration settings as a dictionary.&quot;&quot;&quot;</span>
-</span><span id="L-67"><a href="#L-67"><span class="linenos"> 67</span></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="L-68"><a href="#L-68"><span class="linenos"> 68</span></a>        <span class="s2">&quot;USER_ID&quot;</span><span class="p">:</span> <span class="n">get_userid</span><span class="p">(),</span>
-</span><span id="L-69"><a href="#L-69"><span class="linenos"> 69</span></a>        <span class="s2">&quot;ROOT_DIR&quot;</span><span class="p">:</span> <span class="n">ROOT_DIR</span><span class="p">,</span>
-</span><span id="L-70"><a href="#L-70"><span class="linenos"> 70</span></a>        <span class="s2">&quot;HOME_DIR&quot;</span><span class="p">:</span> <span class="n">HOME_DIR</span><span class="p">,</span>
-</span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a>        <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">:</span> <span class="n">DATA_DIR</span><span class="p">,</span>
-</span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a>        <span class="s2">&quot;REPO_DIR&quot;</span><span class="p">:</span> <span class="n">REPO_DIR</span><span class="p">,</span>
-</span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a>        <span class="s2">&quot;WEAVIATE_URL&quot;</span><span class="p">:</span> <span class="n">WEAVIATE_URL</span><span class="p">,</span>
-</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a>        <span class="s2">&quot;OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
-</span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a>        <span class="s2">&quot;REMOTE_OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">REMOTE_OLLAMA_URL</span><span class="p">,</span>
-</span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a>        <span class="s2">&quot;LLM_MODEL&quot;</span><span class="p">:</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
-</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a>        <span class="s2">&quot;USE_WEAVIATE&quot;</span><span class="p">:</span> <span class="n">USE_WEAVIATE</span><span class="p">,</span>
-</span><span id="L-78"><a href="#L-78"><span class="linenos"> 78</span></a>        <span class="s2">&quot;USE_MCP&quot;</span><span class="p">:</span> <span class="n">USE_MCP</span><span class="p">,</span>
-</span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a>        <span class="s2">&quot;LOG_LEVEL&quot;</span><span class="p">:</span> <span class="n">LOG_LEVEL</span><span class="p">,</span>
-</span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a>        <span class="s2">&quot;MCP_SERVERS&quot;</span><span class="p">:</span> <span class="n">MCP_SERVERS</span><span class="p">,</span>
-</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a>        <span class="s2">&quot;get_env_var&quot;</span><span class="p">:</span> <span class="n">get_env_var</span><span class="p">,</span>
-</span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a>        <span class="s2">&quot;get_settings&quot;</span><span class="p">:</span> <span class="n">get_settings</span><span class="p">,</span>
-</span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a>        <span class="s2">&quot;get_mcp_servers&quot;</span><span class="p">:</span> <span class="n">get_mcp_servers</span><span class="p">,</span>
-</span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a>        <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_STORAGE_DIR</span><span class="p">,</span>
-</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a>        <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_KNOWLEDGE_DIR</span><span class="p">,</span>
-</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a>        <span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">:</span> <span class="n">STORAGE_BACKEND</span><span class="p">,</span>
-</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a>        <span class="s2">&quot;LIGHTRAG_SERVER&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_SERVER</span><span class="p">,</span>
-</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a>        <span class="s2">&quot;LIGHTRAG_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_URL</span><span class="p">,</span>
-</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_MEMORY_URL</span><span class="p">,</span>
-</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a>    <span class="p">}</span>
-</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a>
-</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a>
-</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a>    <span class="c1"># Core configuration constants</span>
-</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a>    <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a>    <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a>    <span class="s2">&quot;BASE_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a>    <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a>    <span class="s2">&quot;HOME_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a>    <span class="s2">&quot;PERSAG_HOME&quot;</span><span class="p">,</span>
-</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a>    <span class="s2">&quot;PERSAG_ROOT&quot;</span><span class="p">,</span>
-</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a>    <span class="s2">&quot;REPO_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a>    <span class="s2">&quot;ROOT_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a>    <span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">,</span>
-</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a>    
-</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a>    <span class="c1"># LightRAG configuration</span>
-</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a>    <span class="s2">&quot;LIGHTRAG_INPUTS_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_INPUTS_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_PORT&quot;</span><span class="p">,</span>
-</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_STORAGE_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_URL&quot;</span><span class="p">,</span>
-</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a>    <span class="s2">&quot;LIGHTRAG_PORT&quot;</span><span class="p">,</span>
-</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a>    <span class="s2">&quot;LIGHTRAG_SERVER&quot;</span><span class="p">,</span>
-</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a>    <span class="s2">&quot;LIGHTRAG_SERVER_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a>    <span class="s2">&quot;LIGHTRAG_STORAGE_DIR&quot;</span><span class="p">,</span>
-</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a>    <span class="s2">&quot;LIGHTRAG_URL&quot;</span><span class="p">,</span>
-</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a>    
-</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a>    <span class="c1"># LLM and service URLs</span>
-</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a>    <span class="s2">&quot;LLM_MODEL&quot;</span><span class="p">,</span>
-</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a>    <span class="s2">&quot;LMSTUDIO_URL&quot;</span><span class="p">,</span>
-</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>    <span class="s2">&quot;OLLAMA_URL&quot;</span><span class="p">,</span>
-</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a>    <span class="s2">&quot;REMOTE_LMSTUDIO_URL&quot;</span><span class="p">,</span>
-</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a>    <span class="s2">&quot;REMOTE_OLLAMA_URL&quot;</span><span class="p">,</span>
-</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a>    <span class="s2">&quot;WEAVIATE_URL&quot;</span><span class="p">,</span>
-</span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>    
-</span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>    <span class="c1"># Timeout and performance settings</span>
-</span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>    <span class="s2">&quot;EMBEDDING_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>    <span class="s2">&quot;HTTPX_CONNECT_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="s2">&quot;HTTPX_POOL_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a>    <span class="s2">&quot;HTTPX_READ_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>    <span class="s2">&quot;HTTPX_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>    <span class="s2">&quot;HTTPX_WRITE_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>    <span class="s2">&quot;LLM_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-135"><a href="#L-135"><span class="linenos">135</span></a>    <span class="s2">&quot;OLLAMA_KEEP_ALIVE&quot;</span><span class="p">,</span>
-</span><span id="L-136"><a href="#L-136"><span class="linenos">136</span></a>    <span class="s2">&quot;OLLAMA_NUM_PREDICT&quot;</span><span class="p">,</span>
-</span><span id="L-137"><a href="#L-137"><span class="linenos">137</span></a>    <span class="s2">&quot;OLLAMA_TEMPERATURE&quot;</span><span class="p">,</span>
-</span><span id="L-138"><a href="#L-138"><span class="linenos">138</span></a>    <span class="s2">&quot;OLLAMA_TIMEOUT&quot;</span><span class="p">,</span>
-</span><span id="L-139"><a href="#L-139"><span class="linenos">139</span></a>    <span class="s2">&quot;PDF_CHUNK_SIZE&quot;</span><span class="p">,</span>
-</span><span id="L-140"><a href="#L-140"><span class="linenos">140</span></a>    
+</span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a>    <span class="n">USER_DATA_DIR</span><span class="p">,</span>
+</span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a>    <span class="n">WEAVIATE_URL</span><span class="p">,</span>
+</span><span id="L-52"><a href="#L-52"><span class="linenos"> 52</span></a>    <span class="n">get_env_bool</span><span class="p">,</span>
+</span><span id="L-53"><a href="#L-53"><span class="linenos"> 53</span></a>    <span class="n">get_env_var</span><span class="p">,</span>
+</span><span id="L-54"><a href="#L-54"><span class="linenos"> 54</span></a>    <span class="n">get_package_version</span><span class="p">,</span>
+</span><span id="L-55"><a href="#L-55"><span class="linenos"> 55</span></a>    <span class="n">get_qwen_instruct_settings</span><span class="p">,</span>
+</span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a>    <span class="n">get_qwen_thinking_settings</span><span class="p">,</span>
+</span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a><span class="p">)</span>
+</span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">.user_id_mgr</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a>    <span class="n">get_current_user_id</span><span class="p">,</span>
+</span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a>    <span class="n">get_user_storage_paths</span><span class="p">,</span>
+</span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a>    <span class="n">get_userid</span><span class="p">,</span>
+</span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a>    <span class="n">load_user_from_file</span><span class="p">,</span>
+</span><span id="L-63"><a href="#L-63"><span class="linenos"> 63</span></a>    <span class="n">refresh_user_dependent_settings</span><span class="p">,</span>
+</span><span id="L-64"><a href="#L-64"><span class="linenos"> 64</span></a><span class="p">)</span>
+</span><span id="L-65"><a href="#L-65"><span class="linenos"> 65</span></a>
+</span><span id="L-66"><a href="#L-66"><span class="linenos"> 66</span></a>
+</span><span id="L-67"><a href="#L-67"><span class="linenos"> 67</span></a><span class="c1"># Create a simple get_settings function for compatibility</span>
+</span><span id="L-68"><a href="#L-68"><span class="linenos"> 68</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_settings</span><span class="p">():</span>
+</span><span id="L-69"><a href="#L-69"><span class="linenos"> 69</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get configuration settings as a dictionary.&quot;&quot;&quot;</span>
+</span><span id="L-70"><a href="#L-70"><span class="linenos"> 70</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a>        <span class="s2">&quot;USER_ID&quot;</span><span class="p">:</span> <span class="n">get_userid</span><span class="p">(),</span>
+</span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a>        <span class="s2">&quot;ROOT_DIR&quot;</span><span class="p">:</span> <span class="n">ROOT_DIR</span><span class="p">,</span>
+</span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a>        <span class="s2">&quot;HOME_DIR&quot;</span><span class="p">:</span> <span class="n">HOME_DIR</span><span class="p">,</span>
+</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a>        <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">:</span> <span class="n">DATA_DIR</span><span class="p">,</span>
+</span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a>        <span class="s2">&quot;REPO_DIR&quot;</span><span class="p">:</span> <span class="n">REPO_DIR</span><span class="p">,</span>
+</span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a>        <span class="s2">&quot;WEAVIATE_URL&quot;</span><span class="p">:</span> <span class="n">WEAVIATE_URL</span><span class="p">,</span>
+</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a>        <span class="s2">&quot;OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="L-78"><a href="#L-78"><span class="linenos"> 78</span></a>        <span class="s2">&quot;REMOTE_OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">REMOTE_OLLAMA_URL</span><span class="p">,</span>
+</span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a>        <span class="s2">&quot;LLM_MODEL&quot;</span><span class="p">:</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a>        <span class="s2">&quot;USE_WEAVIATE&quot;</span><span class="p">:</span> <span class="n">USE_WEAVIATE</span><span class="p">,</span>
+</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a>        <span class="s2">&quot;USE_MCP&quot;</span><span class="p">:</span> <span class="n">USE_MCP</span><span class="p">,</span>
+</span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a>        <span class="s2">&quot;LOG_LEVEL&quot;</span><span class="p">:</span> <span class="n">LOG_LEVEL</span><span class="p">,</span>
+</span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a>        <span class="s2">&quot;MCP_SERVERS&quot;</span><span class="p">:</span> <span class="n">MCP_SERVERS</span><span class="p">,</span>
+</span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a>        <span class="s2">&quot;get_env_var&quot;</span><span class="p">:</span> <span class="n">get_env_var</span><span class="p">,</span>
+</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a>        <span class="s2">&quot;get_settings&quot;</span><span class="p">:</span> <span class="n">get_settings</span><span class="p">,</span>
+</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a>        <span class="s2">&quot;get_mcp_servers&quot;</span><span class="p">:</span> <span class="n">get_mcp_servers</span><span class="p">,</span>
+</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a>        <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_STORAGE_DIR</span><span class="p">,</span>
+</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a>        <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_KNOWLEDGE_DIR</span><span class="p">,</span>
+</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a>        <span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">:</span> <span class="n">STORAGE_BACKEND</span><span class="p">,</span>
+</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a>        <span class="s2">&quot;LIGHTRAG_SERVER&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_SERVER</span><span class="p">,</span>
+</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a>        <span class="s2">&quot;LIGHTRAG_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_URL</span><span class="p">,</span>
+</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_MEMORY_URL</span><span class="p">,</span>
+</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a>    <span class="p">}</span>
+</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a>
+</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a>
+</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a>    <span class="c1"># Core configuration constants</span>
+</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a>    <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a>    <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a>    <span class="s2">&quot;BASE_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a>    <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a>    <span class="s2">&quot;USER_DATA_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a>    <span class="s2">&quot;HOME_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a>    <span class="s2">&quot;PERSAG_HOME&quot;</span><span class="p">,</span>
+</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a>    <span class="s2">&quot;PERSAG_ROOT&quot;</span><span class="p">,</span>
+</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a>    <span class="s2">&quot;REPO_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a>    <span class="s2">&quot;ROOT_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a>    <span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">,</span>
+</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a>    <span class="c1"># LightRAG configuration</span>
+</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a>    <span class="s2">&quot;LIGHTRAG_INPUTS_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_INPUTS_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_PORT&quot;</span><span class="p">,</span>
+</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_STORAGE_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a>    <span class="s2">&quot;LIGHTRAG_MEMORY_URL&quot;</span><span class="p">,</span>
+</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a>    <span class="s2">&quot;LIGHTRAG_PORT&quot;</span><span class="p">,</span>
+</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a>    <span class="s2">&quot;LIGHTRAG_SERVER&quot;</span><span class="p">,</span>
+</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a>    <span class="s2">&quot;LIGHTRAG_SERVER_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a>    <span class="s2">&quot;LIGHTRAG_STORAGE_DIR&quot;</span><span class="p">,</span>
+</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a>    <span class="s2">&quot;LIGHTRAG_URL&quot;</span><span class="p">,</span>
+</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a>    <span class="c1"># LLM and service URLs</span>
+</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>    <span class="s2">&quot;LLM_MODEL&quot;</span><span class="p">,</span>
+</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a>    <span class="s2">&quot;LMSTUDIO_URL&quot;</span><span class="p">,</span>
+</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a>    <span class="s2">&quot;OLLAMA_URL&quot;</span><span class="p">,</span>
+</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a>    <span class="s2">&quot;REMOTE_LMSTUDIO_URL&quot;</span><span class="p">,</span>
+</span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>    <span class="s2">&quot;REMOTE_OLLAMA_URL&quot;</span><span class="p">,</span>
+</span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>    <span class="s2">&quot;WEAVIATE_URL&quot;</span><span class="p">,</span>
+</span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>    <span class="c1"># Timeout and performance settings</span>
+</span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>    <span class="s2">&quot;EMBEDDING_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="s2">&quot;HTTPX_CONNECT_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a>    <span class="s2">&quot;HTTPX_POOL_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>    <span class="s2">&quot;HTTPX_READ_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>    <span class="s2">&quot;HTTPX_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>    <span class="s2">&quot;HTTPX_WRITE_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-135"><a href="#L-135"><span class="linenos">135</span></a>    <span class="s2">&quot;LLM_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-136"><a href="#L-136"><span class="linenos">136</span></a>    <span class="s2">&quot;OLLAMA_KEEP_ALIVE&quot;</span><span class="p">,</span>
+</span><span id="L-137"><a href="#L-137"><span class="linenos">137</span></a>    <span class="s2">&quot;OLLAMA_NUM_PREDICT&quot;</span><span class="p">,</span>
+</span><span id="L-138"><a href="#L-138"><span class="linenos">138</span></a>    <span class="s2">&quot;OLLAMA_TEMPERATURE&quot;</span><span class="p">,</span>
+</span><span id="L-139"><a href="#L-139"><span class="linenos">139</span></a>    <span class="s2">&quot;OLLAMA_TIMEOUT&quot;</span><span class="p">,</span>
+</span><span id="L-140"><a href="#L-140"><span class="linenos">140</span></a>    <span class="s2">&quot;PDF_CHUNK_SIZE&quot;</span><span class="p">,</span>
 </span><span id="L-141"><a href="#L-141"><span class="linenos">141</span></a>    <span class="c1"># Logging and display</span>
 </span><span id="L-142"><a href="#L-142"><span class="linenos">142</span></a>    <span class="s2">&quot;LOG_LEVEL&quot;</span><span class="p">,</span>
 </span><span id="L-143"><a href="#L-143"><span class="linenos">143</span></a>    <span class="s2">&quot;LOG_LEVEL_STR&quot;</span><span class="p">,</span>
 </span><span id="L-144"><a href="#L-144"><span class="linenos">144</span></a>    <span class="s2">&quot;PORT&quot;</span><span class="p">,</span>
 </span><span id="L-145"><a href="#L-145"><span class="linenos">145</span></a>    <span class="s2">&quot;PROVIDER&quot;</span><span class="p">,</span>
 </span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a>    <span class="s2">&quot;SHOW_SPLASH_SCREEN&quot;</span><span class="p">,</span>
-</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a>    
-</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a>    <span class="c1"># Feature flags</span>
-</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a>    <span class="s2">&quot;USE_MCP&quot;</span><span class="p">,</span>
-</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>    <span class="s2">&quot;USE_WEAVIATE&quot;</span><span class="p">,</span>
-</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a>    
-</span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a>    <span class="c1"># MCP servers</span>
-</span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a>    <span class="s2">&quot;MCP_SERVERS&quot;</span><span class="p">,</span>
-</span><span id="L-154"><a href="#L-154"><span class="linenos">154</span></a>    
-</span><span id="L-155"><a href="#L-155"><span class="linenos">155</span></a>    <span class="c1"># Utility functions</span>
-</span><span id="L-156"><a href="#L-156"><span class="linenos">156</span></a>    <span class="s2">&quot;get_current_user_id&quot;</span><span class="p">,</span>
-</span><span id="L-157"><a href="#L-157"><span class="linenos">157</span></a>    <span class="s2">&quot;get_env_bool&quot;</span><span class="p">,</span>
-</span><span id="L-158"><a href="#L-158"><span class="linenos">158</span></a>    <span class="s2">&quot;get_env_var&quot;</span><span class="p">,</span>
-</span><span id="L-159"><a href="#L-159"><span class="linenos">159</span></a>    <span class="s2">&quot;get_mcp_servers&quot;</span><span class="p">,</span>
-</span><span id="L-160"><a href="#L-160"><span class="linenos">160</span></a>    <span class="s2">&quot;get_package_version&quot;</span><span class="p">,</span>
-</span><span id="L-161"><a href="#L-161"><span class="linenos">161</span></a>    <span class="s2">&quot;get_settings&quot;</span><span class="p">,</span>
-</span><span id="L-162"><a href="#L-162"><span class="linenos">162</span></a>    <span class="s2">&quot;get_user_storage_paths&quot;</span><span class="p">,</span>
-</span><span id="L-163"><a href="#L-163"><span class="linenos">163</span></a>    <span class="s2">&quot;get_userid&quot;</span><span class="p">,</span>
-</span><span id="L-164"><a href="#L-164"><span class="linenos">164</span></a>    <span class="s2">&quot;load_user_from_file&quot;</span><span class="p">,</span>
-</span><span id="L-165"><a href="#L-165"><span class="linenos">165</span></a>    <span class="s2">&quot;refresh_user_dependent_settings&quot;</span><span class="p">,</span>
-</span><span id="L-166"><a href="#L-166"><span class="linenos">166</span></a><span class="p">]</span>
+</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a>    <span class="c1"># Feature flags</span>
+</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a>    <span class="s2">&quot;USE_MCP&quot;</span><span class="p">,</span>
+</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a>    <span class="s2">&quot;USE_WEAVIATE&quot;</span><span class="p">,</span>
+</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>    <span class="c1"># MCP servers</span>
+</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a>    <span class="s2">&quot;MCP_SERVERS&quot;</span><span class="p">,</span>
+</span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a>    <span class="c1"># Utility functions</span>
+</span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a>    <span class="s2">&quot;get_current_user_id&quot;</span><span class="p">,</span>
+</span><span id="L-154"><a href="#L-154"><span class="linenos">154</span></a>    <span class="s2">&quot;get_env_bool&quot;</span><span class="p">,</span>
+</span><span id="L-155"><a href="#L-155"><span class="linenos">155</span></a>    <span class="s2">&quot;get_env_var&quot;</span><span class="p">,</span>
+</span><span id="L-156"><a href="#L-156"><span class="linenos">156</span></a>    <span class="s2">&quot;get_mcp_servers&quot;</span><span class="p">,</span>
+</span><span id="L-157"><a href="#L-157"><span class="linenos">157</span></a>    <span class="s2">&quot;get_package_version&quot;</span><span class="p">,</span>
+</span><span id="L-158"><a href="#L-158"><span class="linenos">158</span></a>    <span class="s2">&quot;get_qwen_instruct_settings&quot;</span><span class="p">,</span>
+</span><span id="L-159"><a href="#L-159"><span class="linenos">159</span></a>    <span class="s2">&quot;get_qwen_thinking_settings&quot;</span><span class="p">,</span>
+</span><span id="L-160"><a href="#L-160"><span class="linenos">160</span></a>    <span class="s2">&quot;get_settings&quot;</span><span class="p">,</span>
+</span><span id="L-161"><a href="#L-161"><span class="linenos">161</span></a>    <span class="s2">&quot;get_user_storage_paths&quot;</span><span class="p">,</span>
+</span><span id="L-162"><a href="#L-162"><span class="linenos">162</span></a>    <span class="s2">&quot;get_userid&quot;</span><span class="p">,</span>
+</span><span id="L-163"><a href="#L-163"><span class="linenos">163</span></a>    <span class="s2">&quot;load_user_from_file&quot;</span><span class="p">,</span>
+</span><span id="L-164"><a href="#L-164"><span class="linenos">164</span></a>    <span class="s2">&quot;refresh_user_dependent_settings&quot;</span><span class="p">,</span>
+</span><span id="L-165"><a href="#L-165"><span class="linenos">165</span></a><span class="p">]</span>
 </span></pre></div>
 
 
@@ -397,7 +405,7 @@
                 <section id="AGNO_KNOWLEDGE_DIR">
                     <div class="attr variable">
             <span class="name">AGNO_KNOWLEDGE_DIR</span>        =
-<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/eric/knowledge&#39;</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok/knowledge&#39;</span>
 
         
     </div>
@@ -409,7 +417,7 @@
                 <section id="AGNO_STORAGE_DIR">
                     <div class="attr variable">
             <span class="name">AGNO_STORAGE_DIR</span>        =
-<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/eric&#39;</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok&#39;</span>
 
         
     </div>
@@ -433,11 +441,23 @@
                 <section id="DATA_DIR">
                     <div class="attr variable">
             <span class="name">DATA_DIR</span>        =
-<span class="default_value">$PERSAG_ROOT</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data&#39;</span>
 
         
     </div>
     <a class="headerlink" href="#DATA_DIR"></a>
+    
+    
+
+                </section>
+                <section id="USER_DATA_DIR">
+                    <div class="attr variable">
+            <span class="name">USER_DATA_DIR</span>        =
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok/data&#39;</span>
+
+        
+    </div>
+    <a class="headerlink" href="#USER_DATA_DIR"></a>
     
     
 
@@ -469,7 +489,7 @@
                 <section id="PERSAG_ROOT">
                     <div class="attr variable">
             <span class="name">PERSAG_ROOT</span>        =
-<span class="default_value">$PERSAG_ROOT</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data&#39;</span>
 
         
     </div>
@@ -517,7 +537,7 @@
                 <section id="LIGHTRAG_INPUTS_DIR">
                     <div class="attr variable">
             <span class="name">LIGHTRAG_INPUTS_DIR</span>        =
-<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/eric/inputs&#39;</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok/inputs&#39;</span>
 
         
     </div>
@@ -541,7 +561,7 @@
                 <section id="LIGHTRAG_MEMORY_INPUTS_DIR">
                     <div class="attr variable">
             <span class="name">LIGHTRAG_MEMORY_INPUTS_DIR</span>        =
-<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/eric/memory_inputs&#39;</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok/memory_inputs&#39;</span>
 
         
     </div>
@@ -565,7 +585,7 @@
                 <section id="LIGHTRAG_MEMORY_STORAGE_DIR">
                     <div class="attr variable">
             <span class="name">LIGHTRAG_MEMORY_STORAGE_DIR</span>        =
-<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/eric/memory_rag_storage&#39;</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok/memory_rag_storage&#39;</span>
 
         
     </div>
@@ -625,7 +645,7 @@
                 <section id="LIGHTRAG_STORAGE_DIR">
                     <div class="attr variable">
             <span class="name">LIGHTRAG_STORAGE_DIR</span>        =
-<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/eric/rag_storage&#39;</span>
+<span class="default_value">&#39;/Users/Shared/personal_agent_data/agno/grok/rag_storage&#39;</span>
 
         
     </div>
@@ -661,7 +681,7 @@
                 <section id="LMSTUDIO_URL">
                     <div class="attr variable">
             <span class="name">LMSTUDIO_URL</span>        =
-<span class="default_value">$LMSTUDIO_URL</span>
+<span class="default_value">&#39;https://localhost:1234/v1&#39;</span>
 
         
     </div>
@@ -673,7 +693,7 @@
                 <section id="OLLAMA_URL">
                     <div class="attr variable">
             <span class="name">OLLAMA_URL</span>        =
-<span class="default_value">$OLLAMA_URL</span>
+<span class="default_value">&#39;http://localhost:11434&#39;</span>
 
         
     </div>
@@ -685,7 +705,7 @@
                 <section id="REMOTE_LMSTUDIO_URL">
                     <div class="attr variable">
             <span class="name">REMOTE_LMSTUDIO_URL</span>        =
-<span class="default_value">$REMOTE_LMSTUDIO_URL</span>
+<span class="default_value">$REMOTE_OLLAMA_URL</span>
 
         
     </div>
@@ -829,7 +849,7 @@
                 <section id="OLLAMA_TEMPERATURE">
                     <div class="attr variable">
             <span class="name">OLLAMA_TEMPERATURE</span>        =
-<span class="default_value">&#39;0.1&#39;</span>
+<span class="default_value">&#39;0.4&#39;</span>
 
         
     </div>
@@ -970,16 +990,16 @@
 
     </div>
     <a class="headerlink" href="#get_current_user_id"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_current_user_id-113"><a href="#get_current_user_id-113"><span class="linenos">113</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_current_user_id</span><span class="p">():</span>
-</span><span id="get_current_user_id-114"><a href="#get_current_user_id-114"><span class="linenos">114</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the current USER_ID dynamically from ~/.persag/env.userid.</span>
-</span><span id="get_current_user_id-115"><a href="#get_current_user_id-115"><span class="linenos">115</span></a>
-</span><span id="get_current_user_id-116"><a href="#get_current_user_id-116"><span class="linenos">116</span></a><span class="sd">    This function always reads from ~/.persag/env.userid to ensure we get the latest value</span>
-</span><span id="get_current_user_id-117"><a href="#get_current_user_id-117"><span class="linenos">117</span></a><span class="sd">    after user switching, rather than the cached value from module import time.</span>
-</span><span id="get_current_user_id-118"><a href="#get_current_user_id-118"><span class="linenos">118</span></a>
-</span><span id="get_current_user_id-119"><a href="#get_current_user_id-119"><span class="linenos">119</span></a><span class="sd">    Returns:</span>
-</span><span id="get_current_user_id-120"><a href="#get_current_user_id-120"><span class="linenos">120</span></a><span class="sd">        Current USER_ID from ~/.persag/env.userid or default fallback</span>
-</span><span id="get_current_user_id-121"><a href="#get_current_user_id-121"><span class="linenos">121</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_current_user_id-122"><a href="#get_current_user_id-122"><span class="linenos">122</span></a>    <span class="k">return</span> <span class="n">get_userid</span><span class="p">()</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_current_user_id-112"><a href="#get_current_user_id-112"><span class="linenos">112</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_current_user_id</span><span class="p">():</span>
+</span><span id="get_current_user_id-113"><a href="#get_current_user_id-113"><span class="linenos">113</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the current USER_ID dynamically from ~/.persag/env.userid.</span>
+</span><span id="get_current_user_id-114"><a href="#get_current_user_id-114"><span class="linenos">114</span></a>
+</span><span id="get_current_user_id-115"><a href="#get_current_user_id-115"><span class="linenos">115</span></a><span class="sd">    This function always reads from ~/.persag/env.userid to ensure we get the latest value</span>
+</span><span id="get_current_user_id-116"><a href="#get_current_user_id-116"><span class="linenos">116</span></a><span class="sd">    after user switching, rather than the cached value from module import time.</span>
+</span><span id="get_current_user_id-117"><a href="#get_current_user_id-117"><span class="linenos">117</span></a>
+</span><span id="get_current_user_id-118"><a href="#get_current_user_id-118"><span class="linenos">118</span></a><span class="sd">    Returns:</span>
+</span><span id="get_current_user_id-119"><a href="#get_current_user_id-119"><span class="linenos">119</span></a><span class="sd">        Current USER_ID from ~/.persag/env.userid or default fallback</span>
+</span><span id="get_current_user_id-120"><a href="#get_current_user_id-120"><span class="linenos">120</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_current_user_id-121"><a href="#get_current_user_id-121"><span class="linenos">121</span></a>    <span class="k">return</span> <span class="n">get_userid</span><span class="p">()</span>
 </span></pre></div>
 
 
@@ -1005,22 +1025,22 @@ after user switching, rather than the cached value from module import time.</p>
 
     </div>
     <a class="headerlink" href="#get_env_bool"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_env_bool-70"><a href="#get_env_bool-70"><span class="linenos">70</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_env_bool</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fallback</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="get_env_bool-71"><a href="#get_env_bool-71"><span class="linenos">71</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse environment variable as boolean with flexible string interpretation.</span>
-</span><span id="get_env_bool-72"><a href="#get_env_bool-72"><span class="linenos">72</span></a>
-</span><span id="get_env_bool-73"><a href="#get_env_bool-73"><span class="linenos">73</span></a><span class="sd">    Converts string environment variables to boolean values using common</span>
-</span><span id="get_env_bool-74"><a href="#get_env_bool-74"><span class="linenos">74</span></a><span class="sd">    boolean representations. Accepts multiple formats for true values:</span>
-</span><span id="get_env_bool-75"><a href="#get_env_bool-75"><span class="linenos">75</span></a><span class="sd">    &#39;true&#39;, &#39;1&#39;, &#39;yes&#39;, &#39;on&#39; (case-insensitive).</span>
-</span><span id="get_env_bool-76"><a href="#get_env_bool-76"><span class="linenos">76</span></a>
-</span><span id="get_env_bool-77"><a href="#get_env_bool-77"><span class="linenos">77</span></a><span class="sd">    Args:</span>
-</span><span id="get_env_bool-78"><a href="#get_env_bool-78"><span class="linenos">78</span></a><span class="sd">        key: Environment variable name to retrieve and parse</span>
-</span><span id="get_env_bool-79"><a href="#get_env_bool-79"><span class="linenos">79</span></a><span class="sd">        fallback: Default boolean value if variable not found (default: True)</span>
-</span><span id="get_env_bool-80"><a href="#get_env_bool-80"><span class="linenos">80</span></a>
-</span><span id="get_env_bool-81"><a href="#get_env_bool-81"><span class="linenos">81</span></a><span class="sd">    Returns:</span>
-</span><span id="get_env_bool-82"><a href="#get_env_bool-82"><span class="linenos">82</span></a><span class="sd">        bool: Parsed boolean value or fallback if variable not found</span>
-</span><span id="get_env_bool-83"><a href="#get_env_bool-83"><span class="linenos">83</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_env_bool-84"><a href="#get_env_bool-84"><span class="linenos">84</span></a>    <span class="n">value</span> <span class="o">=</span> <span class="n">get_env_var</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">fallback</span><span class="p">))</span>
-</span><span id="get_env_bool-85"><a href="#get_env_bool-85"><span class="linenos">85</span></a>    <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;yes&quot;</span><span class="p">,</span> <span class="s2">&quot;on&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_env_bool-76"><a href="#get_env_bool-76"><span class="linenos">76</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_env_bool</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fallback</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="get_env_bool-77"><a href="#get_env_bool-77"><span class="linenos">77</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse environment variable as boolean with flexible string interpretation.</span>
+</span><span id="get_env_bool-78"><a href="#get_env_bool-78"><span class="linenos">78</span></a>
+</span><span id="get_env_bool-79"><a href="#get_env_bool-79"><span class="linenos">79</span></a><span class="sd">    Converts string environment variables to boolean values using common</span>
+</span><span id="get_env_bool-80"><a href="#get_env_bool-80"><span class="linenos">80</span></a><span class="sd">    boolean representations. Accepts multiple formats for true values:</span>
+</span><span id="get_env_bool-81"><a href="#get_env_bool-81"><span class="linenos">81</span></a><span class="sd">    &#39;true&#39;, &#39;1&#39;, &#39;yes&#39;, &#39;on&#39; (case-insensitive).</span>
+</span><span id="get_env_bool-82"><a href="#get_env_bool-82"><span class="linenos">82</span></a>
+</span><span id="get_env_bool-83"><a href="#get_env_bool-83"><span class="linenos">83</span></a><span class="sd">    Args:</span>
+</span><span id="get_env_bool-84"><a href="#get_env_bool-84"><span class="linenos">84</span></a><span class="sd">        key: Environment variable name to retrieve and parse</span>
+</span><span id="get_env_bool-85"><a href="#get_env_bool-85"><span class="linenos">85</span></a><span class="sd">        fallback: Default boolean value if variable not found (default: True)</span>
+</span><span id="get_env_bool-86"><a href="#get_env_bool-86"><span class="linenos">86</span></a>
+</span><span id="get_env_bool-87"><a href="#get_env_bool-87"><span class="linenos">87</span></a><span class="sd">    Returns:</span>
+</span><span id="get_env_bool-88"><a href="#get_env_bool-88"><span class="linenos">88</span></a><span class="sd">        bool: Parsed boolean value or fallback if variable not found</span>
+</span><span id="get_env_bool-89"><a href="#get_env_bool-89"><span class="linenos">89</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_env_bool-90"><a href="#get_env_bool-90"><span class="linenos">90</span></a>    <span class="n">value</span> <span class="o">=</span> <span class="n">get_env_var</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">fallback</span><span class="p">))</span>
+</span><span id="get_env_bool-91"><a href="#get_env_bool-91"><span class="linenos">91</span></a>    <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;yes&quot;</span><span class="p">,</span> <span class="s2">&quot;on&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -1051,25 +1071,25 @@ boolean representations. Accepts multiple formats for true values:
 
     </div>
     <a class="headerlink" href="#get_env_var"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_env_var-44"><a href="#get_env_var-44"><span class="linenos">44</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_env_var</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fallback</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="get_env_var-45"><a href="#get_env_var-45"><span class="linenos">45</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve environment variable with intelligent fallback strategy.</span>
-</span><span id="get_env_var-46"><a href="#get_env_var-46"><span class="linenos">46</span></a>
-</span><span id="get_env_var-47"><a href="#get_env_var-47"><span class="linenos">47</span></a><span class="sd">    Prioritizes dotenv cache over os.environ to ensure consistent behavior.</span>
-</span><span id="get_env_var-48"><a href="#get_env_var-48"><span class="linenos">48</span></a><span class="sd">    Uses a two-tier lookup: first checks the cached .env values, then falls</span>
-</span><span id="get_env_var-49"><a href="#get_env_var-49"><span class="linenos">49</span></a><span class="sd">    back to system environment variables if not found or if dotenv loading failed.</span>
-</span><span id="get_env_var-50"><a href="#get_env_var-50"><span class="linenos">50</span></a>
-</span><span id="get_env_var-51"><a href="#get_env_var-51"><span class="linenos">51</span></a><span class="sd">    Args:</span>
-</span><span id="get_env_var-52"><a href="#get_env_var-52"><span class="linenos">52</span></a><span class="sd">        key: Environment variable name to retrieve</span>
-</span><span id="get_env_var-53"><a href="#get_env_var-53"><span class="linenos">53</span></a><span class="sd">        fallback: Default value if variable not found (default: empty string)</span>
-</span><span id="get_env_var-54"><a href="#get_env_var-54"><span class="linenos">54</span></a>
-</span><span id="get_env_var-55"><a href="#get_env_var-55"><span class="linenos">55</span></a><span class="sd">    Returns:</span>
-</span><span id="get_env_var-56"><a href="#get_env_var-56"><span class="linenos">56</span></a><span class="sd">        str: Environment variable value or fallback if not found</span>
-</span><span id="get_env_var-57"><a href="#get_env_var-57"><span class="linenos">57</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_env_var-58"><a href="#get_env_var-58"><span class="linenos">58</span></a>    <span class="k">if</span> <span class="n">dotenv_loaded</span> <span class="ow">and</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_env_vars</span><span class="p">:</span>
-</span><span id="get_env_var-59"><a href="#get_env_var-59"><span class="linenos">59</span></a>        <span class="k">return</span> <span class="n">_env_vars</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">or</span> <span class="n">fallback</span>
-</span><span id="get_env_var-60"><a href="#get_env_var-60"><span class="linenos">60</span></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="get_env_var-61"><a href="#get_env_var-61"><span class="linenos">61</span></a>        <span class="c1"># If dotenv failed or key not in .env, try os.getenv as fallback</span>
-</span><span id="get_env_var-62"><a href="#get_env_var-62"><span class="linenos">62</span></a>        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">fallback</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_env_var-50"><a href="#get_env_var-50"><span class="linenos">50</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_env_var</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fallback</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="get_env_var-51"><a href="#get_env_var-51"><span class="linenos">51</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve environment variable with intelligent fallback strategy.</span>
+</span><span id="get_env_var-52"><a href="#get_env_var-52"><span class="linenos">52</span></a>
+</span><span id="get_env_var-53"><a href="#get_env_var-53"><span class="linenos">53</span></a><span class="sd">    Prioritizes dotenv cache over os.environ to ensure consistent behavior.</span>
+</span><span id="get_env_var-54"><a href="#get_env_var-54"><span class="linenos">54</span></a><span class="sd">    Uses a two-tier lookup: first checks the cached .env values, then falls</span>
+</span><span id="get_env_var-55"><a href="#get_env_var-55"><span class="linenos">55</span></a><span class="sd">    back to system environment variables if not found or if dotenv loading failed.</span>
+</span><span id="get_env_var-56"><a href="#get_env_var-56"><span class="linenos">56</span></a>
+</span><span id="get_env_var-57"><a href="#get_env_var-57"><span class="linenos">57</span></a><span class="sd">    Args:</span>
+</span><span id="get_env_var-58"><a href="#get_env_var-58"><span class="linenos">58</span></a><span class="sd">        key: Environment variable name to retrieve</span>
+</span><span id="get_env_var-59"><a href="#get_env_var-59"><span class="linenos">59</span></a><span class="sd">        fallback: Default value if variable not found (default: empty string)</span>
+</span><span id="get_env_var-60"><a href="#get_env_var-60"><span class="linenos">60</span></a>
+</span><span id="get_env_var-61"><a href="#get_env_var-61"><span class="linenos">61</span></a><span class="sd">    Returns:</span>
+</span><span id="get_env_var-62"><a href="#get_env_var-62"><span class="linenos">62</span></a><span class="sd">        str: Environment variable value or fallback if not found</span>
+</span><span id="get_env_var-63"><a href="#get_env_var-63"><span class="linenos">63</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_env_var-64"><a href="#get_env_var-64"><span class="linenos">64</span></a>    <span class="k">if</span> <span class="n">dotenv_loaded</span> <span class="ow">and</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_env_vars</span><span class="p">:</span>
+</span><span id="get_env_var-65"><a href="#get_env_var-65"><span class="linenos">65</span></a>        <span class="k">return</span> <span class="n">_env_vars</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">or</span> <span class="n">fallback</span>
+</span><span id="get_env_var-66"><a href="#get_env_var-66"><span class="linenos">66</span></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="get_env_var-67"><a href="#get_env_var-67"><span class="linenos">67</span></a>        <span class="c1"># If dotenv failed or key not in .env, try os.getenv as fallback</span>
+</span><span id="get_env_var-68"><a href="#get_env_var-68"><span class="linenos">68</span></a>        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">fallback</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -1122,27 +1142,27 @@ back to system environment variables if not found or if dotenv loading failed.</
 
     </div>
     <a class="headerlink" href="#get_package_version"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_package_version-180"><a href="#get_package_version-180"><span class="linenos">180</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_package_version</span><span class="p">():</span>
-</span><span id="get_package_version-181"><a href="#get_package_version-181"><span class="linenos">181</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve package version with import path handling.</span>
-</span><span id="get_package_version-182"><a href="#get_package_version-182"><span class="linenos">182</span></a>
-</span><span id="get_package_version-183"><a href="#get_package_version-183"><span class="linenos">183</span></a><span class="sd">    Attempts to import the version from the package&#39;s __init__.py file,</span>
-</span><span id="get_package_version-184"><a href="#get_package_version-184"><span class="linenos">184</span></a><span class="sd">    handling both standalone script execution and module import scenarios.</span>
-</span><span id="get_package_version-185"><a href="#get_package_version-185"><span class="linenos">185</span></a><span class="sd">    Uses different import strategies based on execution context.</span>
-</span><span id="get_package_version-186"><a href="#get_package_version-186"><span class="linenos">186</span></a>
-</span><span id="get_package_version-187"><a href="#get_package_version-187"><span class="linenos">187</span></a><span class="sd">    Returns:</span>
-</span><span id="get_package_version-188"><a href="#get_package_version-188"><span class="linenos">188</span></a><span class="sd">        str: Package version string or &#39;unknown&#39; if import fails</span>
-</span><span id="get_package_version-189"><a href="#get_package_version-189"><span class="linenos">189</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_package_version-190"><a href="#get_package_version-190"><span class="linenos">190</span></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="get_package_version-191"><a href="#get_package_version-191"><span class="linenos">191</span></a>        <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-</span><span id="get_package_version-192"><a href="#get_package_version-192"><span class="linenos">192</span></a>            <span class="c1"># When run as standalone, try absolute import</span>
-</span><span id="get_package_version-193"><a href="#get_package_version-193"><span class="linenos">193</span></a>            <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">BASE_DIR</span><span class="p">))</span>
-</span><span id="get_package_version-194"><a href="#get_package_version-194"><span class="linenos">194</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">personal_agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
-</span><span id="get_package_version-195"><a href="#get_package_version-195"><span class="linenos">195</span></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="get_package_version-196"><a href="#get_package_version-196"><span class="linenos">196</span></a>            <span class="c1"># When imported as module, use relative import</span>
-</span><span id="get_package_version-197"><a href="#get_package_version-197"><span class="linenos">197</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">...</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
-</span><span id="get_package_version-198"><a href="#get_package_version-198"><span class="linenos">198</span></a>        <span class="k">return</span> <span class="n">__version__</span>
-</span><span id="get_package_version-199"><a href="#get_package_version-199"><span class="linenos">199</span></a>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-</span><span id="get_package_version-200"><a href="#get_package_version-200"><span class="linenos">200</span></a>        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_package_version-221"><a href="#get_package_version-221"><span class="linenos">221</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_package_version</span><span class="p">():</span>
+</span><span id="get_package_version-222"><a href="#get_package_version-222"><span class="linenos">222</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve package version with import path handling.</span>
+</span><span id="get_package_version-223"><a href="#get_package_version-223"><span class="linenos">223</span></a>
+</span><span id="get_package_version-224"><a href="#get_package_version-224"><span class="linenos">224</span></a><span class="sd">    Attempts to import the version from the package&#39;s __init__.py file,</span>
+</span><span id="get_package_version-225"><a href="#get_package_version-225"><span class="linenos">225</span></a><span class="sd">    handling both standalone script execution and module import scenarios.</span>
+</span><span id="get_package_version-226"><a href="#get_package_version-226"><span class="linenos">226</span></a><span class="sd">    Uses different import strategies based on execution context.</span>
+</span><span id="get_package_version-227"><a href="#get_package_version-227"><span class="linenos">227</span></a>
+</span><span id="get_package_version-228"><a href="#get_package_version-228"><span class="linenos">228</span></a><span class="sd">    Returns:</span>
+</span><span id="get_package_version-229"><a href="#get_package_version-229"><span class="linenos">229</span></a><span class="sd">        str: Package version string or &#39;unknown&#39; if import fails</span>
+</span><span id="get_package_version-230"><a href="#get_package_version-230"><span class="linenos">230</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_package_version-231"><a href="#get_package_version-231"><span class="linenos">231</span></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="get_package_version-232"><a href="#get_package_version-232"><span class="linenos">232</span></a>        <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+</span><span id="get_package_version-233"><a href="#get_package_version-233"><span class="linenos">233</span></a>            <span class="c1"># When run as standalone, try absolute import</span>
+</span><span id="get_package_version-234"><a href="#get_package_version-234"><span class="linenos">234</span></a>            <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">BASE_DIR</span><span class="p">))</span>
+</span><span id="get_package_version-235"><a href="#get_package_version-235"><span class="linenos">235</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">personal_agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+</span><span id="get_package_version-236"><a href="#get_package_version-236"><span class="linenos">236</span></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="get_package_version-237"><a href="#get_package_version-237"><span class="linenos">237</span></a>            <span class="c1"># When imported as module, use relative import</span>
+</span><span id="get_package_version-238"><a href="#get_package_version-238"><span class="linenos">238</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">...</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+</span><span id="get_package_version-239"><a href="#get_package_version-239"><span class="linenos">239</span></a>        <span class="k">return</span> <span class="n">__version__</span>
+</span><span id="get_package_version-240"><a href="#get_package_version-240"><span class="linenos">240</span></a>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+</span><span id="get_package_version-241"><a href="#get_package_version-241"><span class="linenos">241</span></a>        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
 </span></pre></div>
 
 
@@ -1158,6 +1178,73 @@ Uses different import strategies based on execution context.</p>
 
 
                 </section>
+                <section id="get_qwen_instruct_settings">
+                            <input id="get_qwen_instruct_settings-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">get_qwen_instruct_settings</span><span class="signature pdoc-code condensed">(<span class="return-annotation">) -> <span class="nb">dict</span>:</span></span>
+
+                <label class="view-source-button" for="get_qwen_instruct_settings-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#get_qwen_instruct_settings"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_qwen_instruct_settings-169"><a href="#get_qwen_instruct_settings-169"><span class="linenos">169</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_qwen_instruct_settings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="get_qwen_instruct_settings-170"><a href="#get_qwen_instruct_settings-170"><span class="linenos">170</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Qwen instruct model settings as a dictionary.</span>
+</span><span id="get_qwen_instruct_settings-171"><a href="#get_qwen_instruct_settings-171"><span class="linenos">171</span></a>
+</span><span id="get_qwen_instruct_settings-172"><a href="#get_qwen_instruct_settings-172"><span class="linenos">172</span></a><span class="sd">    Returns:</span>
+</span><span id="get_qwen_instruct_settings-173"><a href="#get_qwen_instruct_settings-173"><span class="linenos">173</span></a><span class="sd">        dict: Dictionary containing instruct model parameters</span>
+</span><span id="get_qwen_instruct_settings-174"><a href="#get_qwen_instruct_settings-174"><span class="linenos">174</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_qwen_instruct_settings-175"><a href="#get_qwen_instruct_settings-175"><span class="linenos">175</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="get_qwen_instruct_settings-176"><a href="#get_qwen_instruct_settings-176"><span class="linenos">176</span></a>        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TEMPERATURE</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-177"><a href="#get_qwen_instruct_settings-177"><span class="linenos">177</span></a>        <span class="s2">&quot;min_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_MIN_P</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-178"><a href="#get_qwen_instruct_settings-178"><span class="linenos">178</span></a>        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TOP_P</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-179"><a href="#get_qwen_instruct_settings-179"><span class="linenos">179</span></a>        <span class="s2">&quot;top_k&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TOP_K</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-180"><a href="#get_qwen_instruct_settings-180"><span class="linenos">180</span></a>    <span class="p">}</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Get Qwen instruct model settings as a dictionary.</p>
+
+<p>Returns:
+    dict: Dictionary containing instruct model parameters</p>
+</div>
+
+
+                </section>
+                <section id="get_qwen_thinking_settings">
+                            <input id="get_qwen_thinking_settings-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">get_qwen_thinking_settings</span><span class="signature pdoc-code condensed">(<span class="return-annotation">) -> <span class="nb">dict</span>:</span></span>
+
+                <label class="view-source-button" for="get_qwen_thinking_settings-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#get_qwen_thinking_settings"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_qwen_thinking_settings-183"><a href="#get_qwen_thinking_settings-183"><span class="linenos">183</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_qwen_thinking_settings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="get_qwen_thinking_settings-184"><a href="#get_qwen_thinking_settings-184"><span class="linenos">184</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Qwen thinking model settings as a dictionary.</span>
+</span><span id="get_qwen_thinking_settings-185"><a href="#get_qwen_thinking_settings-185"><span class="linenos">185</span></a>
+</span><span id="get_qwen_thinking_settings-186"><a href="#get_qwen_thinking_settings-186"><span class="linenos">186</span></a><span class="sd">    Returns:</span>
+</span><span id="get_qwen_thinking_settings-187"><a href="#get_qwen_thinking_settings-187"><span class="linenos">187</span></a><span class="sd">        dict: Dictionary containing thinking model parameters</span>
+</span><span id="get_qwen_thinking_settings-188"><a href="#get_qwen_thinking_settings-188"><span class="linenos">188</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_qwen_thinking_settings-189"><a href="#get_qwen_thinking_settings-189"><span class="linenos">189</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="get_qwen_thinking_settings-190"><a href="#get_qwen_thinking_settings-190"><span class="linenos">190</span></a>        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_TEMPERATURE</span><span class="p">),</span>
+</span><span id="get_qwen_thinking_settings-191"><a href="#get_qwen_thinking_settings-191"><span class="linenos">191</span></a>        <span class="s2">&quot;min_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_MIN_P</span><span class="p">),</span>
+</span><span id="get_qwen_thinking_settings-192"><a href="#get_qwen_thinking_settings-192"><span class="linenos">192</span></a>        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_TOP_P</span><span class="p">),</span>
+</span><span id="get_qwen_thinking_settings-193"><a href="#get_qwen_thinking_settings-193"><span class="linenos">193</span></a>    <span class="p">}</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Get Qwen thinking model settings as a dictionary.</p>
+
+<p>Returns:
+    dict: Dictionary containing thinking model parameters</p>
+</div>
+
+
+                </section>
                 <section id="get_settings">
                             <input id="get_settings-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
 <div class="attr function">
@@ -1169,32 +1256,32 @@ Uses different import strategies based on execution context.</p>
 
     </div>
     <a class="headerlink" href="#get_settings"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_settings-66"><a href="#get_settings-66"><span class="linenos">66</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_settings</span><span class="p">():</span>
-</span><span id="get_settings-67"><a href="#get_settings-67"><span class="linenos">67</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get configuration settings as a dictionary.&quot;&quot;&quot;</span>
-</span><span id="get_settings-68"><a href="#get_settings-68"><span class="linenos">68</span></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="get_settings-69"><a href="#get_settings-69"><span class="linenos">69</span></a>        <span class="s2">&quot;USER_ID&quot;</span><span class="p">:</span> <span class="n">get_userid</span><span class="p">(),</span>
-</span><span id="get_settings-70"><a href="#get_settings-70"><span class="linenos">70</span></a>        <span class="s2">&quot;ROOT_DIR&quot;</span><span class="p">:</span> <span class="n">ROOT_DIR</span><span class="p">,</span>
-</span><span id="get_settings-71"><a href="#get_settings-71"><span class="linenos">71</span></a>        <span class="s2">&quot;HOME_DIR&quot;</span><span class="p">:</span> <span class="n">HOME_DIR</span><span class="p">,</span>
-</span><span id="get_settings-72"><a href="#get_settings-72"><span class="linenos">72</span></a>        <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">:</span> <span class="n">DATA_DIR</span><span class="p">,</span>
-</span><span id="get_settings-73"><a href="#get_settings-73"><span class="linenos">73</span></a>        <span class="s2">&quot;REPO_DIR&quot;</span><span class="p">:</span> <span class="n">REPO_DIR</span><span class="p">,</span>
-</span><span id="get_settings-74"><a href="#get_settings-74"><span class="linenos">74</span></a>        <span class="s2">&quot;WEAVIATE_URL&quot;</span><span class="p">:</span> <span class="n">WEAVIATE_URL</span><span class="p">,</span>
-</span><span id="get_settings-75"><a href="#get_settings-75"><span class="linenos">75</span></a>        <span class="s2">&quot;OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
-</span><span id="get_settings-76"><a href="#get_settings-76"><span class="linenos">76</span></a>        <span class="s2">&quot;REMOTE_OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">REMOTE_OLLAMA_URL</span><span class="p">,</span>
-</span><span id="get_settings-77"><a href="#get_settings-77"><span class="linenos">77</span></a>        <span class="s2">&quot;LLM_MODEL&quot;</span><span class="p">:</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
-</span><span id="get_settings-78"><a href="#get_settings-78"><span class="linenos">78</span></a>        <span class="s2">&quot;USE_WEAVIATE&quot;</span><span class="p">:</span> <span class="n">USE_WEAVIATE</span><span class="p">,</span>
-</span><span id="get_settings-79"><a href="#get_settings-79"><span class="linenos">79</span></a>        <span class="s2">&quot;USE_MCP&quot;</span><span class="p">:</span> <span class="n">USE_MCP</span><span class="p">,</span>
-</span><span id="get_settings-80"><a href="#get_settings-80"><span class="linenos">80</span></a>        <span class="s2">&quot;LOG_LEVEL&quot;</span><span class="p">:</span> <span class="n">LOG_LEVEL</span><span class="p">,</span>
-</span><span id="get_settings-81"><a href="#get_settings-81"><span class="linenos">81</span></a>        <span class="s2">&quot;MCP_SERVERS&quot;</span><span class="p">:</span> <span class="n">MCP_SERVERS</span><span class="p">,</span>
-</span><span id="get_settings-82"><a href="#get_settings-82"><span class="linenos">82</span></a>        <span class="s2">&quot;get_env_var&quot;</span><span class="p">:</span> <span class="n">get_env_var</span><span class="p">,</span>
-</span><span id="get_settings-83"><a href="#get_settings-83"><span class="linenos">83</span></a>        <span class="s2">&quot;get_settings&quot;</span><span class="p">:</span> <span class="n">get_settings</span><span class="p">,</span>
-</span><span id="get_settings-84"><a href="#get_settings-84"><span class="linenos">84</span></a>        <span class="s2">&quot;get_mcp_servers&quot;</span><span class="p">:</span> <span class="n">get_mcp_servers</span><span class="p">,</span>
-</span><span id="get_settings-85"><a href="#get_settings-85"><span class="linenos">85</span></a>        <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_STORAGE_DIR</span><span class="p">,</span>
-</span><span id="get_settings-86"><a href="#get_settings-86"><span class="linenos">86</span></a>        <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_KNOWLEDGE_DIR</span><span class="p">,</span>
-</span><span id="get_settings-87"><a href="#get_settings-87"><span class="linenos">87</span></a>        <span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">:</span> <span class="n">STORAGE_BACKEND</span><span class="p">,</span>
-</span><span id="get_settings-88"><a href="#get_settings-88"><span class="linenos">88</span></a>        <span class="s2">&quot;LIGHTRAG_SERVER&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_SERVER</span><span class="p">,</span>
-</span><span id="get_settings-89"><a href="#get_settings-89"><span class="linenos">89</span></a>        <span class="s2">&quot;LIGHTRAG_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_URL</span><span class="p">,</span>
-</span><span id="get_settings-90"><a href="#get_settings-90"><span class="linenos">90</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_MEMORY_URL</span><span class="p">,</span>
-</span><span id="get_settings-91"><a href="#get_settings-91"><span class="linenos">91</span></a>    <span class="p">}</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_settings-69"><a href="#get_settings-69"><span class="linenos">69</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_settings</span><span class="p">():</span>
+</span><span id="get_settings-70"><a href="#get_settings-70"><span class="linenos">70</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get configuration settings as a dictionary.&quot;&quot;&quot;</span>
+</span><span id="get_settings-71"><a href="#get_settings-71"><span class="linenos">71</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="get_settings-72"><a href="#get_settings-72"><span class="linenos">72</span></a>        <span class="s2">&quot;USER_ID&quot;</span><span class="p">:</span> <span class="n">get_userid</span><span class="p">(),</span>
+</span><span id="get_settings-73"><a href="#get_settings-73"><span class="linenos">73</span></a>        <span class="s2">&quot;ROOT_DIR&quot;</span><span class="p">:</span> <span class="n">ROOT_DIR</span><span class="p">,</span>
+</span><span id="get_settings-74"><a href="#get_settings-74"><span class="linenos">74</span></a>        <span class="s2">&quot;HOME_DIR&quot;</span><span class="p">:</span> <span class="n">HOME_DIR</span><span class="p">,</span>
+</span><span id="get_settings-75"><a href="#get_settings-75"><span class="linenos">75</span></a>        <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">:</span> <span class="n">DATA_DIR</span><span class="p">,</span>
+</span><span id="get_settings-76"><a href="#get_settings-76"><span class="linenos">76</span></a>        <span class="s2">&quot;REPO_DIR&quot;</span><span class="p">:</span> <span class="n">REPO_DIR</span><span class="p">,</span>
+</span><span id="get_settings-77"><a href="#get_settings-77"><span class="linenos">77</span></a>        <span class="s2">&quot;WEAVIATE_URL&quot;</span><span class="p">:</span> <span class="n">WEAVIATE_URL</span><span class="p">,</span>
+</span><span id="get_settings-78"><a href="#get_settings-78"><span class="linenos">78</span></a>        <span class="s2">&quot;OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">OLLAMA_URL</span><span class="p">,</span>
+</span><span id="get_settings-79"><a href="#get_settings-79"><span class="linenos">79</span></a>        <span class="s2">&quot;REMOTE_OLLAMA_URL&quot;</span><span class="p">:</span> <span class="n">REMOTE_OLLAMA_URL</span><span class="p">,</span>
+</span><span id="get_settings-80"><a href="#get_settings-80"><span class="linenos">80</span></a>        <span class="s2">&quot;LLM_MODEL&quot;</span><span class="p">:</span> <span class="n">LLM_MODEL</span><span class="p">,</span>
+</span><span id="get_settings-81"><a href="#get_settings-81"><span class="linenos">81</span></a>        <span class="s2">&quot;USE_WEAVIATE&quot;</span><span class="p">:</span> <span class="n">USE_WEAVIATE</span><span class="p">,</span>
+</span><span id="get_settings-82"><a href="#get_settings-82"><span class="linenos">82</span></a>        <span class="s2">&quot;USE_MCP&quot;</span><span class="p">:</span> <span class="n">USE_MCP</span><span class="p">,</span>
+</span><span id="get_settings-83"><a href="#get_settings-83"><span class="linenos">83</span></a>        <span class="s2">&quot;LOG_LEVEL&quot;</span><span class="p">:</span> <span class="n">LOG_LEVEL</span><span class="p">,</span>
+</span><span id="get_settings-84"><a href="#get_settings-84"><span class="linenos">84</span></a>        <span class="s2">&quot;MCP_SERVERS&quot;</span><span class="p">:</span> <span class="n">MCP_SERVERS</span><span class="p">,</span>
+</span><span id="get_settings-85"><a href="#get_settings-85"><span class="linenos">85</span></a>        <span class="s2">&quot;get_env_var&quot;</span><span class="p">:</span> <span class="n">get_env_var</span><span class="p">,</span>
+</span><span id="get_settings-86"><a href="#get_settings-86"><span class="linenos">86</span></a>        <span class="s2">&quot;get_settings&quot;</span><span class="p">:</span> <span class="n">get_settings</span><span class="p">,</span>
+</span><span id="get_settings-87"><a href="#get_settings-87"><span class="linenos">87</span></a>        <span class="s2">&quot;get_mcp_servers&quot;</span><span class="p">:</span> <span class="n">get_mcp_servers</span><span class="p">,</span>
+</span><span id="get_settings-88"><a href="#get_settings-88"><span class="linenos">88</span></a>        <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_STORAGE_DIR</span><span class="p">,</span>
+</span><span id="get_settings-89"><a href="#get_settings-89"><span class="linenos">89</span></a>        <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">:</span> <span class="n">AGNO_KNOWLEDGE_DIR</span><span class="p">,</span>
+</span><span id="get_settings-90"><a href="#get_settings-90"><span class="linenos">90</span></a>        <span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">:</span> <span class="n">STORAGE_BACKEND</span><span class="p">,</span>
+</span><span id="get_settings-91"><a href="#get_settings-91"><span class="linenos">91</span></a>        <span class="s2">&quot;LIGHTRAG_SERVER&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_SERVER</span><span class="p">,</span>
+</span><span id="get_settings-92"><a href="#get_settings-92"><span class="linenos">92</span></a>        <span class="s2">&quot;LIGHTRAG_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_URL</span><span class="p">,</span>
+</span><span id="get_settings-93"><a href="#get_settings-93"><span class="linenos">93</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_URL&quot;</span><span class="p">:</span> <span class="n">LIGHTRAG_MEMORY_URL</span><span class="p">,</span>
+</span><span id="get_settings-94"><a href="#get_settings-94"><span class="linenos">94</span></a>    <span class="p">}</span>
 </span></pre></div>
 
 
@@ -1214,25 +1301,26 @@ Uses different import strategies based on execution context.</p>
 
     </div>
     <a class="headerlink" href="#get_user_storage_paths"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_user_storage_paths-125"><a href="#get_user_storage_paths-125"><span class="linenos">125</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_user_storage_paths</span><span class="p">():</span>
-</span><span id="get_user_storage_paths-126"><a href="#get_user_storage_paths-126"><span class="linenos">126</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate user-specific storage directory paths for current user.</span>
-</span><span id="get_user_storage_paths-127"><a href="#get_user_storage_paths-127"><span class="linenos">127</span></a>
-</span><span id="get_user_storage_paths-128"><a href="#get_user_storage_paths-128"><span class="linenos">128</span></a><span class="sd">    Creates a complete mapping of storage directories customized for the current</span>
-</span><span id="get_user_storage_paths-129"><a href="#get_user_storage_paths-129"><span class="linenos">129</span></a><span class="sd">    user ID, incorporating the configured storage backend and root paths.</span>
-</span><span id="get_user_storage_paths-130"><a href="#get_user_storage_paths-130"><span class="linenos">130</span></a><span class="sd">    All paths use environment variable expansion for flexibility.</span>
-</span><span id="get_user_storage_paths-131"><a href="#get_user_storage_paths-131"><span class="linenos">131</span></a>
-</span><span id="get_user_storage_paths-132"><a href="#get_user_storage_paths-132"><span class="linenos">132</span></a><span class="sd">    Returns:</span>
-</span><span id="get_user_storage_paths-133"><a href="#get_user_storage_paths-133"><span class="linenos">133</span></a><span class="sd">        dict: Dictionary mapping storage types to their full directory paths:</span>
-</span><span id="get_user_storage_paths-134"><a href="#get_user_storage_paths-134"><span class="linenos">134</span></a><span class="sd">            - DATA_DIR: General data storage</span>
-</span><span id="get_user_storage_paths-135"><a href="#get_user_storage_paths-135"><span class="linenos">135</span></a><span class="sd">            - AGNO_STORAGE_DIR: AGNO agent storage root</span>
-</span><span id="get_user_storage_paths-136"><a href="#get_user_storage_paths-136"><span class="linenos">136</span></a><span class="sd">            - AGNO_KNOWLEDGE_DIR: AGNO knowledge base</span>
-</span><span id="get_user_storage_paths-137"><a href="#get_user_storage_paths-137"><span class="linenos">137</span></a><span class="sd">            - LIGHTRAG_STORAGE_DIR: LightRAG document storage</span>
-</span><span id="get_user_storage_paths-138"><a href="#get_user_storage_paths-138"><span class="linenos">138</span></a><span class="sd">            - LIGHTRAG_INPUTS_DIR: LightRAG input files</span>
-</span><span id="get_user_storage_paths-139"><a href="#get_user_storage_paths-139"><span class="linenos">139</span></a><span class="sd">            - LIGHTRAG_MEMORY_STORAGE_DIR: LightRAG memory storage</span>
-</span><span id="get_user_storage_paths-140"><a href="#get_user_storage_paths-140"><span class="linenos">140</span></a><span class="sd">            - LIGHTRAG_MEMORY_INPUTS_DIR: LightRAG memory input files</span>
-</span><span id="get_user_storage_paths-141"><a href="#get_user_storage_paths-141"><span class="linenos">141</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_user_storage_paths-142"><a href="#get_user_storage_paths-142"><span class="linenos">142</span></a>    <span class="c1"># Import here to avoid circular imports</span>
-</span><span id="get_user_storage_paths-143"><a href="#get_user_storage_paths-143"><span class="linenos">143</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">PERSAG_ROOT</span><span class="p">,</span> <span class="n">STORAGE_BACKEND</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_user_storage_paths-124"><a href="#get_user_storage_paths-124"><span class="linenos">124</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_user_storage_paths</span><span class="p">():</span>
+</span><span id="get_user_storage_paths-125"><a href="#get_user_storage_paths-125"><span class="linenos">125</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate user-specific storage directory paths for current user.</span>
+</span><span id="get_user_storage_paths-126"><a href="#get_user_storage_paths-126"><span class="linenos">126</span></a>
+</span><span id="get_user_storage_paths-127"><a href="#get_user_storage_paths-127"><span class="linenos">127</span></a><span class="sd">    Creates a complete mapping of storage directories customized for the current</span>
+</span><span id="get_user_storage_paths-128"><a href="#get_user_storage_paths-128"><span class="linenos">128</span></a><span class="sd">    user ID, incorporating the configured storage backend and root paths.</span>
+</span><span id="get_user_storage_paths-129"><a href="#get_user_storage_paths-129"><span class="linenos">129</span></a><span class="sd">    All paths use environment variable expansion for flexibility.</span>
+</span><span id="get_user_storage_paths-130"><a href="#get_user_storage_paths-130"><span class="linenos">130</span></a>
+</span><span id="get_user_storage_paths-131"><a href="#get_user_storage_paths-131"><span class="linenos">131</span></a><span class="sd">    Returns:</span>
+</span><span id="get_user_storage_paths-132"><a href="#get_user_storage_paths-132"><span class="linenos">132</span></a><span class="sd">        dict: Dictionary mapping storage types to their full directory paths:</span>
+</span><span id="get_user_storage_paths-133"><a href="#get_user_storage_paths-133"><span class="linenos">133</span></a><span class="sd">            - DATA_DIR: General data storage</span>
+</span><span id="get_user_storage_paths-134"><a href="#get_user_storage_paths-134"><span class="linenos">134</span></a><span class="sd">            - AGNO_STORAGE_DIR: AGNO agent storage root</span>
+</span><span id="get_user_storage_paths-135"><a href="#get_user_storage_paths-135"><span class="linenos">135</span></a><span class="sd">            - AGNO_KNOWLEDGE_DIR: AGNO knowledge base</span>
+</span><span id="get_user_storage_paths-136"><a href="#get_user_storage_paths-136"><span class="linenos">136</span></a><span class="sd">            - LIGHTRAG_STORAGE_DIR: LightRAG document storage</span>
+</span><span id="get_user_storage_paths-137"><a href="#get_user_storage_paths-137"><span class="linenos">137</span></a><span class="sd">            - LIGHTRAG_INPUTS_DIR: LightRAG input files</span>
+</span><span id="get_user_storage_paths-138"><a href="#get_user_storage_paths-138"><span class="linenos">138</span></a><span class="sd">            - LIGHTRAG_MEMORY_STORAGE_DIR: LightRAG memory storage</span>
+</span><span id="get_user_storage_paths-139"><a href="#get_user_storage_paths-139"><span class="linenos">139</span></a><span class="sd">            - LIGHTRAG_MEMORY_INPUTS_DIR: LightRAG memory input files</span>
+</span><span id="get_user_storage_paths-140"><a href="#get_user_storage_paths-140"><span class="linenos">140</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_user_storage_paths-141"><a href="#get_user_storage_paths-141"><span class="linenos">141</span></a>    <span class="c1"># Get values directly from environment to avoid circular imports</span>
+</span><span id="get_user_storage_paths-142"><a href="#get_user_storage_paths-142"><span class="linenos">142</span></a>    <span class="n">PERSAG_ROOT</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PERSAG_ROOT&quot;</span><span class="p">,</span> <span class="s2">&quot;/Users/Shared/personal_agent_data&quot;</span><span class="p">)</span>
+</span><span id="get_user_storage_paths-143"><a href="#get_user_storage_paths-143"><span class="linenos">143</span></a>    <span class="n">STORAGE_BACKEND</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">,</span> <span class="s2">&quot;agno&quot;</span><span class="p">)</span>
 </span><span id="get_user_storage_paths-144"><a href="#get_user_storage_paths-144"><span class="linenos">144</span></a>
 </span><span id="get_user_storage_paths-145"><a href="#get_user_storage_paths-145"><span class="linenos">145</span></a>    <span class="n">current_user_id</span> <span class="o">=</span> <span class="n">get_userid</span><span class="p">()</span>
 </span><span id="get_user_storage_paths-146"><a href="#get_user_storage_paths-146"><span class="linenos">146</span></a>    <span class="k">return</span> <span class="p">{</span>
@@ -1292,16 +1380,16 @@ All paths use environment variable expansion for flexibility.</p>
 
     </div>
     <a class="headerlink" href="#get_userid"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_userid-101"><a href="#get_userid-101"><span class="linenos">101</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_userid</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="get_userid-102"><a href="#get_userid-102"><span class="linenos">102</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve the current USER_ID dynamically from ~/.persag/env.userid.</span>
-</span><span id="get_userid-103"><a href="#get_userid-103"><span class="linenos">103</span></a>
-</span><span id="get_userid-104"><a href="#get_userid-104"><span class="linenos">104</span></a><span class="sd">    Always reads from the filesystem to ensure the most current user ID is returned,</span>
-</span><span id="get_userid-105"><a href="#get_userid-105"><span class="linenos">105</span></a><span class="sd">    supporting dynamic user switching without requiring module reload.</span>
-</span><span id="get_userid-106"><a href="#get_userid-106"><span class="linenos">106</span></a>
-</span><span id="get_userid-107"><a href="#get_userid-107"><span class="linenos">107</span></a><span class="sd">    Returns:</span>
-</span><span id="get_userid-108"><a href="#get_userid-108"><span class="linenos">108</span></a><span class="sd">        str: Current user ID from ~/.persag/env.userid or &#39;default_user&#39; fallback</span>
-</span><span id="get_userid-109"><a href="#get_userid-109"><span class="linenos">109</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_userid-110"><a href="#get_userid-110"><span class="linenos">110</span></a>    <span class="k">return</span> <span class="n">load_user_from_file</span><span class="p">()</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_userid-100"><a href="#get_userid-100"><span class="linenos">100</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_userid</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="get_userid-101"><a href="#get_userid-101"><span class="linenos">101</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve the current USER_ID dynamically from ~/.persag/env.userid.</span>
+</span><span id="get_userid-102"><a href="#get_userid-102"><span class="linenos">102</span></a>
+</span><span id="get_userid-103"><a href="#get_userid-103"><span class="linenos">103</span></a><span class="sd">    Always reads from the filesystem to ensure the most current user ID is returned,</span>
+</span><span id="get_userid-104"><a href="#get_userid-104"><span class="linenos">104</span></a><span class="sd">    supporting dynamic user switching without requiring module reload.</span>
+</span><span id="get_userid-105"><a href="#get_userid-105"><span class="linenos">105</span></a>
+</span><span id="get_userid-106"><a href="#get_userid-106"><span class="linenos">106</span></a><span class="sd">    Returns:</span>
+</span><span id="get_userid-107"><a href="#get_userid-107"><span class="linenos">107</span></a><span class="sd">        str: Current user ID from ~/.persag/env.userid or &#39;default_user&#39; fallback</span>
+</span><span id="get_userid-108"><a href="#get_userid-108"><span class="linenos">108</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_userid-109"><a href="#get_userid-109"><span class="linenos">109</span></a>    <span class="k">return</span> <span class="n">load_user_from_file</span><span class="p">()</span>
 </span></pre></div>
 
 
@@ -1327,80 +1415,80 @@ supporting dynamic user switching without requiring module reload.</p>
 
     </div>
     <a class="headerlink" href="#load_user_from_file"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="load_user_from_file-25"><a href="#load_user_from_file-25"><span class="linenos">25</span></a><span class="k">def</span><span class="w"> </span><span class="nf">load_user_from_file</span><span class="p">():</span>
-</span><span id="load_user_from_file-26"><a href="#load_user_from_file-26"><span class="linenos">26</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialize PERSAG environment and load user configuration.</span>
-</span><span id="load_user_from_file-27"><a href="#load_user_from_file-27"><span class="linenos">27</span></a>
-</span><span id="load_user_from_file-28"><a href="#load_user_from_file-28"><span class="linenos">28</span></a><span class="sd">    Creates the ~/.persag directory structure if it doesn&#39;t exist, copies default</span>
-</span><span id="load_user_from_file-29"><a href="#load_user_from_file-29"><span class="linenos">29</span></a><span class="sd">    LightRAG server configurations from the project root, and manages the user ID</span>
-</span><span id="load_user_from_file-30"><a href="#load_user_from_file-30"><span class="linenos">30</span></a><span class="sd">    file (env.userid). Sets up the complete user environment on first run.</span>
-</span><span id="load_user_from_file-31"><a href="#load_user_from_file-31"><span class="linenos">31</span></a>
-</span><span id="load_user_from_file-32"><a href="#load_user_from_file-32"><span class="linenos">32</span></a><span class="sd">    Directory Setup:</span>
-</span><span id="load_user_from_file-33"><a href="#load_user_from_file-33"><span class="linenos">33</span></a><span class="sd">        - Creates ~/.persag/ if missing</span>
-</span><span id="load_user_from_file-34"><a href="#load_user_from_file-34"><span class="linenos">34</span></a><span class="sd">        - Copies lightrag_server/ and lightrag_memory_server/ directories</span>
-</span><span id="load_user_from_file-35"><a href="#load_user_from_file-35"><span class="linenos">35</span></a><span class="sd">        - Creates/manages env.userid file with USER_ID configuration</span>
-</span><span id="load_user_from_file-36"><a href="#load_user_from_file-36"><span class="linenos">36</span></a>
-</span><span id="load_user_from_file-37"><a href="#load_user_from_file-37"><span class="linenos">37</span></a><span class="sd">    Returns:</span>
-</span><span id="load_user_from_file-38"><a href="#load_user_from_file-38"><span class="linenos">38</span></a><span class="sd">        str: The current user ID (loaded from file or default &#39;default_user&#39;)</span>
-</span><span id="load_user_from_file-39"><a href="#load_user_from_file-39"><span class="linenos">39</span></a>
-</span><span id="load_user_from_file-40"><a href="#load_user_from_file-40"><span class="linenos">40</span></a><span class="sd">    Side Effects:</span>
-</span><span id="load_user_from_file-41"><a href="#load_user_from_file-41"><span class="linenos">41</span></a><span class="sd">        - Sets USER_ID in os.environ</span>
-</span><span id="load_user_from_file-42"><a href="#load_user_from_file-42"><span class="linenos">42</span></a><span class="sd">        - Creates directory structure and config files</span>
-</span><span id="load_user_from_file-43"><a href="#load_user_from_file-43"><span class="linenos">43</span></a><span class="sd">        - Logs setup progress and errors</span>
-</span><span id="load_user_from_file-44"><a href="#load_user_from_file-44"><span class="linenos">44</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="load_user_from_file-45"><a href="#load_user_from_file-45"><span class="linenos">45</span></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="load_user_from_file-46"><a href="#load_user_from_file-46"><span class="linenos">46</span></a>
-</span><span id="load_user_from_file-47"><a href="#load_user_from_file-47"><span class="linenos">47</span></a>        <span class="n">persag_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PERSAG_HOME&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;.persag&quot;</span><span class="p">)))</span>
-</span><span id="load_user_from_file-48"><a href="#load_user_from_file-48"><span class="linenos">48</span></a>        <span class="n">userid_file</span> <span class="o">=</span> <span class="n">persag_dir</span> <span class="o">/</span> <span class="s2">&quot;env.userid&quot;</span>
-</span><span id="load_user_from_file-49"><a href="#load_user_from_file-49"><span class="linenos">49</span></a>
-</span><span id="load_user_from_file-50"><a href="#load_user_from_file-50"><span class="linenos">50</span></a>        <span class="c1"># Create ~/.persag and copy default configs if it doesn&#39;t exist</span>
-</span><span id="load_user_from_file-51"><a href="#load_user_from_file-51"><span class="linenos">51</span></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">persag_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="load_user_from_file-52"><a href="#load_user_from_file-52"><span class="linenos">52</span></a>            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PERSAG directory not found. Creating at: </span><span class="si">{</span><span class="n">persag_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="load_user_from_file-53"><a href="#load_user_from_file-53"><span class="linenos">53</span></a>            <span class="n">persag_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="load_user_from_file-54"><a href="#load_user_from_file-54"><span class="linenos">54</span></a>
-</span><span id="load_user_from_file-55"><a href="#load_user_from_file-55"><span class="linenos">55</span></a>            <span class="c1"># Copy lightrag server directories from project root</span>
-</span><span id="load_user_from_file-56"><a href="#load_user_from_file-56"><span class="linenos">56</span></a>            <span class="n">project_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
-</span><span id="load_user_from_file-57"><a href="#load_user_from_file-57"><span class="linenos">57</span></a>            <span class="n">source_server_dir</span> <span class="o">=</span> <span class="n">project_root</span> <span class="o">/</span> <span class="s2">&quot;lightrag_server&quot;</span>
-</span><span id="load_user_from_file-58"><a href="#load_user_from_file-58"><span class="linenos">58</span></a>            <span class="n">source_memory_dir</span> <span class="o">=</span> <span class="n">project_root</span> <span class="o">/</span> <span class="s2">&quot;lightrag_memory_server&quot;</span>
-</span><span id="load_user_from_file-59"><a href="#load_user_from_file-59"><span class="linenos">59</span></a>            <span class="n">dest_server_dir</span> <span class="o">=</span> <span class="n">persag_dir</span> <span class="o">/</span> <span class="s2">&quot;lightrag_server&quot;</span>
-</span><span id="load_user_from_file-60"><a href="#load_user_from_file-60"><span class="linenos">60</span></a>            <span class="n">dest_memory_dir</span> <span class="o">=</span> <span class="n">persag_dir</span> <span class="o">/</span> <span class="s2">&quot;lightrag_memory_server&quot;</span>
-</span><span id="load_user_from_file-61"><a href="#load_user_from_file-61"><span class="linenos">61</span></a>
-</span><span id="load_user_from_file-62"><a href="#load_user_from_file-62"><span class="linenos">62</span></a>            <span class="k">try</span><span class="p">:</span>
-</span><span id="load_user_from_file-63"><a href="#load_user_from_file-63"><span class="linenos">63</span></a>                <span class="k">if</span> <span class="n">source_server_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">dest_server_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="load_user_from_file-64"><a href="#load_user_from_file-64"><span class="linenos">64</span></a>                    <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">source_server_dir</span><span class="p">,</span> <span class="n">dest_server_dir</span><span class="p">)</span>
-</span><span id="load_user_from_file-65"><a href="#load_user_from_file-65"><span class="linenos">65</span></a>                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Copied default lightrag_server to </span><span class="si">{</span><span class="n">dest_server_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="load_user_from_file-66"><a href="#load_user_from_file-66"><span class="linenos">66</span></a>                <span class="k">if</span> <span class="n">source_memory_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">dest_memory_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="load_user_from_file-67"><a href="#load_user_from_file-67"><span class="linenos">67</span></a>                    <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">source_memory_dir</span><span class="p">,</span> <span class="n">dest_memory_dir</span><span class="p">)</span>
-</span><span id="load_user_from_file-68"><a href="#load_user_from_file-68"><span class="linenos">68</span></a>                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-</span><span id="load_user_from_file-69"><a href="#load_user_from_file-69"><span class="linenos">69</span></a>                        <span class="sa">f</span><span class="s2">&quot;Copied default lightrag_memory_server to </span><span class="si">{</span><span class="n">dest_memory_dir</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="load_user_from_file-70"><a href="#load_user_from_file-70"><span class="linenos">70</span></a>                    <span class="p">)</span>
-</span><span id="load_user_from_file-71"><a href="#load_user_from_file-71"><span class="linenos">71</span></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">copy_e</span><span class="p">:</span>
-</span><span id="load_user_from_file-72"><a href="#load_user_from_file-72"><span class="linenos">72</span></a>                <span class="n">_logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
-</span><span id="load_user_from_file-73"><a href="#load_user_from_file-73"><span class="linenos">73</span></a>                    <span class="sa">f</span><span class="s2">&quot;Failed to copy LightRAG directories to </span><span class="si">{</span><span class="n">persag_dir</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">copy_e</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="load_user_from_file-74"><a href="#load_user_from_file-74"><span class="linenos">74</span></a>                <span class="p">)</span>
-</span><span id="load_user_from_file-75"><a href="#load_user_from_file-75"><span class="linenos">75</span></a>
-</span><span id="load_user_from_file-76"><a href="#load_user_from_file-76"><span class="linenos">76</span></a>        <span class="c1"># Now, manage the env.userid file</span>
-</span><span id="load_user_from_file-77"><a href="#load_user_from_file-77"><span class="linenos">77</span></a>        <span class="k">if</span> <span class="n">userid_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="load_user_from_file-78"><a href="#load_user_from_file-78"><span class="linenos">78</span></a>            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">userid_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-</span><span id="load_user_from_file-79"><a href="#load_user_from_file-79"><span class="linenos">79</span></a>                <span class="n">content</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
-</span><span id="load_user_from_file-80"><a href="#load_user_from_file-80"><span class="linenos">80</span></a>                <span class="k">if</span> <span class="n">content</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;USER_ID=&quot;</span><span class="p">):</span>
-</span><span id="load_user_from_file-81"><a href="#load_user_from_file-81"><span class="linenos">81</span></a>                    <span class="n">user_id</span> <span class="o">=</span> <span class="n">content</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="load_user_from_file-82"><a href="#load_user_from_file-82"><span class="linenos">82</span></a>                    <span class="k">if</span> <span class="n">user_id</span><span class="p">:</span>
-</span><span id="load_user_from_file-83"><a href="#load_user_from_file-83"><span class="linenos">83</span></a>                        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">user_id</span>
-</span><span id="load_user_from_file-84"><a href="#load_user_from_file-84"><span class="linenos">84</span></a>                        <span class="k">return</span> <span class="n">user_id</span>
-</span><span id="load_user_from_file-85"><a href="#load_user_from_file-85"><span class="linenos">85</span></a>
-</span><span id="load_user_from_file-86"><a href="#load_user_from_file-86"><span class="linenos">86</span></a>        <span class="c1"># If file doesn&#39;t exist or is empty, create/set a default user</span>
-</span><span id="load_user_from_file-87"><a href="#load_user_from_file-87"><span class="linenos">87</span></a>        <span class="n">default_user_id</span> <span class="o">=</span> <span class="s2">&quot;default_user&quot;</span>
-</span><span id="load_user_from_file-88"><a href="#load_user_from_file-88"><span class="linenos">88</span></a>        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">userid_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-</span><span id="load_user_from_file-89"><a href="#load_user_from_file-89"><span class="linenos">89</span></a>            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;USER_ID=&quot;</span><span class="si">{</span><span class="n">default_user_id</span><span class="si">}</span><span class="s1">&quot;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
-</span><span id="load_user_from_file-90"><a href="#load_user_from_file-90"><span class="linenos">90</span></a>        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">default_user_id</span>
-</span><span id="load_user_from_file-91"><a href="#load_user_from_file-91"><span class="linenos">91</span></a>        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created default USER_ID in </span><span class="si">{</span><span class="n">userid_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="load_user_from_file-92"><a href="#load_user_from_file-92"><span class="linenos">92</span></a>        <span class="k">return</span> <span class="n">default_user_id</span>
-</span><span id="load_user_from_file-93"><a href="#load_user_from_file-93"><span class="linenos">93</span></a>
-</span><span id="load_user_from_file-94"><a href="#load_user_from_file-94"><span class="linenos">94</span></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="load_user_from_file-95"><a href="#load_user_from_file-95"><span class="linenos">95</span></a>        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load user ID from ~/.persag: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="load_user_from_file-96"><a href="#load_user_from_file-96"><span class="linenos">96</span></a>        <span class="n">fallback_user_id</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">,</span> <span class="s2">&quot;default_user&quot;</span><span class="p">)</span>
-</span><span id="load_user_from_file-97"><a href="#load_user_from_file-97"><span class="linenos">97</span></a>        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fallback_user_id</span>
-</span><span id="load_user_from_file-98"><a href="#load_user_from_file-98"><span class="linenos">98</span></a>        <span class="k">return</span> <span class="n">fallback_user_id</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="load_user_from_file-24"><a href="#load_user_from_file-24"><span class="linenos">24</span></a><span class="k">def</span><span class="w"> </span><span class="nf">load_user_from_file</span><span class="p">():</span>
+</span><span id="load_user_from_file-25"><a href="#load_user_from_file-25"><span class="linenos">25</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialize PERSAG environment and load user configuration.</span>
+</span><span id="load_user_from_file-26"><a href="#load_user_from_file-26"><span class="linenos">26</span></a>
+</span><span id="load_user_from_file-27"><a href="#load_user_from_file-27"><span class="linenos">27</span></a><span class="sd">    Creates the ~/.persag directory structure if it doesn&#39;t exist, copies default</span>
+</span><span id="load_user_from_file-28"><a href="#load_user_from_file-28"><span class="linenos">28</span></a><span class="sd">    LightRAG server configurations from the project root, and manages the user ID</span>
+</span><span id="load_user_from_file-29"><a href="#load_user_from_file-29"><span class="linenos">29</span></a><span class="sd">    file (env.userid). Sets up the complete user environment on first run.</span>
+</span><span id="load_user_from_file-30"><a href="#load_user_from_file-30"><span class="linenos">30</span></a>
+</span><span id="load_user_from_file-31"><a href="#load_user_from_file-31"><span class="linenos">31</span></a><span class="sd">    Directory Setup:</span>
+</span><span id="load_user_from_file-32"><a href="#load_user_from_file-32"><span class="linenos">32</span></a><span class="sd">        - Creates ~/.persag/ if missing</span>
+</span><span id="load_user_from_file-33"><a href="#load_user_from_file-33"><span class="linenos">33</span></a><span class="sd">        - Copies lightrag_server/ and lightrag_memory_server/ directories</span>
+</span><span id="load_user_from_file-34"><a href="#load_user_from_file-34"><span class="linenos">34</span></a><span class="sd">        - Creates/manages env.userid file with USER_ID configuration</span>
+</span><span id="load_user_from_file-35"><a href="#load_user_from_file-35"><span class="linenos">35</span></a>
+</span><span id="load_user_from_file-36"><a href="#load_user_from_file-36"><span class="linenos">36</span></a><span class="sd">    Returns:</span>
+</span><span id="load_user_from_file-37"><a href="#load_user_from_file-37"><span class="linenos">37</span></a><span class="sd">        str: The current user ID (loaded from file or default &#39;default_user&#39;)</span>
+</span><span id="load_user_from_file-38"><a href="#load_user_from_file-38"><span class="linenos">38</span></a>
+</span><span id="load_user_from_file-39"><a href="#load_user_from_file-39"><span class="linenos">39</span></a><span class="sd">    Side Effects:</span>
+</span><span id="load_user_from_file-40"><a href="#load_user_from_file-40"><span class="linenos">40</span></a><span class="sd">        - Sets USER_ID in os.environ</span>
+</span><span id="load_user_from_file-41"><a href="#load_user_from_file-41"><span class="linenos">41</span></a><span class="sd">        - Creates directory structure and config files</span>
+</span><span id="load_user_from_file-42"><a href="#load_user_from_file-42"><span class="linenos">42</span></a><span class="sd">        - Logs setup progress and errors</span>
+</span><span id="load_user_from_file-43"><a href="#load_user_from_file-43"><span class="linenos">43</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="load_user_from_file-44"><a href="#load_user_from_file-44"><span class="linenos">44</span></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="load_user_from_file-45"><a href="#load_user_from_file-45"><span class="linenos">45</span></a>
+</span><span id="load_user_from_file-46"><a href="#load_user_from_file-46"><span class="linenos">46</span></a>        <span class="n">persag_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PERSAG_HOME&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;.persag&quot;</span><span class="p">)))</span>
+</span><span id="load_user_from_file-47"><a href="#load_user_from_file-47"><span class="linenos">47</span></a>        <span class="n">userid_file</span> <span class="o">=</span> <span class="n">persag_dir</span> <span class="o">/</span> <span class="s2">&quot;env.userid&quot;</span>
+</span><span id="load_user_from_file-48"><a href="#load_user_from_file-48"><span class="linenos">48</span></a>
+</span><span id="load_user_from_file-49"><a href="#load_user_from_file-49"><span class="linenos">49</span></a>        <span class="c1"># Create ~/.persag and copy default configs if it doesn&#39;t exist</span>
+</span><span id="load_user_from_file-50"><a href="#load_user_from_file-50"><span class="linenos">50</span></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">persag_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="load_user_from_file-51"><a href="#load_user_from_file-51"><span class="linenos">51</span></a>            <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PERSAG directory not found. Creating at: </span><span class="si">{</span><span class="n">persag_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="load_user_from_file-52"><a href="#load_user_from_file-52"><span class="linenos">52</span></a>            <span class="n">persag_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="load_user_from_file-53"><a href="#load_user_from_file-53"><span class="linenos">53</span></a>
+</span><span id="load_user_from_file-54"><a href="#load_user_from_file-54"><span class="linenos">54</span></a>            <span class="c1"># Copy lightrag server directories from project root</span>
+</span><span id="load_user_from_file-55"><a href="#load_user_from_file-55"><span class="linenos">55</span></a>            <span class="n">project_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
+</span><span id="load_user_from_file-56"><a href="#load_user_from_file-56"><span class="linenos">56</span></a>            <span class="n">source_server_dir</span> <span class="o">=</span> <span class="n">project_root</span> <span class="o">/</span> <span class="s2">&quot;lightrag_server&quot;</span>
+</span><span id="load_user_from_file-57"><a href="#load_user_from_file-57"><span class="linenos">57</span></a>            <span class="n">source_memory_dir</span> <span class="o">=</span> <span class="n">project_root</span> <span class="o">/</span> <span class="s2">&quot;lightrag_memory_server&quot;</span>
+</span><span id="load_user_from_file-58"><a href="#load_user_from_file-58"><span class="linenos">58</span></a>            <span class="n">dest_server_dir</span> <span class="o">=</span> <span class="n">persag_dir</span> <span class="o">/</span> <span class="s2">&quot;lightrag_server&quot;</span>
+</span><span id="load_user_from_file-59"><a href="#load_user_from_file-59"><span class="linenos">59</span></a>            <span class="n">dest_memory_dir</span> <span class="o">=</span> <span class="n">persag_dir</span> <span class="o">/</span> <span class="s2">&quot;lightrag_memory_server&quot;</span>
+</span><span id="load_user_from_file-60"><a href="#load_user_from_file-60"><span class="linenos">60</span></a>
+</span><span id="load_user_from_file-61"><a href="#load_user_from_file-61"><span class="linenos">61</span></a>            <span class="k">try</span><span class="p">:</span>
+</span><span id="load_user_from_file-62"><a href="#load_user_from_file-62"><span class="linenos">62</span></a>                <span class="k">if</span> <span class="n">source_server_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">dest_server_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="load_user_from_file-63"><a href="#load_user_from_file-63"><span class="linenos">63</span></a>                    <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">source_server_dir</span><span class="p">,</span> <span class="n">dest_server_dir</span><span class="p">)</span>
+</span><span id="load_user_from_file-64"><a href="#load_user_from_file-64"><span class="linenos">64</span></a>                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Copied default lightrag_server to </span><span class="si">{</span><span class="n">dest_server_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="load_user_from_file-65"><a href="#load_user_from_file-65"><span class="linenos">65</span></a>                <span class="k">if</span> <span class="n">source_memory_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">dest_memory_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="load_user_from_file-66"><a href="#load_user_from_file-66"><span class="linenos">66</span></a>                    <span class="n">shutil</span><span class="o">.</span><span class="n">copytree</span><span class="p">(</span><span class="n">source_memory_dir</span><span class="p">,</span> <span class="n">dest_memory_dir</span><span class="p">)</span>
+</span><span id="load_user_from_file-67"><a href="#load_user_from_file-67"><span class="linenos">67</span></a>                    <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+</span><span id="load_user_from_file-68"><a href="#load_user_from_file-68"><span class="linenos">68</span></a>                        <span class="sa">f</span><span class="s2">&quot;Copied default lightrag_memory_server to </span><span class="si">{</span><span class="n">dest_memory_dir</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="load_user_from_file-69"><a href="#load_user_from_file-69"><span class="linenos">69</span></a>                    <span class="p">)</span>
+</span><span id="load_user_from_file-70"><a href="#load_user_from_file-70"><span class="linenos">70</span></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">copy_e</span><span class="p">:</span>
+</span><span id="load_user_from_file-71"><a href="#load_user_from_file-71"><span class="linenos">71</span></a>                <span class="n">_logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
+</span><span id="load_user_from_file-72"><a href="#load_user_from_file-72"><span class="linenos">72</span></a>                    <span class="sa">f</span><span class="s2">&quot;Failed to copy LightRAG directories to </span><span class="si">{</span><span class="n">persag_dir</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">copy_e</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="load_user_from_file-73"><a href="#load_user_from_file-73"><span class="linenos">73</span></a>                <span class="p">)</span>
+</span><span id="load_user_from_file-74"><a href="#load_user_from_file-74"><span class="linenos">74</span></a>
+</span><span id="load_user_from_file-75"><a href="#load_user_from_file-75"><span class="linenos">75</span></a>        <span class="c1"># Now, manage the env.userid file</span>
+</span><span id="load_user_from_file-76"><a href="#load_user_from_file-76"><span class="linenos">76</span></a>        <span class="k">if</span> <span class="n">userid_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="load_user_from_file-77"><a href="#load_user_from_file-77"><span class="linenos">77</span></a>            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">userid_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+</span><span id="load_user_from_file-78"><a href="#load_user_from_file-78"><span class="linenos">78</span></a>                <span class="n">content</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</span><span id="load_user_from_file-79"><a href="#load_user_from_file-79"><span class="linenos">79</span></a>                <span class="k">if</span> <span class="n">content</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;USER_ID=&quot;</span><span class="p">):</span>
+</span><span id="load_user_from_file-80"><a href="#load_user_from_file-80"><span class="linenos">80</span></a>                    <span class="n">user_id</span> <span class="o">=</span> <span class="n">content</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;&#39;</span><span class="se">\&quot;</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="load_user_from_file-81"><a href="#load_user_from_file-81"><span class="linenos">81</span></a>                    <span class="k">if</span> <span class="n">user_id</span><span class="p">:</span>
+</span><span id="load_user_from_file-82"><a href="#load_user_from_file-82"><span class="linenos">82</span></a>                        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">user_id</span>
+</span><span id="load_user_from_file-83"><a href="#load_user_from_file-83"><span class="linenos">83</span></a>                        <span class="k">return</span> <span class="n">user_id</span>
+</span><span id="load_user_from_file-84"><a href="#load_user_from_file-84"><span class="linenos">84</span></a>
+</span><span id="load_user_from_file-85"><a href="#load_user_from_file-85"><span class="linenos">85</span></a>        <span class="c1"># If file doesn&#39;t exist or is empty, create/set a default user</span>
+</span><span id="load_user_from_file-86"><a href="#load_user_from_file-86"><span class="linenos">86</span></a>        <span class="n">default_user_id</span> <span class="o">=</span> <span class="s2">&quot;default_user&quot;</span>
+</span><span id="load_user_from_file-87"><a href="#load_user_from_file-87"><span class="linenos">87</span></a>        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">userid_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+</span><span id="load_user_from_file-88"><a href="#load_user_from_file-88"><span class="linenos">88</span></a>            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;USER_ID=&quot;</span><span class="si">{</span><span class="n">default_user_id</span><span class="si">}</span><span class="s1">&quot;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="load_user_from_file-89"><a href="#load_user_from_file-89"><span class="linenos">89</span></a>        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">default_user_id</span>
+</span><span id="load_user_from_file-90"><a href="#load_user_from_file-90"><span class="linenos">90</span></a>        <span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created default USER_ID in </span><span class="si">{</span><span class="n">userid_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="load_user_from_file-91"><a href="#load_user_from_file-91"><span class="linenos">91</span></a>        <span class="k">return</span> <span class="n">default_user_id</span>
+</span><span id="load_user_from_file-92"><a href="#load_user_from_file-92"><span class="linenos">92</span></a>
+</span><span id="load_user_from_file-93"><a href="#load_user_from_file-93"><span class="linenos">93</span></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="load_user_from_file-94"><a href="#load_user_from_file-94"><span class="linenos">94</span></a>        <span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load user ID from ~/.persag: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="load_user_from_file-95"><a href="#load_user_from_file-95"><span class="linenos">95</span></a>        <span class="n">fallback_user_id</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">,</span> <span class="s2">&quot;default_user&quot;</span><span class="p">)</span>
+</span><span id="load_user_from_file-96"><a href="#load_user_from_file-96"><span class="linenos">96</span></a>        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;USER_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fallback_user_id</span>
+</span><span id="load_user_from_file-97"><a href="#load_user_from_file-97"><span class="linenos">97</span></a>        <span class="k">return</span> <span class="n">fallback_user_id</span>
 </span></pre></div>
 
 
@@ -1450,45 +1538,46 @@ file (env.userid). Sets up the complete user environment on first run.</p>
 </span><span id="refresh_user_dependent_settings-182"><a href="#refresh_user_dependent_settings-182"><span class="linenos">182</span></a><span class="sd">    Returns:</span>
 </span><span id="refresh_user_dependent_settings-183"><a href="#refresh_user_dependent_settings-183"><span class="linenos">183</span></a><span class="sd">        Dictionary with updated settings</span>
 </span><span id="refresh_user_dependent_settings-184"><a href="#refresh_user_dependent_settings-184"><span class="linenos">184</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="refresh_user_dependent_settings-185"><a href="#refresh_user_dependent_settings-185"><span class="linenos">185</span></a>    <span class="c1"># Import here to avoid circular imports</span>
-</span><span id="refresh_user_dependent_settings-186"><a href="#refresh_user_dependent_settings-186"><span class="linenos">186</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">PERSAG_ROOT</span><span class="p">,</span> <span class="n">STORAGE_BACKEND</span>
-</span><span id="refresh_user_dependent_settings-187"><a href="#refresh_user_dependent_settings-187"><span class="linenos">187</span></a>
-</span><span id="refresh_user_dependent_settings-188"><a href="#refresh_user_dependent_settings-188"><span class="linenos">188</span></a>    <span class="n">current_user_id</span> <span class="o">=</span> <span class="n">user_id</span> <span class="ow">or</span> <span class="n">get_userid</span><span class="p">()</span>
-</span><span id="refresh_user_dependent_settings-189"><a href="#refresh_user_dependent_settings-189"><span class="linenos">189</span></a>
-</span><span id="refresh_user_dependent_settings-190"><a href="#refresh_user_dependent_settings-190"><span class="linenos">190</span></a>    <span class="c1"># Recalculate storage directories with current USER_ID using os.path.expandvars</span>
-</span><span id="refresh_user_dependent_settings-191"><a href="#refresh_user_dependent_settings-191"><span class="linenos">191</span></a>    <span class="c1"># to match the behavior of get_user_storage_paths()</span>
-</span><span id="refresh_user_dependent_settings-192"><a href="#refresh_user_dependent_settings-192"><span class="linenos">192</span></a>    <span class="n">data_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-193"><a href="#refresh_user_dependent_settings-193"><span class="linenos">193</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/data&quot;</span>
-</span><span id="refresh_user_dependent_settings-194"><a href="#refresh_user_dependent_settings-194"><span class="linenos">194</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-195"><a href="#refresh_user_dependent_settings-195"><span class="linenos">195</span></a>    <span class="n">agno_storage_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-196"><a href="#refresh_user_dependent_settings-196"><span class="linenos">196</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="refresh_user_dependent_settings-197"><a href="#refresh_user_dependent_settings-197"><span class="linenos">197</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-198"><a href="#refresh_user_dependent_settings-198"><span class="linenos">198</span></a>    <span class="n">agno_knowledge_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-199"><a href="#refresh_user_dependent_settings-199"><span class="linenos">199</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/knowledge&quot;</span>
-</span><span id="refresh_user_dependent_settings-200"><a href="#refresh_user_dependent_settings-200"><span class="linenos">200</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-201"><a href="#refresh_user_dependent_settings-201"><span class="linenos">201</span></a>    <span class="n">lightrag_storage_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-202"><a href="#refresh_user_dependent_settings-202"><span class="linenos">202</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/rag_storage&quot;</span>
-</span><span id="refresh_user_dependent_settings-203"><a href="#refresh_user_dependent_settings-203"><span class="linenos">203</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-204"><a href="#refresh_user_dependent_settings-204"><span class="linenos">204</span></a>    <span class="n">lightrag_inputs_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-205"><a href="#refresh_user_dependent_settings-205"><span class="linenos">205</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/inputs&quot;</span>
-</span><span id="refresh_user_dependent_settings-206"><a href="#refresh_user_dependent_settings-206"><span class="linenos">206</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-207"><a href="#refresh_user_dependent_settings-207"><span class="linenos">207</span></a>    <span class="n">lightrag_memory_storage_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-208"><a href="#refresh_user_dependent_settings-208"><span class="linenos">208</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/memory_rag_storage&quot;</span>
-</span><span id="refresh_user_dependent_settings-209"><a href="#refresh_user_dependent_settings-209"><span class="linenos">209</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-210"><a href="#refresh_user_dependent_settings-210"><span class="linenos">210</span></a>    <span class="n">lightrag_memory_inputs_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
-</span><span id="refresh_user_dependent_settings-211"><a href="#refresh_user_dependent_settings-211"><span class="linenos">211</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/memory_inputs&quot;</span>
-</span><span id="refresh_user_dependent_settings-212"><a href="#refresh_user_dependent_settings-212"><span class="linenos">212</span></a>    <span class="p">)</span>
-</span><span id="refresh_user_dependent_settings-213"><a href="#refresh_user_dependent_settings-213"><span class="linenos">213</span></a>
-</span><span id="refresh_user_dependent_settings-214"><a href="#refresh_user_dependent_settings-214"><span class="linenos">214</span></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="refresh_user_dependent_settings-215"><a href="#refresh_user_dependent_settings-215"><span class="linenos">215</span></a>        <span class="s2">&quot;USER_ID&quot;</span><span class="p">:</span> <span class="n">current_user_id</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-216"><a href="#refresh_user_dependent_settings-216"><span class="linenos">216</span></a>        <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">:</span> <span class="n">data_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-217"><a href="#refresh_user_dependent_settings-217"><span class="linenos">217</span></a>        <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">agno_storage_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-218"><a href="#refresh_user_dependent_settings-218"><span class="linenos">218</span></a>        <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">:</span> <span class="n">agno_knowledge_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-219"><a href="#refresh_user_dependent_settings-219"><span class="linenos">219</span></a>        <span class="s2">&quot;LIGHTRAG_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_storage_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-220"><a href="#refresh_user_dependent_settings-220"><span class="linenos">220</span></a>        <span class="s2">&quot;LIGHTRAG_INPUTS_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_inputs_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-221"><a href="#refresh_user_dependent_settings-221"><span class="linenos">221</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_memory_storage_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-222"><a href="#refresh_user_dependent_settings-222"><span class="linenos">222</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_INPUTS_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_memory_inputs_dir</span><span class="p">,</span>
-</span><span id="refresh_user_dependent_settings-223"><a href="#refresh_user_dependent_settings-223"><span class="linenos">223</span></a>    <span class="p">}</span>
+</span><span id="refresh_user_dependent_settings-185"><a href="#refresh_user_dependent_settings-185"><span class="linenos">185</span></a>    <span class="c1"># Get values directly from environment to avoid circular imports</span>
+</span><span id="refresh_user_dependent_settings-186"><a href="#refresh_user_dependent_settings-186"><span class="linenos">186</span></a>    <span class="n">PERSAG_ROOT</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;PERSAG_ROOT&quot;</span><span class="p">,</span> <span class="s2">&quot;/Users/Shared/personal_agent_data&quot;</span><span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-187"><a href="#refresh_user_dependent_settings-187"><span class="linenos">187</span></a>    <span class="n">STORAGE_BACKEND</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;STORAGE_BACKEND&quot;</span><span class="p">,</span> <span class="s2">&quot;agno&quot;</span><span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-188"><a href="#refresh_user_dependent_settings-188"><span class="linenos">188</span></a>
+</span><span id="refresh_user_dependent_settings-189"><a href="#refresh_user_dependent_settings-189"><span class="linenos">189</span></a>    <span class="n">current_user_id</span> <span class="o">=</span> <span class="n">user_id</span> <span class="ow">or</span> <span class="n">get_userid</span><span class="p">()</span>
+</span><span id="refresh_user_dependent_settings-190"><a href="#refresh_user_dependent_settings-190"><span class="linenos">190</span></a>
+</span><span id="refresh_user_dependent_settings-191"><a href="#refresh_user_dependent_settings-191"><span class="linenos">191</span></a>    <span class="c1"># Recalculate storage directories with current USER_ID using os.path.expandvars</span>
+</span><span id="refresh_user_dependent_settings-192"><a href="#refresh_user_dependent_settings-192"><span class="linenos">192</span></a>    <span class="c1"># to match the behavior of get_user_storage_paths()</span>
+</span><span id="refresh_user_dependent_settings-193"><a href="#refresh_user_dependent_settings-193"><span class="linenos">193</span></a>    <span class="n">data_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-194"><a href="#refresh_user_dependent_settings-194"><span class="linenos">194</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/data&quot;</span>
+</span><span id="refresh_user_dependent_settings-195"><a href="#refresh_user_dependent_settings-195"><span class="linenos">195</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-196"><a href="#refresh_user_dependent_settings-196"><span class="linenos">196</span></a>    <span class="n">agno_storage_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-197"><a href="#refresh_user_dependent_settings-197"><span class="linenos">197</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="refresh_user_dependent_settings-198"><a href="#refresh_user_dependent_settings-198"><span class="linenos">198</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-199"><a href="#refresh_user_dependent_settings-199"><span class="linenos">199</span></a>    <span class="n">agno_knowledge_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-200"><a href="#refresh_user_dependent_settings-200"><span class="linenos">200</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/knowledge&quot;</span>
+</span><span id="refresh_user_dependent_settings-201"><a href="#refresh_user_dependent_settings-201"><span class="linenos">201</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-202"><a href="#refresh_user_dependent_settings-202"><span class="linenos">202</span></a>    <span class="n">lightrag_storage_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-203"><a href="#refresh_user_dependent_settings-203"><span class="linenos">203</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/rag_storage&quot;</span>
+</span><span id="refresh_user_dependent_settings-204"><a href="#refresh_user_dependent_settings-204"><span class="linenos">204</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-205"><a href="#refresh_user_dependent_settings-205"><span class="linenos">205</span></a>    <span class="n">lightrag_inputs_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-206"><a href="#refresh_user_dependent_settings-206"><span class="linenos">206</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/inputs&quot;</span>
+</span><span id="refresh_user_dependent_settings-207"><a href="#refresh_user_dependent_settings-207"><span class="linenos">207</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-208"><a href="#refresh_user_dependent_settings-208"><span class="linenos">208</span></a>    <span class="n">lightrag_memory_storage_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-209"><a href="#refresh_user_dependent_settings-209"><span class="linenos">209</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/memory_rag_storage&quot;</span>
+</span><span id="refresh_user_dependent_settings-210"><a href="#refresh_user_dependent_settings-210"><span class="linenos">210</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-211"><a href="#refresh_user_dependent_settings-211"><span class="linenos">211</span></a>    <span class="n">lightrag_memory_inputs_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expandvars</span><span class="p">(</span>
+</span><span id="refresh_user_dependent_settings-212"><a href="#refresh_user_dependent_settings-212"><span class="linenos">212</span></a>        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PERSAG_ROOT</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">STORAGE_BACKEND</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">current_user_id</span><span class="si">}</span><span class="s2">/memory_inputs&quot;</span>
+</span><span id="refresh_user_dependent_settings-213"><a href="#refresh_user_dependent_settings-213"><span class="linenos">213</span></a>    <span class="p">)</span>
+</span><span id="refresh_user_dependent_settings-214"><a href="#refresh_user_dependent_settings-214"><span class="linenos">214</span></a>
+</span><span id="refresh_user_dependent_settings-215"><a href="#refresh_user_dependent_settings-215"><span class="linenos">215</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="refresh_user_dependent_settings-216"><a href="#refresh_user_dependent_settings-216"><span class="linenos">216</span></a>        <span class="s2">&quot;USER_ID&quot;</span><span class="p">:</span> <span class="n">current_user_id</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-217"><a href="#refresh_user_dependent_settings-217"><span class="linenos">217</span></a>        <span class="s2">&quot;DATA_DIR&quot;</span><span class="p">:</span> <span class="n">data_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-218"><a href="#refresh_user_dependent_settings-218"><span class="linenos">218</span></a>        <span class="s2">&quot;AGNO_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">agno_storage_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-219"><a href="#refresh_user_dependent_settings-219"><span class="linenos">219</span></a>        <span class="s2">&quot;AGNO_KNOWLEDGE_DIR&quot;</span><span class="p">:</span> <span class="n">agno_knowledge_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-220"><a href="#refresh_user_dependent_settings-220"><span class="linenos">220</span></a>        <span class="s2">&quot;LIGHTRAG_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_storage_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-221"><a href="#refresh_user_dependent_settings-221"><span class="linenos">221</span></a>        <span class="s2">&quot;LIGHTRAG_INPUTS_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_inputs_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-222"><a href="#refresh_user_dependent_settings-222"><span class="linenos">222</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_STORAGE_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_memory_storage_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-223"><a href="#refresh_user_dependent_settings-223"><span class="linenos">223</span></a>        <span class="s2">&quot;LIGHTRAG_MEMORY_INPUTS_DIR&quot;</span><span class="p">:</span> <span class="n">lightrag_memory_inputs_dir</span><span class="p">,</span>
+</span><span id="refresh_user_dependent_settings-224"><a href="#refresh_user_dependent_settings-224"><span class="linenos">224</span></a>    <span class="p">}</span>
 </span></pre></div>
 
 
