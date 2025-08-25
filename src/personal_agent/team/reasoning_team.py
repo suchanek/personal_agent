@@ -97,7 +97,6 @@ import asyncio
 import logging
 from pathlib import Path
 from textwrap import dedent
-from agno.tools.toolkit import Toolkit
 
 from agno.agent import Agent
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
@@ -111,6 +110,7 @@ from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
+from agno.tools.toolkit import Toolkit
 from agno.tools.yfinance import YFinanceTools
 from dotenv import load_dotenv
 from rich.console import Console
@@ -488,6 +488,7 @@ def create_openai_model(
 
     return model
 
+
 class WritingTools(Toolkit):
     """Custom writing tools for the writer agent."""
 
@@ -498,7 +499,7 @@ class WritingTools(Toolkit):
             self.proofread_content,
         ]
         super().__init__(name="writing_tools", tools=tools)
-    
+
     def write_original_content(
         self,
         content_type: str,
@@ -646,7 +647,7 @@ def create_writer_agent(
     :param model_name: Model name to use
     :param ollama_base_url: Base URL for Ollama API
     :param debug: Enable debug mode
-    :param use_remote: Use remote Ollama 
+    :param use_remote: Use remote Ollama
     :return: Configured writing agent
     """
 
@@ -791,7 +792,7 @@ def create_agents(use_remote: bool = False):
     # Calculator agent using Ollama
     calculator_agent = Agent(
         name="Calculator Agent",
-        #model=create_model(provider=PROVIDER, use_remote=use_remote),
+        # model=create_model(provider=PROVIDER, use_remote=use_remote),
         role="Calculate mathematical expressions",
         tools=[
             CalculatorTools(
@@ -860,21 +861,29 @@ def create_agents(use_remote: bool = False):
 
 def create_personalized_instructions(agent, base_instructions: list) -> list:
     """Create personalized instructions using the agent's user_id."""
-    user_id = getattr(agent, 'user_id', 'user')
-    
+    user_id = getattr(agent, "user_id", "user")
+
     # Use the user_id directly instead of generic "user" references
-    if user_id and user_id != 'default_user':
+    if user_id and user_id != "default_user":
         # Replace "the user" and "user" with the actual user_id in instructions
         personalized_instructions = []
         for instruction in base_instructions:
             # Replace various forms of "user" references
             personalized_instruction = instruction.replace("the user", user_id)
-            personalized_instruction = personalized_instruction.replace("ABOUT THE USER", f"ABOUT {user_id.upper()}")
-            personalized_instruction = personalized_instruction.replace("about the user", f"about {user_id}")
-            personalized_instruction = personalized_instruction.replace("User ", f"{user_id} ")
-            personalized_instruction = personalized_instruction.replace("user ", f"{user_id} ")
+            personalized_instruction = personalized_instruction.replace(
+                "ABOUT THE USER", f"ABOUT {user_id.upper()}"
+            )
+            personalized_instruction = personalized_instruction.replace(
+                "about the user", f"about {user_id}"
+            )
+            personalized_instruction = personalized_instruction.replace(
+                "User ", f"{user_id} "
+            )
+            personalized_instruction = personalized_instruction.replace(
+                "user ", f"{user_id} "
+            )
             personalized_instructions.append(personalized_instruction)
-        
+
         logger.info(f"✅ Personalized instructions created for user: {user_id}")
         return personalized_instructions
     else:
@@ -892,13 +901,6 @@ async def create_memory_agent(
     # Get user_id dynamically if not provided
     if user_id is None:
         user_id = get_userid()
-
-    try:
-        from ..tools.knowledge_tools import KnowledgeTools
-        from ..tools.persag_memory_tools import PersagMemoryTools
-    except ImportError:
-        from personal_agent.tools.knowledge_tools import KnowledgeTools
-        from personal_agent.tools.persag_memory_tools import PersagMemoryTools
 
     # Determine the correct URL based on use_remote flag
     if PROVIDER == "ollama":
@@ -929,7 +931,9 @@ async def create_memory_agent(
     await memory_agent._ensure_initialized()
 
     # Create personalized instructions using the user's name if available
-    personalized_instructions = create_personalized_instructions(memory_agent, _memory_specific_instructions)
+    personalized_instructions = create_personalized_instructions(
+        memory_agent, _memory_specific_instructions
+    )
     memory_agent.instructions = personalized_instructions
 
     logger.info("✅ Memory agent created with personalized instructions")
@@ -946,13 +950,6 @@ async def create_memory_writer_agent(
     # Get user_id dynamically if not provided
     if user_id is None:
         user_id = get_userid()
-
-    try:
-        from ..tools.knowledge_tools import KnowledgeTools
-        from ..tools.persag_memory_tools import PersagMemoryTools
-    except ImportError:
-        from personal_agent.tools.knowledge_tools import KnowledgeTools
-        from personal_agent.tools.persag_memory_tools import PersagMemoryTools
 
     # Determine the correct URL based on use_remote flag
     if PROVIDER == "ollama":
