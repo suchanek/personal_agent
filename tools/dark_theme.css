@@ -115,3 +115,276 @@ input, textarea, select, .stSelectbox div {
     border-radius: 5px;
     padding: 10px;
 }
+
+/* More aggressive tab targeting for nested tabs */
+.stTabs [data-baseweb="tab-list"] button,
+.stTabs [data-baseweb="tab-list"] > div,
+.stTabs [data-baseweb="tab-list"] > div > div,
+.stTabs [data-baseweb="tab-list"] > div > div > button,
+.stTabs [role="tablist"],
+.stTabs [role="tablist"] button,
+.stTabs [role="tab"],
+div[role="tablist"],
+div[role="tablist"] button,
+div[role="tab"] {
+    background-color: #2b2b2b !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+/* Selected/active tabs */
+.stTabs [aria-selected="true"],
+.stTabs [data-baseweb="tab"][aria-selected="true"],
+div[role="tab"][aria-selected="true"],
+button[role="tab"][aria-selected="true"] {
+    background-color: #4c78e0 !important;
+    color: white !important;
+    border-bottom: 2px solid #4c78e0 !important;
+}
+
+/* Tab panels and content areas */
+.stTabs [data-baseweb="tab-panel"],
+.stTabs [role="tabpanel"],
+div[role="tabpanel"] {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Streamlit's internal tab styling overrides */
+.stTabs > div,
+.stTabs > div > div,
+.stTabs > div > div > div {
+    background-color: #0e1117 !important;
+}
+
+/* Target any remaining white backgrounds in tab areas */
+.stTabs div[style*="background-color: rgb(255, 255, 255)"],
+.stTabs div[style*="background-color: white"],
+.stTabs div[style*="background: white"],
+.stTabs div[style*="background: rgb(255, 255, 255)"],
+div[data-testid*="tab"] div[style*="background-color: rgb(255, 255, 255)"],
+div[data-testid*="tab"] div[style*="background-color: white"] {
+    background-color: #2b2b2b !important;
+    color: #fafafa !important;
+}
+
+/* Specific targeting for Streamlit's internal tab components */
+button[data-baseweb="tab"],
+div[data-baseweb="tab"],
+.stTabs button,
+.stTabs > div button,
+.stTabs > div > div button,
+.stTabs > div > div > div button {
+    background-color: #2b2b2b !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+/* Force dark background on tab-like elements */
+[role="tab"],
+[data-testid*="tab"] {
+    background-color: #2b2b2b !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+/* Target specific white background elements in tabs only */
+.stTabs *[style*="background-color: rgb(255, 255, 255)"],
+.stTabs *[style*="background-color: white"],
+.stTabs *[style*="background: white"],
+.stTabs *[style*="background: rgb(255, 255, 255)"] {
+    background-color: #2b2b2b !important;
+    color: #fafafa !important;
+}
+
+/* Tables and DataFrames */
+.stDataFrame,
+.stTable,
+[data-testid="stTable"],
+[data-testid="stDataFrame"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+}
+
+.stDataFrame table,
+.stTable table,
+[data-testid="stTable"] table,
+[data-testid="stDataFrame"] table {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+}
+
+.stDataFrame th,
+.stTable th,
+.stDataFrame td,
+.stTable td,
+[data-testid="stTable"] th,
+[data-testid="stTable"] td,
+[data-testid="stDataFrame"] th,
+[data-testid="stDataFrame"] td {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+.stDataFrame thead th,
+.stTable thead th,
+[data-testid="stTable"] thead th,
+[data-testid="stDataFrame"] thead th {
+    background-color: #2d2d2d !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    background-color: #0e1117 !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: #2b2b2b !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #4c78e0 !important;
+    color: white !important;
+}
+
+.stTabs [data-baseweb="tab-panel"] {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Forms and Form Elements */
+.stForm {
+    background-color: #1e1e1e !important;
+    border: 1px solid #4a4a4a !important;
+    border-radius: 5px;
+}
+
+.stForm label,
+.stForm .stMarkdown,
+.stForm .stText {
+    color: #fafafa !important;
+}
+
+/* Selectbox and other form controls */
+.stSelectbox > div > div,
+.stSelectbox > div > div > div,
+.stSelectbox label {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4f4f4f !important;
+}
+
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stNumberInput > div > div > input {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4f4f4f !important;
+}
+
+/* Checkbox and Radio */
+.stCheckbox label,
+.stRadio label {
+    color: #fafafa !important;
+}
+
+/* Info, Warning, Error, Success messages */
+.stAlert,
+[data-testid="stAlert"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border-color: #4a4a4a !important;
+}
+
+.stInfo,
+[data-testid="stInfo"] {
+    background-color: #1a3a5c !important;
+    color: #e3f2fd !important;
+}
+
+.stWarning,
+[data-testid="stWarning"] {
+    background-color: #5c4a1a !important;
+    color: #fff3cd !important;
+}
+
+.stError,
+[data-testid="stError"] {
+    background-color: #5c1a1a !important;
+    color: #f8d7da !important;
+}
+
+.stSuccess,
+[data-testid="stSuccess"] {
+    background-color: #1a5c2e !important;
+    color: #d4edda !important;
+}
+
+/* JSON display */
+.stJson {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+/* Code blocks */
+.stCode,
+pre,
+code {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+/* Captions */
+.stCaption,
+[data-testid="stCaption"] {
+    color: #b0b0b0 !important;
+}
+
+/* Subheaders and Headers */
+.stSubheader,
+.stHeader,
+h1, h2, h3, h4, h5, h6 {
+    color: #fafafa !important;
+}
+
+/* Progress bars */
+.stProgress > div > div {
+    background-color: #4c78e0 !important;
+}
+
+/* Spinner */
+.stSpinner {
+    color: #4c78e0 !important;
+}
+
+/* Columns */
+.stColumn {
+    background-color: #0e1117 !important;
+}
+
+/* Container */
+.stContainer {
+    background-color: #0e1117 !important;
+    color: #fafafa !important;
+}
+
+/* Ensure all text elements are visible */
+div, span, p, label, h1, h2, h3, h4, h5, h6 {
+    color: #fafafa !important;
+}
+
+/* Override any remaining white backgrounds */
+div[style*="background-color: rgb(255, 255, 255)"],
+div[style*="background-color: white"],
+div[style*="background: white"],
+div[style*="background: rgb(255, 255, 255)"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+}

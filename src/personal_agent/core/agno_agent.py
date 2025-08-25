@@ -86,11 +86,11 @@ from ..config.settings import (
 )
 from ..config.user_id_mgr import get_userid
 from ..tools.knowledge_tools import KnowledgeTools
+from ..tools.persag_memory_tools import PersagMemoryTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
 )
-from ..tools.refactored_memory_tools import PersagMemoryTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
