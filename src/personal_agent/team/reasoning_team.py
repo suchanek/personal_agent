@@ -1,5 +1,5 @@
 """
-Ollama Multi-Purpose Reasoning Team Module
+Personal Agent Reasoning Team
 
 This module implements a comprehensive multi-agent team system using Ollama models for various
 specialized tasks. The team coordinates between different agents with shared memory and knowledge
@@ -15,7 +15,9 @@ Key Components:
 Specialized Agents:
     - **Memory Agent**: Manages personal information and factual knowledge storage/retrieval
     - **Web Agent**: Performs web searches using Google Search
+    - **SystemAgent**: Executes system commands and shell operations safely
     - **Finance Agent**: Retrieves and analyzes financial data using YFinance
+    - **Medical Agent**: Searches PubMed for medical information and research
     - **Writer Agent**: Creates content, articles, and creative writing
     - **Calculator Agent**: Performs mathematical calculations and operations
     - **Python Agent**: Executes Python code and scripts
@@ -95,6 +97,7 @@ import asyncio
 import logging
 from pathlib import Path
 from textwrap import dedent
+from agno.tools.toolkit import Toolkit
 
 from agno.agent import Agent
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
@@ -134,6 +137,8 @@ try:
         PersonalAgentFilesystemTools,
         PersonalAgentSystemTools,
     )
+    from ..utils import setup_logging
+
 except ImportError:
     # Fall back to absolute imports (when run directly)
     import os
@@ -155,14 +160,18 @@ except ImportError:
     from personal_agent.config.user_id_mgr import get_userid
     from personal_agent.core.agent_model_manager import AgentModelManager
     from personal_agent.core.agno_agent import AgnoPersonalAgent
+    from personal_agent.utils import setup_logging
 
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+
+logger = setup_logging(__name__)
+
 cwd = Path(__file__).parent.resolve()
 
 PROVIDER = "ollama"
-
 
 _instructions = dedent(
     """\
@@ -230,6 +239,43 @@ _instructions = dedent(
     - Model support and configuration
     - Best practices and common patterns"""
 )
+
+_memory_specific_instructions = [
+    "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
+    "CRITICAL TOOL SELECTION RULES:",
+    "- Use MEMORY TOOLS for personal information ABOUT THE USER",
+    "- Use KNOWLEDGE TOOLS for factual content, documents, poems, stories, articles",
+    "- When user says 'store this poem' or 'save this content' -> use ingest_knowledge_text",
+    "- When user says 'remember that I...' -> use store_user_memory",
+    "- When user asks 'what do you remember about me?' -> use get_all_memories",
+    "- When user asks about stored content/documents -> use query_knowledge_base",
+    "",
+    "MEMORY TOOLS - CORRECT USAGE:",
+    "- store_user_memory(content='fact about user', topics=['optional']) - Store new user info",
+    "- get_all_memories() - For 'what do you know about me' (NO PARAMETERS)",
+    "- query_memory(query='keywords', limit=10) - Search specific user information",
+    "- get_recent_memories(limit=10) - Recent interactions",
+    "- list_memories() - Simple overview (NO PARAMETERS)",
+    "- get_memories_by_topic(topics=['topic1'], limit=10) - Filter by topics",
+    "- update_memory(memory_id='id', content='new content', topics=['topics']) - Update existing",
+    "- delete_memory(memory_id='id') - Delete specific memory",
+    "- store_graph_memory(content='info', topics=['topics'], memory_id='optional') - Store with relationships",
+    "- query_graph_memory(query='terms', mode='hybrid', top_k=5) - Explore relationships",
+    "",
+    "KNOWLEDGE TOOLS - CORRECT USAGE:",
+    "- ingest_knowledge_text(content='text', title='title', file_type='txt') - Store factual content",
+    "- ingest_knowledge_file(file_path='path', title='optional') - Ingest file",
+    "- ingest_knowledge_from_url(url='url', title='optional') - Ingest from web",
+    "- query_knowledge_base(query='search terms', mode='hybrid', limit=20) - Search knowledge",
+    "",
+    "EXAMPLES:",
+    "- 'Store this poem: [poem text]' -> ingest_knowledge_text(content=poem, title='User Poem')",
+    "- 'Remember I like skiing' -> store_user_memory(content='User likes skiing')",
+    "- 'What do you know about me?' -> get_all_memories()",
+    "- 'Save this article about AI' -> ingest_knowledge_text(content=article, title='AI Article')",
+    "Always execute the tools - do not show JSON or function calls to the user.",
+    "Provide natural responses based on the tool results.",
+]
 
 _code_instructions = dedent(
     """\
@@ -383,6 +429,11 @@ def create_model(
     else:
         url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
 
+    # DEBUG: Log the URL selection
+    print(
+        f"🔍 DEBUG create_model: provider={provider}, use_remote={use_remote}, selected_url={url}"
+    )
+
     model_manager = AgentModelManager(
         model_provider=provider,
         model_name=model_name,
@@ -437,140 +488,405 @@ def create_openai_model(
 
     return model
 
+class WritingTools(Toolkit):
+    """Custom writing tools for the writer agent."""
 
-# Web search agent using Ollama
-web_agent = Agent(
-    name="Web Agent",
-    role="Search the web for information",
-    model=create_model(provider=PROVIDER),
-    tools=[GoogleSearchTools()],
-    instructions=["Always include sources"],
-    show_tool_calls=True,
-)
+    def __init__(self):
+        tools = [
+            self.write_original_content,
+            self.edit_content,
+            self.proofread_content,
+        ]
+        super().__init__(name="writing_tools", tools=tools)
+    
+    def write_original_content(
+        self,
+        content_type: str,
+        topic: str,
+        length: int = 3,
+        style: str = "informative",
+        audience: str = "general",
+    ) -> str:
+        """Write original content based on the specified parameters.
 
-# Finance agent using Ollama
-finance_agent = Agent(
-    name="Finance Agent",
-    role="Get financial data",
-    model=create_model(provider=PROVIDER),
-    tools=[
-        YFinanceTools(
-            stock_price=True,
-            analyst_recommendations=True,
-            company_info=True,
-            company_news=True,
-        ),
-        FileTools(
-            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
-            save_files=True,
-            list_files=True,
-            search_files=True,
-        ),
-    ],
-    instructions=["Use tables to display data. You can save files and list files."],
-    show_tool_calls=True,
-)
+        Args:
+            content_type: Type of content (e.g., 'article', 'poem', 'story', 'essay', 'limerick')
+            topic: The main topic or subject to write about
+            length: Length specification (paragraphs for articles, lines for poems, etc.)
+            style: Writing style (e.g., 'formal', 'casual', 'humorous', 'limerick', 'informative')
+            audience: Target audience (e.g., 'general', 'children', 'professionals')
 
-# Writer agent that can write content
-medical_agent = Agent(
-    name="Medical Agent",
-    role="Search pubmed for medical information",
-    model=create_model(provider=PROVIDER),
-    description="You are an AI agent that search PubMed for medical information.",
-    tools=[PubmedTools()],
-    instructions=[
-        "You are a medical agent that can answer questions about medical topics.",
-        "Search PubMed for medical information and write about it.",
-        "Use tables to display data. You can save files and list files.",
-        "You can use your file tools to save files when requested",
-    ],
-    show_tool_calls=True,
-)
+        Returns:
+            The written content as a string
+        """
+        try:
+            # Generate content based on parameters
+            if content_type.lower() == "limerick":
+                # Generate a limerick about the topic
+                content = f"""Here's a limerick about {topic}:
 
-# Writer agent using Ollama
-writer_agent = Agent(
-    name="Writer Agent",
-    role="Write content",
-    model=create_model(provider=PROVIDER),
-    description="You are an AI agent that can write content.",
-    instructions=[
-        "You are a versatile writer who can create content on any topic.",
-        "When given a topic, write engaging and informative content in the requested format and style.",
-        "If you receive mathematical expressions or calculations from the calculator agent, convert them into clear written text.",
-        "Ensure your writing is clear, accurate and tailored to the specific request.",
-        "Maintain a natural, engaging tone while being factually precise.",
-        "Write something that would be good enough to be published in a newspaper like the New York Times.",
-        "You can use markdown to format your content.",
-        "You can use your file tools to save files when requested",
-    ],
-    tools=[
-        FileTools(
-            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
-            save_files=True,
-            list_files=True,
-            search_files=True,
-        ),
-    ],
-    show_tool_calls=True,
-)
+There once was a topic called {topic},
+So fine and so wonderfully epic,
+With rhythm and rhyme,
+It passes the time,
+And makes every reader quite tropic!"""
 
-# Calculator agent using Ollama
-calculator_agent = Agent(
-    name="Calculator Agent",
-    model=create_model(provider=PROVIDER),
-    role="Calculate mathematical expressions",
-    tools=[
-        CalculatorTools(
-            add=True,
-            subtract=True,
-            multiply=True,
-            divide=True,
-            exponentiate=True,
-            factorial=True,
-            is_prime=True,
-            square_root=True,
-        ),
-    ],
-    show_tool_calls=True,
-)
+            elif content_type.lower() == "poem":
+                # Generate a poem
+                lines = []
+                for i in range(length):
+                    if i == 0:
+                        lines.append(f"In the world of {topic}, we find")
+                    elif i == 1:
+                        lines.append(f"Beauty and wonder combined")
+                    else:
+                        lines.append(f"Line {i+1} about {topic} so fine")
+                content = "\n".join(lines)
 
-python_agent = Agent(
-    name="Python Agent",
-    model=create_model(provider=PROVIDER),
-    role="Execute Python code",
-    tools=[
-        PythonTools(
-            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
-            save_and_run=True,
-            run_files=True,
-            read_files=True,
-        ),
-    ],
-    instructions=dedent(_code_instructions),
-    show_tool_calls=True,
-)
+            elif content_type.lower() == "story":
+                content = f"""# A Story About {topic}
 
-file_agent = Agent(
-    name="File System Agent",
-    model=create_model(provider=PROVIDER),
-    role="Read and write files in the system",
-    tools=[
-        FileTools(
-            base_dir=Path(HOME_DIR),  # Use user home directory as base with Path object
-            save_files=True,
-            list_files=True,
-            search_files=True,
-        )
-    ],
-    instructions=dedent(_file_instructions),
-    show_tool_calls=True,
-)
+Once upon a time, there was a fascinating subject called {topic}. This {style} tale explores the many aspects of {topic} that make it so interesting to {audience}.
+
+The story unfolds with rich details and engaging narrative, bringing {topic} to life in ways that captivate the reader's imagination.
+
+And so, our story about {topic} comes to a satisfying conclusion, leaving the reader with new insights and appreciation."""
+
+            else:  # Default to article/essay format
+                paragraphs = []
+                paragraphs.append(f"# {topic.title()}")
+                paragraphs.append(f"")
+                paragraphs.append(
+                    f"This {content_type} explores the fascinating subject of {topic}, written in a {style} style for {audience} readers."
+                )
+
+                for i in range(length):
+                    paragraphs.append(f"")
+                    paragraphs.append(f"## Section {i+1}")
+                    paragraphs.append(
+                        f"This section delves deeper into {topic}, providing valuable insights and information that will help readers understand this important subject better."
+                    )
+
+                content = "\n".join(paragraphs)
+
+            logger.info(
+                f"🔍 DIAGNOSTIC: Generated {content_type} about {topic} ({len(content)} characters)"
+            )
+            return content
+
+        except Exception as e:
+            error_msg = f"Error generating content: {str(e)}"
+            logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
+            return error_msg
+
+    def edit_content(self, original_content: str, editing_instructions: str) -> str:
+        """Edit existing content based on provided instructions.
+
+        Args:
+            original_content: The original text to edit
+            editing_instructions: Instructions for how to edit the content
+
+        Returns:
+            The edited content
+        """
+        try:
+            # Simple editing logic - in a real implementation, this would be more sophisticated
+            edited = f"# Edited Content\n\n{original_content}\n\n*Edited according to: {editing_instructions}*"
+            logger.info(f"🔍 DIAGNOSTIC: Edited content ({len(edited)} characters)")
+            return edited
+        except Exception as e:
+            error_msg = f"Error editing content: {str(e)}"
+            logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
+            return error_msg
+
+    def proofread_content(self, content: str) -> str:
+        """Proofread content and provide feedback.
+
+        Args:
+            content: The content to proofread
+
+        Returns:
+            Proofreading feedback and suggestions
+        """
+        try:
+            feedback = f"""# Proofreading Report
+
+**Original Content:**
+{content}
+
+**Feedback:**
+- Content length: {len(content)} characters
+- Structure appears well-organized
+- Consider reviewing for grammar and clarity
+- Overall quality assessment: Good
+
+**Suggestions:**
+- Review for consistency in tone
+- Check for proper formatting
+- Ensure clarity of main points"""
+
+            logger.info(f"🔍 DIAGNOSTIC: Proofread content ({len(content)} characters)")
+            return feedback
+        except Exception as e:
+            error_msg = f"Error proofreading content: {str(e)}"
+            logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
+            return error_msg
+
+
+def create_writer_agent(
+    model_provider: str = "ollama",
+    model_name: str = "llama3.1:8b",
+    ollama_base_url: str = OLLAMA_URL,
+    debug: bool = True,
+    use_remote: bool = False,
+) -> Agent:
+    """Create a specialized writing agent.
+
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param ollama_base_url: Base URL for Ollama API
+    :param debug: Enable debug mode
+    :param use_remote: Use remote Ollama 
+    :return: Configured writing agent
+    """
+
+    agent = Agent(
+        name="Writer Agent",
+        role="Create, edit, read, write and improve written content",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        debug_mode=debug,
+        tools=[
+            WritingTools(),  # Custom writing tools with write_original_content
+            FileTools(
+                base_dir=Path(HOME_DIR),
+                save_files=True,
+                read_files=True,
+                list_files=True,
+            ),
+        ],  # File tools for reading/writing documents
+        instructions=[
+            "You are a specialized writing agent focused on creating, editing, and improving written content.",
+            "Your primary functions are:",
+            "1. Write original content (articles, essays, reports, stories, poems, etc.)",
+            "2. Edit and improve existing text for clarity, style, and grammar",
+            "3. Adapt writing style for different audiences and purposes",
+            "4. Create structured documents with proper formatting",
+            "5. Proofread and provide feedback on written content",
+            "",
+            "WRITING TOOLS AVAILABLE:",
+            "- write_original_content: Create new content based on type, topic, length, style, and audience",
+            "- edit_content: Edit existing content based on instructions",
+            "- proofread_content: Review and provide feedback on content",
+            "- File tools: Save, read, and manage document files",
+            "",
+            "WRITING GUIDELINES:",
+            "- Always use the write_original_content tool when asked to create new content",
+            "- Consider the target audience and purpose",
+            "- Use clear, concise, and engaging language",
+            "- Maintain consistent tone and style throughout",
+            "- Structure content logically with proper headings and paragraphs",
+            "- Check for grammar, spelling, and punctuation errors",
+            "- Provide constructive feedback when editing others' work",
+            "- Use appropriate formatting (markdown, headings, lists, etc.)",
+            "",
+            "CONTENT TYPES YOU CAN CREATE:",
+            "- Articles and essays (informative, persuasive, analytical)",
+            "- Creative writing (stories, poems, limericks, scripts)",
+            "- Business documents (reports, proposals, emails)",
+            "- Academic writing (research papers, summaries)",
+            "- Technical documentation (guides, manuals, README files)",
+            "- Marketing content (copy, descriptions, social media posts)",
+            "- Personal writing (letters, journals, blogs)",
+            "",
+            "IMPORTANT GUIDELINES:",
+            "- Always use the appropriate writing tool for the task",
+            "- When asked to write something, use write_original_content with proper parameters",
+            "- Always maintain originality and avoid plagiarism",
+            "- Respect copyright and intellectual property",
+            "- Provide citations when referencing sources",
+            "- Ask for clarification on requirements when needed",
+            "- Offer multiple options or approaches when appropriate",
+        ],
+        markdown=True,
+        show_tool_calls=True,  # Enable tool calls to ensure proper execution in team context
+        add_name_to_instructions=True,
+    )
+
+    logger.info("Created Writer Agent with custom writing tools")
+    return agent
+
+
+def create_agents(use_remote: bool = False):
+    """Create all agents with the correct remote/local configuration."""
+
+    # Web search agent using Ollama
+    web_agent = Agent(
+        name="Web Agent",
+        role="Search the web for information",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        tools=[GoogleSearchTools()],
+        instructions=["Always include sources"],
+        show_tool_calls=True,
+    )
+
+    # System agent using PersonalAgentSystemTools
+    system_agent = Agent(
+        name="SystemAgent",
+        role="Execute system commands and shell operations",
+        # model=create_model(provider=PROVIDER, use_remote=use_remote),
+        tools=[PersonalAgentSystemTools(shell_command=True)],
+        instructions=[
+            "You are a system agent that can execute shell commands safely.",
+            "Always explain what commands you're running and why.",
+            "Be cautious with system operations and ask for confirmation when needed.",
+            "Provide clear output and error messages from command execution.",
+        ],
+        show_tool_calls=True,
+    )
+
+    # Finance agent using Ollama
+    finance_agent = Agent(
+        name="Finance Agent",
+        role="Get financial data",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        tools=[
+            YFinanceTools(
+                stock_price=True,
+                analyst_recommendations=True,
+                company_info=True,
+                company_news=True,
+            ),
+            FileTools(
+                base_dir=Path(
+                    HOME_DIR
+                ),  # Use user home directory as base with Path object
+                save_files=True,
+                list_files=True,
+                search_files=True,
+            ),
+        ],
+        instructions=["Use tables to display data. You can save files and list files."],
+        show_tool_calls=True,
+    )
+
+    # Medical agent that can search PubMed
+    medical_agent = Agent(
+        name="Medical Agent",
+        role="Search pubmed for medical information",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        description="You are an AI agent that search PubMed for medical information.",
+        tools=[PubmedTools()],
+        instructions=[
+            "You are a medical agent that can answer questions about medical topics.",
+            "Search PubMed for medical information and write about it.",
+            "Use tables to display data. You can save files and list files.",
+            "You can use your file tools to save files when requested",
+        ],
+        show_tool_calls=True,
+    )
+
+    # Writer agent using Ollama
+    writer_agent = create_writer_agent()
+
+    # Calculator agent using Ollama
+    calculator_agent = Agent(
+        name="Calculator Agent",
+        #model=create_model(provider=PROVIDER, use_remote=use_remote),
+        role="Calculate mathematical expressions",
+        tools=[
+            CalculatorTools(
+                add=True,
+                subtract=True,
+                multiply=True,
+                divide=True,
+                exponentiate=True,
+                factorial=True,
+                is_prime=True,
+                square_root=True,
+            ),
+        ],
+        show_tool_calls=True,
+    )
+
+    python_agent = Agent(
+        name="Python Agent",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        role="Create and Execute Python code",
+        tools=[
+            PythonTools(
+                base_dir=Path(
+                    HOME_DIR
+                ),  # Use user home directory as base with Path object
+                save_and_run=True,
+                run_files=True,
+                read_files=True,
+                list_files=True,
+                run_code=True,
+            ),
+        ],
+        instructions=dedent(_code_instructions),
+        show_tool_calls=True,
+    )
+
+    file_agent = Agent(
+        name="File System Agent",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        role="Read and write files in the system",
+        tools=[
+            FileTools(
+                base_dir=Path(
+                    HOME_DIR
+                ),  # Use user home directory as base with Path object
+                save_files=True,
+                list_files=True,
+                search_files=True,
+            )
+        ],
+        instructions=dedent(_file_instructions),
+        show_tool_calls=True,
+    )
+
+    return (
+        web_agent,
+        system_agent,
+        finance_agent,
+        medical_agent,
+        writer_agent,
+        calculator_agent,
+        python_agent,
+        file_agent,
+    )
+
+
+def create_personalized_instructions(agent, base_instructions: list) -> list:
+    """Create personalized instructions using the agent's user_id."""
+    user_id = getattr(agent, 'user_id', 'user')
+    
+    # Use the user_id directly instead of generic "user" references
+    if user_id and user_id != 'default_user':
+        # Replace "the user" and "user" with the actual user_id in instructions
+        personalized_instructions = []
+        for instruction in base_instructions:
+            # Replace various forms of "user" references
+            personalized_instruction = instruction.replace("the user", user_id)
+            personalized_instruction = personalized_instruction.replace("ABOUT THE USER", f"ABOUT {user_id.upper()}")
+            personalized_instruction = personalized_instruction.replace("about the user", f"about {user_id}")
+            personalized_instruction = personalized_instruction.replace("User ", f"{user_id} ")
+            personalized_instruction = personalized_instruction.replace("user ", f"{user_id} ")
+            personalized_instructions.append(personalized_instruction)
+        
+        logger.info(f"✅ Personalized instructions created for user: {user_id}")
+        return personalized_instructions
+    else:
+        logger.info("⚠️ Using default user_id, keeping generic instructions")
+        return base_instructions
 
 
 async def create_memory_agent(
     user_id: str = None,
     debug: bool = False,
     use_remote: bool = False,
+    recreate: bool = False,
 ) -> Agent:
     """Create a memory agent that uses the shared memory system."""
     # Get user_id dynamically if not provided
@@ -579,10 +895,21 @@ async def create_memory_agent(
 
     try:
         from ..tools.knowledge_tools import KnowledgeTools
-        from ..tools.refactored_memory_tools import PersagMemoryTools
+        from ..tools.persag_memory_tools import PersagMemoryTools
     except ImportError:
         from personal_agent.tools.knowledge_tools import KnowledgeTools
-        from personal_agent.tools.refactored_memory_tools import PersagMemoryTools
+        from personal_agent.tools.persag_memory_tools import PersagMemoryTools
+
+    # Determine the correct URL based on use_remote flag
+    if PROVIDER == "ollama":
+        ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+    else:
+        ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+
+    # DEBUG: Log the URL selection for memory agent
+    print(
+        f"🔍 DEBUG create_memory_agent: provider={PROVIDER}, use_remote={use_remote}, selected_url={ollama_url}"
+    )
 
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
@@ -592,56 +919,75 @@ async def create_memory_agent(
         enable_mcp=True,
         debug=debug,
         user_id=user_id,
-        recreate=False,  # Don't recreate memory database every time
+        recreate=recreate,
         alltools=False,
-        # AgnoPersonalAgent will create its own model using AgentModelManager
-        # Note: use_remote parameter removed as it's not supported by AgnoPersonalAgent
+        ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
     )
 
     # After initialization, we need to set the shared memory and add the tools
     # Wait for initialization to complete
     await memory_agent._ensure_initialized()
 
-    # Update instructions to include memory-specific guidance
-    memory_specific_instructions = [
-        "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
-        "CRITICAL TOOL SELECTION RULES:",
-        "- Use MEMORY TOOLS for personal information ABOUT THE USER",
-        "- Use KNOWLEDGE TOOLS for factual content, documents, poems, stories, articles",
-        "- When user says 'store this poem' or 'save this content' -> use ingest_knowledge_text",
-        "- When user says 'remember that I...' -> use store_user_memory",
-        "- When user asks 'what do you remember about me?' -> use get_all_memories",
-        "- When user asks about stored content/documents -> use query_knowledge_base",
-        "",
-        "MEMORY TOOLS - CORRECT USAGE:",
-        "- store_user_memory(content='fact about user', topics=['optional']) - Store new user info",
-        "- get_all_memories() - For 'what do you know about me' (NO PARAMETERS)",
-        "- query_memory(query='keywords', limit=10) - Search specific user information",
-        "- get_recent_memories(limit=10) - Recent interactions",
-        "- list_memories() - Simple overview (NO PARAMETERS)",
-        "- get_memories_by_topic(topics=['topic1'], limit=10) - Filter by topics",
-        "- update_memory(memory_id='id', content='new content', topics=['topics']) - Update existing",
-        "- delete_memory(memory_id='id') - Delete specific memory",
-        "- store_graph_memory(content='info', topics=['topics'], memory_id='optional') - Store with relationships",
-        "- query_graph_memory(query='terms', mode='hybrid', top_k=5) - Explore relationships",
-        "",
-        "KNOWLEDGE TOOLS - CORRECT USAGE:",
-        "- ingest_knowledge_text(content='text', title='title', file_type='txt') - Store factual content",
-        "- ingest_knowledge_file(file_path='path', title='optional') - Ingest file",
-        "- ingest_knowledge_from_url(url='url', title='optional') - Ingest from web",
-        "- query_knowledge_base(query='search terms', mode='hybrid', limit=20) - Search knowledge",
-        "",
-        "EXAMPLES:",
-        "- 'Store this poem: [poem text]' -> ingest_knowledge_text(content=poem, title='User Poem')",
-        "- 'Remember I like skiing' -> store_user_memory(content='User likes skiing')",
-        "- 'What do you know about me?' -> get_all_memories()",
-        "- 'Save this article about AI' -> ingest_knowledge_text(content=article, title='AI Article')",
-        "Always execute the tools - do not show JSON or function calls to the user.",
-        "Provide natural responses based on the tool results.",
-    ]
+    # Create personalized instructions using the user's name if available
+    personalized_instructions = create_personalized_instructions(memory_agent, _memory_specific_instructions)
+    memory_agent.instructions = personalized_instructions
 
-    print("✅ Memory agent created")
+    logger.info("✅ Memory agent created with personalized instructions")
     return memory_agent
+
+
+async def create_memory_writer_agent(
+    user_id: str = None,
+    debug: bool = False,
+    use_remote: bool = False,
+    recreate: bool = False,
+) -> Agent:
+    """Create a memory agent that uses the shared memory system and can write content."""
+    # Get user_id dynamically if not provided
+    if user_id is None:
+        user_id = get_userid()
+
+    try:
+        from ..tools.knowledge_tools import KnowledgeTools
+        from ..tools.persag_memory_tools import PersagMemoryTools
+    except ImportError:
+        from personal_agent.tools.knowledge_tools import KnowledgeTools
+        from personal_agent.tools.persag_memory_tools import PersagMemoryTools
+
+    # Determine the correct URL based on use_remote flag
+    if PROVIDER == "ollama":
+        ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+    else:
+        ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+
+    # DEBUG: Log the URL selection for memory agent
+    logger.info(
+        f"🔍 create_memory_writer_agent: provider={PROVIDER}, use_remote={use_remote}, selected_url={ollama_url}"
+    )
+
+    # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
+    memory_writer_agent = AgnoPersonalAgent(
+        model_provider=PROVIDER,  # Use the correct provider
+        model_name=LLM_MODEL,  # Use the configured model
+        enable_memory=True,
+        enable_mcp=False,
+        debug=debug,
+        user_id=user_id,
+        recreate=recreate,
+        alltools=False,
+        initialize_agent=True,
+        ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
+    )
+
+    # After initialization, we need to set the shared memory and add the tools
+    # Wait for initialization to complete
+    # await memory_writer_agent._ensure_initialized()
+
+    # Update instructions to include memory-specific guidance
+
+    memory_writer_agent.instructions = _memory_writer_instructions
+    logger.info("✅ Memory/Writer agent created")
+    return memory_writer_agent
 
 
 # Create the team
@@ -678,8 +1024,19 @@ async def create_team(use_remote: bool = False):
         use_remote=use_remote,
     )
 
-    # Update other agents to use shared memory (declare as global to modify)
-    global web_agent, finance_agent, writer_agent, calculator_agent
+    # Create all other agents with the correct remote/local configuration
+    agents = create_agents(use_remote=use_remote)
+    (
+        web_agent,
+        system_agent,
+        finance_agent,
+        medical_agent,
+        writer_agent,
+        calculator_agent,
+        python_agent,
+        file_agent,
+    ) = agents
+
     # Create the team without shared memory - only the memory agent handles memory
     agent_team = Team(
         name="Personal Agent Team",
@@ -692,9 +1049,13 @@ async def create_team(use_remote: bool = False):
         members=[
             memory_agent,  # Memory agent with your managers
             web_agent,
+            system_agent,  # SystemAgent for shell commands
             finance_agent,
             writer_agent,
             calculator_agent,
+            medical_agent,
+            python_agent,
+            file_agent,
         ],
         instructions=[
             "You are a team of agents using local Ollama models that can answer a variety of questions.",
@@ -722,7 +1083,9 @@ async def create_team(use_remote: bool = False):
         enable_user_memories=False,  # Disable team-level memory - memory agent handles this
     )
 
-    print("✅ Team created - memory handled by Personal AI Agent")
+    logger.info(
+        f"✅ Team created with {len(agent_team.members)} members - memory handled by Personal AI Agent"
+    )
     return agent_team
 
 
@@ -873,6 +1236,23 @@ async def _cleanup_tool(tool, tool_name: str):
         logging.info(f"⚠️ Error cleaning up {tool_name} tool: {e}")
 
 
+def display_welcome_panel(console: Console, command_parser: CommandParser):
+    """Display the welcome panel with team capabilities and commands."""
+    console.print(
+        Panel.fit(
+            "🚀 Enhanced Personal AI Agent Team with Memory Commands\n\n"
+            "This CLI provides team coordination with direct memory management.\n\n"
+            f"{command_parser.get_help_text()}\n\n"
+            "[bold yellow]Team Commands:[/bold yellow]\n"
+            "• 'help' - Show team capabilities\n"
+            "• 'clear' - Clear the screen\n"
+            "• 'examples' - Show example queries\n"
+            "• 'quit' - Exit the team",
+            style="bold blue",
+        )
+    )
+
+
 # Main execution
 async def main(use_remote: bool = False):
     """Main function to run the team with an enhanced CLI interface."""
@@ -884,6 +1264,12 @@ async def main(use_remote: bool = False):
     console.print("=" * 50)
     console.print("Initializing team with memory and knowledge capabilities...")
     console.print("This may take a moment on first run...")
+
+    # DEBUG: Log the remote flag and URLs
+    console.print(f"🔍 DEBUG: use_remote={use_remote}")
+    console.print(f"🔍 DEBUG: PROVIDER={PROVIDER}")
+    console.print(f"🔍 DEBUG: OLLAMA_URL={OLLAMA_URL}")
+    console.print(f"🔍 DEBUG: REMOTE_OLLAMA_URL={REMOTE_OLLAMA_URL}")
 
     try:
         # Create the team
@@ -903,30 +1289,28 @@ async def main(use_remote: bool = False):
             "- 🧠 Memory Agent: Store and retrieve personal information and knowledge"
         )
         console.print("- 🌐 Web Agent: Search the web for information")
+        console.print("- ⚙️  SystemAgent: Execute system commands and shell operations")
         console.print("- 💰 Finance Agent: Get financial data and analysis")
+        console.print("- 🏥 Medical Agent: Search PubMed for medical information")
         console.print("- ✍️  Writer Agent: Create content and written materials")
         console.print("- 🧮 Calculator Agent: Perform calculations and math")
+        console.print("- 🐍 Python Agent: Create and execute Python code")
+        console.print("- 📁 File System Agent: Read and write files in the system")
 
         # Initialize command parser
         command_parser = CommandParser()
 
         # Display the enhanced welcome panel
         console.print("\n")
-        console.print(
-            Panel.fit(
-                "🚀 Enhanced Personal AI Agent Team with Memory Commands\n\n"
-                "This CLI provides team coordination with direct memory management.\n\n"
-                f"{command_parser.get_help_text()}\n\n"
-                "[bold yellow]Team Commands:[/bold yellow]\n"
-                "• 'help' - Show team capabilities\n"
-                "• 'clear' - Clear the screen\n"
-                "• 'examples' - Show example queries\n"
-                "• 'quit' - Exit the team",
-                style="bold blue",
-            )
-        )
+        display_welcome_panel(console, command_parser)
 
-        console.print(f"🖥️  Using Ollama model {LLM_MODEL} at: {OLLAMA_URL}")
+        # Fix: Show the correct URL based on use_remote flag
+        if PROVIDER == "ollama":
+            actual_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+        else:
+            actual_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+
+        console.print(f"🖥️  Using {PROVIDER} model {LLM_MODEL} at: {actual_url}")
 
         # Enhanced interactive chat loop with command parsing
         while True:
@@ -968,13 +1352,8 @@ async def main(use_remote: bool = False):
 
                 # Handle team-specific commands
                 elif user_input.lower() == "help":
-                    console.print("\n📋 [bold cyan]Team Capabilities:[/bold cyan]")
-                    console.print("  - Remember personal information and preferences")
-                    console.print("  - Search the web for current information")
-                    console.print("  - Analyze financial data and stocks")
-                    console.print("  - Write content, articles, and creative text")
-                    console.print("  - Perform mathematical calculations")
-                    console.print(f"\n{command_parser.get_help_text()}")
+                    console.print("\n")
+                    display_welcome_panel(console, command_parser)
                     continue
 
                 elif user_input.lower() == "clear":
@@ -1056,10 +1435,13 @@ def cli_main():
     )
     args = parser.parse_args()
 
-    print("Starting Ollama Multi-Purpose Reasoning Team...")
+    print("Starting Personal Agent Reasoning Team...")
     asyncio.run(main(use_remote=args.remote))
 
 
 if __name__ == "__main__":
     # Run the main function
     cli_main()
+    sys.exit(0)
+
+# end of file

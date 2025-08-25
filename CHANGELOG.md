@@ -7,7 +7,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2025-08-23
+## [responsefix/v0.2.3] - 2025-08-24
+
+### Added
+- **Streamlit Management Dashboard**: Introduced a new, full-featured Streamlit dashboard (`src/personal_agent/streamlit/dashboard.py`) for comprehensive system management. The dashboard includes tabs for System Status, User Management, Memory Management, and Docker Services, along with a dark mode theme for improved usability. See [ADR-074](./refs/adr/074-reasoning-team-cli-and-ui-updates.md) for details.
+- **Response Parsing Guide**: Created a new `runresponse_parsing_guide.md` to provide a clear and comprehensive guide for parsing `RunResponse` and `TeamRunResponse` objects from the `agno` framework, standardizing UI and tool development.
+
+### Changed
+- **Enhanced Reasoning Team CLI**: The standalone Ollama Reasoning Team (`src/personal_agent/team/reasoning_team.py`) has been significantly upgraded. It now integrates a full `AgnoPersonalAgent` instance as its memory and knowledge manager, providing feature parity with the main agent's CLI, including all advanced memory commands (`!`, `?`, `@`). The CLI has been rebuilt with `rich` for an improved user experience. See [ADR-074](./refs/adr/074-reasoning-team-cli-and-ui-updates.md) for details.
+
+### Fixed
+- **Streamlit User Display**: Corrected a bug in the new Streamlit dashboard where the current user ID was not being displayed reliably. The dashboard now uses a fallback mechanism to ensure the user is always shown.
+
+
+## [responsefix/v0.23] - 2025-08-23
 
 ### Added
 - **Qwen Model Settings**: Implemented specific, environment-configurable settings for the Qwen model, including parameters for temperature, `min_p`, `top_p`, and `top_k`. These settings are now applied during model initialization and are displayed in the Streamlit UI for transparency. This is documented in [QWEN_MODEL_SETTINGS_IMPLEMENTATION.md](./refs/QWEN_MODEL_SETTINGS_IMPLEMENTATION.md).

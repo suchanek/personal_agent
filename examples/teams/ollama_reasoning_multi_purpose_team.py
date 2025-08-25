@@ -47,7 +47,7 @@ from src.personal_agent.core.agno_storage import (
     load_combined_knowledge_base,
 )
 from src.personal_agent.tools.knowledge_tools import KnowledgeTools
-from src.personal_agent.tools.refactored_memory_tools import PersagMemoryTools
+from src.personal_agent.tools.persag_memory_tools import PersagMemoryTools
 
 # Load environment variables
 load_dotenv()

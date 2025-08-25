@@ -132,16 +132,9 @@ class StreamlitMemoryHelper:
             return []
         try:
             # Use same method as agent tools for consistency
-            results = self.memory_manager.search_memories(
-                query="",  # Empty query to get all memories
-                db=self.db,
-                user_id=self.agent.user_id,
-                limit=None,  # Get all memories
-                similarity_threshold=0.0,  # Very low threshold to get all
-                search_topics=False,
-            )
-            # Extract just the memory objects from the (memory, score) tuples
-            return [memory for memory, score in results]
+            # get_all_memories returns List[UserMemory] directly, not tuples
+            results = self.memory_manager.get_all_memories(self.db)
+            return results
         except Exception as e:
             st.error(f"Error getting all memories: {e}")
             return []
@@ -230,7 +223,9 @@ class StreamlitMemoryHelper:
             logger.info(f"User ID: {getattr(self.agent, 'user_id', 'Unknown')}")
 
             # Check if this is a team wrapper
-            is_team_wrapper = hasattr(self.agent, 'team') and hasattr(self.agent, '_get_memory_tools')
+            is_team_wrapper = hasattr(self.agent, "team") and hasattr(
+                self.agent, "_get_memory_tools"
+            )
             logger.info(f"Is team wrapper: {is_team_wrapper}")
 
             # Ensure agent is initialized first
@@ -248,14 +243,21 @@ class StreamlitMemoryHelper:
             if hasattr(self.agent, "memory_tools") and self.agent.memory_tools:
                 memory_tools = self.agent.memory_tools
                 logger.info("Found memory_tools on agent directly")
-            elif is_team_wrapper and hasattr(self.agent, '_get_memory_tools'):
+            elif is_team_wrapper and hasattr(self.agent, "_get_memory_tools"):
                 memory_tools = self.agent._get_memory_tools()
                 logger.info("Found memory_tools via team wrapper method")
-            elif is_team_wrapper and hasattr(self.agent, 'team') and hasattr(self.agent.team, 'members'):
+            elif (
+                is_team_wrapper
+                and hasattr(self.agent, "team")
+                and hasattr(self.agent.team, "members")
+            ):
                 # Try to get memory tools from the knowledge agent (first team member)
                 if self.agent.team.members:
                     knowledge_agent = self.agent.team.members[0]
-                    if hasattr(knowledge_agent, 'memory_tools') and knowledge_agent.memory_tools:
+                    if (
+                        hasattr(knowledge_agent, "memory_tools")
+                        and knowledge_agent.memory_tools
+                    ):
                         memory_tools = knowledge_agent.memory_tools
                         logger.info("Found memory_tools from knowledge agent (team[0])")
 
@@ -283,7 +285,7 @@ class StreamlitMemoryHelper:
                 logger.info("Found delete_memory tool via CLI-style search")
                 result = asyncio.run(delete_tool(memory_id))
                 logger.info(f"CLI-style tool deletion result: {result}")
-                
+
                 if isinstance(result, str):
                     if "✅" in result or "Successfully deleted" in result:
                         return True, result
@@ -298,9 +300,7 @@ class StreamlitMemoryHelper:
                 try:
                     logger.info("Using memory manager delete_memory directly")
                     success, message = self.memory_manager.delete_memory(
-                        memory_id=memory_id,
-                        db=self.db,
-                        user_id=self.agent.user_id
+                        memory_id=memory_id, db=self.db, user_id=self.agent.user_id
                     )
                     if success:
                         logger.info(f"✅ Memory manager deletion successful: {message}")
@@ -323,24 +323,31 @@ class StreamlitMemoryHelper:
         """Find a tool function by name from the agent's tools, similar to CLI approach."""
         try:
             # Handle team wrapper case
-            if hasattr(self.agent, 'team') and hasattr(self.agent.team, 'members'):
+            if hasattr(self.agent, "team") and hasattr(self.agent.team, "members"):
                 # Search in the knowledge agent (first team member)
                 if self.agent.team.members:
                     knowledge_agent = self.agent.team.members[0]
-                    if hasattr(knowledge_agent, 'agent') and hasattr(knowledge_agent.agent, 'tools'):
+                    if hasattr(knowledge_agent, "agent") and hasattr(
+                        knowledge_agent.agent, "tools"
+                    ):
                         for toolkit in knowledge_agent.agent.tools:
                             # Check if the toolkit itself is a callable tool
                             if getattr(toolkit, "__name__", "") == tool_name:
                                 return toolkit
 
                             # Check for tools within the toolkit
-                            if hasattr(toolkit, "tools") and isinstance(toolkit.tools, list):
+                            if hasattr(toolkit, "tools") and isinstance(
+                                toolkit.tools, list
+                            ):
                                 for tool in toolkit.tools:
-                                    if hasattr(tool, "__name__") and tool.__name__ == tool_name:
+                                    if (
+                                        hasattr(tool, "__name__")
+                                        and tool.__name__ == tool_name
+                                    ):
                                         return tool
-            
+
             # Handle direct agent case
-            elif hasattr(self.agent, 'agent') and hasattr(self.agent.agent, 'tools'):
+            elif hasattr(self.agent, "agent") and hasattr(self.agent.agent, "tools"):
                 for toolkit in self.agent.agent.tools:
                     # Check if the toolkit itself is a callable tool
                     if getattr(toolkit, "__name__", "") == tool_name:
@@ -351,7 +358,7 @@ class StreamlitMemoryHelper:
                         for tool in toolkit.tools:
                             if hasattr(tool, "__name__") and tool.__name__ == tool_name:
                                 return tool
-            
+
             return None
         except Exception as e:
             logger.error(f"Error finding tool {tool_name}: {e}")

@@ -231,6 +231,10 @@ def _render_memory_explorer():
                             with col_confirm2:
                                 if st.button("Delete", key=f"confirm_delete_{memory_id}", type="primary"):
                                     if confirmation_text.lower() == "yes":
+                                        # Show toast notification with 2-second delay
+                                        st.toast(f"Deleting memory {memory_id}...", icon="🗑️")
+                                        time.sleep(2)
+                                        
                                         with st.spinner("Deleting memory..."):
                                             success, message = memory_helper.delete_memory(memory_id)
                                             
@@ -245,9 +249,12 @@ def _render_memory_explorer():
                                             st.session_state[f"show_delete_confirm_{memory_id}"] = False
                                             
                                             if success:
+                                                st.toast("Memory deleted successfully!", icon="✅")
                                                 # Clear the agent cache to ensure fresh data on next load
                                                 st.cache_resource.clear()
                                                 st.rerun()
+                                            else:
+                                                st.toast(f"Failed to delete memory: {message}", icon="❌")
                                     else:
                                         st.error("Please type 'yes' to confirm deletion")
                                 
@@ -353,13 +360,19 @@ def _render_memory_search():
                                 f"🗑️ Delete Memory",
                                 key=f"delete_search_{memory.memory_id}",
                             ):
+                                # Show toast notification with 2-second delay
+                                st.toast(f"Deleting memory {memory.memory_id}...", icon="🗑️")
+                                time.sleep(2)
+                                
                                 success, message = memory_helper.delete_memory(
                                     memory.memory_id
                                 )
                                 if success:
+                                    st.toast("Memory deleted successfully!", icon="✅")
                                     st.success(f"Memory deleted: {message}")
                                     st.rerun()
                                 else:
+                                    st.toast(f"Failed to delete memory: {message}", icon="❌")
                                     st.error(f"Failed to delete memory: {message}")
                 else:
                     st.info("No memories found matching your search.")

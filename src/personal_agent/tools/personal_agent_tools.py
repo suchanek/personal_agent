@@ -357,7 +357,7 @@ class PersonalAgentSystemTools(Toolkit):
 
         super().__init__(name="personal_system", tools=tools, **kwargs)
 
-    def shell_command(self, command: str, working_directory: str = ".") -> str:
+    def shell_command(self, command: str, working_directory: str = HOME_DIR) -> str:
         """Execute a shell command safely.
 
         Args:

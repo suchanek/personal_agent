@@ -21,7 +21,7 @@ import yaml
 
 # Import settings from the config module
 try:
-    from ..config import settings
+    from ..config import settings, get_userid
     from ..config.mcp_servers import get_mcp_servers
 except ImportError:
     # Fallback for direct execution
@@ -31,8 +31,7 @@ except ImportError:
     project_root = script_dir.parent.parent.parent
     src_dir = project_root / "src"
     sys.path.insert(0, str(src_dir))
-    from personal_agent.config import settings
-    from personal_agent.config.mcp_servers import get_mcp_servers
+    from personal_agent.config import settings, get_userid, get_mcp_servers
 
 
 def get_project_root():
@@ -87,11 +86,12 @@ def output_json():
         "ai_storage": {
             "storage_backend": settings.STORAGE_BACKEND,
             "llm_model": settings.LLM_MODEL,
-            "user_id": settings.get_userid(),
+            "user_id": get_userid(),
             "log_level": settings.LOG_LEVEL_STR,
         },
         "agentic_tools": get_agentic_tools(),
-        "docker_compose_summary": get_docker_compose_summary()
+        "docker_compose_summary": get_docker_compose_summary(),
+        "current_user": get_userid()
     }
     
     return json.dumps(config_data, indent=2)
@@ -463,7 +463,7 @@ def print_config_colored():
             'items': [
                 ('Storage Backend', settings.STORAGE_BACKEND),
                 ('LLM Model', settings.LLM_MODEL),
-                ('User ID', settings.get_userid()),
+                ('User ID', get_userid()),
                 ('Log Level', settings.LOG_LEVEL_STR),
             ]
         }
@@ -554,6 +554,7 @@ def print_config_colored():
     # Footer
     print(f"\n{CYAN}{BOLD}{'=' * 60}{RESET}")
     print(f"{GREEN}{BOLD}Configuration loaded successfully!{RESET}")
+    print(f"{CYAN}{BOLD}Current User: {YELLOW}{get_userid()}{RESET}")
     print(f"{CYAN}{BOLD}{'=' * 60}{RESET}")
 
 
@@ -648,7 +649,7 @@ def print_config_no_color():
             'items': [
                 ('Storage Backend', settings.STORAGE_BACKEND),
                 ('LLM Model', settings.LLM_MODEL),
-                ('User ID', settings.get_userid()),
+                ('User ID', get_userid()),
                 ('Log Level', settings.LOG_LEVEL_STR),
             ]
         }
@@ -730,6 +731,7 @@ def print_config_no_color():
     # Footer
     print("\n" + "=" * 60)
     print("Configuration loaded successfully!")
+    print(f"Current User: {get_userid()}")
     print("=" * 60)
 
 
