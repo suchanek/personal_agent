@@ -7,6 +7,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [responsefix/v0.2.4] - 2025-08-25
+
+### Changed
+- **Unambiguous Data Directory Configuration**: Refactored data directory management to remove ambiguous and direct `DATA_DIR` usage. The application now consistently uses specific, user-aware environment variables (`USER_DATA_DIR`, `AGNO_KNOWLEDGE_DIR`, etc.) to ensure proper multi-user data isolation and improve security and maintainability. See [ADR-075](./refs/adr/075-unambiguous-data-dir-configuration.md) for details.
+
+
 ## [responsefix/v0.2.3] - 2025-08-24
 
 ### Added

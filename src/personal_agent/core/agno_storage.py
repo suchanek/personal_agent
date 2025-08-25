@@ -49,7 +49,7 @@ from agno.vectordb.lancedb import LanceDb, SearchType
 
 # Handle imports for both module import and direct execution
 try:
-    from ..config import DATA_DIR, LOG_LEVEL, OLLAMA_URL
+    from ..config import AGNO_STORAGE_DIR, DATA_DIR, LOG_LEVEL, OLLAMA_URL
     from ..utils import setup_logging
     from .semantic_memory_manager import (
         SemanticMemoryManager,
@@ -81,7 +81,7 @@ def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
     :return: Configured SQLite storage instance
     """
     if storage_dir is None:
-        storage_dir = f"{DATA_DIR}/agno"
+        storage_dir = AGNO_STORAGE_DIR
 
     storage_path = Path(storage_dir)
     storage_path.mkdir(parents=True, exist_ok=True)

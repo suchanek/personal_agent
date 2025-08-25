@@ -792,7 +792,7 @@ class KnowledgeTools(Toolkit):
                 logger.warning(f"File type {mime_type} may not be fully supported")
 
             # Copy file to semantic knowledge directory
-            semantic_knowledge_dir = Path(settings.DATA_DIR) / "knowledge"
+            semantic_knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename to avoid conflicts
@@ -870,7 +870,7 @@ class KnowledgeTools(Toolkit):
                 file_type = ".txt"  # Default to txt
 
             # Create semantic knowledge directory
-            semantic_knowledge_dir = Path(settings.DATA_DIR) / "knowledge"
+            semantic_knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename

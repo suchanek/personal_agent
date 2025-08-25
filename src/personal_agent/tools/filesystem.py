@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from langchain.tools import tool
 
-from ..config import DATA_DIR, HOME_DIR, USE_MCP, USE_WEAVIATE
+from ..config import DATA_DIR, HOME_DIR, USER_DATA_DIR, USE_MCP, USE_WEAVIATE
 
 if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient
@@ -39,7 +39,7 @@ def mcp_read_file(file_path: str = ".") -> str:
         server_name = "filesystem-home"  # Default to home directory access
 
         # Choose server based on path and desired access level
-        if file_path.startswith(DATA_DIR + "/") or file_path.startswith("data/"):
+        if file_path.startswith(USER_DATA_DIR + "/") or file_path.startswith("data/"):
             server_name = "filesystem-data"
         elif file_path.startswith("/") and not file_path.startswith(HOME_DIR):
             # Use root server for paths outside home directory
