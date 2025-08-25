@@ -2,6 +2,15 @@
 
 A modern, production-ready personal AI assistant built with the Agno framework, featuring comprehensive memory management, knowledge base integration, and local privacy. The Personal Agent Program introduces an advanced AI system designed to support individuals with memory challenges by preserving their memories, wisdom, and connections, while ensuring that every individual's intellectual contributions are preserved for future generations.
 
+## ✨ Latest Updates
+
+The Streamlit web interface has been significantly upgraded to provide a unified experience for both single-agent and multi-agent team interactions.
+
+- **Unified Dual-Mode UI**: A single, powerful interface (`poetry run paga`) now manages both the single personal agent and the multi-agent team.
+- **Dynamic Mode Switching**: Seamlessly switch between single-agent and team modes directly within the UI.
+- **New `paga_streamlit_agno.py`**: This new script is the primary entry point for the web UI, replacing the older `persag_app.py`.
+- **Deprecation of `paga_team_cli`**: The separate command-line interface for the team has been deprecated in favor of the new unified Streamlit application.
+
 ## Key Features
 
 ### 🚀 **Core Architecture**
@@ -26,13 +35,13 @@ A modern, production-ready personal AI assistant built with the Agno framework, 
 - **Memory Tools**: Comprehensive memory storage, retrieval, and management
 
 ### 🌐 **User Interface**
-- **Streamlit Web Interface**: Modern web UI with real-time model selection and debug capabilities
-- **CLI Interface**: Full-featured command-line interface with memory commands
-- **Team Interface**: Multi-agent reasoning team for complex tasks
+- **Unified Dual-Mode UI**: A single Streamlit interface for both single-agent chat and multi-agent team collaboration.
+- **CLI Interface**: Full-featured command-line interface for direct interaction.
+- **Dynamic Mode Switching**: Toggle between single-agent and team modes at runtime in the web UI.
 
 ## 🚀 Quick Start
 
-> **🚀 Quick Start**: Run `poetry run paga` for the Streamlit web interface or `poetry run paga_cli` for command-line interaction
+> **🚀 Quick Start**: Run `poetry run paga` for the new unified Streamlit web interface or `poetry run paga_cli` for command-line interaction.
 
 ### Prerequisites
 
@@ -57,30 +66,94 @@ poetry install
 Use the provided helper scripts to start and manage the LightRAG services:
 
 ```bash
-# Restart the main LightRAG server
-./restart-lightrag.sh
-
 # Smart restart with user synchronization
 ./smart-restart-lightrag.sh
 ```
 
 3. **Setup Ollama**
 
+First, install Ollama on your system.
+
 ```bash
 # Install Ollama (macOS)
-brew install ollama
+# IMPORTANT: For GPU acceleration on Mac, download the official app from https://ollama.com
+# Do NOT use 'brew install ollama' as it may not support Metal acceleration.
 
-# Start Ollama service
-ollama serve
-
-# Pull recommended models
+# After installing, pull the recommended models:
 ollama pull qwen2.5:7b-instruct
 ollama pull qwen3:8b
 ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 ```
 
-4. **Configure Environment**
+To run Ollama as a robust background service with the optimal settings for this project, follow these steps to create a startup script and a system service. These *must* be done in a terminal with root privileges, hence the `sudo` command.
+
+**Step 1: Prepare the Startup Script**
+
+This project includes a recommended startup script for Ollama at `scripts/start_ollama.sh`. To use it, copy it to a personal binary directory (e.g., `~/bin`) so that it can be reliably found by the system service.
+
+```bash
+# Create the ~/bin directory if it doesn't exist
+mkdir -p ~/bin
+
+# Copy the script
+cp scripts/start_ollama.sh /usr/local/bin/start_ollama.sh
+
+# Make the script executable
+chmod +x /usr/local/binstart_ollama.sh
+```
+
+**Step 2: Create the System Service (macOS)**
+
+This project includes a `launchd` service file at `scripts/com.personal-agent.ollama.plist`. This service will automatically run the `start_ollama.sh` script in the background.
+
+To install it, copy the file to your `/Library/LaunchAgents` directory.
+
+```bash
+
+# Copy the service file
+sudo cp scripts/com.personal-agent.ollama.plist /Library/LaunchAgents/com.personal-agent.ollama.plist
+```
+
+**Step 3: Start the Service**
+
+Load and start the new service. If you have the official Ollama app, make sure it is not running to avoid conflicts.
+
+```bash
+
+# Load and start your new custom service
+sudo launchctl load /Library/LaunchAgents/com.personal-agent.ollama.plist
+sudo launchctl start com.personal-agent.ollama
+```
+
+You can check the status and logs with:
+```bash
+# Check if the service is running
+sudo launchctl list | grep com.personal-agent.ollama
+
+# View the logs
+tail -f /Library/Logs/ollama.log
+```
+
+4. **Install Poetry**
+
+This project uses [Poetry](https://python-poetry.org/) for dependency management. If you don't have it installed, you can install it by running:
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+Follow the instructions to add Poetry to your shell's `PATH`.
+
+5. **Install Poe the Poet**
+
+[Poe the Poet](https://github.com/nat-n/poethepoet) is used as a task runner for this project, allowing you to use simple commands like `poe cli`. It is installed as a poetry plugin, so it should be installed automatically when you run `poetry install`.
+
+If for some reason it is not available, you can install it manually:
+```bash
+poetry self add poethepoet
+```
+
+6. **Configure Environment**
 
 Copy `.env.example` to `.env` and configure:
 
@@ -88,10 +161,6 @@ Copy `.env.example` to `.env` and configure:
 # Required: User and data configuration
 USER_ID=your_username
 PERSAG_ROOT=/Users/your_username/.persag
-DATA_DIR=/Users/your_username/.persag/data
-
-# Required: Ollama Configuration
-OLLAMA_URL=http://localhost:11434
 
 # Optional: API keys for enhanced functionality
 GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
@@ -101,54 +170,54 @@ BRAVE_API_KEY=your_api_key_here
 5. **Start the Agent**
 
 ```bash
-# Web interface (recommended)
-poetry run paga
+# Web interface (recommended, defaults to team mode)
+poe serve-persag
 
-# CLI interface
-poetry run paga_cli
+# To start the web interface in single-agent mode
+poe serve-persag --single
 
-# Team interface
-poetry run paga_team_cli
+# CLI interface (single-agent only)
+poe cli
 ```
 
 Open `http://localhost:8501` for the Streamlit interface.
 
 ## 💻 Usage
 
-### Web Interface
+### Web Interface (`poe serve-persag`)
 
-The Streamlit interface provides:
+The unified Streamlit interface provides:
 
-- **Dynamic Model Selection**: Switch between Ollama models in real-time
-- **User Management**: Create, switch, and manage user profiles
-- **Memory Management**: View, search, and clear stored memories
-- **Tool Visibility**: See which tools are called during interactions
-- **Performance Metrics**: Response times and tool usage statistics
-- **Debug Interface**: Comprehensive debugging and introspection tools
+- **Dual-Mode Interaction**: Switch between a single agent and a multi-agent team.
+- **Dynamic Model Selection**: Change Ollama models in real-time.
+- **User Management**: Create, switch, and manage user profiles.
+- **Memory Management**: View, search, and clear stored memories.
+- **Tool Visibility**: See which tools are called during interactions.
+- **Performance Metrics**: Response times and tool usage statistics.
+- **Debug Interface**: Comprehensive debugging and introspection tools.
 
-### Command Line Interface
+### Command Line Interface (`poe cli`)
 
 ```bash
 # Interactive CLI
-poetry run paga_cli
+poe cli
 
 # Direct query
-poetry run paga_cli --query "What's the weather like?"
+poet cli --query "What's the weather like?"
 
 # Recreate knowledge base on startup
-poetry run paga_cli --recreate
+poe cli --recreate
 
 # Help
-poetry run paga_cli --help
+poe cli --help
 ```
 
-### Available Commands
+### Available Commands (via 'poe' <cmd>)
 
 ```bash
 # Main interfaces
-paga                   # Streamlit web interface
-paga_cli               # Command-line interface
-paga_team_cli          # Multi-agent reasoning team
+serve-persag                   # Unified Streamlit web interface (single agent or team)
+li               # Command-line interface (single agent)
 
 # System utilities
 ./smart-restart-lightrag.sh    # Restart LightRAG services
@@ -163,20 +232,39 @@ store-fact                    # Store facts directly in memory
 
 ### 🧠 **Agent Architecture**
 
-The Personal Agent uses a modular, manager-based architecture:
+The Personal Agent uses a modular, manager-based architecture that supports both a single agent and a multi-agent team.
 
 ```mermaid
-graph TB
-    UI[🌟 USER INPUT<br/>Streamlit/CLI Interface] --> AGENT[🤖 AGNO PERSONAL AGENT<br/>Core Processing Engine]
+graph TD
+    subgraph "User Interfaces"
+        UI_Streamlit["🌐 Streamlit UI<br/>(Single/Team Mode)"]
+        UI_CLI["⌨️ CLI Interface"]
+    end
+
+    subgraph "Core Agent System"
+        AGENT["🤖 AgnoPersonalAgent"]
+        TEAM["👨‍👩‍👧‍👦 PersonalAgentTeam"]
+    end
+
+    UI_Streamlit --> |"Selects Mode"| AGENT
+    UI_Streamlit --> |"Selects Mode"| TEAM
+    UI_CLI --> AGENT
+
+    subgraph "Team Composition"
+        TEAM --> Member1["👤 Knowledge Agent"]
+        TEAM --> Member2["👤 Writer Agent"]
+        TEAM --> Member3["👤 ... more agents"]
+    end
     
-    AGENT --> MANAGERS[🎛️ COMPONENT MANAGERS]
-    
+    AGENT --> MANAGERS["🎛️ COMPONENT MANAGERS"]
+    Member1 --> MANAGERS
+
     subgraph "🎛️ Manager Layer"
-        MODEL_MGR[🧠 Model Manager<br/>Ollama/OpenAI]
-        INST_MGR[📋 Instruction Manager<br/>Dynamic Instructions]
-        MEM_MGR[💾 Memory Manager<br/>Dual Storage]
-        KNOW_MGR[📚 Knowledge Manager<br/>LightRAG Integration]
-        TOOL_MGR[🛠️ Tool Manager<br/>Tool Assembly]
+        MODEL_MGR["🧠 Model Manager<br/>Ollama/OpenAI"]
+        INST_MGR["📋 Instruction Manager<br/>Dynamic Instructions"]
+        MEM_MGR["💾 Memory Manager<br/>Dual Storage"]
+        KNOW_MGR["📚 Knowledge Manager<br/>LightRAG Integration"]
+        TOOL_MGR["🛠️ Tool Manager<br/>Tool Assembly"]
     end
     
     MANAGERS --> MODEL_MGR
@@ -186,9 +274,9 @@ graph TB
     MANAGERS --> TOOL_MGR
     
     subgraph "🧠 Memory & Knowledge"
-        LOCAL_MEM[💾 Local Memory<br/>SQLite + LanceDB]
-        GRAPH_MEM[🕸️ Graph Memory<br/>LightRAG Server]
-        KNOWLEDGE[📚 Knowledge Base<br/>Combined Storage]
+        LOCAL_MEM["💾 Local Memory<br/>SQLite + LanceDB"]
+        GRAPH_MEM["🕸️ Graph Memory<br/>LightRAG Server"]
+        KNOWLEDGE["📚 Knowledge Base<br/>Combined Storage"]
     end
     
     MEM_MGR --> LOCAL_MEM
@@ -196,10 +284,10 @@ graph TB
     KNOW_MGR --> KNOWLEDGE
     
     subgraph "🛠️ Tool Ecosystem"
-        BUILTIN[⚙️ Built-in Tools<br/>Search, Python, Finance]
-        MEMORY_TOOLS[🧠 Memory Tools<br/>Storage & Retrieval]
-        KNOWLEDGE_TOOLS[📚 Knowledge Tools<br/>Ingestion & Query]
-        MCP_TOOLS[🔧 MCP Tools<br/>External Integrations]
+        BUILTIN["⚙️ Built-in Tools<br/>Search, Python, Finance"]
+        MEMORY_TOOLS["🧠 Memory Tools<br/>Storage & Retrieval"]
+        KNOWLEDGE_TOOLS["📚 Knowledge Tools<br/>Ingestion & Query"]
+        MCP_TOOLS["🔧 MCP Tools<br/>External Integrations"]
     end
     
     TOOL_MGR --> BUILTIN
@@ -207,11 +295,13 @@ graph TB
     TOOL_MGR --> KNOWLEDGE_TOOLS
     TOOL_MGR --> MCP_TOOLS
     
-    AGENT --> OUTPUT[📤 STRUCTURED OUTPUT]
-    OUTPUT --> STREAM[🌊 Streaming Response]
-    OUTPUT --> TOOLS_CALLS[🔧 Tool Execution Results]
+    AGENT --> OUTPUT["📤 STRUCTURED OUTPUT"]
+    TEAM --> OUTPUT
+    OUTPUT --> STREAM["🌊 Streaming Response"]
+    OUTPUT --> TOOLS_CALLS["🔧 Tool Execution Results"]
     
     style AGENT fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style TEAM fill:#e0f7fa,stroke:#00796b,stroke-width:3px
     style MANAGERS fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
     style LOCAL_MEM fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     style GRAPH_MEM fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
@@ -219,20 +309,20 @@ graph TB
 
 ### 🏠 **Multi-User Architecture**
 
-The system supports multiple users with isolated data storage:
+The system supports multiple users with data isolated under a shared root directory, defined by the `PERSAG_ROOT` environment variable (defaults to `~/.persag`). User-specific data is stored in `$PERSAG_ROOT/agno/<user_id>`.
 
 ```mermaid
 graph TB
     subgraph "🏠 User Management System"
-        USER_MGR[👤 User Manager<br/>Profile Management]
-        USER_REG[📋 User Registry<br/>JSON-based Storage]
-        SERVICE_MGR[🔧 Service Manager<br/>Docker Orchestration]
+        USER_MGR["👤 User Manager<br/>Profile Management"]
+        USER_REG["📋 User Registry<br/>JSON-based Storage"]
+        SERVICE_MGR["🔧 Service Manager<br/>Docker Orchestration"]
     end
     
-    subgraph "📁 User Data Isolation"
-        USER1[👤 User 1<br/>~/.persag/user1/]
-        USER2[👤 User 2<br/>~/.persag/user2/]
-        USER3[👤 User 3<br/>~/.persag/user3/]
+    subgraph "📁 User Data Isolation (under PERSAG_ROOT)"
+        USER1["👤 User 1<br/>$PERSAG_ROOT/agno/user1/"]
+        USER2["👤 User 2<br/>$PERSAG_ROOT/agno/user2/"]
+        USER3["👤 User 3<br/>..."]
     end
     
     USER_MGR --> USER_REG
@@ -320,11 +410,16 @@ Use the "Show All Memories" button in the web interface
 
 ### Environment Variables
 
+The agent can be configured using a `.env` file in the project root.
+
 ```bash
-# Required: User Configuration
-USER_ID="your_username"                    # User identifier
-PERSAG_ROOT="/Users/your_username/.persag" # PersAG home directory
-DATA_DIR="/Users/your_username/.persag/data" # Data storage location
+# Required: User Identifier
+USER_ID="your_username"                    # The current user to run as
+
+# Optional: Data Root Directory
+# All user data, knowledge, and memory will be stored under this path.
+# Defaults to /Users/Shared/personal_agent_data
+AGNO_ROOT="/path/to/your/data/directory"
 
 # Required: Ollama Configuration
 OLLAMA_URL="http://localhost:11434"       # Ollama server URL
