@@ -196,6 +196,30 @@ Dynamic configuration system supporting multi-user environments:
 - **Service Configuration Injection**: Runtime injection of user context into Docker services and configuration files.
 - **Environment Separation**: Clear separation between system-wide settings and user-specific configurations.
 
+### 6.3.1. Environment Variables and Directory Structure
+
+The system uses a hierarchical and user-aware set of environment variables to manage data paths, ensuring strict user isolation and maintainability. Direct usage of the base `DATA_DIR` is prohibited in application code; instead, more specific variables should be used.
+
+**Directory Structure:**
+```
+/Users/Shared/personal_agent_data/  (PERSAG_ROOT)
+└── agno/                          (STORAGE_BACKEND)
+    └── {user_id}/                 (USER_ID)
+        ├── data/                  (USER_DATA_DIR)
+        ├── knowledge/             (AGNO_KNOWLEDGE_DIR)
+        ├── rag_storage/           (LIGHTRAG_STORAGE_DIR)
+        └── inputs/                (LIGHTRAG_INPUTS_DIR)
+```
+
+**Environment Variables Hierarchy:**
+
+-   **`PERSAG_ROOT`**: The absolute path to the root directory for all application data.
+-   **`USER_DATA_DIR`**: The root directory for the current user's data.
+-   **`AGNO_STORAGE_DIR`**: The directory for the current user's core Agno storage.
+-   **`AGNO_KNOWLEDGE_DIR`**: The directory for the current user's local semantic knowledge base.
+-   **`LIGHTRAG_STORAGE_DIR`**: The directory for the current user's LightRAG storage.
+-   **`LIGHTRAG_INPUTS_DIR`**: The directory for the current user's LightRAG input files.
+
 ## 7. Deployment and Configuration
 
 The system is designed for local deployment with emphasis on ease of use and multi-user support:

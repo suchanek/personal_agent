@@ -121,7 +121,7 @@ def main():
     except ImportError:
         try:
             # Fallback to the settings import
-            from personal_agent.config.settings import get_userid
+            from personal_agent.config.user_id_mgr import get_userid
 
             st.sidebar.caption(f"Current User: {get_userid()}")
         except ImportError:
