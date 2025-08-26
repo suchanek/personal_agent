@@ -335,6 +335,22 @@ If tools are being called but not visible in debug panels:
 
 When requested to add an issue, add it to the `ISSUES.md` file. Each issue should be on a new line and must include the current git branch, the current date, and a timestamp.
 
+## Memory Subsystem Schemas
+
+The agent uses a layered memory system with different schemas. Key distinctions are:
+
+-   **`UserMemory` (v2, Current)**: The primary application-layer model (`agno.memory.v2.schema.UserMemory`).
+    -   Uses `memory_id` as the unique identifier.
+    -   Supports multiple `topics`.
+-   **`Memory` (v1, Legacy)**: The original memory model (`agno.memory.memory.Memory`).
+    -   Uses `id` as the unique identifier.
+    -   Supports a single `topic`.
+-   **`MemoryRow` (DB Layer)**: The Pydantic model for the database (`agno.memory.v2.db.schema.MemoryRow`).
+    -   Uses a UUID `id` field as the primary key.
+    -   Stores the `UserMemory` object as a serialized dictionary.
+
+This distinction, especially between `id` and `memory_id`, is a common source of bugs. The `scripts/run_diagnostics.py` script now correctly uses `memory_id` for `UserMemory` objects.
+
 ## Project Structure
 
 ```

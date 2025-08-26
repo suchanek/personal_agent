@@ -21,6 +21,7 @@ Examples:
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict
 
@@ -152,6 +153,7 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
     try:
         from personal_agent.config import DATA_DIR, PERSAG_HOME
         from personal_agent.core.user_manager import UserManager
+        from personal_agent.core.docker_integration import ensure_docker_user_consistency
 
         user_manager = UserManager(data_dir=DATA_DIR, project_root=PERSAG_HOME)
 
@@ -160,7 +162,7 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
         # Perform the user switch
         result = user_manager.switch_user(
             user_id=user_id,
-            restart_lightrag=restart_services,
+            restart_lightrag=False, # We will handle this with the more robust docker_integration module
             update_global_config=True,
         )
 
@@ -188,20 +190,15 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
                     f"  • Memory Storage: {config_refresh.get('LIGHTRAG_MEMORY_STORAGE_DIR', 'N/A')}"
                 )
 
-            # Display LightRAG status if services were restarted
-            if restart_services and result.get("lightrag_status"):
-                lightrag_status = result["lightrag_status"]
-                if lightrag_status.get("success"):
-                    print_success("LightRAG services restarted successfully")
-                    if lightrag_status.get("services_restarted"):
-                        print_info(
-                            f"Services restarted: {', '.join(lightrag_status['services_restarted'])}"
-                        )
+            # Restart services using the robust docker_integration module
+            if restart_services:
+                print_step("SYNC", "Ensuring Docker services are synchronized...")
+                success, message = ensure_docker_user_consistency(user_id=user_id, auto_fix=True, force_restart=True)
+                if success:
+                    print_success("Docker services synchronized successfully.")
                 else:
-                    print_warning("LightRAG restart had issues")
-                    if lightrag_status.get("errors"):
-                        for error in lightrag_status["errors"]:
-                            print_warning(f"  • {error}")
+                    print_error(f"Docker synchronization failed: {message}")
+                    return False
 
             # Display warnings if any
             if result.get("warnings"):
