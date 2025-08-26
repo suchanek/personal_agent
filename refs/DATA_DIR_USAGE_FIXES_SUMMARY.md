@@ -93,13 +93,14 @@ if storage_dir is None:
 
 ### Current Directory Structure
 ```
+/Users/{user_id}/.persag/           (PERSAG_HOME)
 /Users/Shared/personal_agent_data/  (PERSAG_ROOT)
-└── agno/                          (STORAGE_BACKEND)
-    └── {user_id}/                 (USER_ID)
-        ├── data/                  (USER_DATA_DIR)
-        ├── knowledge/             (AGNO_KNOWLEDGE_DIR)
-        ├── rag_storage/           (LIGHTRAG_STORAGE_DIR)
-        └── inputs/                (LIGHTRAG_INPUTS_DIR)
+└── agno/                           (STORAGE_BACKEND)
+    └── {user_id}/                  (USER_ID)
+        ├── data/                   (USER_DATA_DIR)
+        ├── knowledge/              (AGNO_KNOWLEDGE_DIR)
+        ├── rag_storage/            (LIGHTRAG_STORAGE_DIR)
+        └── inputs/                 (LIGHTRAG_INPUTS_DIR)
 ```
 
 ### Environment Variables Hierarchy
@@ -112,7 +113,7 @@ if storage_dir is None:
 
 ## Testing Implementation
 
-### Test Suite: `test_data_dir_fixes.py`
+### Test Suite: `tests/test_data_dir_fixes.py`
 
 Created comprehensive test suite covering:
 
