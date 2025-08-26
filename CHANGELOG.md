@@ -7,6 +7,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.3dev0 - 2025-08-26
+
+### Added
+- **Formalized Memory Schemas**: Introduced a comprehensive `MEMORY_SUBSYSTEM_SCHEMAS.md` document to serve as the single source of truth for all memory-related data structures, clarifying the distinction between legacy (`id`) and current (`memory_id`) schemas. See [ADR-076](./refs/adr/076-formalize-memory-schemas-and-diagnostics.md) for details.
+- **Unified Diagnostics Script**: Implemented a new, unified diagnostic script at `scripts/run_diagnostics.py` to provide a centralized and structured way to test the health of all major subsystems.
+
+### Changed
+- **Robust Service Restarts**: Refactored the `switch-user.py` script to use the more robust and centralized `ensure_docker_user_consistency` function for restarting Docker services, improving separation of concerns.
+
+### Fixed
+- **Memory Schema Consistency**: The new diagnostic script correctly uses the documented `memory_id` attribute for `UserMemory` objects, resolving a class of bugs caused by schema confusion between legacy and current memory models.
+
+
 ## [responsefix/v0.2.4] - 2025-08-25
 
 ### Changed
