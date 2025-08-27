@@ -10,14 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.2.3dev0 - 2025-08-26
 
 ### Added
+- **One-off Query Execution**: The reasoning team CLI (`rteam-cli`) now supports a `--query` argument to execute a single query and exit, streamlining non-interactive use cases.
+- **System Shutdown Control**: Added a "Power Off" button to the Streamlit dashboard, allowing for a graceful shutdown of the application directly from the UI.
 - **Formalized Memory Schemas**: Introduced a comprehensive `MEMORY_SUBSYSTEM_SCHEMAS.md` document to serve as the single source of truth for all memory-related data structures, clarifying the distinction between legacy (`id`) and current (`memory_id`) schemas. See [ADR-076](./refs/adr/076-formalize-memory-schemas-and-diagnostics.md) for details.
 - **Unified Diagnostics Script**: Implemented a new, unified diagnostic script at `scripts/run_diagnostics.py` to provide a centralized and structured way to test the health of all major subsystems.
 
 ### Changed
+- **Developer Setup Overhaul**: The project setup has been significantly streamlined. It now standardizes on Python 3.12, uses `uv` for faster virtual environment management, and includes a completely revamped `README` with detailed, step-by-step instructions for installation, Docker, and Ollama configuration. See [ADR-077](./refs/adr/077-developer-environment-and-setup-overhaul.md) for details.
+- **Task Runner Cleanup**: Renamed the `poe` task `rteam` to `rteam-cli` for improved clarity and consistency.
 - **Robust Service Restarts**: Refactored the `switch-user.py` script to use the more robust and centralized `ensure_docker_user_consistency` function for restarting Docker services, improving separation of concerns.
+- **Legacy File Rename for Clarity**: Renamed `src/personal_agent/tools/memory_tools.py` to `weaviate_memory_tools.py` to clearly indicate its Weaviate-specific legacy status and avoid confusion with current memory functionality. The file is no longer actively used since the system evolved to use the agno framework without Weaviate. See [ADR-078](./refs/adr/078-memory-tools-rename-for-clarity.md) for details.
 
 ### Fixed
+- **Streamlit Application Path**: Corrected the file path for the Streamlit application in the `serve-persag` poe task.
 - **Memory Schema Consistency**: The new diagnostic script correctly uses the documented `memory_id` attribute for `UserMemory` objects, resolving a class of bugs caused by schema confusion between legacy and current memory models.
+
+### Removed
+- **Redundant Agno Workaround**: Removed the obsolete `agno` role-mapping workaround from the reasoning team's model creation, as the underlying framework issue has been resolved.
+- **Obsolete UI File**: Deleted the old and unused `tools/paga_streamlit_team_orig.py` file.
 
 
 ## [responsefix/v0.2.4] - 2025-08-25

@@ -22,6 +22,7 @@ Specialized Agents:
     - **Calculator Agent**: Performs mathematical calculations and operations
     - **Python Agent**: Executes Python code and scripts
     - **File Agent**: Handles file system operations and management
+    - **Image Agent**: Creates images using DALL-E based on text descriptions
 
 Features:
     - Ollama model integration with configurable local/remote endpoints
@@ -95,8 +96,10 @@ Version: 1.0.0
 import argparse
 import asyncio
 import logging
+import sys
 from pathlib import Path
 from textwrap import dedent
+from typing import Optional
 
 from agno.agent import Agent
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
@@ -105,6 +108,7 @@ from agno.models.ollama.tools import OllamaTools
 from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
+from agno.tools.dalle import DalleTools
 from agno.tools.file import FileTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.pubmed import PubmedTools
@@ -161,6 +165,8 @@ except ImportError:
     from personal_agent.core.agent_model_manager import AgentModelManager
     from personal_agent.core.agno_agent import AgnoPersonalAgent
     from personal_agent.utils import setup_logging
+
+WRITER_MODEL = "llama3.1:8b"
 
 # Load environment variables
 load_dotenv()
@@ -429,11 +435,6 @@ def create_model(
     else:
         url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
 
-    # DEBUG: Log the URL selection
-    print(
-        f"🔍 DEBUG create_model: provider={provider}, use_remote={use_remote}, selected_url={url}"
-    )
-
     model_manager = AgentModelManager(
         model_provider=provider,
         model_name=model_name,
@@ -441,20 +442,6 @@ def create_model(
         seed=None,
     )
     model = model_manager.create_model()
-
-    # WORKAROUND: Fix incorrect role mapping in Agno framework
-    # The default_role_map incorrectly maps "system" -> "developer"
-    # but OpenAI API only accepts: user, assistant, system, tool
-    if hasattr(model, "role_map"):
-        # Always override the role mapping to fix the bug
-        model.role_map = {
-            "system": "system",  # Fix: should be "system", not "developer"
-            "user": "user",
-            "assistant": "assistant",
-            "tool": "tool",
-            "model": "assistant",
-        }
-        print(f"🔧 Applied role mapping fix to model: {model_name}")
 
     return model
 
@@ -472,20 +459,6 @@ def create_openai_model(
     )
     model = model_manager.create_model()
 
-    # WORKAROUND: Fix incorrect role mapping in Agno framework
-    # The default_role_map incorrectly maps "system" -> "developer"
-    # but OpenAI API only accepts: user, assistant, system, tool
-    if hasattr(model, "role_map"):
-        # Always override the role mapping to fix the bug
-        model.role_map = {
-            "system": "system",  # Fix: should be "system", not "developer"
-            "user": "user",
-            "assistant": "assistant",
-            "tool": "tool",
-            "model": "assistant",
-        }
-        print(f"🔧 Applied role mapping fix to model: {model_name}")
-
     return model
 
 
@@ -495,8 +468,6 @@ class WritingTools(Toolkit):
     def __init__(self):
         tools = [
             self.write_original_content,
-            self.edit_content,
-            self.proofread_content,
         ]
         super().__init__(name="writing_tools", tools=tools)
 
@@ -521,9 +492,12 @@ class WritingTools(Toolkit):
             The written content as a string
         """
         try:
-            # Generate content based on parameters
+            # CRITICAL DIAGNOSTIC: Log every call to this method
+            logger.warning(
+                f"🚨 DIAGNOSTIC: write_original_content called - topic: '{topic}', style: '{style}', type: '{content_type}', length: {length}"
+            )
+            # Generate content based on parameters - KEEP IT CONCISE
             if content_type.lower() == "limerick":
-                # Generate a limerick about the topic
                 content = f"""Here's a limerick about {topic}:
 
 There once was a topic called {topic},
@@ -533,9 +507,9 @@ It passes the time,
 And makes every reader quite tropic!"""
 
             elif content_type.lower() == "poem":
-                # Generate a poem
+                # Generate a simple poem with specified number of lines
                 lines = []
-                for i in range(length):
+                for i in range(min(length, 8)):  # Cap at 8 lines max
                     if i == 0:
                         lines.append(f"In the world of {topic}, we find")
                     elif i == 1:
@@ -544,31 +518,52 @@ And makes every reader quite tropic!"""
                         lines.append(f"Line {i+1} about {topic} so fine")
                 content = "\n".join(lines)
 
-            elif content_type.lower() == "story":
-                content = f"""# A Story About {topic}
+            elif content_type.lower() in ["summary", "article", "essay"]:
+                # For summaries and articles, respect word/character limits
+                if length > 1000:  # If length seems like word count
+                    # Generate approximately the requested word count
+                    words_per_sentence = 15
+                    sentences_needed = min(
+                        length // words_per_sentence, 50
+                    )  # Cap at 50 sentences
 
-Once upon a time, there was a fascinating subject called {topic}. This {style} tale explores the many aspects of {topic} that make it so interesting to {audience}.
-
-The story unfolds with rich details and engaging narrative, bringing {topic} to life in ways that captivate the reader's imagination.
-
-And so, our story about {topic} comes to a satisfying conclusion, leaving the reader with new insights and appreciation."""
-
-            else:  # Default to article/essay format
-                paragraphs = []
-                paragraphs.append(f"# {topic.title()}")
-                paragraphs.append(f"")
-                paragraphs.append(
-                    f"This {content_type} explores the fascinating subject of {topic}, written in a {style} style for {audience} readers."
-                )
-
-                for i in range(length):
-                    paragraphs.append(f"")
-                    paragraphs.append(f"## Section {i+1}")
-                    paragraphs.append(
-                        f"This section delves deeper into {topic}, providing valuable insights and information that will help readers understand this important subject better."
+                    sentences = []
+                    sentences.append(f"# {topic.title()}")
+                    sentences.append(
+                        f"This {style} {content_type} covers {topic} for {audience} readers."
                     )
 
-                content = "\n".join(paragraphs)
+                    for i in range(
+                        min(sentences_needed - 2, 10)
+                    ):  # Cap at 10 additional sentences
+                        sentences.append(
+                            f"Key point {i+1} about {topic} written in {style} style."
+                        )
+
+                    content = "\n\n".join(sentences)
+                else:
+                    # Generate specified number of paragraphs (capped)
+                    paragraphs = []
+                    paragraphs.append(f"# {topic.title()}")
+                    paragraphs.append(
+                        f"This {style} {content_type} covers {topic} for {audience} readers."
+                    )
+
+                    for i in range(min(length, 5)):  # Cap at 5 paragraphs
+                        paragraphs.append(
+                            f"Section {i+1}: Key insights about {topic} in {style} tone."
+                        )
+
+                    content = "\n\n".join(paragraphs)
+
+            else:  # Default short content
+                content = f"""# {topic.title()}
+
+This {style} {content_type} about {topic} is written for {audience}.
+
+Key points about {topic} presented in {style} style.
+
+Conclusion about {topic}."""
 
             logger.info(
                 f"🔍 DIAGNOSTIC: Generated {content_type} about {topic} ({len(content)} characters)"
@@ -580,65 +575,12 @@ And so, our story about {topic} comes to a satisfying conclusion, leaving the re
             logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
             return error_msg
 
-    def edit_content(self, original_content: str, editing_instructions: str) -> str:
-        """Edit existing content based on provided instructions.
-
-        Args:
-            original_content: The original text to edit
-            editing_instructions: Instructions for how to edit the content
-
-        Returns:
-            The edited content
-        """
-        try:
-            # Simple editing logic - in a real implementation, this would be more sophisticated
-            edited = f"# Edited Content\n\n{original_content}\n\n*Edited according to: {editing_instructions}*"
-            logger.info(f"🔍 DIAGNOSTIC: Edited content ({len(edited)} characters)")
-            return edited
-        except Exception as e:
-            error_msg = f"Error editing content: {str(e)}"
-            logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
-            return error_msg
-
-    def proofread_content(self, content: str) -> str:
-        """Proofread content and provide feedback.
-
-        Args:
-            content: The content to proofread
-
-        Returns:
-            Proofreading feedback and suggestions
-        """
-        try:
-            feedback = f"""# Proofreading Report
-
-**Original Content:**
-{content}
-
-**Feedback:**
-- Content length: {len(content)} characters
-- Structure appears well-organized
-- Consider reviewing for grammar and clarity
-- Overall quality assessment: Good
-
-**Suggestions:**
-- Review for consistency in tone
-- Check for proper formatting
-- Ensure clarity of main points"""
-
-            logger.info(f"🔍 DIAGNOSTIC: Proofread content ({len(content)} characters)")
-            return feedback
-        except Exception as e:
-            error_msg = f"Error proofreading content: {str(e)}"
-            logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
-            return error_msg
-
 
 def create_writer_agent(
     model_provider: str = "ollama",
-    model_name: str = "llama3.1:8b",
+    model_name: str = WRITER_MODEL,
     ollama_base_url: str = OLLAMA_URL,
-    debug: bool = True,
+    debug: bool = False,
     use_remote: bool = False,
 ) -> Agent:
     """Create a specialized writing agent.
@@ -651,13 +593,15 @@ def create_writer_agent(
     :return: Configured writing agent
     """
 
+    # Create writing tools instance
+    writing_tools = WritingTools()
+
     agent = Agent(
         name="Writer Agent",
-        role="Create, edit, read, write and improve written content",
+        role="Create written content in the requested tone and style",
         model=create_model(provider=PROVIDER, use_remote=use_remote),
         debug_mode=debug,
         tools=[
-            WritingTools(),  # Custom writing tools with write_original_content
             FileTools(
                 base_dir=Path(HOME_DIR),
                 save_files=True,
@@ -666,50 +610,15 @@ def create_writer_agent(
             ),
         ],  # File tools for reading/writing documents
         instructions=[
-            "You are a specialized writing agent focused on creating, editing, and improving written content.",
-            "Your primary functions are:",
-            "1. Write original content (articles, essays, reports, stories, poems, etc.)",
-            "2. Edit and improve existing text for clarity, style, and grammar",
-            "3. Adapt writing style for different audiences and purposes",
-            "4. Create structured documents with proper formatting",
-            "5. Proofread and provide feedback on written content",
-            "",
-            "WRITING TOOLS AVAILABLE:",
-            "- write_original_content: Create new content based on type, topic, length, style, and audience",
-            "- edit_content: Edit existing content based on instructions",
-            "- proofread_content: Review and provide feedback on content",
-            "- File tools: Save, read, and manage document files",
-            "",
-            "WRITING GUIDELINES:",
-            "- Always use the write_original_content tool when asked to create new content",
-            "- Consider the target audience and purpose",
-            "- Use clear, concise, and engaging language",
-            "- Maintain consistent tone and style throughout",
-            "- Structure content logically with proper headings and paragraphs",
-            "- Check for grammar, spelling, and punctuation errors",
-            "- Provide constructive feedback when editing others' work",
-            "- Use appropriate formatting (markdown, headings, lists, etc.)",
-            "",
-            "CONTENT TYPES YOU CAN CREATE:",
-            "- Articles and essays (informative, persuasive, analytical)",
-            "- Creative writing (stories, poems, limericks, scripts)",
-            "- Business documents (reports, proposals, emails)",
-            "- Academic writing (research papers, summaries)",
-            "- Technical documentation (guides, manuals, README files)",
-            "- Marketing content (copy, descriptions, social media posts)",
-            "- Personal writing (letters, journals, blogs)",
-            "",
-            "IMPORTANT GUIDELINES:",
-            "- Always use the appropriate writing tool for the task",
-            "- When asked to write something, use write_original_content with proper parameters",
-            "- Always maintain originality and avoid plagiarism",
-            "- Respect copyright and intellectual property",
-            "- Provide citations when referencing sources",
-            "- Ask for clarification on requirements when needed",
-            "- Offer multiple options or approaches when appropriate",
+            "You are a versatile writer who can create content on any topic.",
+            "When given a topic, write engaging and informative content in the requested format and style.",
+            "If you receive mathematical expressions or calculations from the calculator agent, convert them into clear written text.",
+            "Ensure your writing is clear, accurate and tailored to the specific request.",
+            "Maintain a natural, engaging tone while being factually precise.",
+            "Write something that would be good enough to be published in a newspaper like the New York Times.",
         ],
         markdown=True,
-        show_tool_calls=True,  # Enable tool calls to ensure proper execution in team context
+        show_tool_calls=True,  # CRITICAL: Always show tool calls to ensure execution
         add_name_to_instructions=True,
     )
 
@@ -717,7 +626,50 @@ def create_writer_agent(
     return agent
 
 
-def create_agents(use_remote: bool = False):
+def create_image_agent(
+    model_provider: str = "ollama",
+    model_name: str = LLM_MODEL,
+    debug: bool = False,
+    use_remote: bool = False,
+) -> Agent:
+    """Create a specialized image creation agent using DALL-E.
+
+    :param model_provider: LLM provider ('ollama' or 'openai')
+    :param model_name: Model name to use
+    :param debug: Enable debug mode
+    :param use_remote: Use remote Ollama
+    :return: Configured image creation agent
+    """
+
+    agent = Agent(
+        name="Image Agent",
+        role="Create images using DALL-E based on text descriptions",
+        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        debug_mode=debug,
+        tools=[
+            DalleTools(model="dall-e-3", size="1792x1024", quality="hd", style="vivid"),
+        ],
+        instructions=[
+            "You are an AI image creation specialist using DALL-E.",
+            "Create high-quality, detailed images based on user descriptions.",
+            "When given a description, generate vivid and accurate visual representations.",
+            "Pay attention to artistic style, composition, lighting, and detail requirements.",
+            "If the user requests specific styles (photorealistic, cartoon, abstract, etc.), incorporate those into your prompts.",
+            "Always aim for creative and visually appealing results that match the user's intent.",
+            "Provide helpful descriptions of the images you create.",
+            "The DALL-E tool will return an image URL.",
+            "Return the image URL in your response in the following format: `![image description](image URL)`",
+        ],
+        markdown=True,
+        show_tool_calls=True,
+        add_name_to_instructions=True,
+    )
+
+    logger.info("Created Image Agent with DALL-E tools")
+    return agent
+
+
+def create_agents(use_remote: bool = False, debug: bool = False):
     """Create all agents with the correct remote/local configuration."""
 
     # Web search agent using Ollama
@@ -726,7 +678,9 @@ def create_agents(use_remote: bool = False):
         role="Search the web for information",
         model=create_model(provider=PROVIDER, use_remote=use_remote),
         tools=[GoogleSearchTools()],
-        instructions=["Always include sources"],
+        instructions=[
+            "Search the web for information based on the input. Always include sources"
+        ],
         show_tool_calls=True,
     )
 
@@ -738,8 +692,6 @@ def create_agents(use_remote: bool = False):
         tools=[PersonalAgentSystemTools(shell_command=True)],
         instructions=[
             "You are a system agent that can execute shell commands safely.",
-            "Always explain what commands you're running and why.",
-            "Be cautious with system operations and ask for confirmation when needed.",
             "Provide clear output and error messages from command execution.",
         ],
         show_tool_calls=True,
@@ -757,16 +709,8 @@ def create_agents(use_remote: bool = False):
                 company_info=True,
                 company_news=True,
             ),
-            FileTools(
-                base_dir=Path(
-                    HOME_DIR
-                ),  # Use user home directory as base with Path object
-                save_files=True,
-                list_files=True,
-                search_files=True,
-            ),
         ],
-        instructions=["Use tables to display data. You can save files and list files."],
+        instructions=["Use tables to display data. "],
         show_tool_calls=True,
     )
 
@@ -780,14 +724,16 @@ def create_agents(use_remote: bool = False):
         instructions=[
             "You are a medical agent that can answer questions about medical topics.",
             "Search PubMed for medical information and write about it.",
-            "Use tables to display data. You can save files and list files.",
-            "You can use your file tools to save files when requested",
+            "Use tables to display data.",
         ],
         show_tool_calls=True,
     )
 
     # Writer agent using Ollama
     writer_agent = create_writer_agent()
+
+    # Image agent using DALL-E
+    image_agent = create_image_agent(use_remote=use_remote)
 
     # Calculator agent using Ollama
     calculator_agent = Agent(
@@ -853,6 +799,7 @@ def create_agents(use_remote: bool = False):
         finance_agent,
         medical_agent,
         writer_agent,
+        image_agent,
         calculator_agent,
         python_agent,
         file_agent,
@@ -908,17 +855,12 @@ async def create_memory_agent(
     else:
         ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
 
-    # DEBUG: Log the URL selection for memory agent
-    print(
-        f"🔍 DEBUG create_memory_agent: provider={PROVIDER}, use_remote={use_remote}, selected_url={ollama_url}"
-    )
-
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
         model_name=LLM_MODEL,  # Use the configured model
         enable_memory=True,
-        enable_mcp=True,
+        enable_mcp=False,
         debug=debug,
         user_id=user_id,
         recreate=recreate,
@@ -982,7 +924,7 @@ async def create_memory_writer_agent(
 
     # Update instructions to include memory-specific guidance
 
-    memory_writer_agent.instructions = _memory_writer_instructions
+    memory_writer_agent.instructions = _memory_specific_instructions
     logger.info("✅ Memory/Writer agent created")
     return memory_writer_agent
 
@@ -1029,6 +971,7 @@ async def create_team(use_remote: bool = False):
         finance_agent,
         medical_agent,
         writer_agent,
+        image_agent,
         calculator_agent,
         python_agent,
         file_agent,
@@ -1049,6 +992,7 @@ async def create_team(use_remote: bool = False):
             system_agent,  # SystemAgent for shell commands
             finance_agent,
             writer_agent,
+            image_agent,  # Image creation agent
             calculator_agent,
             medical_agent,
             python_agent,
@@ -1062,8 +1006,15 @@ async def create_team(use_remote: bool = False):
             "- For storing personal info about the user -> delegate to Personal AI Agent",
             "- For web searches -> delegate to Web Agent",
             "- For financial data -> delegate to Finance Agent",
-            "- For writing content -> delegate to Writer Agent",
+            "- For writing content -> delegate to Writer Agent ONCE ONLY",
             "- For calculations -> delegate to Calculator Agent",
+            "",
+            "CRITICAL WRITING DELEGATION RULES:",
+            "- Delegate to Writer Agent ONLY ONCE per user request",
+            "- Do NOT call Writer Agent multiple times to edit or improve content",
+            "- Accept the Writer Agent's first response as final",
+            "- Include ALL requirements (tone, style, length) in the initial delegation",
+            "",
             "KNOWLEDGE STORAGE EXAMPLES:",
             "- 'Store this poem' -> delegate to Personal AI Agent (will use knowledge tools)",
             "- 'Save this article' -> delegate to Personal AI Agent (will use knowledge tools)",
@@ -1073,8 +1024,8 @@ async def create_team(use_remote: bool = False):
             "If the user is only being conversational, encourage them to talk about themselves, life events, and feelings.",
         ],
         markdown=True,
-        show_tool_calls=True,
         show_members_responses=True,
+        show_tool_calls=True,
         enable_agentic_context=True,
         share_member_interactions=True,  # Disable shared interactions - memory agent handles this
         enable_user_memories=False,  # Disable team-level memory - memory agent handles this
@@ -1126,7 +1077,7 @@ async def cleanup_team(team):
                             await member.memory.db.close()
                         logging.info(f"✅ {member_name} memory database closed")
                     except Exception as e:
-                        logging.info(
+                        logging.error(
                             f"⚠️ Error closing {member_name} memory database: {e}"
                         )
 
@@ -1138,7 +1089,7 @@ async def cleanup_team(team):
                             try:
                                 await _cleanup_tool(tool, f"{member_name}-{tool_name}")
                             except Exception as e:
-                                logging.info(
+                                logging.error(
                                     f"⚠️ Error cleaning up {member_name}-{tool_name}: {e}"
                                 )
 
@@ -1153,7 +1104,7 @@ async def cleanup_team(team):
         logging.info("✅ Team cleanup completed")
 
     except Exception as e:
-        logging.info(f"❌ Error during team cleanup: {e}")
+        logging.error(f"❌ Error during team cleanup: {e}")
 
 
 async def _cleanup_model(model, model_name: str):
@@ -1186,7 +1137,7 @@ async def _cleanup_model(model, model_name: str):
             logging.info(f"✅ {model_name} Ollama client closed")
 
     except Exception as e:
-        logging.info(f"⚠️ Error cleaning up {model_name} model: {e}")
+        logging.error(f"⚠️ Error cleaning up {model_name} model: {e}")
 
 
 async def _cleanup_tool(tool, tool_name: str):
@@ -1230,7 +1181,7 @@ async def _cleanup_tool(tool, tool_name: str):
             logging.info(f"✅ {tool_name} tool client closed")
 
     except Exception as e:
-        logging.info(f"⚠️ Error cleaning up {tool_name} tool: {e}")
+        logging.error(f"⚠️ Error cleaning up {tool_name} tool: {e}")
 
 
 def display_welcome_panel(console: Console, command_parser: CommandParser):
@@ -1251,7 +1202,7 @@ def display_welcome_panel(console: Console, command_parser: CommandParser):
 
 
 # Main execution
-async def main(use_remote: bool = False):
+async def main(use_remote: bool = False, query: Optional[str] = None):
     """Main function to run the team with an enhanced CLI interface."""
 
     # Initialize Rich console for better formatting
@@ -1290,9 +1241,41 @@ async def main(use_remote: bool = False):
         console.print("- 💰 Finance Agent: Get financial data and analysis")
         console.print("- 🏥 Medical Agent: Search PubMed for medical information")
         console.print("- ✍️  Writer Agent: Create content and written materials")
+        console.print(
+            "- 🎨 Image Agent: Create images using DALL-E based on descriptions"
+        )
         console.print("- 🧮 Calculator Agent: Perform calculations and math")
         console.print("- 🐍 Python Agent: Create and execute Python code")
         console.print("- 📁 File System Agent: Read and write files in the system")
+
+        # If a one-off query was provided, process it and exit
+        if query:
+            try:
+                # Parse the command using the same system as the interactive CLI
+                command_parser = CommandParser()
+                command_handler, remaining_text, kwargs = command_parser.parse_command(
+                    query
+                )
+
+                # If it's a memory command, execute it with the memory agent
+                if command_handler and memory_agent:
+                    try:
+                        if remaining_text is not None:
+                            await command_handler(memory_agent, remaining_text, console)
+                        else:
+                            await command_handler(memory_agent, console)
+                    except Exception as e:
+                        console.print(f"💥 Error executing memory command: {e}")
+                else:
+                    # Otherwise, treat as regular team query - use same method as interactive CLI
+                    console.print("🤖 [bold green]Team:[/bold green]")
+                    await team.aprint_response(query, stream=False)
+
+            except Exception as e:
+                console.print(f"💥 Error: {e}")
+            finally:
+                await cleanup_team(team)
+            return
 
         # Initialize command parser
         command_parser = CommandParser()
@@ -1381,6 +1364,14 @@ async def main(use_remote: bool = False):
                     console.print("\n  [yellow]Writing:[/yellow]")
                     console.print("    - 'Write a short poem about AI agents'")
                     console.print("    - 'Create a summary of machine learning'")
+                    console.print("\n  [yellow]Image Creation:[/yellow]")
+                    console.print("    - 'Create an image of a futuristic AI robot'")
+                    console.print(
+                        "    - 'Generate a picture of a sunset over mountains'"
+                    )
+                    console.print(
+                        "    - 'Make an abstract art piece with vibrant colors'"
+                    )
                     console.print("\n  [yellow]Math & Calculations:[/yellow]")
                     console.print("    - 'Calculate the square root of 144'")
                     console.print("    - 'What's 15% of 250?'")
@@ -1430,10 +1421,16 @@ def cli_main():
     parser.add_argument(
         "--remote", action="store_true", help="Use remote Ollama server"
     )
+    parser.add_argument(
+        "-q",
+        "--query",
+        type=str,
+        help="Run a one-off query against the initialized team and exit",
+    )
     args = parser.parse_args()
 
     print("Starting Personal Agent Reasoning Team...")
-    asyncio.run(main(use_remote=args.remote))
+    asyncio.run(main(use_remote=args.remote, query=args.query))
 
 
 if __name__ == "__main__":

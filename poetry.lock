@@ -4512,6 +4512,19 @@ typing = ["typing-extensions"]
 xmp = ["defusedxml"]
 
 [[package]]
+name = "pip"
+version = "25.2"
+description = "The PyPA recommended tool for installing Python packages."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "pip-25.2-py3-none-any.whl", hash = "sha256:6d67a2b4e7f14d8b31b8b52648866fa717f45a1eb70e83002f4331d07e953717"},
+    {file = "pip-25.2.tar.gz", hash = "sha256:578283f006390f85bb6282dffb876454593d637f5d1be494b5202ce4877e71f2"},
+]
+
+[[package]]
 name = "pipmaster"
 version = "0.9.2"
 description = "A versatile Python package manager utility for simplifying package installation, updates, checks, and environment management."
@@ -7896,4 +7909,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "a087685520c65f422beb6e6d29df572ef05784abe61e92f042b6a85bb890ff37"
+content-hash = "8f120b633e7832ce823910e44dbb2e75e49add1380a1babc3425cc19626fa5f0"

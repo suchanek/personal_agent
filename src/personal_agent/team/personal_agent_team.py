@@ -140,7 +140,7 @@ def create_personal_agent_team(
     )
     writer_agent = create_writer_agent(
         model_provider=model_provider,
-        model_name=model_name, 
+        model_name=model_name,
         ollama_base_url=ollama_base_url,
         debug=debug,
     )

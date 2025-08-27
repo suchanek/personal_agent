@@ -122,7 +122,7 @@ PANDAS_AVAILABLE = True
 logger = logging.getLogger(__name__)
 
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent import __version__
@@ -173,6 +173,7 @@ SESSION_KEY_MEMORY_HELPER = "memory_helper"
 SESSION_KEY_KNOWLEDGE_HELPER = "knowledge_helper"
 SESSION_KEY_RAG_SERVER_LOCATION = "rag_server_location"
 SESSION_KEY_DELETE_CONFIRMATIONS = "delete_confirmations"
+SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION = "show_power_off_confirmation"
 
 USER_ID = get_current_user_id()
 
@@ -2580,6 +2581,63 @@ def render_sidebar():
         if st.button("Clear Chat History"):
             st.session_state[SESSION_KEY_MESSAGES] = []
             st.rerun()
+
+        # System Controls Section
+        st.header("System")
+        if st.button("🔴 Power Off", key="power_off_btn", type="primary"):
+            # Show confirmation dialog
+            if not st.session_state.get("show_power_off_confirmation", False):
+                st.session_state["show_power_off_confirmation"] = True
+                st.rerun()
+
+        # Power off confirmation
+        if st.session_state.get("show_power_off_confirmation", False):
+            st.warning("⚠️ **Confirm System Shutdown**")
+            st.write("This will shut down the application and close the browser.")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("❌ Cancel", key="cancel_power_off"):
+                    st.session_state["show_power_off_confirmation"] = False
+                    st.rerun()
+            with col2:
+                if st.button("🔴 Shutdown", key="confirm_power_off", type="primary"):
+                    # Clear confirmation state
+                    st.session_state["show_power_off_confirmation"] = False
+
+                    # Show shutdown message
+                    st.success("🔴 Shutting down system...")
+                    st.balloons()
+
+                    # Graceful system shutdown - no browser closing attempts
+                    import os
+                    import threading
+                    import time
+
+                    def graceful_shutdown():
+                        """Perform graceful shutdown of the system."""
+                        try:
+                            # Give time for the UI to show the shutdown message
+                            time.sleep(3)
+
+                            # Log shutdown
+                            logger.info("🔴 SHUTDOWN: Initiating graceful shutdown...")
+
+                            # Force exit the Python process
+                            os._exit(0)
+
+                        except Exception as e:
+                            logger.error(f"🔴 SHUTDOWN ERROR: {e}")
+                            # Force exit as fallback
+                            os._exit(1)
+
+                    # Start shutdown in a separate thread
+                    shutdown_thread = threading.Thread(target=graceful_shutdown)
+                    shutdown_thread.daemon = True
+                    shutdown_thread.start()
+
+                    # Stop Streamlit execution
+                    st.stop()
 
         st.header("Debug Info")
         debug_label = "Enable Debug Mode"
