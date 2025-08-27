@@ -6,10 +6,10 @@ A modern, production-ready personal AI assistant built with the Agno framework, 
 
 The Streamlit web interface has been significantly upgraded to provide a unified experience for both single-agent and multi-agent team interactions.
 
-- **Unified Dual-Mode UI**: A single, powerful interface (`poetry run paga`) now manages both the single personal agent and the multi-agent team.
-- **Dynamic Mode Switching**: Seamlessly switch between single-agent and team modes directly within the UI.
-- **New `paga_streamlit_agno.py`**: This new script is the primary entry point for the web UI, replacing the older `persag_app.py`.
-- **Deprecation of `paga_team_cli`**: The separate command-line interface for the team has been deprecated in favor of the new unified Streamlit application.
+- **Unified Dual-Mode UI**: A single, powerful interface (`poe serve-persag`) now manages both the single personal agent and the multi-agent team.
+- **Mode Switching**: Switch between single-agent and team modes at launch.
+- **Team-based cli `poe rteam`**: The separate command-line interface for the team.
+- **Streamlit-based Dashboard `poe dashboard`**: Streamlit-based system management dashboard.
 
 ## Key Features
 
@@ -53,15 +53,93 @@ The Streamlit web interface has been significantly upgraded to provide a unified
 
 ### Installation
 
-1. **Clone and Setup**
+1.  **Install Python 3.12**
 
-```bash
-git clone <repository-url>
-cd personal_agent
-poetry install
-```
+    It is recommended to use Python 3.12 for this project. You can install it using [Homebrew](https://brew.sh/):
 
-2. **Start LightRAG Services**
+    ```bash
+    brew install python@3.12
+    ```
+
+2.  **Update Your PATH**
+
+    To ensure that you are using the correct Python version, you need to update your shell's `PATH` variable. Add the following line to your shell's configuration file (e.g., `~/.zshrc`, `~/.bash_profile`, or `~/.bashrc`):
+
+    ```bash
+    export PATH="/opt/homebrew/bin/python3.12:$PATH"
+    ```
+
+    After adding this line, restart your terminal or run `source ~/.zshrc` (or the appropriate file for your shell) to apply the changes.
+
+3.  **Install `uv`**
+
+    This project uses `uv` for fast Python package management. Install it with:
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+4.  **Create Virtual Environment**
+
+    Use `uv` to create the virtual environment:
+
+    ```bash
+    uv venv
+    ```
+
+    This will create a `.venv` directory in your project folder.
+
+5.  **Install Dependencies with Poetry**
+
+    Finally, use Poetry to install the project's dependencies into the virtual environment created by `uv`:
+
+    ```bash
+    poetry install
+    ```
+
+6. **Install Docker**
+
+    Docker is required for running the LightRAG services that provide the knowledge base functionality.
+
+    **macOS:**
+    ```bash
+    # Install Docker Desktop from the official website
+    # Visit: https://www.docker.com/products/docker-desktop/
+    # Or install via Homebrew:
+    brew install --cask docker
+    ```
+
+    **Linux (Ubuntu/Debian):**
+    ```bash
+    # Update package index
+    sudo apt-get update
+
+    # Install Docker
+    sudo apt-get install docker.io
+
+    # Start and enable Docker service
+    sudo systemctl start docker
+    sudo systemctl enable docker
+
+    # Add your user to the docker group (optional, to run without sudo)
+    sudo usermod -aG docker $USER
+    ```
+
+    **Verify Docker Installation:**
+    ```bash
+    docker --version
+    docker run hello-world
+    ```
+
+    **Pull Required Docker Images:**
+
+    The project uses LightRAG services that run in Docker containers. Pull the necessary images:
+
+    ```bash
+    # Pull the LightRAG server image (one image serves both server and memory )
+    docker pull ghcr.io/suchanek/lightrag_pagent:latest
+
+7. **Start LightRAG Services**
 
 Use the provided helper scripts to start and manage the LightRAG services:
 
@@ -70,7 +148,7 @@ Use the provided helper scripts to start and manage the LightRAG services:
 ./smart-restart-lightrag.sh
 ```
 
-3. **Setup Ollama**
+7. **Setup Ollama**
 
 First, install Ollama on your system.
 
@@ -80,8 +158,8 @@ First, install Ollama on your system.
 # Do NOT use 'brew install ollama' as it may not support Metal acceleration.
 
 # After installing, pull the recommended models:
-ollama pull qwen2.5:7b-instruct
 ollama pull qwen3:8b
+ollama pull qwen3:1.7b
 ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 ```
@@ -90,17 +168,17 @@ To run Ollama as a robust background service with the optimal settings for this 
 
 **Step 1: Prepare the Startup Script**
 
-This project includes a recommended startup script for Ollama at `scripts/start_ollama.sh`. To use it, copy it to a personal binary directory (e.g., `~/bin`) so that it can be reliably found by the system service.
+This project includes a recommended startup script for Ollama at `scripts/start_ollama.sh`. To use it, copy it to a good user binary directory (e.g., `/usr/localbin`) so that it can be reliably found by the system service. These commands must be done as root.
 
 ```bash
 # Create the ~/bin directory if it doesn't exist
-mkdir -p ~/bin
+sudo mkdir -p /usr/local/bin
 
 # Copy the script
-cp scripts/start_ollama.sh /usr/local/bin/start_ollama.sh
+sudo cp scripts/start_ollama.sh /usr/local/bin/start_ollama.sh
 
 # Make the script executable
-chmod +x /usr/local/binstart_ollama.sh
+sudo chmod +x /usr/local/binstart_ollama.sh
 ```
 
 **Step 2: Create the System Service (macOS)**
@@ -135,16 +213,7 @@ sudo launchctl list | grep com.personal-agent.ollama
 tail -f /Library/Logs/ollama.log
 ```
 
-4. **Install Poetry**
-
-This project uses [Poetry](https://python-poetry.org/) for dependency management. If you don't have it installed, you can install it by running:
-
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-Follow the instructions to add Poetry to your shell's `PATH`.
-
-5. **Install Poe the Poet**
+8. **Install Poe the Poet**
 
 [Poe the Poet](https://github.com/nat-n/poethepoet) is used as a task runner for this project, allowing you to use simple commands like `poe cli`. It is installed as a poetry plugin, so it should be installed automatically when you run `poetry install`.
 
@@ -153,21 +222,21 @@ If for some reason it is not available, you can install it manually:
 poetry self add poethepoet
 ```
 
-6. **Configure Environment**
+9. **Configure Environment**
 
 Copy `.env.example` to `.env` and configure:
 
 ```bash
 # Required: User and data configuration
-USER_ID=your_username
 PERSAG_ROOT=/Users/your_username/.persag
 
 # Optional: API keys for enhanced functionality
 GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
 BRAVE_API_KEY=your_api_key_here
+...
 ```
 
-5. **Start the Agent**
+10. **Start the Agent**
 
 ```bash
 # Web interface (recommended, defaults to team mode)
@@ -177,12 +246,12 @@ poe serve-persag
 poe serve-persag --single
 
 # CLI interface (single-agent only)
-poe cli
+poe rteam
 ```
 
-Open `http://localhost:8501` for the Streamlit interface.
+Open `http://localhost:8501` for the Streamlit interface if it doesn't open automatically.
 
-## 💻 Usage
+## � Usage
 
 ### Web Interface (`poe serve-persag`)
 
@@ -200,7 +269,7 @@ The unified Streamlit interface provides:
 
 ```bash
 # Interactive CLI
-poe cli
+poe team
 
 # Direct query
 poet cli --query "What's the weather like?"

@@ -1,4 +1,10 @@
-"""Memory management tools for storing and retrieving knowledge."""
+"""Weaviate-based memory management tools for storing and retrieving knowledge.
+This code is now legacy, since we use the agno framework without Weaviate now.
+Renamed from memory_tools.py to weaviate_memory_tools.py for clarity.
+
+Author: Eric G. Suchanek, PhD.
+Last revision: 2025-08-26 23:55:00
+"""
 
 from datetime import datetime
 from typing import List

@@ -244,7 +244,7 @@ Both systems utilize the same core components:
   - Enhanced code organization by centralizing logging utilities in proper utils package
 - **Weaviate Error Handling Enhancement**: Added robust database corruption detection and automatic recovery
   - Implemented `reset_weaviate_if_corrupted()` function in `core/memory.py` for automatic database recovery
-  - Added corruption detection in `memory_tools.py` for storage and query operations
+  - Added corruption detection in `weaviate_memory_tools.py` for storage and query operations
   - Enhanced error handling with automatic retry logic after successful database recovery
   - Improved system resilience against Weaviate WAL file corruption and missing segment errors
 - **Import Path Standardization**: Updated all files to use consistent import patterns

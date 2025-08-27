@@ -78,7 +78,7 @@ except ImportError:
         # Default settings
         AGNO_KNOWLEDGE_DIR = "./knowledge"
         AGNO_STORAGE_DIR = "./storage"
-        LLM_MODEL = "llama3.2:3b"
+        LLM_MODEL = "qwen3:8b"
         OLLAMA_URL = "http://localhost:11434"
         USE_MCP = False
 

@@ -66,6 +66,7 @@ e2b-code-interpreter = "^1.5.2"
 openai-harmony = "^0.0.3"
 psutil = "^7.0.0"
 langfuse = "^3.3.0"
+pip = "^25.2"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"
@@ -84,7 +85,7 @@ personal-agent-agno-cli = "src.personal_agent.agno_main:cli_main"
 paga_cli = "src.personal_agent.agno_main:cli_main"
 
 paga_team_cli = "src.personal_agent.team.reasoning_team:cli_main"
-rteam = "src.personal_agent.team.reasoning_team:cli_main"
+rteam-cli = "src.personal_agent.team.reasoning_team:cli_main"
 
 install-mcp-servers = "scripts.install_mcp:main"
 test-mcp-servers = "tests.test_mcp_availability:main"
@@ -109,7 +110,7 @@ args = [
 [tool.poe.tasks.serve-persag]
 help = "Start the Personal Agent Streamlit interface (PAGA) - defaults to team mode"
 shell = """
-streamlit run tools/paga_streamlit_agno.py \
+streamlit run src/personal_agent/tools/paga_streamlit_agno.py \
   ${port:+--server.port $port} \
   ${host:+--server.address $host} \
   -- \
@@ -143,7 +144,7 @@ cmd = "poetry run paga_cli"
 
 [tool.poe.tasks.team]
 help = "Run reasoning team CLI"
-cmd = "poetry run rteam"
+cmd = "poetry run rteam-cli"
 
 # === MCP Server Management ===
 [tool.poe.tasks.mcp-install]
