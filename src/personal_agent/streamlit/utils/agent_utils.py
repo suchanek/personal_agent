@@ -1,154 +1,203 @@
 """
-Agent Utilities for Streamlit
+Agent Utilities for Streamlit Applications
 
-Manages AgnoPersonalAgent instances for the Streamlit dashboard.
+This module provides utilities for working with Agno agents in Streamlit applications,
+specifically for handling streaming responses and extracting final results with tool calls.
+
+Key Features:
+- Collect streaming responses from Agno agents
+- Intelligently analyze and extract final content
+- Extract tool calls and image URLs
+- Format results for Streamlit display
 """
 
-import asyncio
-import streamlit as st
-from typing import Optional
+import re
+from typing import Any, Dict, Iterator, List, Optional, Union
 
-from personal_agent.core.agno_agent import AgnoPersonalAgent
-from personal_agent.config import (
-    AGNO_STORAGE_DIR,
-    LLM_MODEL,
-    OLLAMA_URL,
-    get_userid,
-)
+from agno.agent import Agent, RunResponse
+from agno.run.response import RunResponseEvent
+from agno.models.response import ToolExecution
 
 
-@st.cache_resource(ttl=300)  # Cache for 5 minutes, then refresh
-def get_agent_instance() -> Optional[AgnoPersonalAgent]:
+def collect_streaming_response(run_stream: Iterator[RunResponseEvent]) -> List[RunResponseEvent]:
     """
-    Get or create a cached AgnoPersonalAgent instance for Streamlit using the same pattern as paga_streamlit_agno.py.
-    
-    Returns:
-        AgnoPersonalAgent instance or None if initialization fails
-    """
-    try:
-        # Import the create_agno_agent function (same as paga_streamlit_agno.py)
-        from personal_agent.core.agno_agent import create_agno_agent
-        
-        # Import knowledge directory setting
-        from personal_agent.config import AGNO_KNOWLEDGE_DIR
-        
-        # Use asyncio.run to properly initialize the agent (same pattern as paga_streamlit_agno.py)
-        agent = asyncio.run(create_agno_agent(
-            model_provider="ollama",
-            model_name=LLM_MODEL,
-            ollama_base_url=OLLAMA_URL,
-            user_id=get_userid(),
-            debug=False,  # Disable debug for cleaner Streamlit output
-            enable_memory=True,
-            enable_mcp=True,
-            storage_dir=AGNO_STORAGE_DIR,
-            knowledge_dir=AGNO_KNOWLEDGE_DIR,
-            recreate=False,
-        ))
-        
-        return agent
-        
-    except Exception as e:
-        st.error(f"Failed to initialize agent: {str(e)}")
-        return None
-
-
-def get_agent_memory(agent: AgnoPersonalAgent):
-    """
-    Get the memory system from an agent instance.
+    Collect all chunks from a streaming response iterator.
     
     Args:
-        agent: AgnoPersonalAgent instance
+        run_stream: Iterator of RunResponseEvent objects from agent.run(stream=True)
         
     Returns:
-        Memory system instance or None
+        List of all RunResponseEvent chunks
     """
-    try:
-        if hasattr(agent, 'agno_memory') and agent.agno_memory:
-            return agent.agno_memory
-        else:
-            st.warning("Agent memory system not available")
-            return None
-    except Exception as e:
-        st.error(f"Error accessing agent memory: {str(e)}")
-        return None
+    return list(run_stream)
 
 
-async def initialize_agent_async() -> Optional[AgnoPersonalAgent]:
+def extract_final_response_and_tools(
+    chunks: List[RunResponseEvent]
+) -> Dict[str, Any]:
     """
-    Asynchronously initialize an AgnoPersonalAgent instance.
+    Intelligently extract final response content and tool calls from streaming chunks.
     
-    Returns:
-        AgnoPersonalAgent instance or None if initialization fails
-    """
-    try:
-        agent = AgnoPersonalAgent(
-            model_provider="ollama",
-            model_name=LLM_MODEL,
-            ollama_base_url=OLLAMA_URL,
-            user_id=get_userid(),
-            debug=False,
-            enable_memory=True,
-            enable_mcp=True,
-            storage_dir=AGNO_STORAGE_DIR,
-        )
-        
-        await agent.initialize()
-        return agent
-        
-    except Exception as e:
-        st.error(f"Failed to initialize agent: {str(e)}")
-        return None
-
-
-def check_agent_status(agent: Optional[AgnoPersonalAgent]) -> dict:
-    """
-    Check the status of an agent instance, accounting for lazy initialization.
+    This function analyzes all chunks from a streaming response to reconstruct
+    the complete final response, including any tool calls made and image URLs generated.
     
     Args:
-        agent: AgnoPersonalAgent instance or None
+        chunks: List of RunResponseEvent objects from streaming response
         
     Returns:
-        Dictionary with status information
+        Dictionary containing:
+            - final_content: The complete final response content
+            - tool_calls: List of tool calls made during the response
+            - image_urls: List of image URLs found in the content
+            - status: Final status of the run
+            - chunk_count: Total number of chunks processed
     """
-    if agent is None:
-        return {
-            "initialized": False,
-            "memory_available": False,
-            "error": "Agent not initialized"
-        }
+    result = {
+        "final_content": "",
+        "tool_calls": [],
+        "image_urls": [],
+        "status": "unknown",
+        "chunk_count": len(chunks)
+    }
     
-    try:
-        # Check if agent is initialized (accounting for lazy initialization)
-        is_initialized = getattr(agent, '_initialized', False)
+    # Process each chunk to build complete response
+    for chunk in chunks:
+        # Extract tool calls from any chunk that has them
+        # Check for tool in 'tool' attribute (single tool) - primary source in streaming
+        if hasattr(chunk, 'tool') and chunk.tool:
+            tool_info = {
+                "name": getattr(chunk.tool, 'tool_name', 'Unknown'),
+                "arguments": getattr(chunk.tool, 'arguments', {}),
+                "status": getattr(chunk.tool, 'status', 'unknown')
+            }
+            if tool_info not in result["tool_calls"]:
+                result["tool_calls"].append(tool_info)
         
-        # For lazy initialization, trigger initialization if needed to get accurate status
-        if not is_initialized and hasattr(agent, '_ensure_initialized'):
-            try:
-                # Trigger lazy initialization to get accurate memory status
-                asyncio.run(agent._ensure_initialized())
-                is_initialized = getattr(agent, '_initialized', False)
-            except Exception as init_e:
-                return {
-                    "initialized": False,
-                    "memory_available": False,
-                    "error": f"Initialization failed: {str(init_e)}"
+        # Check for tools in 'tools' attribute (list of tools) - secondary source
+        if hasattr(chunk, 'tools') and chunk.tools:
+            for tool in chunk.tools:
+                tool_info = {
+                    "name": getattr(tool, 'tool_name', 'Unknown'),
+                    "arguments": getattr(tool, 'arguments', {}),
+                    "status": getattr(tool, 'status', 'unknown')
                 }
+                if tool_info not in result["tool_calls"]:
+                    result["tool_calls"].append(tool_info)
         
-        # Check memory availability after ensuring initialization
-        memory_available = hasattr(agent, 'agno_memory') and agent.agno_memory is not None
+        # Extract image URLs from content
+        if hasattr(chunk, 'content') and chunk.content:
+            # Find markdown image patterns ![alt](url)
+            image_matches = re.findall(r'!\[([^\]]*)\]\((https?://[^\)]+)\)', str(chunk.content))
+            for alt_text, url in image_matches:
+                if url not in [img["url"] for img in result["image_urls"]]:
+                    result["image_urls"].append({
+                        "alt_text": alt_text,
+                        "url": url
+                    })
         
-        return {
-            "initialized": is_initialized,
-            "memory_available": memory_available,
-            "user_id": getattr(agent, 'user_id', 'unknown'),
-            "model": getattr(agent, 'model_name', 'unknown'),
-            "storage_dir": str(getattr(agent, 'storage_dir', 'unknown'))
+        # Identify the final chunk (usually has completed status)
+        if hasattr(chunk, 'status') and str(chunk.status) == 'RunStatus.completed':
+            result["status"] = "completed"
+            if hasattr(chunk, 'content'):
+                result["final_content"] = chunk.content
+    
+    # Fallback to last chunk if no completed status found
+    if not result["final_content"] and chunks:
+        last_chunk = chunks[-1]
+        if hasattr(last_chunk, 'content'):
+            result["final_content"] = last_chunk.content
+        if hasattr(last_chunk, 'status'):
+            result["status"] = str(last_chunk.status)
+    
+    return result
+
+
+def format_for_streamlit_display(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Format analysis results for Streamlit application display.
+    
+    This function prepares the analysis results in a format that's easy to use
+    in Streamlit applications, with proper data types and organization.
+    
+    Args:
+        analysis_result: Dictionary from extract_final_response_and_tools
+        
+    Returns:
+        Streamlit-friendly formatted dictionary
+    """
+    return {
+        "response_content": analysis_result["final_content"],
+        "tool_calls": analysis_result["tool_calls"],
+        "images": analysis_result["image_urls"],
+        "status": analysis_result["status"],
+        "metrics": {
+            "total_chunks": analysis_result["chunk_count"],
+            "content_length": len(str(analysis_result["final_content"])),
+            "tool_call_count": len(analysis_result["tool_calls"]),
+            "image_count": len(analysis_result["image_urls"])
         }
+    }
+
+
+def get_complete_response_from_agent(
+    agent: Agent,
+    message: str,
+    stream: bool = False,
+    **kwargs
+) -> Union[RunResponse, Dict[str, Any]]:
+    """
+    Get complete response from an Agno agent, handling both streaming and non-streaming modes.
+    
+    This function provides a unified interface for getting responses from Agno agents,
+    whether in streaming or non-streaming mode, and returns data formatted for Streamlit.
+    
+    Args:
+        agent: Agno Agent instance
+        message: Input message/prompt for the agent
+        stream: Whether to use streaming mode
+        **kwargs: Additional arguments to pass to agent.run()
         
-    except Exception as e:
-        return {
-            "initialized": False,
-            "memory_available": False,
-            "error": str(e)
-        }
+    Returns:
+        For streaming: Dictionary with analyzed results
+        For non-streaming: RunResponse object
+    """
+    if stream:
+        # Streaming mode - collect and analyze chunks
+        run_stream = agent.run(message, stream=True, **kwargs)
+        chunks = collect_streaming_response(run_stream)
+        analysis = extract_final_response_and_tools(chunks)
+        return format_for_streamlit_display(analysis)
+    else:
+        # Non-streaming mode - return complete response
+        return agent.run(message, stream=False, **kwargs)
+
+
+# Example usage for Streamlit apps:
+"""
+import streamlit as st
+from src.personal_agent.streamlit.utils.agent_utils import get_complete_response_from_agent
+
+# In your Streamlit app:
+def run_agent_and_display_results(agent, prompt):
+    # For real-time streaming updates
+    with st.spinner("Processing..."):
+        result = get_complete_response_from_agent(
+            agent, 
+            prompt, 
+            stream=True,
+            stream_intermediate_steps=True
+        )
+    
+    # Display results
+    st.markdown(result["response_content"])
+    
+    # Display images if any
+    for img in result["images"]:
+        st.image(img["url"], caption=img["alt_text"])
+    
+    # Display tool calls
+    if result["tool_calls"]:
+        st.subheader("Tools Used")
+        for tool in result["tool_calls"]:
+            st.write(f"• {tool['name']}")
+"""
