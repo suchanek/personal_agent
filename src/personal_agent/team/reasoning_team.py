@@ -651,24 +651,19 @@ def create_image_agent(
         ],
         instructions=[
             "You are an AI image creation specialist using DALL-E.",
-            "CRITICAL: You MUST use the DALL-E tool to generate images. Do NOT respond with text descriptions only.",
-            "When given a description, IMMEDIATELY call the DALL-E tool to create the image.",
-            "Create high-quality, detailed images based on user descriptions.",
-            "When given a description, generate vivid and accurate visual representations.",
-            "Pay attention to artistic style, composition, lighting, and detail requirements.",
-            "If the user requests specific styles (photorealistic, cartoon, abstract, etc.), incorporate those into your prompts.",
-            "Always aim for creative and visually appealing results that match the user's intent.",
-            "The DALL-E tool will return an image URL - this is your ONLY response format.",
-            "Return ONLY the image URL in your response in the following format: `![image description](image URL)`",
-            "Do NOT add any additional text, explanations, or descriptions. Only the markdown image link.",
-            "DIAGNOSTIC: Log when you receive requests and when you call tools.",
+            "When asked to create an image, use the create_image tool with the user's description.",
+            "After the tool creates the image, return the image URL in markdown format: ![description](URL)",
+            "You may include brief context or description along with the image.",
+            "Focus on providing the image markdown format clearly and prominently in your response.",
         ],
         markdown=True,
-        show_tool_calls=True,
+        show_tool_calls=True,  # Enable tool call display for better debugging
         add_name_to_instructions=True,
     )
 
-    logger.info("Created Image Agent with DALL-E tools")
+    logger.info(
+        "🚨 DIAGNOSTIC: Created Image Agent with simplified instructions and disabled tool call display"
+    )
     return agent
 
 
@@ -1011,6 +1006,17 @@ async def create_team(use_remote: bool = False):
             "- For financial data -> delegate to Finance Agent",
             "- For writing content -> delegate to Writer Agent ONCE ONLY",
             "- For calculations -> delegate to Calculator Agent",
+            "- For image creation -> delegate to Image Agent",
+            "",
+            "CRITICAL IMAGE DELEGATION RULES:",
+            "- For image creation requests, delegate to Image Agent",
+            "- ALWAYS extract and display the actual image URL from the Image Agent's response",
+            "- Look for ![description](URL) format in the Image Agent's response",
+            "- Copy the exact ![description](URL) markdown from Image Agent to your response",
+            "- Do NOT summarize, describe, or replace the image URL with text",
+            "- Do NOT use emojis instead of the actual image URL",
+            "- The user needs to see the clickable image link, not a description",
+            "- Example: If Image Agent returns ![robot](https://example.com/image.png), show exactly that",
             "",
             "CRITICAL WRITING DELEGATION RULES:",
             "- Delegate to Writer Agent ONLY ONCE per user request",
@@ -1272,7 +1278,7 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                 else:
                     # Otherwise, treat as regular team query - use same method as interactive CLI
                     console.print("🤖 [bold green]Team:[/bold green]")
-                    await team.aprint_response(query, stream=False)
+                    await team.aprint_response(query, stream=True, show_full_reasoning=True)
 
             except Exception as e:
                 console.print(f"💥 Error: {e}")
@@ -1383,6 +1389,8 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                 # If not a command, treat as regular team chat
                 try:
                     console.print("🤖 [bold green]Team:[/bold green]")
+
+                    # Use non-streaming response for better response parsing
                     await team.aprint_response(user_input, stream=True)
 
                 except Exception as e:
