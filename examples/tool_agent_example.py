@@ -1,5 +1,3 @@
-Agno Tool Agent
-
 """
 A minimal Agno + Ollama tool-only agent with Qwen3-Instruct.
 
@@ -12,13 +10,14 @@ Requires:
 
 import json
 import re
-from typing import Dict, Any
+from typing import Any, Dict
 
-from agno.agents import Agent
+from agno.agent import Agent
 from agno.models.ollama import Ollama
 from agno.tools import tool
 
 # --- 1) Define tools ---------------------------------------------------------
+
 
 @tool
 def get_weather(location: str) -> Dict[str, Any]:
@@ -29,6 +28,7 @@ def get_weather(location: str) -> Dict[str, Any]:
     # Replace with your real implementation
     return {"location": location, "temperature_c": 26.3, "conditions": "Partly cloudy"}
 
+
 @tool
 def web_search(query: str, k: int = 3) -> Dict[str, Any]:
     """
@@ -38,11 +38,12 @@ def web_search(query: str, k: int = 3) -> Dict[str, Any]:
     """
     return {"query": query, "results": [f"Result {i+1} for {query}" for i in range(k)]}
 
+
 TOOLS = [get_weather, web_search]
 
 # --- 2) Small Qwen model (non-thinking) -------------------------------------
 
-MODEL_NAME = "qwen3:4b-instruct"   # or "qwen3:1.7b-instruct" / "qwen2.5:3b-instruct"
+MODEL_NAME = "qwen3:1.7b"  # or "qwen3:1.7b-instruct" / "qwen2.5:3b-instruct"
 
 # --- 3) System prompt to enforce tool-only ----------------------------------
 
@@ -65,14 +66,16 @@ You are a tool-calling router. Strict rules:
 
 THINK_TAG_RE = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
 
+
 def strip_think_blocks(text: str) -> str:
     """Remove Qwen-style think tags if they appear."""
     return THINK_TAG_RE.sub("", text or "").strip()
 
+
 # --- 5) Create the agent -----------------------------------------------------
 
 agent = Agent(
-    model=Ollama(model=MODEL_NAME, temperature=0.2),
+    model=Ollama(id=MODEL_NAME),
     tools=TOOLS,
     instructions=SYSTEM_PROMPT,
     # If your Agno version supports it, this hint increases reliability:
@@ -80,6 +83,7 @@ agent = Agent(
 )
 
 # --- 6) Run a query (tool-only) ---------------------------------------------
+
 
 def ask(user_text: str) -> Any:
     """
@@ -107,7 +111,7 @@ def ask(user_text: str) -> Any:
 
     return result
 
+
 if __name__ == "__main__":
     out = ask("What's the temperature in Cincinnati right now?")
     print(out)
-

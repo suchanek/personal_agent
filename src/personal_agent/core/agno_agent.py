@@ -60,6 +60,7 @@ import aiohttp
 from agno.agent import Agent, RunResponse
 from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
+from agno.tools.dalle import DalleTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
@@ -262,7 +263,7 @@ class AgnoPersonalAgent(Agent):
 
         # Initialize base Agent with proper model to prevent OpenAI default
         super().__init__(
-            name="Personal AI Agent",
+            name="Personal-Agent",
             model=initial_model,  # Set proper model immediately
             tools=[],  # Will be updated in _do_initialization()
             instructions=[],  # Will be updated in _do_initialization()
@@ -493,6 +494,9 @@ class AgnoPersonalAgent(Agent):
                     ),
                     ShellTools(base_dir=Path(HOME_DIR)),
                     PersonalAgentFilesystemTools(),
+                    DalleTools(
+                        model="dall-e-3", size="1792x1024", quality="hd", style="vivid"
+                    ),
                 ]
                 tools.extend(all_tools)
                 logger.info(f"Added {len(all_tools)} built-in tools")
