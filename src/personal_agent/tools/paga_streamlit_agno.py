@@ -116,6 +116,9 @@ import pandas as pd
 import requests
 import streamlit as st
 
+# Fix Altair deprecation warning by setting theme using new API
+alt.theme.enable('default')
+
 PANDAS_AVAILABLE = True
 
 # Set up logging
@@ -142,7 +145,7 @@ from personal_agent.config import (
     get_qwen_thinking_settings,
 )
 from personal_agent.core.agno_agent import AgnoPersonalAgent
-from personal_agent.team.personal_agent_team import create_personal_agent_team
+from personal_agent.team.reasoning_team import create_team as create_personal_agent_team
 from personal_agent.tools.streamlit_helpers import (
     StreamlitKnowledgeHelper,
     StreamlitMemoryHelper,
@@ -264,19 +267,15 @@ def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False
 
 
 def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
-    """Initialize the team using the standard agno Team class."""
+    """Initialize the team using the reasoning_team create_team function."""
     try:
         logger.info(f"Initializing team with model {model_name} at {ollama_url}")
 
-        # Create team using the factory function
-        team = create_personal_agent_team(
-            model_provider="ollama",
-            model_name=model_name,
-            ollama_base_url=ollama_url,
-            storage_dir=AGNO_STORAGE_DIR,
-            user_id=USER_ID,
-            debug=True,
-        )
+        # Determine if we should use remote Ollama based on the URL
+        use_remote = ollama_url == REMOTE_OLLAMA_URL
+
+        # Create team using the factory function from reasoning_team with model_name parameter
+        team = asyncio.run(create_personal_agent_team(use_remote=use_remote, model_name=model_name))
 
         # Validate team creation
         if not team:
@@ -464,16 +463,53 @@ def create_team_wrapper(team):
 
 
 def apply_custom_theme():
-    """Apply custom CSS for theme switching."""
+    """Apply custom CSS for theme switching and configure Altair theme."""
     is_dark_theme = st.session_state.get(SESSION_KEY_DARK_THEME, False)
 
     if is_dark_theme:
-        # Apply dark theme styling
-        css_file = "tools/dark_theme.css"
-        with open(css_file) as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    # Light mode: use default Streamlit styling (no additional CSS needed)
-    # This removes any previously applied dark mode styling by not applying any custom CSS
+        # Apply dark theme styling with fixed dimming support
+        css_file = "tools/dark_theme_fixed.css"
+        try:
+            with open(css_file) as f:
+                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        except FileNotFoundError:
+            # Fallback to original CSS if fixed version not found
+            css_file = "tools/dark_theme.css"
+            with open(css_file) as f:
+                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        
+        # Apply Altair dark theme for charts
+        alt.theme.enable('dark')
+    else:
+        # Light mode: use default Streamlit styling and default Altair theme
+        alt.theme.enable('default')
+        
+        # Apply light mode dimming CSS for sidebar navigation
+        light_mode_dimming_css = """
+        <style>
+        /* Light mode sidebar dimming during query execution */
+        .stApp:has(.stSpinner) [data-testid="stSidebar"],
+        .stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] {
+            opacity: 0.6 !important;
+            pointer-events: none !important;
+            transition: opacity 0.3s ease !important;
+        }
+
+        /* Specifically target navigation elements for dimming in light mode */
+        .stApp:has(.stSpinner) [data-testid="stSidebar"] .stRadio,
+        .stApp:has(.stSpinner) [data-testid="stSidebar"] h1,
+        .stApp:has(.stSpinner) [data-testid="stSidebar"] h2,
+        .stApp:has(.stSpinner) [data-testid="stSidebar"] h3,
+        .stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] .stRadio,
+        .stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] h1,
+        .stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] h2,
+        .stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] h3 {
+            opacity: 0.6 !important;
+            pointer-events: none !important;
+        }
+        </style>
+        """
+        st.markdown(light_mode_dimming_css, unsafe_allow_html=True)
 
 
 def initialize_session_state():
@@ -981,67 +1017,62 @@ def render_chat_tab():
                                 metrics_data,
                             ) = extract_tool_calls_and_metrics(response_obj)
 
-                            # Enhanced diagnostic logging for writer agent issues
-                            logger.info(
-                                f"🔍 STREAMLIT DIAGNOSTIC: Team response content: {response[:200]}..."
-                            )
-                            logger.info(
-                                f"🔍 STREAMLIT DIAGNOSTIC: Tool calls extracted: {tool_calls_made}"
-                            )
-                            logger.info(
-                                f"🔍 STREAMLIT DIAGNOSTIC: Tool call details: {len(tool_call_details)}"
-                            )
-
-                            # Check if this looks like a writer agent response with tool call syntax
-                            if (
-                                "write_original_content(" in response
-                                or "<|python_tag|>" in response
-                            ):
-                                logger.warning(
-                                    "🔍 STREAMLIT DIAGNOSTIC: Writer agent response contains tool call syntax!"
-                                )
-                                logger.warning(
-                                    f"🔍 STREAMLIT DIAGNOSTIC: Full response: {response}"
-                                )
-
-                                # Try to extract actual content from response_obj
-                                actual_content_found = False
-                                if (
-                                    hasattr(response_obj, "member_responses")
-                                    and response_obj.member_responses
-                                ):
-                                    for i, member_resp in enumerate(
-                                        response_obj.member_responses
-                                    ):
-                                        if (
-                                            hasattr(member_resp, "messages")
-                                            and member_resp.messages
-                                        ):
-                                            for msg in member_resp.messages:
-                                                if (
-                                                    hasattr(msg, "content")
-                                                    and msg.content
-                                                    and "write_original_content("
-                                                    not in msg.content
-                                                    and "<|python_tag|>"
-                                                    not in msg.content
-                                                    and len(msg.content.strip()) > 50
-                                                ):  # Ensure it's substantial content
-                                                    logger.info(
-                                                        f"🔍 STREAMLIT DIAGNOSTIC: Found actual content in member {i}: {msg.content[:200]}..."
-                                                    )
-                                                    response = (
-                                                        msg.content
-                                                    )  # Override the response with actual content
-                                                    actual_content_found = True
+                            # 🚨 ENHANCED RESPONSE PARSING: Extract final content using comprehensive analyzer pattern
+                            # This follows the same pattern as comprehensive_streaming_analyzer.py for consistency
+                            
+                            # First, try to get the main response content
+                            if hasattr(response_obj, "content") and response_obj.content:
+                                response = response_obj.content
+                                logger.info(f"🔍 STREAMLIT: Using main response content")
+                            
+                            # Extract actual final response (content after </think> tags) - CRITICAL FIX
+                            actual_final_response = ""
+                            if response and '</think>' in str(response):
+                                parts = str(response).split('</think>')
+                                if len(parts) > 1:
+                                    actual_response = parts[-1].strip()
+                                    if actual_response:
+                                        actual_final_response = actual_response
+                                        logger.info(f"🔍 STREAMLIT: Extracted content after </think> tags")
+                            
+                            # If we have actual final response after </think>, use it
+                            if actual_final_response:
+                                response = actual_final_response
+                                logger.info(f"🔍 STREAMLIT: Using actual final response after </think>")
+                            # If the main response looks like tool syntax, check member responses for actual content
+                            elif (hasattr(response_obj, "member_responses") and response_obj.member_responses and
+                                ("write_original_content(" in response or "<|python_tag|>" in response or
+                                 "create_image(" in response or len(response.strip()) < 50)):
+                                
+                                logger.info(f"🔍 STREAMLIT: Checking member responses for final content")
+                                
+                                # Look through member responses for the final assistant message with actual content
+                                for i, member_resp in enumerate(response_obj.member_responses):
+                                    if hasattr(member_resp, "messages") and member_resp.messages:
+                                        # Get the last assistant message from this member
+                                        for msg in reversed(member_resp.messages):
+                                            if (hasattr(msg, "role") and msg.role == "assistant" and
+                                                hasattr(msg, "content") and msg.content and
+                                                len(msg.content.strip()) > 20):  # Ensure substantial content
+                                                
+                                                # Skip tool call syntax messages
+                                                if not any(syntax in msg.content for syntax in [
+                                                    "write_original_content(", "<|python_tag|>", "create_image("
+                                                ]):
+                                                    # Also check for </think> tags in member responses
+                                                    member_content = msg.content
+                                                    if '</think>' in str(member_content):
+                                                        parts = str(member_content).split('</think>')
+                                                        if len(parts) > 1:
+                                                            member_actual = parts[-1].strip()
+                                                            if member_actual:
+                                                                member_content = member_actual
+                                                    
+                                                    logger.info(f"🔍 STREAMLIT: Found final content from member {i}")
+                                                    response = member_content
                                                     break
-                                        if actual_content_found:
-                                            break
-
-                                if not actual_content_found:
-                                    logger.warning(
-                                        "🔍 STREAMLIT DIAGNOSTIC: Could not find actual content in member responses"
-                                    )
+                            
+                            logger.info(f"🔍 STREAMLIT: Final response length: {len(response)} chars")
 
                             # Display tool calls if any
                             if tool_call_details:
@@ -2495,6 +2526,7 @@ def render_sidebar():
                     st.write("• 📚 Knowledge Base Access")
                     st.write("• 🌐 Web Research")
                     st.write("• ✍️ Writing & Content Creation")
+                    st.write("• 🎨 Image Creation")
                     st.write("• 🔬 PubMed Research")
                     st.write("• 💰 Finance & Calculations")
                     st.write("• 📁 File Operations")

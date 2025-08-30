@@ -3,12 +3,14 @@ Model context size configuration and detection.
 
 This module provides dynamic context size detection for different LLM models,
 ensuring optimal performance by using each model's full context window capacity.
+It also provides model-specific parameter configurations for temperature, top_p, 
+top_k, and repetition_penalty settings.
 """
 
 import json
 import logging
 import re
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 import requests
 
@@ -16,6 +18,104 @@ from ..utils import setup_logging
 from .settings import OLLAMA_URL, get_env_var
 
 logger = setup_logging(__name__)
+
+# Model parameter configuration structure
+class ModelParameters:
+    """Container for model-specific parameters."""
+    
+    def __init__(
+        self,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        top_k: int = 40,
+        repetition_penalty: float = 1.1,
+    ):
+        self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
+        self.repetition_penalty = repetition_penalty
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary format."""
+        return {
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "repetition_penalty": self.repetition_penalty,
+        }
+    
+    def __repr__(self) -> str:
+        return f"ModelParameters(temperature={self.temperature}, top_p={self.top_p}, top_k={self.top_k}, repetition_penalty={self.repetition_penalty})"
+
+# Model parameter database - curated list of known models and their optimal parameters
+MODEL_PARAMETERS: Dict[str, ModelParameters] = {
+    # Qwen models - optimized parameters as suggested
+    "qwen3:1.7b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen3:7b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen3:8b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen3:14b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:0.5b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:1.5b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:3b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:7b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:14b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:32b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "qwen2.5:72b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:q4_k_m": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
+    
+    # Llama models - balanced parameters for instruction following
+    "llama3.1:8b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.1:8b-instruct-q8_0": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.1:70b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.1:405b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.2:1b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.2:3b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.2:11b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.2:90b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.3:latest": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3.3:70b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3:8b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "llama3:70b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    
+    # Mistral models - slightly more creative parameters
+    "mistral:7b": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
+    "mistral:instruct": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
+    "mixtral:8x7b": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
+    "mixtral:8x22b": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
+    
+    # CodeLlama models - focused parameters for code generation
+    "codellama:7b": ModelParameters(temperature=0.2, top_p=0.95, top_k=50, repetition_penalty=1.05),
+    "codellama:13b": ModelParameters(temperature=0.2, top_p=0.95, top_k=50, repetition_penalty=1.05),
+    "codellama:34b": ModelParameters(temperature=0.2, top_p=0.95, top_k=50, repetition_penalty=1.05),
+    
+    # Gemma models - balanced parameters
+    "gemma:2b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "gemma:7b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "gemma2:9b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "gemma2:27b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    
+    # Phi models - optimized for reasoning
+    "phi3:3.8b": ModelParameters(temperature=0.6, top_p=0.9, top_k=30, repetition_penalty=1.1),
+    "phi3:14b": ModelParameters(temperature=0.6, top_p=0.9, top_k=30, repetition_penalty=1.1),
+    "phi3.5:3.8b": ModelParameters(temperature=0.6, top_p=0.9, top_k=30, repetition_penalty=1.1),
+    
+    # Neural Chat models
+    "neural-chat:7b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    
+    # Orca models - conservative parameters for smaller models
+    "orca-mini:3b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
+    "orca-mini:7b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
+    "orca-mini:13b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
+    
+    # Vicuna models - conservative parameters for smaller models
+    "vicuna:7b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
+    "vicuna:13b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
+    "vicuna:33b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
+    
+    # Default fallback parameters for unknown models
+    "default": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+}
 
 # Model context size database - curated list of known models and their context windows
 MODEL_CONTEXT_SIZES: Dict[str, int] = {
@@ -32,6 +132,7 @@ MODEL_CONTEXT_SIZES: Dict[str, int] = {
     "qwen2.5:14b": 32768,
     "qwen2.5:32b": 32768,
     "qwen2.5:72b": 32768,
+    "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:q4_k_m": 262144,
     # Llama 3.1 models (128K context) - Updated via ollama show verification
     "llama3.1:8b": 131072,  # Updated from 32768
     "llama3.1:8b-instruct-q8_0": 131072,  # Updated from 32768
@@ -466,3 +567,222 @@ def get_context_size_summary(model_name: str, ollama_url: str = OLLAMA_URL) -> s
     method_desc = method_descriptions.get(method, method)
 
     return f"Model: {model_name}\nContext Size: {context_size:,} tokens\nDetection Method: {method_desc}"
+
+
+# Model parameter functions
+
+def get_env_parameter_overrides_for_model(model_name: str) -> Dict[str, Any]:
+    """
+    Check for environment variable overrides for model parameters.
+
+    Args:
+        model_name: Model name to check
+
+    Returns:
+        Dictionary of parameter overrides found in environment variables
+    """
+    # Convert model name to env var format
+    # qwen3:1.7b -> QWEN3_1_7B
+    env_name = model_name.upper().replace(":", "_").replace(".", "_").replace("-", "_")
+    
+    overrides = {}
+    
+    # Check for specific parameter overrides
+    param_mappings = {
+        "TEMPERATURE": "temperature",
+        "TOP_P": "top_p", 
+        "TOP_K": "top_k",
+        "REPETITION_PENALTY": "repetition_penalty",
+    }
+    
+    for env_suffix, param_name in param_mappings.items():
+        env_var = f"{env_name}_{env_suffix}"
+        override_value = get_env_var(env_var)
+        if override_value:
+            try:
+                if param_name == "top_k":
+                    overrides[param_name] = int(override_value)
+                else:
+                    overrides[param_name] = float(override_value)
+            except ValueError:
+                logger.warning(
+                    "Invalid %s override for %s: %s", param_name, model_name, override_value
+                )
+    
+    # Also check for general default overrides
+    general_mappings = {
+        "DEFAULT_TEMPERATURE": "temperature",
+        "DEFAULT_TOP_P": "top_p",
+        "DEFAULT_TOP_K": "top_k", 
+        "DEFAULT_REPETITION_PENALTY": "repetition_penalty",
+    }
+    
+    for env_var, param_name in general_mappings.items():
+        if param_name not in overrides:  # Don't override specific model settings
+            general_override = get_env_var(env_var)
+            if general_override:
+                try:
+                    if param_name == "top_k":
+                        overrides[param_name] = int(general_override)
+                    else:
+                        overrides[param_name] = float(general_override)
+                except ValueError:
+                    logger.warning(
+                        "Invalid default %s override: %s", param_name, general_override
+                    )
+    
+    return overrides
+
+
+def get_model_parameters(model_name: str) -> Tuple[ModelParameters, str]:
+    """
+    Get the optimal parameters for a given model using multiple detection methods.
+
+    Detection priority:
+    1. Environment variable override
+    2. Database lookup
+    3. Default fallback
+
+    Args:
+        model_name: Name of the model
+
+    Returns:
+        Tuple of (ModelParameters, detection_method)
+    """
+    logger.debug("Determining parameters for model: %s", model_name)
+
+    # 1. Check environment variable overrides first
+    env_overrides = get_env_parameter_overrides_for_model(model_name)
+    
+    # 2. Look up in our curated database
+    base_params = None
+    detection_method = "default_fallback"
+    
+    # First try the original model name (for case-sensitive models like HuggingFace)
+    if model_name in MODEL_PARAMETERS:
+        base_params = MODEL_PARAMETERS[model_name]
+        detection_method = "database_lookup"
+        logger.info("Found parameters in database for %s", model_name)
+    else:
+        # Then try the normalized name for standard models
+        normalized_name = normalize_model_name(model_name)
+        if normalized_name in MODEL_PARAMETERS:
+            base_params = MODEL_PARAMETERS[normalized_name]
+            detection_method = "database_lookup"
+            logger.info("Found parameters in database for %s (normalized)", model_name)
+        else:
+            # Use default fallback
+            base_params = MODEL_PARAMETERS["default"]
+            logger.warning("Using default parameters for unknown model %s", model_name)
+    
+    # 3. Apply environment overrides if any
+    if env_overrides:
+        logger.info("Applying environment overrides for %s: %s", model_name, env_overrides)
+        # Create new parameters with overrides applied
+        params_dict = base_params.to_dict()
+        params_dict.update(env_overrides)
+        final_params = ModelParameters(**params_dict)
+        detection_method = "environment_override" if env_overrides else detection_method
+        return final_params, detection_method
+    
+    return base_params, detection_method
+
+
+def get_model_parameters_dict(model_name: str) -> Dict[str, Any]:
+    """
+    Get model parameters as a dictionary for easy integration.
+
+    Args:
+        model_name: Name of the model
+
+    Returns:
+        Dictionary containing the model parameters
+    """
+    params, _ = get_model_parameters(model_name)
+    return params.to_dict()
+
+
+def add_model_parameters_to_database(model_name: str, parameters: ModelParameters) -> None:
+    """
+    Add a new model's parameters to the parameter database.
+
+    Args:
+        model_name: Name of the model
+        parameters: ModelParameters object with the model's optimal settings
+    """
+    normalized_name = normalize_model_name(model_name)
+    MODEL_PARAMETERS[normalized_name] = parameters
+    logger.info(
+        "Added model %s to parameter database: %s", normalized_name, parameters
+    )
+
+
+def list_supported_model_parameters() -> Dict[str, ModelParameters]:
+    """
+    Get a list of all models in the parameter database.
+
+    Returns:
+        Dictionary mapping model names to ModelParameters objects
+    """
+    return MODEL_PARAMETERS.copy()
+
+
+def get_model_config_summary(model_name: str, ollama_url: str = OLLAMA_URL) -> str:
+    """
+    Get a comprehensive summary of both context size and parameters for a model.
+
+    Args:
+        model_name: Name of the model
+        ollama_url: Ollama server URL
+
+    Returns:
+        Formatted summary string with both context and parameter information
+    """
+    # Get context size info
+    context_size, context_method = get_model_context_size_sync(model_name, ollama_url)
+    
+    # Get parameter info
+    parameters, param_method = get_model_parameters(model_name)
+    
+    method_descriptions = {
+        "environment_override": "Environment variable override",
+        "ollama_api": "Ollama API query",
+        "model_name_pattern": "Model name pattern extraction",
+        "database_lookup": "Curated database lookup",
+        "default_fallback": "Default fallback (unknown model)",
+    }
+    
+    context_method_desc = method_descriptions.get(context_method, context_method)
+    param_method_desc = method_descriptions.get(param_method, param_method)
+    
+    return f"""Model: {model_name}
+Context Size: {context_size:,} tokens (Detection: {context_method_desc})
+Parameters:
+  - Temperature: {parameters.temperature}
+  - Top P: {parameters.top_p}
+  - Top K: {parameters.top_k}
+  - Repetition Penalty: {parameters.repetition_penalty}
+  (Detection: {param_method_desc})"""
+
+
+def get_model_config_dict(model_name: str, ollama_url: str = OLLAMA_URL) -> Dict[str, Any]:
+    """
+    Get complete model configuration as a dictionary.
+
+    Args:
+        model_name: Name of the model
+        ollama_url: Ollama server URL
+
+    Returns:
+        Dictionary containing both context size and parameters
+    """
+    context_size, context_method = get_model_context_size_sync(model_name, ollama_url)
+    parameters, param_method = get_model_parameters(model_name)
+    
+    return {
+        "model_name": model_name,
+        "context_size": context_size,
+        "context_detection_method": context_method,
+        "parameters": parameters.to_dict(),
+        "parameter_detection_method": param_method,
+    }

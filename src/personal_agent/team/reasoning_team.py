@@ -167,6 +167,7 @@ except ImportError:
     from personal_agent.utils import setup_logging
 
 WRITER_MODEL = "llama3.1:8b"
+CODING_MODEL = "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest"
 
 # Load environment variables
 load_dotenv()
@@ -596,12 +597,18 @@ def create_writer_agent(
     # Create writing tools instance
     writing_tools = WritingTools()
 
+    # Use provided model_name or fall back to WRITER_MODEL default
+    effective_model = model_name if model_name else WRITER_MODEL
+
     agent = Agent(
         name="Writer Agent",
         role="Create written content in the requested tone and style",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
         debug_mode=debug,
         tools=[
+            writing_tools,
             FileTools(
                 base_dir=Path(HOME_DIR),
                 save_files=True,
@@ -628,11 +635,11 @@ def create_writer_agent(
 
 def create_image_agent(
     model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
+    model_name: str = None,
     debug: bool = False,
     use_remote: bool = False,
 ) -> Agent:
-    """Create a specialized image creation agent using DALL-E.
+    """Create a specialized image creation agent using DALL-E with enhanced error handling.
 
     :param model_provider: LLM provider ('ollama' or 'openai')
     :param model_name: Model name to use
@@ -641,20 +648,24 @@ def create_image_agent(
     :return: Configured image creation agent
     """
 
+    # Use provided model_name or fall back to LLM_MODEL default
+    effective_model = model_name if model_name else LLM_MODEL
+
     agent = Agent(
         name="Image Agent",
-        role="Create images using DALL-E based on text descriptions",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
-        debug_mode=debug,
+        role="Create images using DALL-E based on text descriptions with comprehensive error handling",
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
+        debug_mode=True,  # Always enable debug mode for better error tracking
         tools=[
             DalleTools(model="dall-e-3", size="1792x1024", quality="hd", style="vivid"),
         ],
         instructions=[
-            "You are an AI image creation specialist using DALL-E.",
-            "When asked to create an image, use the create_image tool with the user's description.",
-            "After the tool creates the image, return the image URL in markdown format: ![description](URL)",
-            "You may include brief context or description along with the image.",
-            "Focus on providing the image markdown format clearly and prominently in your response.",
+            "You are an AI image creation specialist.",
+            "Your **only** task is to call the `create_image` tool using the user's description.",
+            "Your entire response **MUST** be only the direct, raw, unmodified output from the `create_image` tool.",
+            "**CRITICAL:** Do NOT add any text, thoughts, comments, or any other formatting. Your response must be ONLY the tool's output.",
         ],
         markdown=True,
         show_tool_calls=True,  # Enable tool call display for better debugging
@@ -662,19 +673,26 @@ def create_image_agent(
     )
 
     logger.info(
-        "🚨 DIAGNOSTIC: Created Image Agent with simplified instructions and disabled tool call display"
+        "🚨 DIAGNOSTIC: Created Enhanced Image Agent with comprehensive error handling and diagnostic logging"
     )
     return agent
 
 
-def create_agents(use_remote: bool = False, debug: bool = False):
+def create_agents(
+    use_remote: bool = False, debug: bool = False, model_name: str = None
+):
     """Create all agents with the correct remote/local configuration."""
+
+    # Use provided model_name or fall back to config default
+    effective_model = model_name if model_name else LLM_MODEL
 
     # Web search agent using Ollama
     web_agent = Agent(
         name="Web Agent",
         role="Search the web for information",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
         tools=[GoogleSearchTools()],
         instructions=[
             "Search the web for information based on the input. Always include sources"
@@ -699,7 +717,9 @@ def create_agents(use_remote: bool = False, debug: bool = False):
     finance_agent = Agent(
         name="Finance Agent",
         role="Get financial data",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
         tools=[
             YFinanceTools(
                 stock_price=True,
@@ -716,7 +736,9 @@ def create_agents(use_remote: bool = False, debug: bool = False):
     medical_agent = Agent(
         name="Medical Agent",
         role="Search pubmed for medical information",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
         description="You are an AI agent that search PubMed for medical information.",
         tools=[PubmedTools()],
         instructions=[
@@ -728,10 +750,12 @@ def create_agents(use_remote: bool = False, debug: bool = False):
     )
 
     # Writer agent using Ollama
-    writer_agent = create_writer_agent()
+    writer_agent = create_writer_agent(
+        model_name=effective_model, use_remote=use_remote
+    )
 
     # Image agent using DALL-E
-    image_agent = create_image_agent(use_remote=use_remote)
+    image_agent = create_image_agent(model_name=effective_model, use_remote=use_remote)
 
     # Calculator agent using Ollama
     calculator_agent = Agent(
@@ -755,7 +779,11 @@ def create_agents(use_remote: bool = False, debug: bool = False):
 
     python_agent = Agent(
         name="Python Agent",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER,
+            model_name=CODING_MODEL,
+            use_remote=use_remote,
+        ),
         role="Create and Execute Python code",
         tools=[
             PythonTools(
@@ -775,7 +803,9 @@ def create_agents(use_remote: bool = False, debug: bool = False):
 
     file_agent = Agent(
         name="File System Agent",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        # model=create_model(
+        #    provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        # ),
         role="Read and write files in the system",
         tools=[
             FileTools(
@@ -841,6 +871,7 @@ async def create_memory_agent(
     debug: bool = False,
     use_remote: bool = False,
     recreate: bool = False,
+    model_name: str = None,
 ) -> Agent:
     """Create a memory agent that uses the shared memory system."""
     # Get user_id dynamically if not provided
@@ -853,10 +884,13 @@ async def create_memory_agent(
     else:
         ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
 
+    # Use provided model_name or fall back to config default
+    effective_model = model_name if model_name else LLM_MODEL
+
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
-        model_name=LLM_MODEL,  # Use the configured model
+        model_name=effective_model,  # Use the effective model
         enable_memory=True,
         enable_mcp=False,
         debug=debug,
@@ -928,8 +962,13 @@ async def create_memory_writer_agent(
 
 
 # Create the team
-async def create_team(use_remote: bool = False):
-    """Create the team with shared memory context and your existing managers."""
+async def create_team(use_remote: bool = False, model_name: str = None):
+    """Create the team with shared memory context and your existing managers.
+
+    Args:
+        use_remote: Whether to use remote Ollama server
+        model_name: Specific model name to use (overrides LLM_MODEL from config)
+    """
 
     # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
     try:
@@ -954,15 +993,23 @@ async def create_team(use_remote: bool = False):
         print(f"⚠️ Docker synchronization failed: {docker_message}")
         print("Proceeding with team creation, but Docker services may be inconsistent")
 
+    # Use provided model_name or fall back to config default
+    effective_model = model_name if model_name else LLM_MODEL
+
+    logger.info(
+        f"🔄 Creating team with model: {effective_model} (use_remote={use_remote})"
+    )
+
     # Create memory agent directly using the create_memory_agent function
     memory_agent = await create_memory_agent(
         user_id=current_user_id,
         debug=True,
         use_remote=use_remote,
+        model_name=effective_model,  # Pass the model name
     )
 
     # Create all other agents with the correct remote/local configuration
-    agents = create_agents(use_remote=use_remote)
+    agents = create_agents(use_remote=use_remote, model_name=effective_model)
     (
         web_agent,
         system_agent,
@@ -979,7 +1026,9 @@ async def create_team(use_remote: bool = False):
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
-        model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
         memory=None,  # No team-level memory - only memory agent handles memory
         tools=[
             ReasoningTools(add_instructions=True, add_few_shot=True),
@@ -1010,13 +1059,18 @@ async def create_team(use_remote: bool = False):
             "",
             "CRITICAL IMAGE DELEGATION RULES:",
             "- For image creation requests, delegate to Image Agent",
-            "- ALWAYS extract and display the actual image URL from the Image Agent's response",
-            "- Look for ![description](URL) format in the Image Agent's response",
-            "- Copy the exact ![description](URL) markdown from Image Agent to your response",
+            "- ALWAYS return the Image Agent's response exactly as it is",
             "- Do NOT summarize, describe, or replace the image URL with text",
             "- Do NOT use emojis instead of the actual image URL",
             "- The user needs to see the clickable image link, not a description",
             "- Example: If Image Agent returns ![robot](https://example.com/image.png), show exactly that",
+            "",
+            "🚨 CRITICAL ERROR HANDLING FOR IMAGE REQUESTS:",
+            "- If Image Agent reports an error, ALWAYS show the error message to the user",
+            "- For connection errors: Pass through the agent's suggestion to try again later",
+            "- For content policy violations: Pass through the agent's suggestions for rephrasing",
+            "- NEVER hide or ignore error messages from the Image Agent",
+            "- Be transparent about what went wrong and how to fix it",
             "",
             "CRITICAL WRITING DELEGATION RULES:",
             "- Delegate to Writer Agent ONLY ONCE per user request",
@@ -1278,7 +1332,9 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                 else:
                     # Otherwise, treat as regular team query - use same method as interactive CLI
                     console.print("🤖 [bold green]Team:[/bold green]")
-                    await team.aprint_response(query, stream=True, show_full_reasoning=True)
+                    await team.aprint_response(
+                        query, stream=True, show_full_reasoning=True
+                    )
 
             except Exception as e:
                 console.print(f"💥 Error: {e}")

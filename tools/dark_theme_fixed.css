@@ -53,12 +53,12 @@ html,
     color: #fafafa !important;
 }
 
-/* Sidebar with better text contrast - allow dimming during queries */
+/* Sidebar with better text contrast - FIXED: Allow dimming during queries */
 [data-testid="stSidebar"] {
     background-color: #1a1b26;
 }
 
-/* Allow Streamlit's dimming effect to work by not using !important on sidebar text */
+/* FIXED: Remove !important from sidebar text to allow Streamlit's dimming */
 .stSidebar .stMarkdown,
 .stSidebar .stText,
 .stSidebar h1,
@@ -71,12 +71,32 @@ html,
     color: #fafafa;
 }
 
-/* Ensure sidebar dimming works during query execution */
+/* FIXED: Enhanced sidebar dimming during query execution */
+/* Target the sidebar when the app is in a loading/processing state */
+.stApp[data-testid*="stAppViewContainer"] [data-testid="stSidebar"],
+.stApp.stAppViewContainer [data-testid="stSidebar"],
 [data-testid="stSidebar"][data-testid*="disabled"],
 [data-testid="stSidebar"].stDisabled,
-[data-testid="stSidebar"][aria-disabled="true"] {
-    opacity: 0.6;
-    pointer-events: none;
+[data-testid="stSidebar"][aria-disabled="true"],
+/* Target sidebar during spinner/loading states */
+.stApp:has(.stSpinner) [data-testid="stSidebar"],
+.stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] {
+    opacity: 0.6 !important;
+    pointer-events: none !important;
+    transition: opacity 0.3s ease !important;
+}
+
+/* FIXED: Specifically target navigation elements for dimming */
+.stApp:has(.stSpinner) [data-testid="stSidebar"] .stRadio,
+.stApp:has(.stSpinner) [data-testid="stSidebar"] h1,
+.stApp:has(.stSpinner) [data-testid="stSidebar"] h2,
+.stApp:has(.stSpinner) [data-testid="stSidebar"] h3,
+.stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] .stRadio,
+.stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] h1,
+.stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] h2,
+.stApp:has([data-testid="stSpinner"]) [data-testid="stSidebar"] h3 {
+    opacity: 0.6 !important;
+    pointer-events: none !important;
 }
 
 .stButton > button {
