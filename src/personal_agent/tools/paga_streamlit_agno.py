@@ -144,6 +144,11 @@ from personal_agent.config import (
     get_qwen_instruct_settings,
     get_qwen_thinking_settings,
 )
+from personal_agent.config.model_contexts import (
+    get_model_config_dict,
+    get_model_config_summary,
+    get_model_parameters,
+)
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 from personal_agent.team.reasoning_team import create_team as create_personal_agent_team
 from personal_agent.tools.streamlit_helpers import (
@@ -2502,7 +2507,6 @@ def render_sidebar():
             team = st.session_state.get(SESSION_KEY_TEAM)
             if team:
                 st.write(f"**Mode:** 🤖 Team of Agents")
-                st.write(f"**Framework:** agno")
 
                 # Make team information collapsible
                 with st.expander("🤖 Team Details", expanded=False):
@@ -2551,30 +2555,38 @@ def render_sidebar():
                 st.write(f"**Mode:** 🧠 Single Agent")
                 st.warning("⚠️ Agent not initialized")
 
-        # Show Qwen model settings if using Qwen model
+        # Show comprehensive model configuration for current model
         current_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
-        if "qwen" in current_model.lower():
-            with st.expander("⚙️ Qwen Model Settings", expanded=False):
-                try:
-                    instruct_settings = get_qwen_instruct_settings()
-                    thinking_settings = get_qwen_thinking_settings()
-
-                    st.write("**Instruct Model Settings:**")
-                    st.write(f"• Temperature: {instruct_settings['temperature']}")
-                    st.write(f"• Min_P: {instruct_settings['min_p']}")
-                    st.write(f"• Top_P: {instruct_settings['top_p']}")
-                    st.write(f"• Top_K: {instruct_settings['top_k']}")
-
-                    st.write("**Thinking Model Settings:**")
-                    st.write(f"• Temperature: {thinking_settings['temperature']}")
-                    st.write(f"• Min_P: {thinking_settings['min_p']}")
-                    st.write(f"• Top_P: {thinking_settings['top_p']}")
-
-                    st.caption(
-                        "These settings are configured in src/personal_agent/config/settings.py"
-                    )
-                except Exception as e:
-                    st.error(f"Error loading Qwen settings: {e}")
+        current_ollama_url = st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+        
+        with st.expander("⚙️ Model Configuration", expanded=False):
+            try:
+                # Get comprehensive model configuration
+                model_config = get_model_config_dict(current_model, current_ollama_url)
+                
+                st.write("**Model Parameters:**")
+                params = model_config.get("parameters", {})
+                st.write(f"• Temperature: {params.get('temperature', 'N/A')}")
+                st.write(f"• Top P: {params.get('top_p', 'N/A')}")
+                st.write(f"• Top K: {params.get('top_k', 'N/A')}")
+                st.write(f"• Repetition Penalty: {params.get('repetition_penalty', 'N/A')}")
+                
+                st.write("**Context Configuration:**")
+                context_size = model_config.get("context_size", "N/A")
+                if isinstance(context_size, int):
+                    st.write(f"• Context Size: {context_size:,} tokens")
+                else:
+                    st.write(f"• Context Size: {context_size}")
+                
+                st.caption(
+                    "Configuration sourced from model_contexts.py and environment variables"
+                )
+                
+            except Exception as e:
+                st.error(f"Error loading model configuration: {e}")
+                # Fallback to basic model info
+                st.write(f"**Model:** {current_model}")
+                st.write(f"**Ollama URL:** {current_ollama_url}")
 
         # Show debug info about URL configuration
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):

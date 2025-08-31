@@ -3,14 +3,15 @@ Model context size configuration and detection.
 
 This module provides dynamic context size detection for different LLM models,
 ensuring optimal performance by using each model's full context window capacity.
-It also provides model-specific parameter configurations for temperature, top_p, 
+It also provides model-specific parameter configurations for temperature, top_p,
 top_k, and repetition_penalty settings.
 """
 
 import json
 import logging
 import re
-from typing import Dict, Optional, Tuple, Any
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 
@@ -19,102 +20,397 @@ from .settings import OLLAMA_URL, get_env_var
 
 logger = setup_logging(__name__)
 
-# Model parameter configuration structure
+
+@dataclass
 class ModelParameters:
-    """Container for model-specific parameters."""
-    
-    def __init__(
-        self,
-        temperature: float = 0.7,
-        top_p: float = 0.9,
-        top_k: int = 40,
-        repetition_penalty: float = 1.1,
-    ):
-        self.temperature = temperature
-        self.top_p = top_p
-        self.top_k = top_k
-        self.repetition_penalty = repetition_penalty
-    
+    """Container for complete model configuration including parameters and context size."""
+
+    temperature: float = 0.7
+    top_p: float = 0.9
+    top_k: int = 40
+    repetition_penalty: float = 1.1
+    context_size: Optional[int] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary format."""
-        return {
+        result = {
             "temperature": self.temperature,
             "top_p": self.top_p,
             "top_k": self.top_k,
             "repetition_penalty": self.repetition_penalty,
         }
-    
-    def __repr__(self) -> str:
-        return f"ModelParameters(temperature={self.temperature}, top_p={self.top_p}, top_k={self.top_k}, repetition_penalty={self.repetition_penalty})"
+        if self.context_size is not None:
+            result["context_size"] = self.context_size
+        return result
 
-# Model parameter database - curated list of known models and their optimal parameters
+    def __post_init__(self):
+        """Validate parameters after initialization."""
+        if not 0.0 <= self.temperature <= 2.0:
+            raise ValueError(
+                f"Temperature must be between 0.0 and 2.0, got {self.temperature}"
+            )
+        if not 0.0 <= self.top_p <= 1.0:
+            raise ValueError(f"Top P must be between 0.0 and 1.0, got {self.top_p}")
+        if not 1 <= self.top_k <= 1000:
+            raise ValueError(f"Top K must be between 1 and 1000, got {self.top_k}")
+        if not 0.0 <= self.repetition_penalty <= 2.0:
+            raise ValueError(
+                f"Repetition penalty must be between 0.0 and 2.0, got {self.repetition_penalty}"
+            )
+        if self.context_size is not None and self.context_size <= 0:
+            raise ValueError(f"Context size must be positive, got {self.context_size}")
+
+
+# Unified model configuration database - includes both parameters and context sizes
 MODEL_PARAMETERS: Dict[str, ModelParameters] = {
-    # Qwen models - optimized parameters as suggested
-    "qwen3:1.7b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen3:7b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen3:8b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen3:14b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:0.5b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:1.5b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:3b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:7b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:14b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:32b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "qwen2.5:72b": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:q4_k_m": ModelParameters(temperature=0.7, top_p=0.8, top_k=20, repetition_penalty=1.05),
-    
+    # Qwen models - extracted from actual Ollama installations
+    "qwen3": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    "qwen3:1.7b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    "qwen3:4b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    "qwen3:7b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    "qwen3:8b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    "qwen3:14b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=65535,
+    ),
+    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=65535,
+    ),
+    "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:Q4_K_M": ModelParameters(
+        temperature=0.7,
+        top_p=0.8,
+        top_k=20,
+        context_size=65535,
+        repetition_penalty=1.05,
+    ),
+    "sam860/qwen3-embedding:0.6b-F16": ModelParameters(
+        temperature=0.1,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=40960,
+    ),
+    # Qwen 2.5 models - using similar parameters to Qwen 3
+    "qwen2.5:0.5b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5:1.5b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5:3b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5:7b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5:14b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5:32b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5:72b": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "qwen2.5-coder:3b": ModelParameters(
+        temperature=0.2,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),  # Lower temp for coding
+    "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf": ModelParameters(
+        temperature=0.2,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.0,
+        context_size=32768,
+    ),
+    "myaniu/qwen2.5-1m": ModelParameters(
+        temperature=0.5, top_p=0.95, context_size=1048576
+    ),  # 1M context
     # Llama models - balanced parameters for instruction following
-    "llama3.1:8b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.1:8b-instruct-q8_0": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.1:70b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.1:405b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.2:1b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.2:3b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.2:11b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.2:90b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.3:latest": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3.3:70b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3:8b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "llama3:70b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    
+    "llama3.1:8b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.1:8b-instruct-q8_0": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.1:70b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.1:405b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.2": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.2:1b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.2:3b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.2:11b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.2:90b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.3:latest": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3.3:70b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
+    "llama3:8b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    "llama3:70b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    "llama3-groq-tool-use": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    "hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=131072,
+    ),
     # Mistral models - slightly more creative parameters
-    "mistral:7b": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
-    "mistral:instruct": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
-    "mixtral:8x7b": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
-    "mixtral:8x22b": ModelParameters(temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1),
-    
+    "mistral:7b": ModelParameters(
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+    ),
+    "mistral:instruct": ModelParameters(
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+    ),
+    "mistral-nemo": ModelParameters(
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+    ),
+    "mixtral:8x7b": ModelParameters(
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+    ),
+    "mixtral:8x22b": ModelParameters(
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=65536
+    ),
+    # Gemma models - extracted and balanced parameters
+    "gemma3:1b": ModelParameters(
+        temperature=1.0, top_p=0.95, top_k=64, context_size=32768
+    ),
+    "orieg/gemma3-tools:4b": ModelParameters(
+        temperature=1.0, top_p=0.9, top_k=64, context_size=32768
+    ),
+    "gemma:2b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    "gemma:7b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    "gemma2:9b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    "gemma2:27b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
     # CodeLlama models - focused parameters for code generation
-    "codellama:7b": ModelParameters(temperature=0.2, top_p=0.95, top_k=50, repetition_penalty=1.05),
-    "codellama:13b": ModelParameters(temperature=0.2, top_p=0.95, top_k=50, repetition_penalty=1.05),
-    "codellama:34b": ModelParameters(temperature=0.2, top_p=0.95, top_k=50, repetition_penalty=1.05),
-    
-    # Gemma models - balanced parameters
-    "gemma:2b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "gemma:7b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "gemma2:9b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    "gemma2:27b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    
+    "codellama:7b": ModelParameters(
+        temperature=0.2,
+        top_p=0.95,
+        top_k=50,
+        repetition_penalty=1.05,
+        context_size=16384,
+    ),
+    "codellama:13b": ModelParameters(
+        temperature=0.2,
+        top_p=0.95,
+        top_k=50,
+        repetition_penalty=1.05,
+        context_size=16384,
+    ),
+    "codellama:34b": ModelParameters(
+        temperature=0.2,
+        top_p=0.95,
+        top_k=50,
+        repetition_penalty=1.05,
+        context_size=16384,
+    ),
     # Phi models - optimized for reasoning
-    "phi3:3.8b": ModelParameters(temperature=0.6, top_p=0.9, top_k=30, repetition_penalty=1.1),
-    "phi3:14b": ModelParameters(temperature=0.6, top_p=0.9, top_k=30, repetition_penalty=1.1),
-    "phi3.5:3.8b": ModelParameters(temperature=0.6, top_p=0.9, top_k=30, repetition_penalty=1.1),
-    
+    "phi3:3.8b": ModelParameters(
+        temperature=0.6,
+        top_p=0.9,
+        top_k=30,
+        repetition_penalty=1.1,
+        context_size=128000,
+    ),
+    "phi3:14b": ModelParameters(
+        temperature=0.6,
+        top_p=0.9,
+        top_k=30,
+        repetition_penalty=1.1,
+        context_size=128000,
+    ),
+    "phi3.5:3.8b": ModelParameters(
+        temperature=0.6,
+        top_p=0.9,
+        top_k=30,
+        repetition_penalty=1.1,
+        context_size=128000,
+    ),
+    # SmolLM models
+    "smollm2:1.7B": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
+    # Other specialized models
+    "gpt-oss:20b": ModelParameters(temperature=1.0, context_size=32768),
+    "nomic-embed-text": ModelParameters(
+        temperature=0.1, top_p=0.9, top_k=10, repetition_penalty=1.0, context_size=8192
+    ),  # Embedding model - low temp
     # Neural Chat models
-    "neural-chat:7b": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
-    
+    "neural-chat:7b": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+    ),
     # Orca models - conservative parameters for smaller models
-    "orca-mini:3b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
-    "orca-mini:7b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
-    "orca-mini:13b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
-    
+    "orca-mini:3b": ModelParameters(
+        temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15, context_size=2048
+    ),
+    "orca-mini:7b": ModelParameters(
+        temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15, context_size=2048
+    ),
+    "orca-mini:13b": ModelParameters(
+        temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15, context_size=2048
+    ),
     # Vicuna models - conservative parameters for smaller models
-    "vicuna:7b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
-    "vicuna:13b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
-    "vicuna:33b": ModelParameters(temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15),
-    
+    "vicuna:7b": ModelParameters(
+        temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15, context_size=2048
+    ),
+    "vicuna:13b": ModelParameters(
+        temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15, context_size=2048
+    ),
+    "vicuna:33b": ModelParameters(
+        temperature=0.6, top_p=0.8, top_k=30, repetition_penalty=1.15, context_size=2048
+    ),
     # Default fallback parameters for unknown models
-    "default": ModelParameters(temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1),
+    "default": ModelParameters(
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=4096
+    ),
 }
 
 # Model context size database - curated list of known models and their context windows
@@ -462,6 +758,7 @@ def get_model_context_size_sync(
     Synchronous version of get_model_context_size for compatibility.
 
     This version skips the Ollama API query and uses other detection methods.
+    Now prioritizes the unified ModelParameters database.
 
     Args:
         model_name: Name of the model
@@ -490,28 +787,65 @@ def get_model_context_size_sync(
         )
         return name_context, "model_name_pattern"
 
-    # 3. Look up in our curated database
+    # 3. Look up in our unified ModelParameters database first
     # First try the original model name (for case-sensitive models like HuggingFace)
-    if model_name in MODEL_CONTEXT_SIZES:
-        db_context = MODEL_CONTEXT_SIZES[model_name]
-        logger.info(
-            "Found context size in database for %s: %d tokens", model_name, db_context
-        )
-        return db_context, "database_lookup"
+    if model_name in MODEL_PARAMETERS:
+        model_params = MODEL_PARAMETERS[model_name]
+        if model_params.context_size is not None:
+            logger.info(
+                "Found context size in unified database for %s: %d tokens",
+                model_name,
+                model_params.context_size,
+            )
+            return model_params.context_size, "database_lookup"
 
     # Then try the normalized name for standard models
     normalized_name = normalize_model_name(model_name)
-    if normalized_name in MODEL_CONTEXT_SIZES:
-        db_context = MODEL_CONTEXT_SIZES[normalized_name]
+    if normalized_name in MODEL_PARAMETERS:
+        model_params = MODEL_PARAMETERS[normalized_name]
+        if model_params.context_size is not None:
+            logger.info(
+                "Found context size in unified database for %s: %d tokens",
+                model_name,
+                model_params.context_size,
+            )
+            return model_params.context_size, "database_lookup"
+
+    # 4. Fallback to legacy context size database
+    # First try the original model name
+    if model_name in MODEL_CONTEXT_SIZES:
+        db_context = MODEL_CONTEXT_SIZES[model_name]
         logger.info(
-            "Found context size in database for %s: %d tokens", model_name, db_context
+            "Found context size in legacy database for %s: %d tokens",
+            model_name,
+            db_context,
         )
         return db_context, "database_lookup"
 
-    # 4. Use default fallback
+    # Then try the normalized name
+    if normalized_name in MODEL_CONTEXT_SIZES:
+        db_context = MODEL_CONTEXT_SIZES[normalized_name]
+        logger.info(
+            "Found context size in legacy database for %s: %d tokens",
+            model_name,
+            db_context,
+        )
+        return db_context, "database_lookup"
+
+    # 5. Use default fallback from unified database
+    default_params = MODEL_PARAMETERS["default"]
+    if default_params.context_size is not None:
+        logger.warning(
+            "Using default context size for unknown model %s: %d tokens",
+            model_name,
+            default_params.context_size,
+        )
+        return default_params.context_size, "default_fallback"
+
+    # Final fallback to legacy default
     default_context = MODEL_CONTEXT_SIZES["default"]
     logger.warning(
-        "Using default context size for unknown model %s: %d tokens",
+        "Using legacy default context size for unknown model %s: %d tokens",
         model_name,
         default_context,
     )
@@ -571,6 +905,7 @@ def get_context_size_summary(model_name: str, ollama_url: str = OLLAMA_URL) -> s
 
 # Model parameter functions
 
+
 def get_env_parameter_overrides_for_model(model_name: str) -> Dict[str, Any]:
     """
     Check for environment variable overrides for model parameters.
@@ -584,17 +919,17 @@ def get_env_parameter_overrides_for_model(model_name: str) -> Dict[str, Any]:
     # Convert model name to env var format
     # qwen3:1.7b -> QWEN3_1_7B
     env_name = model_name.upper().replace(":", "_").replace(".", "_").replace("-", "_")
-    
+
     overrides = {}
-    
+
     # Check for specific parameter overrides
     param_mappings = {
         "TEMPERATURE": "temperature",
-        "TOP_P": "top_p", 
+        "TOP_P": "top_p",
         "TOP_K": "top_k",
         "REPETITION_PENALTY": "repetition_penalty",
     }
-    
+
     for env_suffix, param_name in param_mappings.items():
         env_var = f"{env_name}_{env_suffix}"
         override_value = get_env_var(env_var)
@@ -606,17 +941,20 @@ def get_env_parameter_overrides_for_model(model_name: str) -> Dict[str, Any]:
                     overrides[param_name] = float(override_value)
             except ValueError:
                 logger.warning(
-                    "Invalid %s override for %s: %s", param_name, model_name, override_value
+                    "Invalid %s override for %s: %s",
+                    param_name,
+                    model_name,
+                    override_value,
                 )
-    
+
     # Also check for general default overrides
     general_mappings = {
         "DEFAULT_TEMPERATURE": "temperature",
         "DEFAULT_TOP_P": "top_p",
-        "DEFAULT_TOP_K": "top_k", 
+        "DEFAULT_TOP_K": "top_k",
         "DEFAULT_REPETITION_PENALTY": "repetition_penalty",
     }
-    
+
     for env_var, param_name in general_mappings.items():
         if param_name not in overrides:  # Don't override specific model settings
             general_override = get_env_var(env_var)
@@ -630,7 +968,7 @@ def get_env_parameter_overrides_for_model(model_name: str) -> Dict[str, Any]:
                     logger.warning(
                         "Invalid default %s override: %s", param_name, general_override
                     )
-    
+
     return overrides
 
 
@@ -653,11 +991,11 @@ def get_model_parameters(model_name: str) -> Tuple[ModelParameters, str]:
 
     # 1. Check environment variable overrides first
     env_overrides = get_env_parameter_overrides_for_model(model_name)
-    
+
     # 2. Look up in our curated database
     base_params = None
     detection_method = "default_fallback"
-    
+
     # First try the original model name (for case-sensitive models like HuggingFace)
     if model_name in MODEL_PARAMETERS:
         base_params = MODEL_PARAMETERS[model_name]
@@ -674,17 +1012,19 @@ def get_model_parameters(model_name: str) -> Tuple[ModelParameters, str]:
             # Use default fallback
             base_params = MODEL_PARAMETERS["default"]
             logger.warning("Using default parameters for unknown model %s", model_name)
-    
+
     # 3. Apply environment overrides if any
     if env_overrides:
-        logger.info("Applying environment overrides for %s: %s", model_name, env_overrides)
+        logger.info(
+            "Applying environment overrides for %s: %s", model_name, env_overrides
+        )
         # Create new parameters with overrides applied
         params_dict = base_params.to_dict()
         params_dict.update(env_overrides)
         final_params = ModelParameters(**params_dict)
         detection_method = "environment_override" if env_overrides else detection_method
         return final_params, detection_method
-    
+
     return base_params, detection_method
 
 
@@ -702,7 +1042,9 @@ def get_model_parameters_dict(model_name: str) -> Dict[str, Any]:
     return params.to_dict()
 
 
-def add_model_parameters_to_database(model_name: str, parameters: ModelParameters) -> None:
+def add_model_parameters_to_database(
+    model_name: str, parameters: ModelParameters
+) -> None:
     """
     Add a new model's parameters to the parameter database.
 
@@ -712,9 +1054,7 @@ def add_model_parameters_to_database(model_name: str, parameters: ModelParameter
     """
     normalized_name = normalize_model_name(model_name)
     MODEL_PARAMETERS[normalized_name] = parameters
-    logger.info(
-        "Added model %s to parameter database: %s", normalized_name, parameters
-    )
+    logger.info("Added model %s to parameter database: %s", normalized_name, parameters)
 
 
 def list_supported_model_parameters() -> Dict[str, ModelParameters]:
@@ -740,10 +1080,10 @@ def get_model_config_summary(model_name: str, ollama_url: str = OLLAMA_URL) -> s
     """
     # Get context size info
     context_size, context_method = get_model_context_size_sync(model_name, ollama_url)
-    
+
     # Get parameter info
     parameters, param_method = get_model_parameters(model_name)
-    
+
     method_descriptions = {
         "environment_override": "Environment variable override",
         "ollama_api": "Ollama API query",
@@ -751,10 +1091,10 @@ def get_model_config_summary(model_name: str, ollama_url: str = OLLAMA_URL) -> s
         "database_lookup": "Curated database lookup",
         "default_fallback": "Default fallback (unknown model)",
     }
-    
+
     context_method_desc = method_descriptions.get(context_method, context_method)
     param_method_desc = method_descriptions.get(param_method, param_method)
-    
+
     return f"""Model: {model_name}
 Context Size: {context_size:,} tokens (Detection: {context_method_desc})
 Parameters:
@@ -765,7 +1105,9 @@ Parameters:
   (Detection: {param_method_desc})"""
 
 
-def get_model_config_dict(model_name: str, ollama_url: str = OLLAMA_URL) -> Dict[str, Any]:
+def get_model_config_dict(
+    model_name: str, ollama_url: str = OLLAMA_URL
+) -> Dict[str, Any]:
     """
     Get complete model configuration as a dictionary.
 
@@ -778,7 +1120,7 @@ def get_model_config_dict(model_name: str, ollama_url: str = OLLAMA_URL) -> Dict
     """
     context_size, context_method = get_model_context_size_sync(model_name, ollama_url)
     parameters, param_method = get_model_parameters(model_name)
-    
+
     return {
         "model_name": model_name,
         "context_size": context_size,
