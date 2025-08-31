@@ -32,10 +32,10 @@ def test_qwen_parameters():
     ]
     
     expected_qwen_params = {
-        "temperature": 0.7,
-        "top_p": 0.8,
-        "top_k": 20,
-        "repetition_penalty": 1.05
+        "temperature": 0.6,  # Actual value from your Ollama models
+        "top_p": 0.95,       # Actual value from your Ollama models
+        "top_k": 20,         # Same as originally suggested
+        "repetition_penalty": 1.0  # Actual value from your Ollama models
     }
     
     for model in qwen_models:

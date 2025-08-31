@@ -13,8 +13,7 @@ from agno.models.ollama import Ollama  # Use regular Ollama instead of OllamaToo
 from agno.models.openai import OpenAIChat
 
 from ..config import settings
-from ..config.model_contexts import get_model_context_size_sync
-from ..config.settings import get_qwen_instruct_settings, get_qwen_thinking_settings
+from ..config.model_contexts import get_model_parameters_dict
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -117,93 +116,69 @@ class AgentModelManager:
 
                 return model
         elif self.model_provider == "ollama":
-            # Get dynamic context size for this model
-            context_size, detection_method = get_model_context_size_sync(
-                self.model_name, self.ollama_base_url
-            )
+            # Get unified model configuration (parameters + context size)
+            model_config = get_model_parameters_dict(self.model_name)
 
             logger.info(
-                "Using context size %d for model %s (detected via: %s)",
-                context_size,
+                "Using unified model configuration for %s: %s",
                 self.model_name,
-                detection_method,
+                model_config,
             )
 
-            # Use standard configuration for other models
+            # Build model options from unified configuration
             model_options = {
-                "num_ctx": context_size,  # Use dynamically detected context window
-                "temperature": 0.3,  # Optional: set temperature for consistency
+                "num_ctx": model_config.get("context_size", 4096),
+                "temperature": model_config.get("temperature", 0.7),
+                "top_k": model_config.get("top_k", 40),
+                "top_p": model_config.get("top_p", 0.9),
+                "repeat_penalty": model_config.get("repetition_penalty", 1.0),
                 "num_predict": -1,  # Allow unlimited prediction length
-                "top_k": 40,
-                "top_p": 0.9,
-                "repeat_penalty": 1.1,
                 "seed": self.seed,
             }
 
-            # Special handling for qwen models with optimized parameters
+            # Special handling for Qwen models - add min_p and adjust num_predict
             if "qwen" in self.model_name.lower():
                 logger.info(
-                    "Using optimized configuration for Qwen model: %s",
+                    "Applying Qwen-specific optimizations for model: %s",
                     self.model_name,
                 )
+                model_options.update(
+                    {
+                        "num_predict": 32768,  # Set specific prediction length for Qwen
+                        "min_p": 0,  # Qwen-specific parameter
+                    }
+                )
 
-                # Get Qwen settings from configuration
-                try:
-                    qwen_settings = get_qwen_instruct_settings()
-
-                    model_options.update(
-                        {
-                            "num_predict": 32768,  # Set specific prediction length for qwen
-                            "temperature": qwen_settings["temperature"],
-                            "top_k": qwen_settings["top_k"],
-                            "top_p": qwen_settings["top_p"],
-                            "min_p": qwen_settings["min_p"],
-                            "repeat_penalty": 1.1,
-                        }
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to load Qwen settings, using defaults: {e}")
-                    # Fallback to original hardcoded values
-                    model_options.update(
-                        {
-                            "num_predict": 32768,
-                            "temperature": 0.3,
-                            "top_k": 20,
-                            "top_p": 0.95,
-                            "min_p": 0,
-                            "repeat_penalty": 1.1,
-                        }
-                    )
-
+            # Special handling for Llama 3.x models - add stop tokens
+            """
             if (
                 "llama3.1" in self.model_name.lower()
                 or "llama3.2" in self.model_name.lower()
                 or "llama3.3" in self.model_name.lower()
             ):
                 logger.info(
-                    "Using optimized configuration for Llama 3.x model: %s",
+                    "Applying Llama 3.x-specific optimizations for model: %s",
                     self.model_name,
                 )
-                model_options.update(
-                    {
-                        "stop": [
-                            "<|start_header_id|>",
-                            "<|end_header_id|>",
-                            "<|eot_id|>",
-                        ],
-                    }
-                )
-
+                model_options.update({
+                    "stop": [
+                        "<|start_header_id|>",
+                        "<|end_header_id|>",
+                        "<|eot_id|>",
+                    ],
+                })
+            """
             # Add reasoning support for compatible models
             reasoning_models = [
                 "o1",
                 "o1-preview",
                 "o1-mini",  # OpenAI reasoning models
                 "qwen3:8b",
-                "qwen3:1.7b",  # Fixed: lowercase 'b' to match model_contexts.py
+                "qwen3:1.7b",
                 "qwen3:4b",
-                "qwen3-4b-instruct",  # New Qwen model variants
-                "hf.co/unsloth/qwen3-4b-instruct",  # HuggingFace Qwen model from settings
+                "qwen3-4b-instruct",  # Qwen model variants
+                "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:Q4_K_M",
+                "hf.co/unsloth/qwen3-4b-instruct",  # HuggingFace Qwen models
                 "qwq",  # Qwen reasoning models
                 "deepseek-r1",
                 "deepseek-reasoner",  # DeepSeek reasoning models
@@ -218,6 +193,9 @@ class AgentModelManager:
                 reasoning_model in self.model_name.lower()
                 for reasoning_model in reasoning_models
             )
+
+            if model_supports_reasoning:
+                logger.info(f"Model {self.model_name} supports reasoning capabilities")
 
             model = Ollama(
                 id=self.model_name,
