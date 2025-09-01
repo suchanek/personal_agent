@@ -142,11 +142,10 @@ class User:
                     f"Birth date cannot be in the future: {self.birth_date}"
                 )
 
-            # Check if the date is reasonable (not more than 150 years ago)
-            min_birth_year = datetime.now().year - 150
-            if birth_datetime.year < min_birth_year:
+            # Allow dates back to year 1 AD (no year 0 in Gregorian calendar)
+            if birth_datetime.year < 1:
                 raise ValueError(
-                    f"Birth date cannot be more than 150 years ago: {self.birth_date}"
+                    f"Birth date cannot be before year 1 AD: {self.birth_date}"
                 )
 
             return True
