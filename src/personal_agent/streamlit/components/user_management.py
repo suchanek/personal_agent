@@ -82,6 +82,8 @@ def _render_user_overview():
                         st.write(f"User ID: {user['user_id']}")
                         st.write(f"Name: {user['user_name']}")
                         st.write(f"Type: {user['user_type']}")
+                        st.write(f"Birth Date: {user.get('birth_date', 'Not set')}")
+                        st.write(f"Delta Year: {user.get('delta_year', 'Not set')}")
                         st.write(f"Created: {user.get('created_at', 'N/A')}")
                         st.write(f"Last Seen: {user.get('last_seen', 'N/A')}")
                     
@@ -142,6 +144,8 @@ def _render_profile_management():
                         st.write(f"Email: {user_details.get('email', 'Not set')}")
                         st.write(f"Phone: {user_details.get('phone', 'Not set')}")
                         st.write(f"Address: {user_details.get('address', 'Not set')}")
+                        st.write(f"Birth Date: {user_details.get('birth_date', 'Not set')}")
+                        st.write(f"Delta Year: {user_details.get('delta_year', 'Not set')}")
                         st.write(f"Cognitive State: {user_details.get('cognitive_state', 50)}/100")
                     
                     with col2:
@@ -227,6 +231,56 @@ def _render_profile_management():
                             except Exception as e:
                                 st.error(f"Error updating cognitive state: {str(e)}")
                     
+                    # Birth Date and Delta Year Form
+                    with st.form("update_birth_delta_form"):
+                        st.write("**Birth Date & Memory Context**")
+                        
+                        current_birth_date = user_details.get('birth_date', '')
+                        new_birth_date = st.date_input("Birth Date", 
+                                                      value=datetime.fromisoformat(current_birth_date).date() if current_birth_date else None,
+                                                      min_value=datetime(1, 1, 1).date(),
+                                                      max_value=datetime.now().date(),
+                                                      help="User's birth date (YYYY-MM-DD format) - supports dates back to 1 AD")
+                        
+                        current_delta_year = user_details.get('delta_year')
+                        new_delta_year = st.number_input("Delta Year", 
+                                                        min_value=0, 
+                                                        max_value=150, 
+                                                        value=current_delta_year if current_delta_year is not None else 0,
+                                                        help="Years from birth when writing memories (e.g., 6 for writing as 6-year-old)")
+                        
+                        # Show calculated memory year if both fields are set
+                        if new_birth_date and new_delta_year > 0:
+                            memory_year = new_birth_date.year + new_delta_year
+                            st.info(f"Memory context year: {memory_year}")
+                        
+                        birth_delta_submitted = st.form_submit_button("Update Birth Date & Delta Year")
+                        
+                        if birth_delta_submitted:
+                            try:
+                                # Convert date to ISO string format
+                                birth_date_str = new_birth_date.isoformat() if new_birth_date else None
+                                delta_year_val = new_delta_year if new_delta_year > 0 else None
+                                
+                                result = update_user_profile(
+                                    selected_user,
+                                    birth_date=birth_date_str,
+                                    delta_year=delta_year_val
+                                )
+                                
+                                if result['success']:
+                                    st.success("Birth date and delta year updated successfully!")
+                                    if result.get('updated_fields'):
+                                        st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update birth date and delta year")
+                                    if result.get('errors'):
+                                        for error in result['errors']:
+                                            st.error(f"❌ {error}")
+                            except Exception as e:
+                                st.error(f"Error updating birth date and delta year: {str(e)}")
+                    
                     # Basic Info Form
                     with st.form("update_basic_form"):
                         st.write("**Basic Information**")
@@ -299,10 +353,27 @@ def _render_create_user():
         address = st.text_area("Address", 
                               help="User's address")
         
+        birth_date = st.date_input("Birth Date", 
+                                  value=None,
+                                  min_value=datetime(1, 1, 1).date(),
+                                  max_value=datetime.now().date(),
+                                  help="User's birth date (YYYY-MM-DD format) - supports dates back to 1 AD")
+        
+        delta_year = st.number_input("Delta Year", 
+                                    min_value=0, 
+                                    max_value=150, 
+                                    value=0,
+                                    help="Years from birth when writing memories (e.g., 6 for writing as 6-year-old)")
+        
+        # Show calculated memory year if both fields are set
+        if birth_date and delta_year > 0:
+            memory_year = birth_date.year + delta_year
+            st.info(f"Memory context year: {memory_year}")
+        
         cognitive_state = st.slider("Cognitive State", 
                                    min_value=0, 
                                    max_value=100, 
-                                   value=50,
+                                   value=100,
                                    help="User's cognitive state on a scale of 0-100")
         
         st.write("**System Options**")
@@ -327,6 +398,8 @@ def _render_create_user():
                     email=email if email else None,
                     phone=phone if phone else None,
                     address=address if address else None,
+                    birth_date=birth_date.isoformat() if birth_date else None,
+                    delta_year=delta_year if delta_year > 0 else None,
                     cognitive_state=cognitive_state,
                     create_docker=create_docker
                 )

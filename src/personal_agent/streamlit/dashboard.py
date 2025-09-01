@@ -113,22 +113,31 @@ def main():
     except ImportError:
         st.sidebar.caption("Personal Agent")
 
-    # Display current user - Fix the import issue
+    # Display current user using the agent status system
     try:
-        from personal_agent.config.user_id_mgr import get_userid
-
-        st.sidebar.caption(f"Current User: {get_userid()}")
-    except ImportError:
-        try:
-            # Fallback to the settings import
-            from personal_agent.config.user_id_mgr import get_userid
-
-            st.sidebar.caption(f"Current User: {get_userid()}")
-        except ImportError:
-            # Final fallback to environment variable
-            import os
-            user_id = os.getenv("USER_ID", "Unknown")
+        from personal_agent.streamlit.utils.agent_utils import get_agent_instance, check_agent_status
+        
+        agent = get_agent_instance()
+        if agent:
+            status = check_agent_status(agent)
+            user_id = status.get("user_id", "Unknown")
             st.sidebar.caption(f"Current User: {user_id}")
+        else:
+            # Fallback to direct user_id_mgr import if no agent
+            try:
+                from personal_agent.config.user_id_mgr import get_userid
+                st.sidebar.caption(f"Current User: {get_userid()}")
+            except ImportError:
+                # Final fallback to environment variable
+                import os
+                user_id = os.getenv("USER_ID", "Unknown")
+                st.sidebar.caption(f"Current User: {user_id}")
+    except Exception as e:
+        # Final fallback to environment variable
+        import os
+        user_id = os.getenv("USER_ID", "Unknown")
+        st.sidebar.caption(f"Current User: {user_id}")
+        st.sidebar.caption(f"⚠️ User detection error: {str(e)}")
 
     # Main content based on selected tab
     if selected_tab == "System Status":
