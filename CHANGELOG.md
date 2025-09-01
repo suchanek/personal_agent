@@ -7,6 +7,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.4dev0] - 2025-09-01
+
+### Added
+- **Age-Perspective Memory Writing**: Introduced `birth_date` and `delta_year` fields to the `User` model, enabling users to write memories from the perspective of a specific age. This includes a delta-year-aware timestamp system that adjusts the year of `last_seen` to reflect the chosen age, ensuring temporal consistency. See [ADR-079](./refs/adr/079-user-profile-birth-date-delta-year.md) for details.
+- **Comprehensive User Model Validation**: Implemented robust validation for the new `birth_date` and `delta_year` fields, including format checks, range limits, and cross-field validation to ensure the calculated "memory year" is not in the future.
+- **New Test Suite**: Added `test_birth_date_integration.py` to provide comprehensive testing for the new age-perspective memory writing functionality, including validation and timestamp logic.
+
+### Changed
+- **User Management Integration**: The new `birth_date` and `delta_year` fields have been fully integrated into the user management stack, including `UserManager`, `UserRegistry`, and Streamlit UI components and utilities.
+- **Profile Completeness**: The user profile completeness calculation now includes the `birth_date` and `delta_year` fields.
+
 ## [v0.2.3dev0 - 2025-08-26
 
 ### Added

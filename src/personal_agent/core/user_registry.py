@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from personal_agent.config import PERSAG_HOME, STORAGE_BACKEND
 from personal_agent.config.user_id_mgr import get_current_user_id, get_userid
+from .user_model import User
 
 
 class UserRegistry:
@@ -57,7 +58,9 @@ class UserRegistry:
             json.dump(registry, f, indent=2)
 
     def add_user(
-        self, user_id: str, user_name: str = None, user_type: str = "Standard"
+        self, user_id: str, user_name: str = None, user_type: str = "Standard",
+        email: str = None, phone: str = None, address: str = None, 
+        birth_date: str = None, delta_year: int = None, cognitive_state: int = 50
     ) -> bool:
         """
         Add a new user to the registry.
@@ -66,6 +69,12 @@ class UserRegistry:
             user_id: Unique user identifier
             user_name: Display name for the user (defaults to user_id)
             user_type: User type (Standard, Admin, Guest)
+            email: User's email address
+            phone: User's phone number
+            address: User's address
+            birth_date: User's birth date (YYYY-MM-DD format)
+            delta_year: Years from birth when writing memories (e.g., 6 for writing as 6-year-old)
+            cognitive_state: User's cognitive state (0-100 scale)
 
         Returns:
             True if user was added, False if user already exists
@@ -80,18 +89,26 @@ class UserRegistry:
             if user["user_id"] == user_id:
                 return False
 
-        # Add new user
-        new_user = {
-            "user_id": user_id,
-            "user_name": user_name or user_id,
-            "user_type": user_type,
-            "created_at": datetime.now().isoformat(),
-            "last_seen": datetime.now().isoformat(),
-        }
-
-        registry["users"].append(new_user)
-        self._save_registry(registry)
-        return True
+        # Create new user with dataclass
+        try:
+            new_user = User(
+                user_id=user_id,
+                user_name=user_name or user_id,
+                user_type=user_type,
+                email=email,
+                phone=phone,
+                address=address,
+                birth_date=birth_date,
+                delta_year=delta_year,
+                cognitive_state=cognitive_state
+            )
+            
+            registry["users"].append(new_user.to_dict())
+            self._save_registry(registry)
+            return True
+            
+        except ValueError as e:
+            raise ValueError(f"Invalid user data: {str(e)}")
 
     def get_all_users(self) -> List[Dict[str, Any]]:
         """
@@ -162,28 +179,39 @@ class UserRegistry:
 
     def update_user(self, user_id: str, **kwargs) -> bool:
         """
-        Update user information.
+        Update user information with validation.
 
         Args:
             user_id: User identifier
-            **kwargs: Fields to update (user_name, user_type, etc.)
+            **kwargs: Fields to update (user_name, user_type, email, phone, address, cognitive_state)
 
         Returns:
             True if user was updated, False if user not found
         """
         registry = self._load_registry()
 
-        for user in registry["users"]:
-            if user["user_id"] == user_id:
-                # Update allowed fields
-                allowed_fields = {"user_name", "user_type"}
-                for key, value in kwargs.items():
-                    if key in allowed_fields:
-                        user[key] = value
-
-                user["last_seen"] = datetime.now().isoformat()
-                self._save_registry(registry)
-                return True
+        for user_data in registry["users"]:
+            if user_data["user_id"] == user_id:
+                # Create User object from existing data for validation
+                try:
+                    user = User.from_dict(user_data)
+                    
+                    # Update fields using the User dataclass validation
+                    update_result = user.update_profile(**kwargs)
+                    
+                    if update_result["success"]:
+                        # Replace the user data in registry with updated version
+                        registry["users"][registry["users"].index(user_data)] = user.to_dict()
+                        self._save_registry(registry)
+                        return True
+                    else:
+                        # Validation failed
+                        error_msg = "; ".join(update_result["errors"])
+                        raise ValueError(f"User update validation failed: {error_msg}")
+                        
+                except ValueError as e:
+                    raise ValueError(f"Invalid user update: {str(e)}")
+        
         return False
 
     def user_exists(self, user_id: str) -> bool:
@@ -223,3 +251,74 @@ class UserRegistry:
         else:
             # Auto-register current user
             return self.add_user(current_user_id, current_user_id, "Admin")
+    
+    def get_user_object(self, user_id: str) -> Optional[User]:
+        """
+        Get a specific user as a User dataclass object.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            User object or None if not found
+        """
+        user_data = self.get_user(user_id)
+        if user_data:
+            return User.from_dict(user_data)
+        return None
+    
+    def get_all_user_objects(self) -> List[User]:
+        """
+        Get all users as User dataclass objects.
+
+        Returns:
+            List of User objects
+        """
+        registry = self._load_registry()
+        users = []
+        for user_data in registry.get("users", []):
+            try:
+                users.append(User.from_dict(user_data))
+            except Exception:
+                # Skip invalid user data but continue processing others
+                continue
+        return users
+    
+    def update_user_profile(self, user_id: str, **kwargs) -> Dict[str, Any]:
+        """
+        Update user profile with detailed validation results.
+
+        Args:
+            user_id: User identifier
+            **kwargs: Fields to update
+
+        Returns:
+            Dictionary with detailed update results
+        """
+        registry = self._load_registry()
+
+        for user_data in registry["users"]:
+            if user_data["user_id"] == user_id:
+                try:
+                    user = User.from_dict(user_data)
+                    update_result = user.update_profile(**kwargs)
+                    
+                    if update_result["success"]:
+                        # Replace the user data in registry with updated version
+                        registry["users"][registry["users"].index(user_data)] = user.to_dict()
+                        self._save_registry(registry)
+                    
+                    return update_result
+                    
+                except ValueError as e:
+                    return {
+                        "success": False,
+                        "updated_fields": [],
+                        "errors": [f"User data validation failed: {str(e)}"]
+                    }
+        
+        return {
+            "success": False,
+            "updated_fields": [],
+            "errors": [f"User '{user_id}' not found"]
+        }

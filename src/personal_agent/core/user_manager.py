@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 
 from .user_registry import UserRegistry
 from .lightrag_manager import LightRAGManager
+from .user_model import User
 
 
 class UserManager:
@@ -69,14 +70,22 @@ class UserManager:
         """
         return self.registry.get_user(user_id)
     
-    def create_user(self, user_id: str, user_name: str = None, user_type: str = "Standard") -> Dict[str, Any]:
+    def create_user(self, user_id: str, user_name: str = None, user_type: str = "Standard",
+                   email: str = None, phone: str = None, address: str = None, 
+                   birth_date: str = None, delta_year: int = None, cognitive_state: int = 50) -> Dict[str, Any]:
         """
-        Create a new user in the system.
+        Create a new user in the system with extended profile information.
         
         Args:
             user_id: Unique user identifier
             user_name: Display name for the user (defaults to user_id)
             user_type: User type (Standard, Admin, Guest)
+            email: User's email address
+            phone: User's phone number
+            address: User's address
+            birth_date: User's birth date (YYYY-MM-DD format)
+            delta_year: Years from birth when writing memories (e.g., 6 for writing as 6-year-old)
+            cognitive_state: User's cognitive state (0-100 scale)
             
         Returns:
             Dictionary containing result information
@@ -89,8 +98,8 @@ class UserManager:
             if not user_name:
                 user_name = user_id
             
-            # Add user to registry
-            if self.registry.add_user(user_id, user_name, user_type):
+            # Add user to registry with extended fields
+            if self.registry.add_user(user_id, user_name, user_type, email, phone, address, birth_date, delta_year, cognitive_state):
                 return {
                     "success": True,
                     "message": f"User '{user_id}' created successfully",
@@ -516,4 +525,145 @@ class UserManager:
             except Exception:
                 user_details["lightrag_status"] = {"error": "Could not get LightRAG status"}
         
+        # Add profile completion summary
+        try:
+            user_obj = self.registry.get_user_object(user_id)
+            if user_obj:
+                user_details["profile_summary"] = user_obj.get_profile_summary()
+        except Exception:
+            user_details["profile_summary"] = {"error": "Could not get profile summary"}
+        
         return user_details
+    
+    def get_user_object(self, user_id: str) -> Optional[User]:
+        """
+        Get a specific user as a User dataclass object.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            User object or None if not found
+        """
+        return self.registry.get_user_object(user_id)
+    
+    def update_user_profile(self, user_id: str, **kwargs) -> Dict[str, Any]:
+        """
+        Update user profile with detailed validation and results.
+        
+        Args:
+            user_id: User identifier
+            **kwargs: Profile fields to update (email, phone, address, cognitive_state, user_name, user_type)
+            
+        Returns:
+            Dictionary containing detailed update results
+        """
+        try:
+            result = self.registry.update_user_profile(user_id, **kwargs)
+            
+            if result["success"]:
+                result["message"] = f"User '{user_id}' profile updated successfully"
+                result["updated_fields_count"] = len(result["updated_fields"])
+            else:
+                result["message"] = f"Failed to update user '{user_id}' profile"
+            
+            return result
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "updated_fields": [],
+                "errors": [f"Error updating user profile: {str(e)}"],
+                "message": f"Error updating user '{user_id}' profile"
+            }
+    
+    def update_cognitive_state(self, user_id: str, cognitive_state: int) -> Dict[str, Any]:
+        """
+        Update a user's cognitive state with validation.
+        
+        Args:
+            user_id: User identifier
+            cognitive_state: New cognitive state (0-100)
+            
+        Returns:
+            Dictionary containing result information
+        """
+        return self.update_user_profile(user_id, cognitive_state=cognitive_state)
+    
+    def update_contact_info(self, user_id: str, email: str = None, phone: str = None, address: str = None) -> Dict[str, Any]:
+        """
+        Update a user's contact information.
+        
+        Args:
+            user_id: User identifier
+            email: New email address
+            phone: New phone number
+            address: New address
+            
+        Returns:
+            Dictionary containing result information
+        """
+        update_fields = {}
+        if email is not None:
+            update_fields["email"] = email
+        if phone is not None:
+            update_fields["phone"] = phone
+        if address is not None:
+            update_fields["address"] = address
+        
+        if not update_fields:
+            return {
+                "success": False,
+                "error": "No contact information provided to update"
+            }
+        
+        return self.update_user_profile(user_id, **update_fields)
+    
+    def get_user_profile_summary(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get a summary of user's profile completeness.
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            Dictionary with profile completion information
+        """
+        try:
+            user_obj = self.registry.get_user_object(user_id)
+            if not user_obj:
+                return {
+                    "success": False,
+                    "error": f"User '{user_id}' not found"
+                }
+            
+            summary = user_obj.get_profile_summary()
+            summary["success"] = True
+            summary["user_id"] = user_id
+            
+            return summary
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error getting profile summary: {str(e)}"
+            }
+    
+    def get_all_users_with_profiles(self) -> List[Dict[str, Any]]:
+        """
+        Get all users with their profile completion information.
+        
+        Returns:
+            List of user dictionaries with profile summaries
+        """
+        users = self.get_all_users()
+        
+        for user in users:
+            try:
+                user_obj = self.registry.get_user_object(user["user_id"])
+                if user_obj:
+                    user["profile_summary"] = user_obj.get_profile_summary()
+            except Exception:
+                user["profile_summary"] = {"error": "Could not get profile summary"}
+        
+        return users

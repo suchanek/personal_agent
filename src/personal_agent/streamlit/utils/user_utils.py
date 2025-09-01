@@ -58,22 +58,30 @@ def get_user_details(user_id: str) -> Dict[str, Any]:
         return {}
 
 
-def create_new_user(user_id: str, user_name: str, user_type: str, create_docker: bool = True) -> Dict[str, Any]:
+def create_new_user(user_id: str, user_name: str, user_type: str, create_docker: bool = True,
+                   email: str = None, phone: str = None, address: str = None, 
+                   birth_date: str = None, delta_year: int = None, cognitive_state: int = 50) -> Dict[str, Any]:
     """
-    Create a new user in the system.
+    Create a new user in the system with extended profile information.
     
     Args:
         user_id: Unique identifier for the user
         user_name: Display name for the user
         user_type: Type of user (Standard, Admin, Guest)
         create_docker: Whether to create Docker containers for this user
+        email: User's email address
+        phone: User's phone number
+        address: User's address
+        birth_date: User's birth date (YYYY-MM-DD format)
+        delta_year: Years from birth when writing memories (e.g., 6 for writing as 6-year-old)
+        cognitive_state: User's cognitive state (0-100 scale)
         
     Returns:
         Dictionary containing result information
     """
     try:
         user_manager = get_user_manager()
-        return user_manager.create_user(user_id, user_name, user_type)
+        return user_manager.create_user(user_id, user_name, user_type, email, phone, address, birth_date, delta_year, cognitive_state)
     except Exception as e:
         st.error(f"Error creating user: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -117,6 +125,117 @@ def delete_user(user_id: str, delete_data: bool = True, backup_data: bool = Fals
     except Exception as e:
         st.error(f"Error deleting user: {str(e)}")
         return {"success": False, "error": str(e)}
+
+
+def update_user_profile(user_id: str, **kwargs) -> Dict[str, Any]:
+    """
+    Update user profile with validation.
+    
+    Args:
+        user_id: ID of the user to update
+        **kwargs: Profile fields to update
+        
+    Returns:
+        Dictionary containing result information
+    """
+    try:
+        user_manager = get_user_manager()
+        return user_manager.update_user_profile(user_id, **kwargs)
+    except Exception as e:
+        st.error(f"Error updating user profile: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def update_cognitive_state(user_id: str, cognitive_state: int) -> Dict[str, Any]:
+    """
+    Update a user's cognitive state.
+    
+    Args:
+        user_id: ID of the user to update
+        cognitive_state: New cognitive state (0-100)
+        
+    Returns:
+        Dictionary containing result information
+    """
+    try:
+        user_manager = get_user_manager()
+        return user_manager.update_cognitive_state(user_id, cognitive_state)
+    except Exception as e:
+        st.error(f"Error updating cognitive state: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def update_contact_info(user_id: str, email: str = None, phone: str = None, address: str = None, birth_date: str = None, delta_year: int = None) -> Dict[str, Any]:
+    """
+    Update a user's contact information.
+    
+    Args:
+        user_id: ID of the user to update
+        email: New email address
+        phone: New phone number
+        address: New address
+        birth_date: New birth date (YYYY-MM-DD format)
+        delta_year: Years from birth when writing memories (e.g., 6 for writing as 6-year-old)
+        
+    Returns:
+        Dictionary containing result information
+    """
+    try:
+        user_manager = get_user_manager()
+        # Build update fields dictionary
+        update_fields = {}
+        if email is not None:
+            update_fields["email"] = email
+        if phone is not None:
+            update_fields["phone"] = phone
+        if address is not None:
+            update_fields["address"] = address
+        if birth_date is not None:
+            update_fields["birth_date"] = birth_date
+        if delta_year is not None:
+            update_fields["delta_year"] = delta_year
+        
+        if not update_fields:
+            return {"success": False, "error": "No contact information provided to update"}
+        
+        return user_manager.update_user_profile(user_id, **update_fields)
+    except Exception as e:
+        st.error(f"Error updating contact info: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def get_user_profile_summary(user_id: str) -> Dict[str, Any]:
+    """
+    Get a summary of user's profile completeness.
+    
+    Args:
+        user_id: ID of the user to get summary for
+        
+    Returns:
+        Dictionary with profile completion information
+    """
+    try:
+        user_manager = get_user_manager()
+        return user_manager.get_user_profile_summary(user_id)
+    except Exception as e:
+        st.error(f"Error getting profile summary: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def get_all_users_with_profiles() -> List[Dict[str, Any]]:
+    """
+    Get all users with their profile completion information.
+    
+    Returns:
+        List of user dictionaries with profile summaries
+    """
+    try:
+        user_manager = get_user_manager()
+        user_manager.ensure_current_user_registered()
+        return user_manager.get_all_users_with_profiles()
+    except Exception as e:
+        st.error(f"Error getting users with profiles: {str(e)}")
+        return []
 
 
 def get_user_activity(user_id: str) -> List[Dict[str, Any]]:

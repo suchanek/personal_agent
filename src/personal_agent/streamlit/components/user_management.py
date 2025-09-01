@@ -17,10 +17,15 @@ from datetime import datetime
 from personal_agent.core.docker.user_sync import DockerUserSync
 from personal_agent.streamlit.utils.user_utils import (
     get_all_users,
+    get_all_users_with_profiles,
     create_new_user,
     switch_user,
     get_user_details,
-    delete_user
+    delete_user,
+    update_user_profile,
+    update_cognitive_state,
+    update_contact_info,
+    get_user_profile_summary
 )
 
 
@@ -29,7 +34,7 @@ def user_management_tab():
     st.title("User Management")
     
     # Create tabs for different user management functions
-    tabs = st.tabs([" User Overview ", " Create User ", " Switch User ", " Delete User ", " User Settings "])
+    tabs = st.tabs([" User Overview ", " Create User ", " Profile Management ", " Switch User ", " Delete User ", " User Settings "])
     
     with tabs[0]:
         _render_user_overview()
@@ -38,17 +43,20 @@ def user_management_tab():
         _render_create_user()
     
     with tabs[2]:
-        _render_switch_user()
+        _render_profile_management()
     
     with tabs[3]:
-        _render_delete_user()
+        _render_switch_user()
     
     with tabs[4]:
+        _render_delete_user()
+    
+    with tabs[5]:
         _render_user_settings()
 
 
 def _render_user_overview():
-    """Display overview of all users."""
+    """Display overview of all users with enhanced profile information."""
     st.subheader("User Overview")
     
     # Add refresh button to manually refresh user list
@@ -60,13 +68,43 @@ def _render_user_overview():
             st.rerun()
     
     try:
-        # Get all users
-        users = get_all_users()
+        # Get all users with profile information
+        users = get_all_users_with_profiles()
         
         if users:
-            # Create a DataFrame for display
-            df = pd.DataFrame(users)
-            st.dataframe(df)
+            # Create enhanced display with profile completion
+            for user in users:
+                with st.expander(f"👤 {user['user_name']} ({user['user_id']})" + (" - Current User" if user.get('is_current') else "")):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.write("**Basic Info:**")
+                        st.write(f"User ID: {user['user_id']}")
+                        st.write(f"Name: {user['user_name']}")
+                        st.write(f"Type: {user['user_type']}")
+                        st.write(f"Created: {user.get('created_at', 'N/A')}")
+                        st.write(f"Last Seen: {user.get('last_seen', 'N/A')}")
+                    
+                    with col2:
+                        st.write("**Contact Info:**")
+                        st.write(f"Email: {user.get('email', 'Not set')}")
+                        st.write(f"Phone: {user.get('phone', 'Not set')}")
+                        st.write(f"Address: {user.get('address', 'Not set')}")
+                    
+                    with col3:
+                        st.write("**Profile Status:**")
+                        cognitive_state = user.get('cognitive_state', 50)
+                        st.write(f"Cognitive State: {cognitive_state}/100")
+                        st.progress(cognitive_state / 100)
+                        
+                        profile_summary = user.get('profile_summary', {})
+                        if profile_summary and not profile_summary.get('error'):
+                            completion = profile_summary.get('completion_percentage', 0)
+                            st.write(f"Profile Complete: {completion:.1f}%")
+                            st.progress(completion / 100)
+                            
+                            if profile_summary.get('missing_fields'):
+                                st.write(f"Missing: {', '.join(profile_summary['missing_fields'])}")
             
             # Display user count
             st.caption(f"Total Users: {len(users)}")
@@ -77,12 +115,170 @@ def _render_user_overview():
         st.error(f"Error loading user information: {str(e)}")
 
 
+def _render_profile_management():
+    """Interface for managing user profiles."""
+    st.subheader("Profile Management")
+    
+    try:
+        # Get all users
+        users = get_all_users()
+        user_ids = [user['user_id'] for user in users]
+        
+        if user_ids:
+            # User selection
+            selected_user = st.selectbox("Select User to Manage", user_ids)
+            
+            if selected_user:
+                # Get current user details
+                user_details = get_user_details(selected_user)
+                
+                if user_details:
+                    # Display current profile
+                    st.subheader(f"Current Profile: {user_details['user_name']}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("**Current Information:**")
+                        st.write(f"Email: {user_details.get('email', 'Not set')}")
+                        st.write(f"Phone: {user_details.get('phone', 'Not set')}")
+                        st.write(f"Address: {user_details.get('address', 'Not set')}")
+                        st.write(f"Cognitive State: {user_details.get('cognitive_state', 50)}/100")
+                    
+                    with col2:
+                        # Profile completion
+                        profile_summary = user_details.get('profile_summary', {})
+                        if profile_summary and not profile_summary.get('error'):
+                            completion = profile_summary.get('completion_percentage', 0)
+                            st.metric("Profile Completion", f"{completion:.1f}%")
+                            
+                            if profile_summary.get('missing_fields'):
+                                st.warning(f"Missing fields: {', '.join(profile_summary['missing_fields'])}")
+                    
+                    # Profile update forms
+                    st.subheader("Update Profile")
+                    
+                    # Contact Information Form
+                    with st.form("update_contact_form"):
+                        st.write("**Contact Information**")
+                        
+                        new_email = st.text_input("Email", 
+                                                 value=user_details.get('email', ''),
+                                                 help="User's email address")
+                        
+                        new_phone = st.text_input("Phone", 
+                                                 value=user_details.get('phone', ''),
+                                                 help="User's phone number")
+                        
+                        new_address = st.text_area("Address", 
+                                                  value=user_details.get('address', ''),
+                                                  help="User's address")
+                        
+                        contact_submitted = st.form_submit_button("Update Contact Info")
+                        
+                        if contact_submitted:
+                            try:
+                                result = update_contact_info(
+                                    selected_user,
+                                    email=new_email if new_email else None,
+                                    phone=new_phone if new_phone else None,
+                                    address=new_address if new_address else None
+                                )
+                                
+                                if result['success']:
+                                    st.success("Contact information updated successfully!")
+                                    if result.get('updated_fields'):
+                                        st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update contact information")
+                                    if result.get('errors'):
+                                        for error in result['errors']:
+                                            st.error(f"❌ {error}")
+                            except Exception as e:
+                                st.error(f"Error updating contact info: {str(e)}")
+                    
+                    # Cognitive State Form
+                    with st.form("update_cognitive_form"):
+                        st.write("**Cognitive State**")
+                        
+                        current_cognitive = user_details.get('cognitive_state', 50)
+                        new_cognitive = st.slider("Cognitive State", 
+                                                 min_value=0, 
+                                                 max_value=100, 
+                                                 value=current_cognitive,
+                                                 help="User's cognitive state on a scale of 0-100")
+                        
+                        st.write(f"Current: {current_cognitive} → New: {new_cognitive}")
+                        
+                        cognitive_submitted = st.form_submit_button("Update Cognitive State")
+                        
+                        if cognitive_submitted:
+                            try:
+                                result = update_cognitive_state(selected_user, new_cognitive)
+                                
+                                if result['success']:
+                                    st.success(f"Cognitive state updated to {new_cognitive}!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update cognitive state")
+                                    if result.get('errors'):
+                                        for error in result['errors']:
+                                            st.error(f"❌ {error}")
+                            except Exception as e:
+                                st.error(f"Error updating cognitive state: {str(e)}")
+                    
+                    # Basic Info Form
+                    with st.form("update_basic_form"):
+                        st.write("**Basic Information**")
+                        
+                        new_user_name = st.text_input("User Name", 
+                                                     value=user_details.get('user_name', ''),
+                                                     help="Display name for the user")
+                        
+                        new_user_type = st.selectbox("User Type", 
+                                                    ["Standard", "Admin", "Guest"],
+                                                    index=["Standard", "Admin", "Guest"].index(user_details.get('user_type', 'Standard')),
+                                                    help="Determines user permissions")
+                        
+                        basic_submitted = st.form_submit_button("Update Basic Info")
+                        
+                        if basic_submitted:
+                            try:
+                                result = update_user_profile(
+                                    selected_user,
+                                    user_name=new_user_name,
+                                    user_type=new_user_type
+                                )
+                                
+                                if result['success']:
+                                    st.success("Basic information updated successfully!")
+                                    if result.get('updated_fields'):
+                                        st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update basic information")
+                                    if result.get('errors'):
+                                        for error in result['errors']:
+                                            st.error(f"❌ {error}")
+                            except Exception as e:
+                                st.error(f"Error updating basic info: {str(e)}")
+                
+                else:
+                    st.warning(f"User '{selected_user}' not found.")
+        else:
+            st.info("No users available for profile management.")
+            
+    except Exception as e:
+        st.error(f"Error loading profile management: {str(e)}")
+
+
 def _render_create_user():
-    """Interface for creating a new user."""
+    """Interface for creating a new user with enhanced profile fields."""
     st.subheader("Create New User")
     
     # Form for creating a new user
     with st.form("create_user_form"):
+        st.write("**Basic Information**")
         user_id = st.text_input("User ID", 
                                help="Unique identifier for the user")
         
@@ -93,6 +289,23 @@ def _render_create_user():
                                 ["Standard", "Admin", "Guest"],
                                 help="Determines user permissions")
         
+        st.write("**Profile Information (Optional)**")
+        email = st.text_input("Email", 
+                              help="User's email address")
+        
+        phone = st.text_input("Phone", 
+                             help="User's phone number")
+        
+        address = st.text_area("Address", 
+                              help="User's address")
+        
+        cognitive_state = st.slider("Cognitive State", 
+                                   min_value=0, 
+                                   max_value=100, 
+                                   value=50,
+                                   help="User's cognitive state on a scale of 0-100")
+        
+        st.write("**System Options**")
         create_docker = st.checkbox("Create Docker Containers", 
                                    value=True,
                                    help="Create Docker containers for this user")
@@ -101,17 +314,32 @@ def _render_create_user():
         
         if submitted:
             try:
-                # Create the new user
+                # Validate required fields
+                if not user_id:
+                    st.error("User ID is required")
+                    return
+                
+                # Create the new user with enhanced profile
                 result = create_new_user(
                     user_id=user_id,
-                    user_name=user_name,
+                    user_name=user_name or user_id,
                     user_type=user_type,
+                    email=email if email else None,
+                    phone=phone if phone else None,
+                    address=address if address else None,
+                    cognitive_state=cognitive_state,
                     create_docker=create_docker
                 )
                 
                 if result['success']:
                     st.success(f"User '{user_id}' created successfully!")
                     st.info("You may need to restart Docker containers for changes to take effect.")
+                    
+                    # Show profile completion
+                    if email or phone or address:
+                        st.info("✅ User created with extended profile information")
+                    else:
+                        st.info("ℹ️ User created with basic information. You can add profile details later in the Profile Management tab.")
                 else:
                     st.error(f"Failed to create user: {result['error']}")
                     
