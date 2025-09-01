@@ -198,8 +198,8 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         repetition_penalty=1.0,
         context_size=32768,
     ),
-    "myaniu/qwen2.5-1m": ModelParameters(
-        temperature=0.5, top_p=0.95, context_size=1048576
+    "myaniu/qwen2.5-1m:latest": ModelParameters(
+        temperature=0.5, top_p=0.95, context_size=65535
     ),  # 1M context
     # Llama models - balanced parameters for instruction following
     "llama3.1:8b": ModelParameters(
@@ -409,7 +409,7 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
     ),
     # Default fallback parameters for unknown models
     "default": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=4096
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=8192
     ),
 }
 

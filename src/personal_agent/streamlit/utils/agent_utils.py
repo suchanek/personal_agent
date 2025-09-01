@@ -18,6 +18,101 @@ from agno.agent import Agent, RunResponse
 from agno.run.response import RunResponseEvent
 from agno.models.response import ToolExecution
 
+try:
+    import streamlit as st
+except ImportError:
+    # Fallback for non-Streamlit environments
+    st = None
+
+
+def get_agent_instance():
+    """
+    Get the current agent instance from Streamlit session state.
+    
+    This function handles both single agent and team modes, returning the appropriate
+    agent instance for use with StreamlitMemoryHelper and other utilities.
+    
+    Returns:
+        AgnoPersonalAgent or TeamWrapper: The current agent instance, or None if not available
+    """
+    if st is None:
+        return None
+        
+    # Check current mode from session state
+    agent_mode = st.session_state.get("agent_mode", "single")
+    
+    if agent_mode == "team":
+        # Team mode - return the team or team wrapper
+        team = st.session_state.get("team")
+        if team:
+            # Check if it's already a wrapper or needs wrapping
+            if hasattr(team, 'agno_memory') and hasattr(team, 'user_id'):
+                return team  # Already wrapped
+            else:
+                # Return the team directly - the helpers will handle wrapping
+                return team
+        return None
+    else:
+        # Single agent mode
+        return st.session_state.get("agent")
+
+
+def check_agent_status(agent):
+    """
+    Check the status of an agent instance and return comprehensive status information.
+    
+    Args:
+        agent: The agent instance to check (AgnoPersonalAgent, Team, or TeamWrapper)
+        
+    Returns:
+        dict: Status dictionary with keys:
+            - initialized: bool - Whether the agent is properly initialized
+            - memory_available: bool - Whether memory system is available
+            - user_id: str - The user ID associated with the agent
+            - error: str - Error message if any issues detected
+    """
+    status = {
+        "initialized": False,
+        "memory_available": False,
+        "user_id": None,
+        "error": None
+    }
+    
+    if agent is None:
+        status["error"] = "Agent instance is None"
+        return status
+    
+    try:
+        # Check if it's a team or single agent
+        if hasattr(agent, 'members'):
+            # Team mode
+            status["initialized"] = len(getattr(agent, 'members', [])) > 0
+            
+            # Check memory availability through team
+            if hasattr(agent, 'agno_memory'):
+                status["memory_available"] = agent.agno_memory is not None
+            elif hasattr(agent, 'members') and agent.members:
+                # Check first member (knowledge agent) for memory
+                knowledge_agent = agent.members[0]
+                status["memory_available"] = hasattr(knowledge_agent, 'agno_memory') and knowledge_agent.agno_memory is not None
+            
+            # Get user ID from team or first member
+            if hasattr(agent, 'user_id'):
+                status["user_id"] = agent.user_id
+            elif hasattr(agent, 'members') and agent.members and hasattr(agent.members[0], 'user_id'):
+                status["user_id"] = agent.members[0].user_id
+                
+        else:
+            # Single agent mode
+            status["initialized"] = getattr(agent, '_initialized', False)
+            status["memory_available"] = hasattr(agent, 'agno_memory') and agent.agno_memory is not None
+            status["user_id"] = getattr(agent, 'user_id', None)
+            
+    except Exception as e:
+        status["error"] = f"Error checking agent status: {str(e)}"
+    
+    return status
+
 
 def collect_streaming_response(run_stream: Iterator[RunResponseEvent]) -> List[RunResponseEvent]:
     """
