@@ -88,7 +88,10 @@ Note:
     complete setup instructions.
 
 Author: Personal Agent Team
-Version: 1.0.0
+Version: 0.2.4
+Last Revision: 2025-09-01 20:26:39
+Author: Eric G. Suchanek, PhD
+
 """
 
 # pylint: disable=C0415,W0212,C0301,W0718
@@ -102,8 +105,6 @@ from textwrap import dedent
 from typing import Optional
 
 from agno.agent import Agent
-from agno.memory.v2.db.sqlite import SqliteMemoryDb
-from agno.memory.v2.memory import Memory
 from agno.models.ollama.tools import OllamaTools
 from agno.models.openai import OpenAIChat
 from agno.team.team import Team
@@ -125,8 +126,6 @@ try:
     # Try relative imports first (when used as a module)
     from ..cli.command_parser import CommandParser
     from ..config.settings import (
-        AGNO_KNOWLEDGE_DIR,
-        AGNO_STORAGE_DIR,
         HOME_DIR,
         LLM_MODEL,
         LMSTUDIO_URL,
@@ -152,8 +151,6 @@ except ImportError:
 
     from personal_agent.cli.command_parser import CommandParser
     from personal_agent.config.settings import (
-        AGNO_KNOWLEDGE_DIR,
-        AGNO_STORAGE_DIR,
         HOME_DIR,
         LLM_MODEL,
         LMSTUDIO_URL,
@@ -164,10 +161,15 @@ except ImportError:
     from personal_agent.config.user_id_mgr import get_userid
     from personal_agent.core.agent_model_manager import AgentModelManager
     from personal_agent.core.agno_agent import AgnoPersonalAgent
+    from personal_agent.tools.personal_agent_tools import (
+        PersonalAgentFilesystemTools,
+        PersonalAgentSystemTools,
+    )
     from personal_agent.utils import setup_logging
 
 WRITER_MODEL = "llama3.1:8b"
 CODING_MODEL = "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest"
+SYSTEM_MODEL = "qwen3:1.7b"
 
 # Load environment variables
 load_dotenv()
@@ -175,8 +177,6 @@ load_dotenv()
 # Configure logging
 
 logger = setup_logging(__name__)
-
-cwd = Path(__file__).parent.resolve()
 
 PROVIDER = "ollama"
 
@@ -578,7 +578,7 @@ Conclusion about {topic}."""
 
 
 def create_writer_agent(
-    model_provider: str = "ollama",
+    model_provider: str = PROVIDER,
     model_name: str = WRITER_MODEL,
     ollama_base_url: str = OLLAMA_URL,
     debug: bool = False,
@@ -598,24 +598,16 @@ def create_writer_agent(
     writing_tools = WritingTools()
 
     # Use provided model_name or fall back to WRITER_MODEL default
-    effective_model = model_name if model_name else WRITER_MODEL
+    effective_model = WRITER_MODEL
 
     agent = Agent(
         name="Writer Agent",
         role="Create written content in the requested tone and style",
         model=create_model(
-            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+            provider=model_provider, model_name=effective_model, use_remote=use_remote
         ),
         debug_mode=debug,
-        tools=[
-            writing_tools,
-            FileTools(
-                base_dir=Path(HOME_DIR),
-                save_files=True,
-                read_files=True,
-                list_files=True,
-            ),
-        ],  # File tools for reading/writing documents
+        tools=[writing_tools],  # Use the instance, not the class
         instructions=[
             "You are a versatile writer who can create content on any topic.",
             "When given a topic, write engaging and informative content in the requested format and style.",
@@ -634,7 +626,7 @@ def create_writer_agent(
 
 
 def create_image_agent(
-    model_provider: str = "ollama",
+    model_provider: str = PROVIDER,
     model_name: str = None,
     debug: bool = False,
     use_remote: bool = False,
@@ -649,15 +641,15 @@ def create_image_agent(
     """
 
     # Use provided model_name or fall back to LLM_MODEL default
-    effective_model = model_name if model_name else LLM_MODEL
+    effective_model = model_name if model_name else SYSTEM_MODEL
 
     agent = Agent(
         name="Image Agent",
         role="Create images using DALL-E based on text descriptions with comprehensive error handling",
         model=create_model(
-            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+            provider=model_provider, model_name=effective_model, use_remote=use_remote
         ),
-        debug_mode=True,  # Always enable debug mode for better error tracking
+        debug_mode=debug,  # Always enable debug mode for better error tracking
         tools=[
             DalleTools(model="dall-e-3", size="1792x1024", quality="hd", style="vivid"),
         ],
@@ -698,19 +690,23 @@ def create_agents(
             "Search the web for information based on the input. Always include sources"
         ],
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     # System agent using PersonalAgentSystemTools
     system_agent = Agent(
         name="SystemAgent",
         role="Execute system commands and shell operations",
-        # model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=SYSTEM_MODEL, use_remote=use_remote
+        ),
         tools=[PersonalAgentSystemTools(shell_command=True)],
         instructions=[
             "You are a system agent that can execute shell commands safely.",
             "Provide clear output and error messages from command execution.",
         ],
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     # Finance agent using Ollama
@@ -730,6 +726,7 @@ def create_agents(
         ],
         instructions=["Use tables to display data. "],
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     # Medical agent that can search PubMed
@@ -747,12 +744,11 @@ def create_agents(
             "Use tables to display data.",
         ],
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     # Writer agent using Ollama
-    writer_agent = create_writer_agent(
-        model_name=effective_model, use_remote=use_remote
-    )
+    writer_agent = create_writer_agent(model_name=WRITER_MODEL, use_remote=use_remote)
 
     # Image agent using DALL-E
     image_agent = create_image_agent(model_name=effective_model, use_remote=use_remote)
@@ -760,7 +756,9 @@ def create_agents(
     # Calculator agent using Ollama
     calculator_agent = Agent(
         name="Calculator Agent",
-        # model=create_model(provider=PROVIDER, use_remote=use_remote),
+        model=create_model(
+            provider=PROVIDER, model_name=SYSTEM_MODEL, use_remote=use_remote
+        ),
         role="Calculate mathematical expressions",
         tools=[
             CalculatorTools(
@@ -775,6 +773,7 @@ def create_agents(
             ),
         ],
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     python_agent = Agent(
@@ -799,13 +798,14 @@ def create_agents(
         ],
         instructions=dedent(_code_instructions),
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     file_agent = Agent(
         name="File System Agent",
-        # model=create_model(
-        #    provider=PROVIDER, model_name=effective_model, use_remote=use_remote
-        # ),
+        model=create_model(
+            provider=PROVIDER, model_name=effective_model, use_remote=use_remote
+        ),
         role="Read and write files in the system",
         tools=[
             FileTools(
@@ -819,6 +819,7 @@ def create_agents(
         ],
         instructions=dedent(_file_instructions),
         show_tool_calls=True,
+        debug_mode=debug,
     )
 
     return (
@@ -1048,6 +1049,8 @@ async def create_team(use_remote: bool = False, model_name: str = None):
         instructions=[
             "You are a team of agents using local Ollama models that can answer a variety of questions.",
             "Your primary goal is to collect user memories and factual knowledge.",
+            "You are empathetic and caring. If the user talks about their feelings transfer to the Personal AI Agent.",
+            "Greet the user by name and be friendly and engaging!",
             "DELEGATION RULES:",
             "- For storing poems, articles, documents, or factual content -> delegate to Personal AI Agent",
             "- For storing personal info about the user -> delegate to Personal AI Agent",
@@ -1085,6 +1088,7 @@ async def create_team(use_remote: bool = False, model_name: str = None):
             "You can also answer directly, you don't HAVE to forward the question to a member agent.",
             "Reason about more complex questions before delegating to a member agent.",
             "If the user is only being conversational, encourage them to talk about themselves, life events, and feelings.",
+            "Display the results of your agents when they return them to you.",
         ],
         markdown=True,
         show_members_responses=True,

@@ -211,7 +211,6 @@ categories:
     - running
     - swimming
     - cycling
-    - fishing
     - gardening
     - knitting
     - sewing
@@ -434,6 +433,282 @@ categories:
     - foe
     - adversary
     - antagonist
+  journal:
+    - journal
+    - journaling
+    - diary
+    - daily entry
+    - reflection
+    - thoughts
+    - writing
+    - personal writing
+    - daily thoughts
+    - record
+    - log
+    - notebook
+    - entries
+    - daily log
+    - personal record
+    - memoir
+    - chronicle
+    - documentation
+    - daily reflection
+    - introspection
+    - self-reflection
+    - morning pages
+    - gratitude journal
+    - bullet journal
+    - digital journal
+    - handwritten
+    - private thoughts
+    - personal notes
+    - life events
+    - experiences
+    - memories
+    - observations
+    - insights
+    - feelings journal
+    - mood tracking
+    - progress tracking
+    - habit tracking
+    - goal tracking
+    - daily routine
+    - mindfulness
+    - meditation journal
+    - travel journal
+    - dream journal
+    - food journal
+    - exercise journal
+    - work journal
+    - creative writing
+    - stream of consciousness
+    - therapeutic writing
+    - emotional processing
+    - self-discovery
+    - personal growth
+    - life documentation
+    - storytelling
+    - narrative
+    - autobiography
+  self_harm_risk:
+    - suicide
+    - suicidal
+    - kill myself
+    - end my life
+    - hurt myself
+    - harm myself
+    - self harm
+    - self-harm
+    - cutting
+    - overdose
+    - pills
+    - jump
+    - bridge
+    - rope
+    - gun
+    - knife
+    - blade
+    - razor
+    - worthless
+    - hopeless
+    - pointless
+    - burden
+    - better off dead
+    - disappear
+    - vanish
+    - unbearable
+    - cant take it
+    - give up
+    - done
+    - finished
+    - over
+    - goodbye
+    - farewell
+    - hate myself
+    - useless
+    - failure
+    - alone
+    - lonely
+    - isolated
+    - abandoned
+    - rejected
+    - unwanted
+    - unloved
+    - empty
+    - numb
+    - broken
+    - destroyed
+    - ruined
+    - lost
+    - trapped
+    - stuck
+    - helpless
+    - powerless
+    - pathetic
+    - disgusting
+    - stupid
+    - idiot
+    - loser
+    - freak
+    - crazy
+    - insane
+    - purge
+    - starve
+    - restrict
+    - binge
+    - deserve pain
+    - deserve death
+    - deserve nothing
+    - deserve punishment
+    - no point
+    - no hope
+    - no future
+    - cant go on
+    - tired of living
+    - want to die
+    - wish i was dead
+    - everyone hates me
+    - nobody cares
+    - world without me
+    - make it stop
+    - end the pain
+    - final solution
+    - permanent solution
+    - escape forever
+    - never wake up
+    - go to sleep forever
+    - join them
+    - be with them
+    - reunite
+    - peace at last
+    - relief
+    - freedom from pain
+    - no more suffering
+    - cant handle this
+    - too much pain
+    - overwhelming
+    - drowning
+    - suffocating
+    - choking
+    - gasping
+    - struggling
+    - fighting
+    - losing
+    - defeated
+    - surrendering
+    - giving in
+    - letting go
+    - releasing
+    - departing
+    - leaving
+    - saying goodbye
+    - final words
+    - last message
+    - goodbye cruel world
+    - this is it
+    - the end
+    - game over
+    - lights out
+    - fade away
+    - disappear forever
+    - vanish completely
+    - erase myself
+    - delete myself
+    - remove myself
+    - eliminate myself
+    - destroy myself
+    - annihilate myself
+    - obliterate myself
+    - extinguish myself
+    - snuff out
+    - blow out
+    - turn off
+    - shut down
+    - power down
+    - log off
+    - sign out
+    - check out
+    - clock out
+    - punch out
+    - time out
+    - game over
+    - mission complete
+    - task finished
+    - job done
+    - work complete
+    - duty fulfilled
+    - obligation met
+    - responsibility discharged
+    - burden lifted
+    - weight removed
+    - pressure released
+    - tension relieved
+    - stress eliminated
+    - anxiety gone
+    - fear vanished
+    - worry disappeared
+    - concern erased
+    - doubt removed
+    - uncertainty eliminated
+    - confusion cleared
+    - chaos ended
+    - disorder stopped
+    - turmoil ceased
+    - upheaval finished
+    - disruption concluded
+    - disturbance terminated
+    - interference ended
+    - obstruction removed
+    - barrier eliminated
+    - obstacle cleared
+    - impediment gone
+    - hindrance vanished
+    - blockage removed
+    - restriction lifted
+    - limitation eliminated
+    - constraint removed
+    - restraint released
+    - confinement ended
+    - imprisonment terminated
+    - captivity concluded
+    - bondage finished
+    - slavery ended
+    - servitude terminated
+    - subjugation concluded
+    - oppression finished
+    - suppression ended
+    - repression terminated
+    - compression concluded
+    - depression finished
+    - recession ended
+    - regression terminated
+    - retrogression concluded
+    - deterioration finished
+    - degradation ended
+    - degeneration terminated
+    - decay concluded
+    - decomposition finished
+    - disintegration ended
+    - dissolution terminated
+    - destruction concluded
+    - demolition finished
+    - annihilation ended
+    - obliteration terminated
+    - extermination concluded
+    - elimination finished
+    - eradication ended
+    - extirpation terminated
+    - expunction concluded
+    - erasure finished
+    - deletion ended
+    - removal terminated
+    - extraction concluded
+    - withdrawal finished
+    - retreat ended
+    - retirement terminated
+    - resignation concluded
+    - abdication finished
+    - renunciation ended
 
 phrases:
   academic:
@@ -609,3 +884,70 @@ phrases:
     - my rival
     - is my rival
     - rival named
+  journal:
+    - write in my journal
+    - journal entry
+    - daily journal
+    - keep a journal
+    - journaling practice
+    - wrote in my diary
+    - personal diary
+    - reflection time
+    - morning journaling
+    - evening reflection
+    - gratitude practice
+    - bullet journaling
+    - journal writing
+    - private thoughts
+    - record my thoughts
+    - document my day
+    - write down my feelings
+    - capture memories
+    - track my progress
+    - daily reflection
+    - therapeutic writing
+    - mindful journaling
+    - stream of consciousness
+    - creative journaling
+    - travel journaling
+    - dream recording
+    - mood journaling
+    - habit journaling
+    - goal journaling
+    - personal growth journal
+    - self-discovery writing
+    - life documentation
+    - memory keeping
+    - thought recording
+    - experience logging
+    - insight capturing
+    - emotional processing
+    - mindfulness practice
+    - meditation notes
+    - gratitude writing
+    - progress tracking
+    - daily routine log
+    - personal narrative
+    - life story writing
+    - autobiographical writing
+  self_harm_risk:
+    - want to hurt myself
+    - want to kill myself
+    - want to end my life
+    - want to die
+    - hurt myself
+    - kill myself
+    - end my life
+    - harm myself
+    - cut myself
+    - i want to hurt myself
+    - i want to kill myself
+    - i want to end my life
+    - i want to die
+    - thinking about suicide
+    - thinking about killing myself
+    - thinking about hurting myself
+    - planning to hurt myself
+    - planning to kill myself
+    - going to hurt myself
+    - going to kill myself

@@ -255,18 +255,23 @@ def get_container_stats() -> List[Dict[str, Any]]:
             # Calculate network I/O
             rx_bytes = 0
             tx_bytes = 0
-            for _, network_stats in stats['networks'].items():
-                rx_bytes += network_stats['rx_bytes']
-                tx_bytes += network_stats['tx_bytes']
+            networks = stats.get('networks', {})
+            if networks:
+                for _, network_stats in networks.items():
+                    rx_bytes += network_stats.get('rx_bytes', 0)
+                    tx_bytes += network_stats.get('tx_bytes', 0)
             
             # Calculate block I/O
             read_bytes = 0
             write_bytes = 0
-            for io_stat in stats['blkio_stats']['io_service_bytes_recursive']:
-                if io_stat['op'] == 'Read':
-                    read_bytes += io_stat['value']
-                elif io_stat['op'] == 'Write':
-                    write_bytes += io_stat['value']
+            blkio_stats = stats.get('blkio_stats', {})
+            io_service_bytes = blkio_stats.get('io_service_bytes_recursive', [])
+            if io_service_bytes:
+                for io_stat in io_service_bytes:
+                    if io_stat.get('op') == 'Read':
+                        read_bytes += io_stat.get('value', 0)
+                    elif io_stat.get('op') == 'Write':
+                        write_bytes += io_stat.get('value', 0)
             
             # Add container statistics
             container_stats.append({

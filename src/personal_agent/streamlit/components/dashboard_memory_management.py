@@ -448,7 +448,10 @@ def _render_memory_sync():
                             st.warning(f"Error syncing memory: {e}")
 
                     if synced_count > 0:
-                        st.success(f"✅ Synced {synced_count} memories to graph system")
+                        # Show success notification
+                        st.toast(f"🎉 Synced {synced_count} memories to graph system!", icon="✅")
+                        time.sleep(2.0)  # 2 second delay
+                        st.rerun()
                     else:
                         st.info("No memories needed syncing")
             except Exception as e:
@@ -597,7 +600,10 @@ def _render_memory_sync():
                                 st.warning(f"Error importing memory: {e}")
 
                     if imported_count > 0:
-                        st.success(f"Successfully imported {imported_count} memories!")
+                        # Show success notification
+                        st.toast(f"🎉 Successfully imported {imported_count} memories!", icon="✅")
+                        time.sleep(2.0)  # 2 second delay
+                        st.rerun()
                     else:
                         st.warning("No memories were imported.")
 
@@ -648,5 +654,8 @@ def _render_memory_settings():
 
     # Save settings
     if st.button("Save Settings"):
-        st.success("Memory settings saved successfully!")
+        # Show success notification
+        st.toast("🎉 Memory settings saved successfully!", icon="✅")
+        time.sleep(2.0)  # 2 second delay
         st.info("Some settings may require a restart to take effect.")
+        st.rerun()

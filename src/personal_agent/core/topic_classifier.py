@@ -196,13 +196,15 @@ class TopicClassifier:
         """
         cleaned = self.clean_text(text)
         cleaned_words = cleaned.split()
+        # Keep original text for phrase matching (just lowercase, no stopword removal)
+        original_lower = text.lower()
         raw_scores = {category: 0 for category in self.categories}
 
-        # Check phrases first (higher weight)
+        # Check phrases first (higher weight) - use original text to preserve critical words like "myself"
         for category, phrases in self.phrases.items():
             if category in raw_scores:  # Make sure category exists in raw_scores
                 for phrase in phrases:
-                    if phrase.lower() in cleaned:
+                    if phrase.lower() in original_lower:
                         raw_scores[category] += self.phrase_weight
 
         # Check individual keywords with whole word matching

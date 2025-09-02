@@ -1345,6 +1345,7 @@ def render_memory_tab():
         "family",
         "travel",
         "technology",
+        "journal",
         "other",
     ]
     selected_category = st.selectbox("Category:", categories, key="fact_category")
@@ -2626,63 +2627,6 @@ def render_sidebar():
             st.session_state[SESSION_KEY_MESSAGES] = []
             st.rerun()
 
-        # System Controls Section
-        st.header("System")
-        if st.button("🔴 Power Off", key="power_off_btn", type="primary"):
-            # Show confirmation dialog
-            if not st.session_state.get("show_power_off_confirmation", False):
-                st.session_state["show_power_off_confirmation"] = True
-                st.rerun()
-
-        # Power off confirmation
-        if st.session_state.get("show_power_off_confirmation", False):
-            st.warning("⚠️ **Confirm System Shutdown**")
-            st.write("This will shut down the application and close the browser.")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("❌ Cancel", key="cancel_power_off"):
-                    st.session_state["show_power_off_confirmation"] = False
-                    st.rerun()
-            with col2:
-                if st.button("🔴 Shutdown", key="confirm_power_off", type="primary"):
-                    # Clear confirmation state
-                    st.session_state["show_power_off_confirmation"] = False
-
-                    # Show shutdown message
-                    st.success("🔴 Shutting down system...")
-                    st.balloons()
-
-                    # Graceful system shutdown - no browser closing attempts
-                    import os
-                    import threading
-                    import time
-
-                    def graceful_shutdown():
-                        """Perform graceful shutdown of the system."""
-                        try:
-                            # Give time for the UI to show the shutdown message
-                            time.sleep(3)
-
-                            # Log shutdown
-                            logger.info("🔴 SHUTDOWN: Initiating graceful shutdown...")
-
-                            # Force exit the Python process
-                            os._exit(0)
-
-                        except Exception as e:
-                            logger.error(f"🔴 SHUTDOWN ERROR: {e}")
-                            # Force exit as fallback
-                            os._exit(1)
-
-                    # Start shutdown in a separate thread
-                    shutdown_thread = threading.Thread(target=graceful_shutdown)
-                    shutdown_thread.daemon = True
-                    shutdown_thread.start()
-
-                    # Stop Streamlit execution
-                    st.stop()
-
         st.header("Debug Info")
         debug_label = "Enable Debug Mode"
         if DEBUG_FLAG:
@@ -2840,11 +2784,110 @@ def main():
     initialize_session_state()
     apply_custom_theme()
 
+    # Add power button to actual top banner using custom HTML/CSS
+    st.markdown("""
+    <style>
+    .power-button-container {
+        position: fixed;
+        top: 10px;
+        right: 20px;
+        z-index: 999999;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 50%;
+        padding: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .power-button {
+        background: #ff4b4b;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .power-button:hover {
+        background: #ff3333;
+        transform: scale(1.05);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Streamlit UI
     st.title("🤖 Personal AI Friend with Memory")
     st.markdown(
         "*A friendly AI agent that remembers your conversations and learns about you*"
     )
+
+    # Power off button in sidebar (moved back but with better styling)
+    with st.sidebar:
+        st.markdown("---")
+        # Power off button with better styling
+        if st.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
+            # Show confirmation dialog
+            if not st.session_state.get("show_power_off_confirmation", False):
+                st.session_state["show_power_off_confirmation"] = True
+                st.rerun()
+
+    # Power off confirmation modal - full width
+    if st.session_state.get("show_power_off_confirmation", False):
+        # Create a prominent confirmation dialog
+        st.markdown("---")
+        st.error("⚠️ **SYSTEM SHUTDOWN CONFIRMATION**")
+        st.warning("This will permanently shut down the Personal Agent application.")
+        
+        # Create wider columns for better button layout
+        col_spacer1, col_cancel, col_spacer2, col_confirm, col_spacer3 = st.columns([1, 2, 1, 2, 1])
+        
+        with col_cancel:
+            if st.button("❌ Cancel Shutdown", key="wide_cancel_power_off", use_container_width=True):
+                st.session_state["show_power_off_confirmation"] = False
+                st.rerun()
+        
+        with col_confirm:
+            if st.button("🔴 CONFIRM SHUTDOWN", key="wide_confirm_power_off", type="primary", use_container_width=True):
+                # Clear confirmation state
+                st.session_state["show_power_off_confirmation"] = False
+
+                # Show success notification
+                st.toast("🎉 Shutting down system...", icon="🔴")
+                time.sleep(2.0)  # 2 second delay
+
+                # Graceful system shutdown - no browser closing attempts
+                import os
+                import threading
+
+                def graceful_shutdown():
+                    """Perform graceful shutdown of the system."""
+                    try:
+                        # Give time for the UI to show the shutdown message
+                        time.sleep(3)
+
+                        # Log shutdown
+                        logger.info("🔴 SHUTDOWN: Initiating graceful shutdown...")
+
+                        # Force exit the Python process
+                        os._exit(0)
+
+                    except Exception as e:
+                        logger.error(f"🔴 SHUTDOWN ERROR: {e}")
+                        # Force exit as fallback
+                        os._exit(1)
+
+                # Start shutdown in a separate thread
+                shutdown_thread = threading.Thread(target=graceful_shutdown)
+                shutdown_thread.daemon = True
+                shutdown_thread.start()
+
+                # Stop Streamlit execution
+                st.stop()
+        
+        st.markdown("---")
 
     # Sidebar navigation (replaces top-level tabs)
     st.sidebar.title(f"🧠 {USER_ID}'s Personal Agent")
