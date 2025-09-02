@@ -11,12 +11,21 @@ Key Features:
 - Format results for Streamlit display
 """
 
+import asyncio
 import re
 from typing import Any, Dict, Iterator, List, Optional, Union
 
 from agno.agent import Agent, RunResponse
 from agno.run.response import RunResponseEvent
-from agno.models.response import ToolExecution
+
+from personal_agent.config import (
+    AGNO_KNOWLEDGE_DIR,
+    AGNO_STORAGE_DIR,
+    LLM_MODEL,
+    OLLAMA_URL,
+)
+from personal_agent.config.user_id_mgr import get_userid
+from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 try:
     import streamlit as st
@@ -25,45 +34,49 @@ except ImportError:
     st = None
 
 
-def get_agent_instance():
+# @st.cache_resource(ttl=300)  # Cache for 5 minutes, then refresh
+def get_agent_instance() -> Optional[AgnoPersonalAgent]:
     """
-    Get the current agent instance from Streamlit session state.
-    
-    This function handles both single agent and team modes, returning the appropriate
-    agent instance for use with StreamlitMemoryHelper and other utilities.
-    
+    Get or create a cached AgnoPersonalAgent instance for Streamlit using the same pattern as paga_streamlit_agno.py.
+
     Returns:
-        AgnoPersonalAgent or TeamWrapper: The current agent instance, or None if not available
+        AgnoPersonalAgent instance or None if initialization fails
     """
-    if st is None:
+    try:
+        # Import the create_agno_agent function (same as paga_streamlit_agno.py)
+        # Import knowledge directory setting
+        from personal_agent.core.agno_agent import create_agno_agent
+
+        # Use asyncio.run to properly initialize the agent (same pattern as paga_streamlit_agno.py)
+        agent = asyncio.run(
+            create_agno_agent(
+                model_provider="ollama",
+                model_name=LLM_MODEL,
+                ollama_base_url=OLLAMA_URL,
+                user_id=get_userid(),
+                debug=False,  # Disable debug for cleaner Streamlit output
+                enable_memory=True,
+                enable_mcp=True,
+                storage_dir=AGNO_STORAGE_DIR,
+                knowledge_dir=AGNO_KNOWLEDGE_DIR,
+                recreate=False,
+            )
+        )
+
+        return agent
+
+    except Exception as e:
+        st.error(f"Failed to initialize agent: {str(e)}")
         return None
-        
-    # Check current mode from session state
-    agent_mode = st.session_state.get("agent_mode", "single")
-    
-    if agent_mode == "team":
-        # Team mode - return the team or team wrapper
-        team = st.session_state.get("team")
-        if team:
-            # Check if it's already a wrapper or needs wrapping
-            if hasattr(team, 'agno_memory') and hasattr(team, 'user_id'):
-                return team  # Already wrapped
-            else:
-                # Return the team directly - the helpers will handle wrapping
-                return team
-        return None
-    else:
-        # Single agent mode
-        return st.session_state.get("agent")
 
 
 def check_agent_status(agent):
     """
     Check the status of an agent instance and return comprehensive status information.
-    
+
     Args:
         agent: The agent instance to check (AgnoPersonalAgent, Team, or TeamWrapper)
-        
+
     Returns:
         dict: Status dictionary with keys:
             - initialized: bool - Whether the agent is properly initialized
@@ -75,70 +88,79 @@ def check_agent_status(agent):
         "initialized": False,
         "memory_available": False,
         "user_id": None,
-        "error": None
+        "error": None,
     }
-    
+
     if agent is None:
         status["error"] = "Agent instance is None"
         return status
-    
+
     try:
         # Check if it's a team or single agent
-        if hasattr(agent, 'members'):
+        if hasattr(agent, "members"):
             # Team mode
-            status["initialized"] = len(getattr(agent, 'members', [])) > 0
-            
+            status["initialized"] = len(getattr(agent, "members", [])) > 0
+
             # Check memory availability through team
-            if hasattr(agent, 'agno_memory'):
+            if hasattr(agent, "agno_memory"):
                 status["memory_available"] = agent.agno_memory is not None
-            elif hasattr(agent, 'members') and agent.members:
+            elif hasattr(agent, "members") and agent.members:
                 # Check first member (knowledge agent) for memory
                 knowledge_agent = agent.members[0]
-                status["memory_available"] = hasattr(knowledge_agent, 'agno_memory') and knowledge_agent.agno_memory is not None
-            
+                status["memory_available"] = (
+                    hasattr(knowledge_agent, "agno_memory")
+                    and knowledge_agent.agno_memory is not None
+                )
+
             # Get user ID from team or first member
-            if hasattr(agent, 'user_id'):
+            if hasattr(agent, "user_id"):
                 status["user_id"] = agent.user_id
-            elif hasattr(agent, 'members') and agent.members and hasattr(agent.members[0], 'user_id'):
+            elif (
+                hasattr(agent, "members")
+                and agent.members
+                and hasattr(agent.members[0], "user_id")
+            ):
                 status["user_id"] = agent.members[0].user_id
-                
+
         else:
             # Single agent mode
-            status["initialized"] = getattr(agent, '_initialized', False)
-            status["memory_available"] = hasattr(agent, 'agno_memory') and agent.agno_memory is not None
-            status["user_id"] = getattr(agent, 'user_id', None)
-            
+            status["initialized"] = getattr(agent, "_initialized", False)
+            status["memory_available"] = (
+                hasattr(agent, "agno_memory") and agent.agno_memory is not None
+            )
+            status["user_id"] = getattr(agent, "user_id", None)
+
     except Exception as e:
         status["error"] = f"Error checking agent status: {str(e)}"
-    
+
     return status
 
 
-def collect_streaming_response(run_stream: Iterator[RunResponseEvent]) -> List[RunResponseEvent]:
+def collect_streaming_response(
+    run_stream: Iterator[RunResponseEvent],
+) -> List[RunResponseEvent]:
     """
     Collect all chunks from a streaming response iterator.
-    
+
     Args:
         run_stream: Iterator of RunResponseEvent objects from agent.run(stream=True)
-        
+
     Returns:
         List of all RunResponseEvent chunks
     """
     return list(run_stream)
 
 
-def extract_final_response_and_tools(
-    chunks: List[RunResponseEvent]
-) -> Dict[str, Any]:
+def extract_final_response_and_tools(chunks: List[RunResponseEvent]) -> Dict[str, Any]:
     """
     Intelligently extract final response content and tool calls from streaming chunks.
-    
+
     This function analyzes all chunks from a streaming response to reconstruct
     the complete final response, including any tool calls made and image URLs generated.
-    
+
     Args:
         chunks: List of RunResponseEvent objects from streaming response
-        
+
     Returns:
         Dictionary containing:
             - final_content: The complete final response content
@@ -152,71 +174,70 @@ def extract_final_response_and_tools(
         "tool_calls": [],
         "image_urls": [],
         "status": "unknown",
-        "chunk_count": len(chunks)
+        "chunk_count": len(chunks),
     }
-    
+
     # Process each chunk to build complete response
     for chunk in chunks:
         # Extract tool calls from any chunk that has them
         # Check for tool in 'tool' attribute (single tool) - primary source in streaming
-        if hasattr(chunk, 'tool') and chunk.tool:
+        if hasattr(chunk, "tool") and chunk.tool:
             tool_info = {
-                "name": getattr(chunk.tool, 'tool_name', 'Unknown'),
-                "arguments": getattr(chunk.tool, 'arguments', {}),
-                "status": getattr(chunk.tool, 'status', 'unknown')
+                "name": getattr(chunk.tool, "tool_name", "Unknown"),
+                "arguments": getattr(chunk.tool, "arguments", {}),
+                "status": getattr(chunk.tool, "status", "unknown"),
             }
             if tool_info not in result["tool_calls"]:
                 result["tool_calls"].append(tool_info)
-        
+
         # Check for tools in 'tools' attribute (list of tools) - secondary source
-        if hasattr(chunk, 'tools') and chunk.tools:
+        if hasattr(chunk, "tools") and chunk.tools:
             for tool in chunk.tools:
                 tool_info = {
-                    "name": getattr(tool, 'tool_name', 'Unknown'),
-                    "arguments": getattr(tool, 'arguments', {}),
-                    "status": getattr(tool, 'status', 'unknown')
+                    "name": getattr(tool, "tool_name", "Unknown"),
+                    "arguments": getattr(tool, "arguments", {}),
+                    "status": getattr(tool, "status", "unknown"),
                 }
                 if tool_info not in result["tool_calls"]:
                     result["tool_calls"].append(tool_info)
-        
+
         # Extract image URLs from content
-        if hasattr(chunk, 'content') and chunk.content:
+        if hasattr(chunk, "content") and chunk.content:
             # Find markdown image patterns ![alt](url)
-            image_matches = re.findall(r'!\[([^\]]*)\]\((https?://[^\)]+)\)', str(chunk.content))
+            image_matches = re.findall(
+                r"!\[([^\]]*)\]\((https?://[^\)]+)\)", str(chunk.content)
+            )
             for alt_text, url in image_matches:
                 if url not in [img["url"] for img in result["image_urls"]]:
-                    result["image_urls"].append({
-                        "alt_text": alt_text,
-                        "url": url
-                    })
-        
+                    result["image_urls"].append({"alt_text": alt_text, "url": url})
+
         # Identify the final chunk (usually has completed status)
-        if hasattr(chunk, 'status') and str(chunk.status) == 'RunStatus.completed':
+        if hasattr(chunk, "status") and str(chunk.status) == "RunStatus.completed":
             result["status"] = "completed"
-            if hasattr(chunk, 'content'):
+            if hasattr(chunk, "content"):
                 result["final_content"] = chunk.content
-    
+
     # Fallback to last chunk if no completed status found
     if not result["final_content"] and chunks:
         last_chunk = chunks[-1]
-        if hasattr(last_chunk, 'content'):
+        if hasattr(last_chunk, "content"):
             result["final_content"] = last_chunk.content
-        if hasattr(last_chunk, 'status'):
+        if hasattr(last_chunk, "status"):
             result["status"] = str(last_chunk.status)
-    
+
     return result
 
 
 def format_for_streamlit_display(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
     """
     Format analysis results for Streamlit application display.
-    
+
     This function prepares the analysis results in a format that's easy to use
     in Streamlit applications, with proper data types and organization.
-    
+
     Args:
         analysis_result: Dictionary from extract_final_response_and_tools
-        
+
     Returns:
         Streamlit-friendly formatted dictionary
     """
@@ -229,29 +250,26 @@ def format_for_streamlit_display(analysis_result: Dict[str, Any]) -> Dict[str, A
             "total_chunks": analysis_result["chunk_count"],
             "content_length": len(str(analysis_result["final_content"])),
             "tool_call_count": len(analysis_result["tool_calls"]),
-            "image_count": len(analysis_result["image_urls"])
-        }
+            "image_count": len(analysis_result["image_urls"]),
+        },
     }
 
 
 def get_complete_response_from_agent(
-    agent: Agent,
-    message: str,
-    stream: bool = False,
-    **kwargs
+    agent: Agent, message: str, stream: bool = False, **kwargs
 ) -> Union[RunResponse, Dict[str, Any]]:
     """
     Get complete response from an Agno agent, handling both streaming and non-streaming modes.
-    
+
     This function provides a unified interface for getting responses from Agno agents,
     whether in streaming or non-streaming mode, and returns data formatted for Streamlit.
-    
+
     Args:
         agent: Agno Agent instance
         message: Input message/prompt for the agent
         stream: Whether to use streaming mode
         **kwargs: Additional arguments to pass to agent.run()
-        
+
     Returns:
         For streaming: Dictionary with analyzed results
         For non-streaming: RunResponse object

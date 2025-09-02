@@ -35,7 +35,7 @@ async def initialize_agno_system(
     # Set up Rich logging for all components including agno
     configure_all_rich_logging()
     logger = setup_logging(level=settings.LOG_LEVEL)
-    logger.info("Starting Personal AI Agent with agno framework...")
+    logger.info("Starting Personal AI Agent...")
 
     # CRITICAL: Ensure Docker and user synchronization BEFORE any agent creation
     logger.info("🐳 Performing system-level Docker and user synchronization...")
