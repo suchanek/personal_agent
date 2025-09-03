@@ -165,6 +165,7 @@ class AgnoPersonalAgent(Agent):
         seed: Optional[int] = None,
         alltools: Optional[bool] = True,
         initialize_agent: Optional[bool] = False,
+        stream: Optional[bool] = False,
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -277,7 +278,7 @@ class AgnoPersonalAgent(Agent):
             num_history_responses=3,
             debug_mode=debug,
             stream_intermediate_steps=True,
-            stream=True,
+            stream=stream,
             **kwargs,
         )
 
@@ -800,6 +801,154 @@ class AgnoPersonalAgent(Agent):
                 "Memory manager not initialized. Call initialize() first."
             )
         return await self.memory_manager.clear_all_memories()
+
+    async def list_memories(self) -> str:
+        """List all memories in a simple, user-friendly format.
+
+        This is a public method that delegates to the memory_manager.
+
+        Returns:
+            str: Simplified list of all memories
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.list_memories()
+
+    async def query_memory(self, query: str, limit: Union[int, None] = None) -> str:
+        """Search user memories using semantic search.
+
+        This is a public method that delegates to the memory_manager.
+
+        Args:
+            query: The query to search for in memories
+            limit: Maximum number of memories to return
+
+        Returns:
+            str: Found memories or message if none found
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.query_memory(query, limit)
+
+    async def update_memory(
+        self, memory_id: str, content: str, topics: Union[List[str], str, None] = None
+    ) -> str:
+        """Update an existing memory.
+
+        This is a public method that delegates to the memory_manager.
+
+        Args:
+            memory_id: ID of the memory to update
+            content: New memory content
+            topics: Optional list of topics/categories for the memory
+
+        Returns:
+            str: Success or error message
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.update_memory(memory_id, content, topics)
+
+    async def delete_memory(self, memory_id: str) -> str:
+        """Delete a memory from both SQLite and LightRAG systems.
+
+        This is a public method that delegates to the memory_manager.
+
+        Args:
+            memory_id: ID of the memory to delete
+
+        Returns:
+            str: Success or error message
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.delete_memory(memory_id)
+
+    async def get_recent_memories(self, limit: int = 10) -> str:
+        """Get recent memories sorted by date.
+
+        This is a public method that delegates to the memory_manager.
+
+        Args:
+            limit: Maximum number of memories to return
+
+        Returns:
+            str: Formatted string of recent memories
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.get_recent_memories(limit)
+
+    async def get_all_memories(self) -> str:
+        """Get all user memories with full details.
+
+        This is a public method that delegates to the memory_manager.
+
+        Returns:
+            str: Formatted string of all memories
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.get_all_memories()
+
+    async def get_memory_stats(self) -> str:
+        """Get memory statistics including counts and topics.
+
+        This is a public method that delegates to the memory_manager.
+
+        Returns:
+            str: Formatted string with memory statistics
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.get_memory_stats()
+
+    async def get_memories_by_topic(
+        self, topics: Union[List[str], str, None] = None, limit: Union[int, None] = None
+    ) -> str:
+        """Get memories filtered by topic.
+
+        This is a public method that delegates to the memory_manager.
+
+        Args:
+            topics: Topic or list of topics to filter memories by
+            limit: Maximum number of memories to return
+
+        Returns:
+            str: Formatted string of memories matching the topics
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.get_memories_by_topic(topics, limit)
+
+    async def delete_memories_by_topic(self, topics: Union[List[str], str]) -> str:
+        """Delete all memories associated with specific topics.
+
+        This is a public method that delegates to the memory_manager.
+
+        Args:
+            topics: Topic or list of topics to delete memories for
+
+        Returns:
+            str: Success or error message
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.delete_memories_by_topic(topics)
+
+    async def get_memory_graph_labels(self) -> str:
+        """Get the list of all entity and relation labels from the memory graph.
+
+        This is a public method that delegates to the memory_manager.
+
+        Returns:
+            str: Formatted string with entity and relation labels
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.get_memory_graph_labels()
+
+    async def get_graph_entity_count(self) -> int:
+        """Get the count of entities/documents in the LightRAG memory graph.
+
+        This is a public method that delegates to the memory_manager.
+
+        Returns:
+            int: Number of entities/documents in the graph
+        """
+        await self._ensure_initialized()
+        return await self.memory_manager.get_graph_entity_count()
+
 
     async def query_lightrag_knowledge_direct(
         self, query: str, params: dict = None, url: str = LIGHTRAG_URL

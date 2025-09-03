@@ -271,6 +271,33 @@ def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False
     )
 
 
+def _run_async_team_init(coro):
+    """Helper to run async functions, handling existing event loops."""
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+        # If we're in a running loop, we need to use a different approach
+        import concurrent.futures
+        import threading
+        
+        # Create a new event loop in a separate thread
+        def run_in_thread():
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(coro)
+            finally:
+                new_loop.close()
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
+            
+    except RuntimeError:
+        # No running event loop, safe to use asyncio.run()
+        return asyncio.run(coro)
+
+
 def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
     """Initialize the team using the reasoning_team create_team function."""
     try:
@@ -280,7 +307,7 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
         use_remote = ollama_url == REMOTE_OLLAMA_URL
 
         # Create team using the factory function from reasoning_team with model_name parameter
-        team = asyncio.run(create_personal_agent_team(use_remote=use_remote, model_name=model_name))
+        team = _run_async_team_init(create_personal_agent_team(use_remote=use_remote, model_name=model_name))
 
         # Validate team creation
         if not team:
@@ -363,7 +390,7 @@ def create_team_wrapper(team):
                 # Force initialization if not already done
                 if hasattr(knowledge_agent, "_ensure_initialized"):
                     try:
-                        asyncio.run(knowledge_agent._ensure_initialized())
+                        self._run_async_safely(knowledge_agent._ensure_initialized())
                         logger.info("Knowledge agent initialized successfully")
                     except Exception as e:
                         logger.error(f"Failed to initialize knowledge agent: {e}")
@@ -444,7 +471,7 @@ def create_team_wrapper(team):
                 if hasattr(knowledge_agent, "store_user_memory"):
 
                     # This will properly restate facts and process them through the LLM
-                    return asyncio.run(
+                    return self._run_async_safely(
                         knowledge_agent.store_user_memory(
                             content=content, topics=topics
                         )
@@ -462,6 +489,122 @@ def create_team_wrapper(team):
                 logger.warning(f"Memory stored in team memory: {result}")
                 return result
 
+            raise Exception("Team memory not available")
+
+        # Helper method to safely run async functions in Streamlit environment
+        def _run_async_safely(self, coro):
+            """Safely run async coroutines in Streamlit environment."""
+            try:
+                # Try to get the current event loop
+                loop = asyncio.get_running_loop()
+                # If we're in a running loop, create a new thread to run the coroutine
+                import concurrent.futures
+                import threading
+                
+                def run_in_thread():
+                    # Create a new event loop for this thread
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(coro)
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_thread)
+                    return future.result(timeout=30)  # 30 second timeout
+                    
+            except RuntimeError:
+                # No running event loop, safe to use asyncio.run()
+                return asyncio.run(coro)
+
+        # Expose all memory functions from the knowledge agent
+        def list_memories(self):
+            """List all memories using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "list_memories"):
+                    return self._run_async_safely(knowledge_agent.list_memories())
+            raise Exception("Team memory not available")
+
+        def query_memory(self, query, limit=None):
+            """Query memories using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "query_memory"):
+                    return self._run_async_safely(knowledge_agent.query_memory(query, limit))
+            raise Exception("Team memory not available")
+
+        def update_memory(self, memory_id, content, topics=None):
+            """Update a memory using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "update_memory"):
+                    return self._run_async_safely(knowledge_agent.update_memory(memory_id, content, topics))
+            raise Exception("Team memory not available")
+
+        def delete_memory(self, memory_id):
+            """Delete a memory using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "delete_memory"):
+                    return self._run_async_safely(knowledge_agent.delete_memory(memory_id))
+            raise Exception("Team memory not available")
+
+        def get_recent_memories(self, limit=10):
+            """Get recent memories using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "get_recent_memories"):
+                    return self._run_async_safely(knowledge_agent.get_recent_memories(limit))
+            raise Exception("Team memory not available")
+
+        def get_all_memories(self):
+            """Get all memories using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "get_all_memories"):
+                    return self._run_async_safely(knowledge_agent.get_all_memories())
+            raise Exception("Team memory not available")
+
+        def get_memory_stats(self):
+            """Get memory statistics using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "get_memory_stats"):
+                    return self._run_async_safely(knowledge_agent.get_memory_stats())
+            raise Exception("Team memory not available")
+
+        def get_memories_by_topic(self, topics=None, limit=None):
+            """Get memories by topic using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "get_memories_by_topic"):
+                    return self._run_async_safely(knowledge_agent.get_memories_by_topic(topics, limit))
+            raise Exception("Team memory not available")
+
+        def delete_memories_by_topic(self, topics):
+            """Delete memories by topic using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "delete_memories_by_topic"):
+                    return self._run_async_safely(knowledge_agent.delete_memories_by_topic(topics))
+            raise Exception("Team memory not available")
+
+        def get_memory_graph_labels(self):
+            """Get memory graph labels using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "get_memory_graph_labels"):
+                    return self._run_async_safely(knowledge_agent.get_memory_graph_labels())
+            raise Exception("Team memory not available")
+
+        def clear_all_memories(self):
+            """Clear all memories using the knowledge agent."""
+            if hasattr(self.team, "members") and self.team.members:
+                knowledge_agent = self.team.members[0]
+                if hasattr(knowledge_agent, "clear_all_memories"):
+                    return self._run_async_safely(knowledge_agent.clear_all_memories())
             raise Exception("Team memory not available")
 
     return TeamWrapper(team)
@@ -1022,62 +1165,55 @@ def render_chat_tab():
                                 metrics_data,
                             ) = extract_tool_calls_and_metrics(response_obj)
 
-                            # 🚨 ENHANCED RESPONSE PARSING: Extract final content using comprehensive analyzer pattern
-                            # This follows the same pattern as comprehensive_streaming_analyzer.py for consistency
+                            # 🚨 SIMPLIFIED RESPONSE PARSING - NO FILTERING
+                            print(f"🔍 SIMPLE_DEBUG: Starting response parsing for query: '{prompt[:50]}...'")
                             
-                            # First, try to get the main response content
+                            # Step 1: Try main response content first
                             if hasattr(response_obj, "content") and response_obj.content:
-                                response = response_obj.content
-                                logger.info(f"🔍 STREAMLIT: Using main response content")
+                                response = str(response_obj.content)
+                                print(f"🔍 SIMPLE_DEBUG: Using main response content: '{response[:100]}...' ({len(response)} chars)")
+                            else:
+                                response = ""
+                                print(f"🔍 SIMPLE_DEBUG: No main response content found")
                             
-                            # Extract actual final response (content after </think> tags) - CRITICAL FIX
-                            actual_final_response = ""
-                            if response and '</think>' in str(response):
-                                parts = str(response).split('</think>')
-                                if len(parts) > 1:
-                                    actual_response = parts[-1].strip()
-                                    if actual_response:
-                                        actual_final_response = actual_response
-                                        logger.info(f"🔍 STREAMLIT: Extracted content after </think> tags")
-                            
-                            # If we have actual final response after </think>, use it
-                            if actual_final_response:
-                                response = actual_final_response
-                                logger.info(f"🔍 STREAMLIT: Using actual final response after </think>")
-                            # If the main response looks like tool syntax, check member responses for actual content
-                            elif (hasattr(response_obj, "member_responses") and response_obj.member_responses and
-                                ("write_original_content(" in response or "<|python_tag|>" in response or
-                                 "create_image(" in response or len(response.strip()) < 50)):
+                            # Step 2: If no main content or it's empty, check member responses
+                            if not response.strip() and hasattr(response_obj, "member_responses") and response_obj.member_responses:
+                                print(f"🔍 SIMPLE_DEBUG: Main response empty, checking {len(response_obj.member_responses)} member responses")
                                 
-                                logger.info(f"🔍 STREAMLIT: Checking member responses for final content")
-                                
-                                # Look through member responses for the final assistant message with actual content
+                                # Get ALL assistant messages from ALL members - no filtering
+                                all_assistant_messages = []
                                 for i, member_resp in enumerate(response_obj.member_responses):
                                     if hasattr(member_resp, "messages") and member_resp.messages:
-                                        # Get the last assistant message from this member
-                                        for msg in reversed(member_resp.messages):
-                                            if (hasattr(msg, "role") and msg.role == "assistant" and
-                                                hasattr(msg, "content") and msg.content and
-                                                len(msg.content.strip()) > 20):  # Ensure substantial content
-                                                
-                                                # Skip tool call syntax messages
-                                                if not any(syntax in msg.content for syntax in [
-                                                    "write_original_content(", "<|python_tag|>", "create_image("
-                                                ]):
-                                                    # Also check for </think> tags in member responses
-                                                    member_content = msg.content
-                                                    if '</think>' in str(member_content):
-                                                        parts = str(member_content).split('</think>')
-                                                        if len(parts) > 1:
-                                                            member_actual = parts[-1].strip()
-                                                            if member_actual:
-                                                                member_content = member_actual
-                                                    
-                                                    logger.info(f"🔍 STREAMLIT: Found final content from member {i}")
-                                                    response = member_content
-                                                    break
+                                        for j, msg in enumerate(member_resp.messages):
+                                            if hasattr(msg, "role") and msg.role == "assistant" and hasattr(msg, "content") and msg.content:
+                                                all_assistant_messages.append({
+                                                    'member': i,
+                                                    'message': j,
+                                                    'content': str(msg.content),
+                                                    'length': len(str(msg.content))
+                                                })
+                                                print(f"🔍 SIMPLE_DEBUG: Found assistant message from member {i}: '{str(msg.content)[:100]}...' ({len(str(msg.content))} chars)")
+                                
+                                # Use the LAST assistant message (most recent)
+                                if all_assistant_messages:
+                                    last_message = all_assistant_messages[-1]
+                                    response = last_message['content']
+                                    print(f"🔍 SIMPLE_DEBUG: Using LAST assistant message from member {last_message['member']}: '{response[:100]}...' ({len(response)} chars)")
+                                else:
+                                    print(f"🔍 SIMPLE_DEBUG: No assistant messages found in member responses")
                             
-                            logger.info(f"🔍 STREAMLIT: Final response length: {len(response)} chars")
+                            # Step 3: Handle </think> tags if present - PRESERVE them for now (don't strip)
+                            if '</think>' in response:
+                                print(f"🔍 SIMPLE_DEBUG: Found <think> tags in response, preserving them as requested")
+                                # Keep the full response including <think> tags
+                                # Original stripping logic commented out:
+                                # parts = response.split('</think>')
+                                # if len(parts) > 1:
+                                #     after_think = parts[-1].strip()
+                                #     if after_think:
+                                #         response = after_think
+                            
+                            print(f"🔍 SIMPLE_DEBUG: ✅ FINAL RESPONSE: '{response[:200]}...' ({len(response)} chars)")
 
                             # Display tool calls if any
                             if tool_call_details:
@@ -2758,6 +2894,15 @@ def render_sidebar():
             else:
                 st.info("No debug metrics available yet.")
 
+        # Power off button at the bottom of the sidebar
+        st.markdown("---")
+        st.header("🚨 System Control")
+        if st.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
+            # Show confirmation dialog
+            if not st.session_state.get("show_power_off_confirmation", False):
+                st.session_state["show_power_off_confirmation"] = True
+                st.rerun()
+
             st.subheader("🔍 Recent Request Details")
             if st.session_state[SESSION_KEY_DEBUG_METRICS]:
                 for entry in reversed(st.session_state[SESSION_KEY_DEBUG_METRICS][-5:]):
@@ -2824,15 +2969,7 @@ def main():
         "*A friendly AI agent that remembers your conversations and learns about you*"
     )
 
-    # Power off button in sidebar (moved back but with better styling)
-    with st.sidebar:
-        st.markdown("---")
-        # Power off button with better styling
-        if st.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
-            # Show confirmation dialog
-            if not st.session_state.get("show_power_off_confirmation", False):
-                st.session_state["show_power_off_confirmation"] = True
-                st.rerun()
+    # Power off button moved to bottom of sidebar (in render_sidebar function)
 
     # Power off confirmation modal - full width
     if st.session_state.get("show_power_off_confirmation", False):

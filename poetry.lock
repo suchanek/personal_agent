@@ -2576,6 +2576,25 @@ format = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-validat
 format-nongpl = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-validator", "rfc3986-validator (>0.1.0)", "rfc3987-syntax (>=1.1.0)", "uri-template", "webcolors (>=24.6.0)"]
 
 [[package]]
+name = "jsonschema-pydantic"
+version = "0.6"
+description = "Convert JSON Schemas to Pydantic models"
+optional = false
+python-versions = "*"
+groups = ["main"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "jsonschema_pydantic-0.6-py3-none-any.whl", hash = "sha256:98385ed53ab87598665956b43756746350e2b60411a38381231f9703d36e40eb"},
+    {file = "jsonschema_pydantic-0.6.tar.gz", hash = "sha256:6069a8929a333a7c7ea8510e9de50f062e747e655e6ba106da5af1981f995270"},
+]
+
+[package.dependencies]
+pydantic = ">=1.10.0"
+
+[package.extras]
+test = ["black", "coverage", "flake8", "gitchangelog", "isort", "mkdocs", "pydantic (>=2.5.3,<3.0.0)", "pytest", "pytest-cov"]
+
+[[package]]
 name = "jsonschema-specifications"
 version = "2025.4.1"
 description = "The JSON Schema meta-schemas and vocabularies, exposed as a Registry"
@@ -3517,6 +3536,37 @@ uvicorn = {version = ">=0.23.1", markers = "sys_platform != \"emscripten\""}
 cli = ["python-dotenv (>=1.0.0)", "typer (>=0.16.0)"]
 rich = ["rich (>=13.9.4)"]
 ws = ["websockets (>=15.0.1)"]
+
+[[package]]
+name = "mcp-use"
+version = "1.3.10"
+description = "MCP Library for LLMs"
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "mcp_use-1.3.10-py3-none-any.whl", hash = "sha256:d69f5430e4efd49757af671a43f5c702abe10fb3a56443498ad1342dbaf7abcd"},
+    {file = "mcp_use-1.3.10.tar.gz", hash = "sha256:fb1472b649c11af05e39b69c4e0310c0c101b39c165157192617a124c2977aa4"},
+]
+
+[package.dependencies]
+aiohttp = ">=3.9.0"
+jsonschema-pydantic = ">=0.1.0"
+langchain = ">=0.1.0"
+mcp = ">=1.10.0"
+posthog = ">=4.8.0"
+pydantic = ">=2.0.0"
+python-dotenv = ">=1.0.0"
+scarf-sdk = ">=0.1.0"
+websockets = ">=12.0"
+
+[package.extras]
+anthropic = ["langchain-anthropic"]
+dev = ["black (>=23.9.0)", "fastapi", "fastmcp (==2.10.5)", "isort (>=5.12.0)", "mypy (>=1.5.0)", "pytest (>=7.4.0)", "pytest-asyncio (>=0.21.0)", "pytest-cov (>=4.1.0)", "ruff (>=0.1.0)"]
+e2b = ["e2b-code-interpreter (>=1.5.0)"]
+openai = ["langchain-openai"]
+search = ["fastembed (>=0.0.1)"]
 
 [[package]]
 name = "mdurl"
@@ -4625,6 +4675,32 @@ pyyaml = ">=6.0.2,<7.0"
 
 [package.extras]
 poetry-plugin = ["poetry (>=1.2.0,<3.0.0)"]
+
+[[package]]
+name = "posthog"
+version = "6.7.1"
+description = "Integrate PostHog into any python application."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "posthog-6.7.1-py3-none-any.whl", hash = "sha256:57d9a891ddedf690d2b294bb8b7832095c149729a3f123f47b7bcaf7b2b6e1a0"},
+    {file = "posthog-6.7.1.tar.gz", hash = "sha256:1011ddda110b65e0d080f2a5f88eb0337547ed6b5a50d0f8f6191e9357b99434"},
+]
+
+[package.dependencies]
+backoff = ">=1.10.0"
+distro = ">=1.5.0"
+python-dateutil = ">=2.2"
+requests = ">=2.7,<3.0"
+six = ">=1.5"
+typing-extensions = ">=4.2.0"
+
+[package.extras]
+dev = ["django-stubs", "lxml", "mypy", "mypy-baseline", "packaging", "pre-commit", "pydantic", "ruff", "setuptools", "tomli", "tomli_w", "twine", "types-mock", "types-python-dateutil", "types-requests", "types-setuptools", "types-six", "wheel"]
+langchain = ["langchain (>=0.2.0)"]
+test = ["anthropic", "coverage", "django", "freezegun (==1.5.1)", "google-genai", "langchain-anthropic (>=0.3.15)", "langchain-community (>=0.3.25)", "langchain-core (>=0.3.65)", "langchain-openai (>=0.3.22)", "langgraph (>=0.4.8)", "mock (>=2.0.0)", "openai", "parameterized (>=0.8.1)", "pydantic", "pytest", "pytest-asyncio", "pytest-timeout"]
 
 [[package]]
 name = "pot"
@@ -5975,6 +6051,22 @@ files = [
 
 [package.dependencies]
 pyasn1 = ">=0.1.3"
+
+[[package]]
+name = "scarf-sdk"
+version = "0.1.2"
+description = "Python bindings for Scarf telemetry"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "scarf_sdk-0.1.2-py3-none-any.whl", hash = "sha256:d3768ecb9e484965f6956a05c982c52b77cdcd576284107dbeed715f5dffba36"},
+    {file = "scarf_sdk-0.1.2.tar.gz", hash = "sha256:d79e157b440a488da1fed47b8917fdbc794120ca8306e994062f8c7e787ac163"},
+]
+
+[package.dependencies]
+requests = ">=2.25.0"
 
 [[package]]
 name = "scikit-learn"
@@ -7909,4 +8001,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "8f120b633e7832ce823910e44dbb2e75e49add1380a1babc3425cc19626fa5f0"
+content-hash = "97a0750b91f7f644d6b4ead6dfda6764e259d061d05668e28cfcb5920c07706e"

@@ -63,9 +63,9 @@ class AgentModelManager:
                 if not base_url.endswith("/v1"):
                     base_url = base_url.rstrip("/") + "/v1"
 
-                logger.info(f"Using LMStudio with OpenAI-compatible API at: {base_url}")
-                logger.info(f"Model: {self.model_name}")
-                logger.info(
+                logger.debug(f"Using LMStudio with OpenAI-compatible API at: {base_url}")
+                logger.debug(f"Model: {self.model_name}")
+                logger.debug(
                     "This will use /v1/chat/completions endpoint (OpenAI format)"
                 )
 
@@ -89,14 +89,14 @@ class AgentModelManager:
                         "tool": "tool",
                         "model": "assistant",
                     }
-                    logger.info(
+                    logger.debug(
                         f"🔧 Applied role mapping fix to LMStudio model: {self.model_name}"
                     )
 
                 return model
             else:
                 # Standard OpenAI API
-                logger.info(f"Using standard OpenAI API with model: {self.model_name}")
+                logger.debug(f"Using standard OpenAI API with model: {self.model_name}")
                 model = OpenAIChat(id=self.model_name)
 
                 # WORKAROUND: Fix incorrect role mapping in Agno framework
@@ -119,7 +119,7 @@ class AgentModelManager:
             # Get unified model configuration (parameters + context size)
             model_config = get_model_parameters_dict(self.model_name)
 
-            logger.info(
+            logger.debug(
                 "Using unified model configuration for %s: %s",
                 self.model_name,
                 model_config,
@@ -138,7 +138,7 @@ class AgentModelManager:
 
             # Special handling for Qwen models - add min_p and adjust num_predict
             if "qwen" in self.model_name.lower():
-                logger.info(
+                logger.debug(
                     "Applying Qwen-specific optimizations for model: %s",
                     self.model_name,
                 )
@@ -156,7 +156,7 @@ class AgentModelManager:
                 or "llama3.2" in self.model_name.lower()
                 or "llama3.3" in self.model_name.lower()
             ):
-                logger.info(
+                logger.debug(
                     "Applying Llama 3.x-specific optimizations for model: %s",
                     self.model_name,
                 )
@@ -195,7 +195,7 @@ class AgentModelManager:
             )
 
             if model_supports_reasoning:
-                logger.info(f"Model {self.model_name} supports reasoning capabilities")
+                logger.debug(f"Model {self.model_name} supports reasoning capabilities")
 
             model = Ollama(
                 id=self.model_name,
@@ -214,7 +214,7 @@ class AgentModelManager:
                     "tool": "tool",
                     "model": "assistant",
                 }
-                logger.info(
+                logger.debug(
                     f"🔧 Applied role mapping fix to Ollama model: {self.model_name}"
                 )
 
