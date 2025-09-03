@@ -1469,6 +1469,48 @@ class AgentMemoryManager:
             logger.error(f"Error retrieving memory graph labels: {e}")
             return f"❌ Error retrieving memory graph labels: {str(e)}"
 
+    async def get_graph_entity_count(self) -> int:
+        """Get the count of entities/documents in the LightRAG memory graph.
+
+        This method provides direct access to the graph entity count for
+        synchronization status checking.
+
+        Returns:
+            int: Number of entities/documents in the graph
+        """
+        try:
+            if not self.lightrag_memory_url:
+                logger.warning("LightRAG memory URL not configured")
+                return 0
+            
+            # Get documents from LightRAG memory server
+            url = f"{self.lightrag_memory_url}/documents"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        
+                        # Count documents from the response
+                        doc_count = 0
+                        if isinstance(data, dict) and "statuses" in data:
+                            statuses = data["statuses"]
+                            for status_name, docs_list in statuses.items():
+                                if isinstance(docs_list, list):
+                                    doc_count += len(docs_list)
+                        elif isinstance(data, dict) and "documents" in data:
+                            doc_count = len(data["documents"])
+                        elif isinstance(data, list):
+                            doc_count = len(data)
+                        
+                        logger.debug(f"Graph entity count: {doc_count}")
+                        return doc_count
+                    else:
+                        logger.warning(f"Failed to get graph entities: {resp.status}")
+                        return 0
+        except Exception as e:
+            logger.warning(f"Error getting graph entity count: {e}")
+            return 0
+
     async def delete_memories_by_topic(self, topics: Union[List[str], str]) -> str:
         """Delete all memories associated with a specific topic or list of topics from both local and graph memory."""
         try:

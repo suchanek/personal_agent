@@ -93,7 +93,7 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         context_size=40960,
     ),
     "qwen3:8b": ModelParameters(
-        temperature=0.6,
+        temperature=0.2,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
@@ -111,20 +111,20 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=65535,
+        context_size=32768,
     ),
     "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=65535,
+        context_size=32768,
     ),
     "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:Q4_K_M": ModelParameters(
         temperature=0.7,
         top_p=0.8,
         top_k=20,
-        context_size=65535,
+        context_size=32768,
         repetition_penalty=1.05,
     ),
     "sam860/qwen3-embedding:0.6b-F16": ModelParameters(
@@ -199,7 +199,7 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         context_size=32768,
     ),
     "myaniu/qwen2.5-1m:latest": ModelParameters(
-        temperature=0.5, top_p=0.95, context_size=65535
+        temperature=0.5, top_p=0.95, context_size=32768
     ),  # 1M context
     # Llama models - balanced parameters for instruction following
     "llama3.1:8b": ModelParameters(
@@ -207,77 +207,77 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.1:8b-instruct-q8_0": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.1:70b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.1:405b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.2": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.2:1b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.2:3b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.2:11b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.2:90b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.3:latest": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3.3:70b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     "llama3:8b": ModelParameters(
         temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
@@ -293,7 +293,7 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=131072,
+        context_size=32768,
     ),
     # Mistral models - slightly more creative parameters
     "mistral:7b": ModelParameters(
@@ -430,18 +430,18 @@ MODEL_CONTEXT_SIZES: Dict[str, int] = {
     "qwen2.5:72b": 32768,
     "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:q4_k_m": 262144,
     # Llama 3.1 models (128K context) - Updated via ollama show verification
-    "llama3.1:8b": 131072,  # Updated from 32768
-    "llama3.1:8b-instruct-q8_0": 131072,  # Updated from 32768
-    "llama3.1:70b": 131072,  # Updated from 32768 (estimated based on verified models)
-    "llama3.1:405b": 131072,  # Updated from 32768 (estimated based on verified models)
+    "llama3.1:8b": 32768,  # Updated from 32768
+    "llama3.1:8b-instruct-q8_0": 32768,  # Updated from 32768
+    "llama3.1:70b": 32768,  # Updated from 32768 (estimated based on verified models)
+    "llama3.1:405b": 32768,  # Updated from 32768 (estimated based on verified models)
     # Llama 3.2 models (128K context) - Updated via ollama show verification
-    "llama3.2:1b": 131072,  # Updated from 32768 (estimated based on verified models)
-    "llama3.2:3b": 131072,  # Updated from 32768
-    "llama3.2:11b": 131072,  # Updated from 32768 (estimated based on verified models)
-    "llama3.2:90b": 131072,  # Updated from 32768 (estimated based on verified models)
+    "llama3.2:1b": 32768,  # Updated from 32768 (estimated based on verified models)
+    "llama3.2:3b": 32768,  # Updated from 32768
+    "llama3.2:11b": 32768,  # Updated from 32768 (estimated based on verified models)
+    "llama3.2:90b": 32768,  # Updated from 32768 (estimated based on verified models)
     # Llama 3.3 models (131K context)
-    "llama3.3:latest": 131072,
-    "llama3.3:70b": 131072,
+    "llama3.3:latest": 32768,
+    "llama3.3:70b": 32768,
     # Llama 3 models (8K context)
     "llama3:8b": 32768,
     "llama3:70b": 32768,
@@ -693,7 +693,7 @@ async def get_model_context_size(
     # 1. Check environment variable override first
     env_override = get_env_override_for_model(model_name)
     if env_override:
-        logger.info(
+        logger.debug(
             "Using environment override for %s: %d tokens", model_name, env_override
         )
         return env_override, "environment_override"
@@ -704,7 +704,7 @@ async def get_model_context_size(
         if model_info:
             ollama_context = extract_context_from_ollama_info(model_info)
             if ollama_context:
-                logger.info(
+                logger.debug(
                     "Detected context size from Ollama API for %s: %d tokens",
                     model_name,
                     ollama_context,
@@ -716,7 +716,7 @@ async def get_model_context_size(
     # 3. Try extracting from model name patterns
     name_context = extract_context_from_model_name(model_name)
     if name_context:
-        logger.info(
+        logger.debug(
             "Extracted context size from model name %s: %d tokens",
             model_name,
             name_context,
@@ -727,7 +727,7 @@ async def get_model_context_size(
     # First try the original model name (for case-sensitive models like HuggingFace)
     if model_name in MODEL_CONTEXT_SIZES:
         db_context = MODEL_CONTEXT_SIZES[model_name]
-        logger.info(
+        logger.debug(
             "Found context size in database for %s: %d tokens", model_name, db_context
         )
         return db_context, "database_lookup"
@@ -736,7 +736,7 @@ async def get_model_context_size(
     normalized_name = normalize_model_name(model_name)
     if normalized_name in MODEL_CONTEXT_SIZES:
         db_context = MODEL_CONTEXT_SIZES[normalized_name]
-        logger.info(
+        logger.debug(
             "Found context size in database for %s: %d tokens", model_name, db_context
         )
         return db_context, "database_lookup"
@@ -772,7 +772,7 @@ def get_model_context_size_sync(
     # 1. Check environment variable override first
     env_override = get_env_override_for_model(model_name)
     if env_override:
-        logger.info(
+        logger.debug(
             "Using environment override for %s: %d tokens", model_name, env_override
         )
         return env_override, "environment_override"
@@ -780,7 +780,7 @@ def get_model_context_size_sync(
     # 2. Try extracting from model name patterns
     name_context = extract_context_from_model_name(model_name)
     if name_context:
-        logger.info(
+        logger.debug(
             "Extracted context size from model name %s: %d tokens",
             model_name,
             name_context,
@@ -792,7 +792,7 @@ def get_model_context_size_sync(
     if model_name in MODEL_PARAMETERS:
         model_params = MODEL_PARAMETERS[model_name]
         if model_params.context_size is not None:
-            logger.info(
+            logger.debug(
                 "Found context size in unified database for %s: %d tokens",
                 model_name,
                 model_params.context_size,
@@ -804,7 +804,7 @@ def get_model_context_size_sync(
     if normalized_name in MODEL_PARAMETERS:
         model_params = MODEL_PARAMETERS[normalized_name]
         if model_params.context_size is not None:
-            logger.info(
+            logger.debug(
                 "Found context size in unified database for %s: %d tokens",
                 model_name,
                 model_params.context_size,
@@ -815,7 +815,7 @@ def get_model_context_size_sync(
     # First try the original model name
     if model_name in MODEL_CONTEXT_SIZES:
         db_context = MODEL_CONTEXT_SIZES[model_name]
-        logger.info(
+        logger.debug(
             "Found context size in legacy database for %s: %d tokens",
             model_name,
             db_context,
@@ -825,7 +825,7 @@ def get_model_context_size_sync(
     # Then try the normalized name
     if normalized_name in MODEL_CONTEXT_SIZES:
         db_context = MODEL_CONTEXT_SIZES[normalized_name]
-        logger.info(
+        logger.debug(
             "Found context size in legacy database for %s: %d tokens",
             model_name,
             db_context,
@@ -862,7 +862,7 @@ def add_model_to_database(model_name: str, context_size: int) -> None:
     """
     normalized_name = normalize_model_name(model_name)
     MODEL_CONTEXT_SIZES[normalized_name] = context_size
-    logger.info(
+    logger.debug(
         "Added model %s to context database: %d tokens", normalized_name, context_size
     )
 
@@ -1000,14 +1000,14 @@ def get_model_parameters(model_name: str) -> Tuple[ModelParameters, str]:
     if model_name in MODEL_PARAMETERS:
         base_params = MODEL_PARAMETERS[model_name]
         detection_method = "database_lookup"
-        logger.info("Found parameters in database for %s", model_name)
+        logger.debug("Found parameters in database for %s", model_name)
     else:
         # Then try the normalized name for standard models
         normalized_name = normalize_model_name(model_name)
         if normalized_name in MODEL_PARAMETERS:
             base_params = MODEL_PARAMETERS[normalized_name]
             detection_method = "database_lookup"
-            logger.info("Found parameters in database for %s (normalized)", model_name)
+            logger.debug("Found parameters in database for %s (normalized)", model_name)
         else:
             # Use default fallback
             base_params = MODEL_PARAMETERS["default"]
@@ -1015,7 +1015,7 @@ def get_model_parameters(model_name: str) -> Tuple[ModelParameters, str]:
 
     # 3. Apply environment overrides if any
     if env_overrides:
-        logger.info(
+        logger.debug(
             "Applying environment overrides for %s: %s", model_name, env_overrides
         )
         # Create new parameters with overrides applied
@@ -1054,7 +1054,9 @@ def add_model_parameters_to_database(
     """
     normalized_name = normalize_model_name(model_name)
     MODEL_PARAMETERS[normalized_name] = parameters
-    logger.info("Added model %s to parameter database: %s", normalized_name, parameters)
+    logger.debug(
+        "Added model %s to parameter database: %s", normalized_name, parameters
+    )
 
 
 def list_supported_model_parameters() -> Dict[str, ModelParameters]:

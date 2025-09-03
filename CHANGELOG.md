@@ -7,6 +7,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.5dev0] - 2025-09-03
+
+### Added
+- **Unified Agent Memory Interface**: The `AgnoPersonalAgent` now exposes a complete and robust set of public methods for all memory operations (list, query, update, delete, stats, etc.), serving as a single, authoritative interface for memory management. See [ADR-081](./refs/adr/081-unified-agent-memory-interface.md) for details.
+- **Live Graph Memory Count**: The `AgentMemoryManager` can now directly query the LightRAG server for a live count of graph entities, enabling accurate UI reporting of memory synchronization status.
+- **Workflow-Based Coordination Examples**: Added new examples (`workflow_memory_writer_example.py`) demonstrating the use of `agno.Workflow` for robust, stateful, and sequential agent coordination, offering a better architectural pattern for tasks like memory-based writing.
+- **Comprehensive Test Suite**: Added a full suite of integration tests to verify the new memory interfaces, the refactored Streamlit helpers, and the team coordination logic, ensuring all components work correctly across single-agent and team modes.
+
+### Changed
+- **Major UI Refactoring**: The `StreamlitMemoryHelper` has been completely refactored to be a thin client for the new agent-level memory interface. This decouples the UI from the agent's internal state, simplifies the code, and improves robustness.
+- **Team Coordinator Logic**: The `PersonalAgentTeam` coordinator's instructions have been updated to enforce a correct memory-based writing workflow, ensuring memories are first retrieved and then explicitly passed to the writer agent.
+- **Model Context Sizes**: Corrected and standardized the context sizes for many Llama and Qwen models in `model_contexts.py` to a more realistic `32768` tokens.
+- **Reduced Log Verbosity**: Changed numerous `logger.info` calls to `logger.debug` across the agent core to reduce console noise during standard operation.
+
+### Fixed
+- **Streamlit Async Bugs**: Resolved critical `RuntimeError` issues in the Streamlit UI by implementing a safe `asyncio` runner (`_run_async_safely`) that correctly handles the event loop, making memory operations from the UI reliable.
+- **Memory-Based Content Generation**: Fixed a major logical flaw in the `PersonalAgentTeam` where retrieved memories were not being passed to the writer agent. Content generation based on user memories now works as intended.
+- **Inaccurate Memory Sync Status**: The memory sync status in the UI is now accurate, as it uses the new live graph entity count instead of assuming the local and graph counts are identical.
+
 ## [v0.2.4dev0] - 2025-09-01
 
 ### Added
@@ -233,7 +252,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Docker Smart Restart and Module Refactoring**: Implemented a smart restart capability to allow forced restarts of Docker containers even when USER_IDs are consistent. Refactored the Docker synchronization logic by moving the `DockerUserSync` class from `scripts` to a new `src/personal_agent/core/docker` module, eliminating circular dependencies and improving architectural clarity. See [ADR-012](./refs/adr/012-docker-smart-restart.md) for details.
 - **AntiDuplicateMemory Refactor for Polymorphism**: Refactored the `AntiDuplicateMemory` class to align its method signatures with the parent `Memory` class. This change ensures polymorphic compatibility, allowing `AntiDuplicateMemory` to be used as a drop-in replacement for `Memory`, which improves code robustness and maintainability. See [ADR-010](./refs/adr/010-anti-duplicate-memory-refactor.md) for details.
 - **CLI Refactor for Maintainability**: The `agno_main.py` file was refactored to improve maintainability and organization. Memory-related CLI commands and initialization logic were extracted into new modules (`src/personal_agent/cli/` and `src/personal_agent/core/agno_initialization.py`). This significantly reduced the size and complexity of the main CLI file, enhancing modularity, testability, and extensibility while maintaining full backward compatibility. See [ADR-008](./refs/adr/008-cli-refactor.md) for details.
-- **Comprehensive Memory System Technical Summary**: Updated `COMPREHENSIVE_MEMORY_SYSTEM_TECHNICAL_SUMMARY.md` to reflect the CLI refactor, enhanced memory tool CLI, and new testing infrastructure.
+- **Comprehensive Memory System Technical Summary**: Updated `COMPREHensive_MEMORY_SYSTEM_TECHNICAL_SUMMARY.md` to reflect the CLI refactor, enhanced memory tool CLI, and new testing infrastructure.
 
 ### Fixed
 - **Agent Initialization Docker Consistency**: The agent initialization process now forces a restart of Docker containers, ensuring a clean and consistent state at every startup and preventing issues with stale containers or port conflicts.
