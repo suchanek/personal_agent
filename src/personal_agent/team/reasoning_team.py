@@ -99,6 +99,7 @@ Author: Eric G. Suchanek, PhD
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 from textwrap import dedent
@@ -130,6 +131,8 @@ try:
         LLM_MODEL,
         LMSTUDIO_URL,
         OLLAMA_URL,
+        OPENAI_URL,
+        PROVIDER,
         REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
     )
@@ -155,6 +158,8 @@ except ImportError:
         LLM_MODEL,
         LMSTUDIO_URL,
         OLLAMA_URL,
+        OPENAI_URL,
+        PROVIDER,
         REMOTE_LMSTUDIO_URL,
         REMOTE_OLLAMA_URL,
     )
@@ -170,7 +175,6 @@ except ImportError:
 WRITER_MODEL = "llama3.1:8b"
 CODING_MODEL = "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest"
 SYSTEM_MODEL = "qwen3:1.7b"
-
 # Load environment variables
 load_dotenv()
 
@@ -178,7 +182,6 @@ load_dotenv()
 
 logger = setup_logging(__name__)
 
-PROVIDER = "ollama"
 
 _instructions = dedent(
     """\
@@ -248,42 +251,19 @@ _instructions = dedent(
 )
 
 _memory_specific_instructions = [
-    "You are a memory and knowledge agent with access to both personal memory and factual knowledge.",
-    "CRITICAL TOOL SELECTION RULES:",
-    "- Use MEMORY TOOLS for personal information ABOUT THE USER",
-    "- Use KNOWLEDGE TOOLS for factual content, documents, poems, stories, articles",
-    "- When user says 'store this poem' or 'save this content' -> use ingest_knowledge_text",
-    "- When user says 'remember that I...' -> use store_user_memory",
-    "- When user asks 'what do you remember about me?' -> use get_all_memories",
-    "- When user asks 'list all memories' or 'list memories' -> use list_memories",
-    "- When user asks about stored content/documents -> use query_knowledge_base",
+    "You are a memory and knowledge agent.",
     "",
-    "MEMORY TOOLS - CORRECT USAGE:",
-    "- store_user_memory(content='fact about user', topics=['optional']) - Store new user info",
-    "- get_all_memories() - For 'what do you know about me' (NO PARAMETERS)",
-    "- query_memory(query='keywords', limit=10) - Search specific user information",
-    "- get_recent_memories(limit=10) - Recent interactions",
-    "- list_memories() - Simple overview (NO PARAMETERS)",
-    "- get_memories_by_topic(topics=['topic1'], limit=10) - Filter by topics",
-    "- update_memory(memory_id='id', content='new content', topics=['topics']) - Update existing",
-    "- delete_memory(memory_id='id') - Delete specific memory",
-    "- store_graph_memory(content='info', topics=['topics'], memory_id='optional') - Store with relationships",
-    "- query_graph_memory(query='terms', mode='hybrid', top_k=5) - Explore relationships",
+    "SIMPLE TOOL SELECTION:",
+    "- Personal info about user → use memory tools (store_user_memory, get_all_memories, etc.)",
+    "- Documents, articles, poems → use knowledge tools (ingest_knowledge_text, query_knowledge_base)",
     "",
-    "KNOWLEDGE TOOLS - CORRECT USAGE:",
-    "- ingest_knowledge_text(content='text', title='title', file_type='txt') - Store factual content",
-    "- ingest_knowledge_file(file_path='path', title='optional') - Ingest file",
-    "- ingest_knowledge_from_url(url='url', title='optional') - Ingest from web",
-    "- query_knowledge_base(query='search terms', mode='hybrid', limit=20) - Search knowledge",
+    "COMMON PATTERNS:",
+    "- 'Remember I...' → store_user_memory",
+    "- 'What do you remember about me?' → get_all_memories",
+    "- 'Store this poem/article' → ingest_knowledge_text",
+    "- 'List memories' → list_memories",
     "",
-    "EXAMPLES:",
-    "- 'Store this poem: [poem text]' -> ingest_knowledge_text(content=poem, title='User Poem')",
-    "- 'Remember I like skiing' -> store_user_memory(content='User likes skiing')",
-    "- 'What do you know about me?' -> get_all_memories()",
-    "- 'List all memories' -> list_memories()",
-    "- 'Save this article about AI' -> ingest_knowledge_text(content=article, title='AI Article')",
-    "Always execute the tools - do not show JSON or function calls to the user.",
-    "Provide natural responses based on the tool results.",
+    "Execute tools directly and provide natural responses.",
 ]
 
 _code_instructions = dedent(
@@ -412,40 +392,63 @@ _file_instructions = dedent(
 
 def create_ollama_model(
     model_name: str = LLM_MODEL, use_remote: bool = False
-) -> OllamaTools:
-    """Create an Ollama model using your AgentModelManager."""
-    # Use LMStudio URL when provider is 'openai', otherwise use Ollama URL
+):
+    """Create a model using your AgentModelManager (supports both Ollama and OpenAI)."""
+    # Use proper URL selection based on provider
     if PROVIDER == "openai":
-        url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+        # For OpenAI provider, use proper OpenAI URL logic
+        if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
+            url = OPENAI_URL
+        else:
+            url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+        
+        model_manager = AgentModelManager(
+            model_provider=PROVIDER,
+            model_name=model_name,
+            ollama_base_url="",
+            openai_base_url=url,
+            seed=None,
+        )
     else:
         url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
-
-    model_manager = AgentModelManager(
-        model_provider=PROVIDER,
-        model_name=model_name,
-        ollama_base_url=url,
-        seed=None,
-    )
+        model_manager = AgentModelManager(
+            model_provider=PROVIDER,
+            model_name=model_name,
+            ollama_base_url=url,
+            openai_base_url="",
+            seed=None,
+        )
     return model_manager.create_model()
 
 
 def create_model(
     provider: str = "ollama", model_name: str = LLM_MODEL, use_remote: bool = False
-) -> Agent:
-    """Create an Agent using AgentModelManager."""
+):
+    """Create a model using AgentModelManager."""
     if provider == "ollama":
         url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+        model_manager = AgentModelManager(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url=url,
+            seed=None,
+        )
     else:
-        url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+        # FIX: For OpenAI provider, use proper OpenAI URL logic
+        if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
+            url = OPENAI_URL
+        else:
+            url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+        
+        model_manager = AgentModelManager(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url="",
+            openai_base_url=url,
+            seed=None,
+        )
 
-    model_manager = AgentModelManager(
-        model_provider=provider,
-        model_name=model_name,
-        ollama_base_url=url,
-        seed=None,
-    )
     model = model_manager.create_model()
-
     return model
 
 
@@ -455,9 +458,10 @@ def create_openai_model(
     """Create an OpenAI model using AgentModelManager."""
     openai_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
     model_manager = AgentModelManager(
-        model_provider=PROVIDER,
+        model_provider="openai",
         model_name=model_name,
-        ollama_base_url=openai_url,
+        ollama_base_url="",
+        openai_base_url=openai_url,
         seed=None,
     )
     model = model_manager.create_model()
@@ -623,7 +627,7 @@ def create_writer_agent(
         add_name_to_instructions=True,
     )
 
-    logger.info("Created Writer Agent with custom writing tools")
+    logger.debug("Created Writer Agent with custom writing tools")
     return agent
 
 
@@ -666,7 +670,7 @@ def create_image_agent(
         add_name_to_instructions=True,
     )
 
-    logger.info(
+    logger.debug(
         "🚨 DIAGNOSTIC: Created Enhanced Image Agent with comprehensive error handling and diagnostic logging"
     )
     return agent
@@ -865,7 +869,7 @@ def create_personalized_instructions(agent, base_instructions: list) -> list:
         logger.info(f"✅ Personalized instructions created for user: {user_id}")
         return personalized_instructions
     else:
-        logger.info("⚠️ Using default user_id, keeping generic instructions")
+        logger.warning("⚠️ Using default user_id, keeping generic instructions")
         return base_instructions
 
 
@@ -881,11 +885,18 @@ async def create_memory_agent(
     if user_id is None:
         user_id = get_userid()
 
-    # Determine the correct URL based on use_remote flag
-    if PROVIDER == "ollama":
-        ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+    # Determine the correct URL based on use_remote flag and provider
+    if PROVIDER == "openai":
+        # For OpenAI provider, use proper OpenAI URL logic
+        if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
+            openai_url = OPENAI_URL
+            ollama_url = ""  # Empty for OpenAI
+        else:
+            openai_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+            ollama_url = ""  # Empty for OpenAI
     else:
-        ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+        ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+        openai_url = ""  # Empty for Ollama
 
     # Use provided model_name or fall back to config default
     effective_model = model_name if model_name else LLM_MODEL
@@ -901,6 +912,7 @@ async def create_memory_agent(
         recreate=recreate,
         alltools=False,
         ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
+        openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -935,7 +947,7 @@ async def create_memory_writer_agent(
         ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
 
     # DEBUG: Log the URL selection for memory agent
-    logger.info(
+    logger.debug(
         f"🔍 create_memory_writer_agent: provider={PROVIDER}, use_remote={use_remote}, selected_url={ollama_url}"
     )
 
@@ -960,7 +972,7 @@ async def create_memory_writer_agent(
     # Update instructions to include memory-specific guidance
 
     memory_writer_agent.instructions = _memory_specific_instructions
-    logger.info("✅ Memory/Writer agent created")
+    logger.debug("✅ Memory/Writer agent created")
     return memory_writer_agent
 
 
@@ -1049,78 +1061,52 @@ async def create_team(use_remote: bool = False, model_name: str = None):
             file_agent,
         ],
         instructions=[
-            "You are a team of agents using local Ollama models that can answer a variety of questions.",
-            "Your primary goal is to collect user memories and factual knowledge.",
-            "You are empathetic and caring. If the user talks about their feelings transfer to the Personal AI Agent.",
-            "Greet the user by name and be friendly and engaging!",
-            "DELEGATION RULES:",
-            "- For storing poems, articles, documents, or factual content -> delegate to Personal AI Agent",
-            "- For storing personal info about the user -> delegate to Personal AI Agent",
-            "- For memory queries like 'list all memories', 'what do you remember about me?' -> delegate to Personal AI Agent",
-            "- For web searches -> delegate to Web Agent",
-            "- For financial data -> delegate to Finance Agent",
-            "- For writing content -> delegate to Writer Agent ONCE ONLY",
-            "- For calculations -> delegate to Calculator Agent",
-            "- For image creation -> delegate to Image Agent",
+            "You are a team coordinator that delegates tasks to specialized agents.",
+            "Be friendly and greet users by name, {current_user_id} when possible.",
+            "Your primary role is to elicit memories and stories from your potentially neuro-degenerative impaired user",
+            "Help the user feel good about themselves!",
             "",
-            "🚨 CRITICAL MEMORY-BASED WRITING WORKFLOW:",
-            "- When user requests content 'based on my memories' or 'about me':",
-            "  1. FIRST delegate to Personal AI Agent to retrieve relevant memories",
-            "  2. THEN delegate to Writer Agent WITH the retrieved memories included",
-            "  3. Format: 'Write a [type] about [topic] using these memories: [memory content]'",
-            "- Example: User says 'write a story about me based on my memories'",
-            "  Step 1: Ask Personal AI Agent: 'list all memories'",
-            "  Step 2: Ask Writer Agent: 'Write a story about [user] using these memories: [retrieved memories]'",
+            "CRITICAL SUCCESS RECOGNITION:",
+            "- If you see 'Added memory for user' or 'ACCEPTED:' in the output, the memory storage was SUCCESSFUL",
+            "- If you see 'Memory stored successfully' or similar confirmation, the task is COMPLETE",
+            "- DO NOT make duplicate tool calls for the same task once you see success confirmation",
+            "- ONE successful tool call per task is sufficient",
             "",
-            "CRITICAL IMAGE DELEGATION RULES:",
-            "- For image creation requests, delegate to Image Agent",
-            "- ALWAYS return the Image Agent's response exactly as it is",
-            "- Do NOT summarize, describe, or replace the image URL with text",
-            "- Do NOT use emojis instead of the actual image URL",
-            "- The user needs to see the clickable image link, not a description",
-            "- Example: If Image Agent returns ![robot](https://example.com/image.png), show exactly that",
+            "SIMPLE DELEGATION RULES:",
+            "- Memory/personal info → Personal AI Agent (ONE call only per task)",
+            "- Web searches → Web Agent",
+            "- Writing content → Writer Agent",
+            "- Financial data → Finance Agent",
+            "- Math/calculations → Calculator Agent",
+            "- Images → Image Agent",
+            "- Code/Python → Python Agent",
+            "- Files → File System Agent",
+            "- System commands → SystemAgent",
+            "- Medical info → Medical Agent",
             "",
-            "🚨 CRITICAL ERROR HANDLING FOR IMAGE REQUESTS:",
-            "- If Image Agent reports an error, ALWAYS show the error message to the user",
-            "- For connection errors: Pass through the agent's suggestion to try again later",
-            "- For content policy violations: Pass through the agent's suggestions for rephrasing",
-            "- NEVER hide or ignore error messages from the Image Agent",
-            "- Be transparent about what went wrong and how to fix it",
+            "TASK COMPLETION LOGIC:",
+            "- Make ONE tool call per task",
+            "- Wait for the response",
+            "- If the response shows success (memory stored, task completed), STOP",
+            "- Do NOT make additional tool calls for the same task",
+            "- Only make multiple calls if the first one fails or for different subtasks",
             "",
-            "CRITICAL WRITING DELEGATION RULES:",
-            "- Delegate to Writer Agent ONLY ONCE per user request",
-            "- Do NOT call Writer Agent multiple times to edit or improve content",
-            "- Accept the Writer Agent's first response as final",
-            "- Include ALL requirements (tone, style, length) in the initial delegation",
-            "- When memories are involved, ALWAYS include the actual memory content in the delegation",
+            "FOR COMPLEX REQUESTS:",
+            "- If request needs web search + writing: First delegate to Web Agent, then to Writer Agent with the search results",
+            "- If request needs memories + writing: First get memories from Personal AI Agent, then delegate to Writer Agent with memory content",
             "",
-            "🚨 CRITICAL MEMORY DELEGATION RULES:",
-            "- For memory queries like 'list all memories', 'list memories', 'what do you remember about me?' -> ALWAYS delegate to Personal AI Agent",
-            "- NEVER summarize or paraphrase memory responses - show the COMPLETE response from Personal AI Agent",
-            "- When Personal AI Agent returns memory lists, show EVERY memory item exactly as returned",
-            "- Do NOT say 'I've retrieved X memories' - show the actual memory content",
+            "RESPONSE HANDLING:",
+            "- Pass through agent responses without modification",
+            "- Show complete responses from agents",
+            "- For errors, show the error message to help the user",
             "",
-            "KNOWLEDGE STORAGE EXAMPLES:",
-            "- 'Store this poem' -> delegate to Personal AI Agent (will use knowledge tools)",
-            "- 'Save this article' -> delegate to Personal AI Agent (will use knowledge tools)",
-            "- 'Remember I like skiing' -> delegate to Personal AI Agent (will use memory tools)",
-            "- 'List all memories' -> delegate to Personal AI Agent and show COMPLETE response",
-            "",
-            "🚨 CRITICAL RESPONSE HANDLING:",
-            "- ALWAYS show the COMPLETE, UNMODIFIED response from delegated agents",
-            "- Do NOT summarize, paraphrase, or describe what the agent returned",
-            "- If Personal AI Agent lists memories, show ALL the memories exactly as provided",
-            "- Your role is to PASS THROUGH responses, not to summarize them",
-            "- You are allowed to summarize any team member response when asked.",
-            "You can also answer directly, you don't HAVE to forward the question to a member agent.",
-            "Reason about more complex questions before delegating to a member agent.",
-            "If the user is only being conversational, encourage them to talk about themselves, life events, and feelings.",
+            "You can answer simple questions directly without delegation.",
         ],
         markdown=True,
         show_members_responses=True,
         show_tool_calls=True,
-        enable_agentic_context=True,
-        share_member_interactions=False,  # Disable shared interactions - memory agent handles this
+        enable_agentic_context=False,
+        share_member_interactions=True,  # Disable shared interactions - memory agent handles this
         enable_user_memories=False,  # Disable team-level memory - memory agent handles this
     )
 
@@ -1132,7 +1118,7 @@ async def create_team(use_remote: bool = False, model_name: str = None):
 
 async def cleanup_team(team):
     """Comprehensive cleanup of team resources to prevent ResourceWarnings."""
-    logging.info("🧹 Cleaning up team resources...")
+    logger.debug("🧹 Cleaning up team resources...")
 
     try:
         # 1. Close team-level resources
@@ -1140,35 +1126,35 @@ async def cleanup_team(team):
             try:
                 await _cleanup_model(team.model, "Team")
             except Exception as e:
-                logging.info(f"⚠️ Error cleaning up team model: {e}")
+                logger.debug(f"⚠️ Error cleaning up team model: {e}")
 
         if hasattr(team, "memory") and hasattr(team.memory, "db"):
             try:
                 if hasattr(team.memory.db, "close"):
                     await team.memory.db.close()
-                logging.info("✅ Team memory database closed")
+                logger.debug("✅ Team memory database closed")
             except Exception as e:
-                logging.info(f"⚠️ Error closing team memory database: {e}")
+                logger.debug(f"⚠️ Error closing team memory database: {e}")
 
         # 2. Close member-level resources
         if hasattr(team, "members") and team.members:
             for i, member in enumerate(team.members):
                 member_name = getattr(member, "name", f"Member-{i}")
-                logging.info(f"🔧 Cleaning up {member_name}...")
+                logger.debug(f"🔧 Cleaning up {member_name}...")
 
                 # Close member's model
                 if hasattr(member, "model") and member.model:
                     try:
                         await _cleanup_model(member.model, member_name)
                     except Exception as e:
-                        logging.info(f"⚠️ Error cleaning up {member_name} model: {e}")
+                        logger.debug(f"⚠️ Error cleaning up {member_name} model: {e}")
 
                 # Close member's memory
                 if hasattr(member, "memory") and hasattr(member.memory, "db"):
                     try:
                         if hasattr(member.memory.db, "close"):
                             await member.memory.db.close()
-                        logging.info(f"✅ {member_name} memory database closed")
+                        logger.debug(f"✅ {member_name} memory database closed")
                     except Exception as e:
                         logging.error(
                             f"⚠️ Error closing {member_name} memory database: {e}"
@@ -1194,7 +1180,7 @@ async def cleanup_team(team):
         # 4. Give asyncio time to close remaining connections
         await asyncio.sleep(0.5)
 
-        logging.info("✅ Team cleanup completed")
+        logger.debug("✅ Team cleanup completed")
 
     except Exception as e:
         logging.error(f"❌ Error during team cleanup: {e}")
@@ -1207,12 +1193,12 @@ async def _cleanup_model(model, model_name: str):
         if hasattr(model, "_session") and model._session:
             if not model._session.closed:
                 await model._session.close()
-            logging.info(f"✅ {model_name} model HTTP session closed")
+            logger.debug(f"✅ {model_name} model HTTP session closed")
 
         if hasattr(model, "session") and model.session:
             if not model.session.closed:
                 await model.session.close()
-            logging.info(f"✅ {model_name} model session closed")
+            logger.debug(f"✅ {model_name} model session closed")
 
         # Close any client connections
         if hasattr(model, "client"):
@@ -1221,13 +1207,13 @@ async def _cleanup_model(model, model_name: str):
             elif hasattr(model.client, "_session") and model.client._session:
                 if not model.client._session.closed:
                     await model.client._session.close()
-            logging.info(f"✅ {model_name} model client closed")
+            logger.debug(f"✅ {model_name} model client closed")
 
         # Handle OllamaTools specific cleanup
         if hasattr(model, "_client") and model._client:
             if hasattr(model._client, "close"):
                 await model._client.close()
-            logging.info(f"✅ {model_name} Ollama client closed")
+            logger.debug(f"✅ {model_name} Ollama client closed")
 
     except Exception as e:
         logging.error(f"⚠️ Error cleaning up {model_name} model: {e}")
@@ -1240,29 +1226,29 @@ async def _cleanup_tool(tool, tool_name: str):
         if hasattr(tool, "_session") and tool._session:
             if not tool._session.closed:
                 await tool._session.close()
-            logging.info(f"✅ {tool_name} tool HTTP session closed")
+            logger.debug(f"✅ {tool_name} tool HTTP session closed")
 
         if hasattr(tool, "session") and tool.session:
             if not tool.session.closed:
                 await tool.session.close()
-            logging.info(f"✅ {tool_name} tool session closed")
+            logger.debug(f"✅ {tool_name} tool session closed")
 
         # Handle DuckDuckGo tools specifically
         if hasattr(tool, "ddgs"):
             if hasattr(tool.ddgs, "_session") and tool.ddgs._session:
                 if not tool.ddgs._session.closed:
                     await tool.ddgs._session.close()
-                logging.info(f"✅ {tool_name} DuckDuckGo session closed")
+                logger.debug(f"✅ {tool_name} DuckDuckGo session closed")
 
             if hasattr(tool.ddgs, "close"):
                 await tool.ddgs.close()
-                logging.info(f"✅ {tool_name} DuckDuckGo client closed")
+                logger.debug(f"✅ {tool_name} DuckDuckGo client closed")
 
         # Handle YFinance tools
         if hasattr(tool, "_session") and "yfinance" in str(type(tool)).lower():
             if tool._session and not tool._session.closed:
                 await tool._session.close()
-                logging.info(f"✅ {tool_name} YFinance session closed")
+                logger.debug(f"✅ {tool_name} YFinance session closed")
 
         # Close any other client connections
         if hasattr(tool, "client"):
@@ -1271,7 +1257,7 @@ async def _cleanup_tool(tool, tool_name: str):
             elif hasattr(tool.client, "_session") and tool.client._session:
                 if not tool.client._session.closed:
                     await tool.client._session.close()
-            logging.info(f"✅ {tool_name} tool client closed")
+            logger.debug(f"✅ {tool_name} tool client closed")
 
     except Exception as e:
         logging.error(f"⚠️ Error cleaning up {tool_name} tool: {e}")
@@ -1379,11 +1365,15 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
         console.print("\n")
         display_welcome_panel(console, command_parser)
 
-        # Fix: Show the correct URL based on use_remote flag
-        if PROVIDER == "ollama":
-            actual_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+        # Fix: Show the correct URL based on use_remote flag and provider
+        if PROVIDER == "openai":
+            # For OpenAI provider, use proper OpenAI URL logic
+            if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
+                actual_url = OPENAI_URL
+            else:
+                actual_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
         else:
-            actual_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+            actual_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
 
         console.print(f"🖥️  Using {PROVIDER} model {LLM_MODEL} at: {actual_url}")
 
@@ -1512,8 +1502,18 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
 
 def cli_main():
     """Entry point for the paga_team_cli command."""
+    # Declare global PROVIDER at the top to avoid pylint errors
+    global PROVIDER
+    
     parser = argparse.ArgumentParser(
         description="Run the Ollama Multi-Purpose Reasoning Team"
+    )
+    parser.add_argument(
+        "--provider",
+        type=str,
+        default=PROVIDER,  # Use the PROVIDER from settings (which reads from .env)
+        choices=["ollama", "openai"],
+        help=f"The LLM provider to use. Defaults to '{PROVIDER}' from environment/config.",
     )
     parser.add_argument(
         "--remote", action="store_true", help="Use remote Ollama server"
@@ -1526,7 +1526,11 @@ def cli_main():
     )
     args = parser.parse_args()
 
-    print("Starting Personal Agent Reasoning Team...")
+    # Update the global provider based on the command-line argument.
+    # This is necessary because many functions in this module rely on the global PROVIDER variable.
+    PROVIDER = args.provider
+
+    print(f"Starting Personal Agent Reasoning Team with provider: {PROVIDER}...")
     asyncio.run(main(use_remote=args.remote, query=args.query))
 
 

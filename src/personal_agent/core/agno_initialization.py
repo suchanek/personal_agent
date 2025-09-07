@@ -19,7 +19,7 @@ from .agno_agent import AgnoPersonalAgent, create_agno_agent
 async def initialize_agno_system(
     use_remote_ollama: bool = False,
     recreate: bool = False,
-    instruction_level: str = "STANDARD",
+    instruction_level: str = settings.INSTRUCTION_LEVEL,
 ) -> Tuple[AgnoPersonalAgent, callable, callable, callable, str]:
     """
     Initialize all system components for agno framework.
