@@ -109,6 +109,7 @@ from .agno_storage import (
 from .docker_integration import ensure_docker_user_consistency
 from .knowledge_coordinator import create_knowledge_coordinator
 from .semantic_memory_manager import MemoryStorageResult, MemoryStorageStatus
+from .user_manager import UserManager
 
 # Configure logging
 logger = setup_logging(__name__, level=LOG_LEVEL)
@@ -159,6 +160,7 @@ class AgnoPersonalAgent(Agent):
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
+        openai_base_url: str = None,  # Add OpenAI base URL parameter
         user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
@@ -166,6 +168,7 @@ class AgnoPersonalAgent(Agent):
         alltools: Optional[bool] = True,
         initialize_agent: Optional[bool] = False,
         stream: Optional[bool] = False,
+        tool_caller: Optional[bool] = True,
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -211,21 +214,27 @@ class AgnoPersonalAgent(Agent):
 
         self.debug = debug
         self.ollama_base_url = ollama_base_url
-        self.user_id = user_id
+        self.openai_base_url = openai_base_url  # Store OpenAI base URL
         self.recreate = recreate
         self.instruction_level = instruction_level
         self.seed = seed
         self.alltools = alltools
 
+        # Set user_id with fallback
+        if user_id is None:
+            user_id = get_userid()
+
+        self.user_id = user_id
+        user_manager = UserManager()
+
+        self.user_details = user_manager.get_user_details(user_id)
+        self.delta_year = self.user_details.get("delta_year", 0)
+        self.cognitive_state = self.user_details.get("cognitive_state", 100)
+
         # Lazy initialization flag
         self._initialized = False
         self._initialization_lock = asyncio.Lock()
         self._force_init = initialize_agent
-
-        # Set user_id with fallback
-        if user_id is None:
-            user_id = get_userid()
-        self.user_id = user_id
 
         # Set up storage paths
         self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
@@ -257,10 +266,18 @@ class AgnoPersonalAgent(Agent):
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
 
         # Create the model immediately to avoid agno defaulting to OpenAI
+        # FIX: Pass openai_base_url parameter for proper OpenAI endpoint configuration
         temp_model_manager = AgentModelManager(
-            model_provider, model_name, ollama_base_url, seed
+            model_provider=model_provider,
+            model_name=model_name,
+            ollama_base_url=ollama_base_url,
+            openai_base_url=openai_base_url,  # Pass the OpenAI base URL parameter
+            seed=seed
         )
-        initial_model = temp_model_manager.create_model()
+
+        initial_model = None
+        if not tool_caller:
+            initial_model = temp_model_manager.create_model()
 
         # Initialize base Agent with proper model to prevent OpenAI default
         super().__init__(
@@ -430,7 +447,11 @@ class AgnoPersonalAgent(Agent):
 
             # 5. Initialize managers (CRITICAL: Must be done after agno_memory creation)
             self.model_manager = AgentModelManager(
-                self.model_provider, self.model_name, self.ollama_base_url, self.seed
+                model_provider=self.model_provider,
+                model_name=self.model_name,
+                ollama_base_url=self.ollama_base_url,
+                openai_base_url=self.openai_base_url,  # Pass the OpenAI base URL parameter
+                seed=self.seed
             )
 
             self.instruction_manager = AgentInstructionManager(
@@ -948,7 +969,6 @@ class AgnoPersonalAgent(Agent):
         """
         await self._ensure_initialized()
         return await self.memory_manager.get_graph_entity_count()
-
 
     async def query_lightrag_knowledge_direct(
         self, query: str, params: dict = None, url: str = LIGHTRAG_URL

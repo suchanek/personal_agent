@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-05
+
+### Added
+- **Multi-Provider Model Support**: The agent now supports multiple language model providers, starting with OpenAI and Ollama. This allows for greater flexibility, enabling the use of models like GPT-4o alongside local models. See [ADR-082](./refs/adr/082-multi-provider-model-support.md) for details.
+- **Configuration for Model Providers**: Added new environment variables (`MODEL_PROVIDER`, `OPENAI_API_KEY`) to manage the selection and authentication of model providers.
+- **OpenAI Dependency**: Added the `openai` library to the project dependencies to support the new provider.
+
+### Changed
+- **Refactored Model Management**: The `AgentModelManager` has been significantly refactored to dynamically load and manage models based on the selected provider, making the system more modular and extensible.
+- **UI Provider Display**: The Streamlit UI now displays the active model provider and model name for better transparency.
+
+### Fixed
+- **Ollama Tool-Calling Stability**: Replaced the unstable, custom `OllamaTools` wrapper with the standard `agno.models.ollama.Ollama` class. This resolves previous reliability issues and improves the stability of tool-calling when using Ollama models.
+
+
 _Reminder: All new entries should include a date/timestamp._
 
 All notable changes to this project will be documented in this file.

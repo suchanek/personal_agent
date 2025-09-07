@@ -28,7 +28,7 @@ async def run_agno_cli_wrapper(
     query: str = None,
     use_remote_ollama: bool = False,
     recreate: bool = False,
-    instruction_level: str = "STANDARD",
+    instruction_level: str = "NONE",
 ):
     """
     Wrapper function to initialize system and run CLI.
@@ -83,8 +83,6 @@ def cli_main():
             instruction_level=args.instruction_level,
         )
     )
-
-
 
 
 if __name__ == "__main__":

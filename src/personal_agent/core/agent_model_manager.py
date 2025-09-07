@@ -27,6 +27,7 @@ class AgentModelManager:
         model_provider: str,
         model_name: str,
         ollama_base_url: str,
+        openai_base_url: Optional[str] = None,
         seed: Optional[int] = None,
     ):
         """Initialize the model manager.
@@ -35,11 +36,13 @@ class AgentModelManager:
             model_provider: LLM provider ('ollama' or 'openai')
             model_name: Model name to use
             ollama_base_url: Base URL for Ollama API
+            openai_base_url: Optional base URL for OpenAI-compatible APIs.
             seed: Optional seed for model reproducibility
         """
         self.model_provider = model_provider
         self.model_name = model_name
         self.ollama_base_url = ollama_base_url
+        self.openai_base_url = openai_base_url
         self.seed = seed
 
     def create_model(self) -> Union[OpenAIChat, Ollama]:
@@ -52,20 +55,22 @@ class AgentModelManager:
             ValueError: If unsupported model provider is specified
         """
         if self.model_provider == "openai":
-            # Use LMStudio URL from settings when provider is openai
-            lmstudio_url = settings.LMSTUDIO_URL
-
-            # Check if we're using LMStudio (localhost:1234 indicates LMStudio)
-            if "localhost:1234" in lmstudio_url or "1234" in lmstudio_url:
+            # Check if LMSTUDIO_URL is configured and points to LMStudio
+            lmstudio_url = getattr(settings, 'LMSTUDIO_URL', None)
+            
+            # Use LMStudio if LMSTUDIO_URL is set and contains localhost:1234
+            if lmstudio_url and ("localhost:1234" in lmstudio_url or "127.0.0.1:1234" in lmstudio_url):
                 # Use LMStudio with OpenAI-compatible API
                 # Ensure the base URL has the correct /v1 endpoint for LMStudio
                 base_url = lmstudio_url
                 if not base_url.endswith("/v1"):
                     base_url = base_url.rstrip("/") + "/v1"
 
-                logger.debug(f"Using LMStudio with OpenAI-compatible API at: {base_url}")
-                logger.debug(f"Model: {self.model_name}")
-                logger.debug(
+                logger.info(
+                    f"Using LMStudio with OpenAI-compatible API at: {base_url}"
+                )
+                logger.info(f"Model: {self.model_name}")
+                logger.info(
                     "This will use /v1/chat/completions endpoint (OpenAI format)"
                 )
 
@@ -95,9 +100,17 @@ class AgentModelManager:
 
                 return model
             else:
-                # Standard OpenAI API
-                logger.debug(f"Using standard OpenAI API with model: {self.model_name}")
-                model = OpenAIChat(id=self.model_name)
+                # Standard OpenAI API - uses OPENAI_API_KEY from environment
+                logger.info(f"Using standard OpenAI API with model: {self.model_name}")
+                if self.openai_base_url:
+                    logger.info(f"Using custom OpenAI base URL: {self.openai_base_url}")
+                else:
+                    logger.info("Using default OpenAI API endpoint.")
+                logger.info(
+                    "API Key will be read from OPENAI_API_KEY environment variable"
+                )
+
+                model = OpenAIChat(id=self.model_name, base_url=self.openai_base_url)
 
                 # WORKAROUND: Fix incorrect role mapping in Agno framework
                 # The default_role_map incorrectly maps "system" -> "developer"
@@ -110,7 +123,7 @@ class AgentModelManager:
                         "tool": "tool",
                         "model": "assistant",
                     }
-                    logger.warning(
+                    logger.info(
                         f"🔧 Applied role mapping fix to OpenAI model: {self.model_name}"
                     )
 

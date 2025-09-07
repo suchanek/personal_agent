@@ -18,7 +18,7 @@ PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
 
-LMSTUDIO_URL = "https://localhost:1234/v1"
+INSTRUCTION_LEVEL = "CONCISE"
 
 # see below for the ollama server urls
 
@@ -110,9 +110,15 @@ PROVIDER = get_env_var("PROVIDER", "ollama")
 WEAVIATE_URL = get_env_var("WEAVIATE_URL", "http://localhost:8080")
 USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 
+INSTRUCTION_LEVEL = get_env_var("INSTRUCTION_LEVEL", "CONCISE")
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
 REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://100.100.248.61:11434")
 REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://100.100.248.61:11434")
+
+# LMStudio URL configuration - defaults to localhost LMStudio, can be overridden in .env
+LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "")
+# FIX: Corrected OpenAI API URL - was using chat.openai.com instead of api.openai.com
+OPENAI_URL = "https://api.openai.com/v1"
 
 USE_MCP = get_env_bool("USE_MCP", True)
 
@@ -151,7 +157,7 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 logger.setLevel(LOG_LEVEL)
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:8b")
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7b")
 
 # Qwen Model Settings - Instruct Model Parameters
 QWEN_INSTRUCT_TEMPERATURE = get_env_var("QWEN_INSTRUCT_TEMPERATURE", "0.7")
