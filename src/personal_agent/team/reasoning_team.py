@@ -175,6 +175,9 @@ except ImportError:
 WRITER_MODEL = "llama3.1:8b"
 CODING_MODEL = "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest"
 SYSTEM_MODEL = "qwen3:1.7b"
+# MEMORY_AGENT_MODEL = "gpt-4o"
+MEMORY_AGENT_MODEL = "qwen3:4b"
+
 # Load environment variables
 load_dotenv()
 
@@ -251,19 +254,39 @@ _instructions = dedent(
 )
 
 _memory_specific_instructions = [
-    "You are a memory and knowledge agent.",
-    "",
+    "- You are a memory and knowledge agent.",
+    "- Return your tool responses immediately",
+    "- Optimize token use. Use the list_all_memories over get_all_memories to save output tokens!",
     "SIMPLE TOOL SELECTION:",
     "- Personal info about user → use memory tools (store_user_memory, get_all_memories, etc.)",
     "- Documents, articles, poems → use knowledge tools (ingest_knowledge_text, query_knowledge_base)",
+    "FUNCTION SELECTION RULES:",
+    "- Use list_all_memories for: summaries, overviews, quick lists, counts, general requests",
+    "- Use get_all_memories for: detailed content, full information, when explicitly asked for details",
+    "- Default to list_all_memories unless user specifically requests detailed information",
+    "- Always prefer concise responses (list_all_memories) unless details explicitly requested",
     "",
     "COMMON PATTERNS:",
     "- 'Remember I...' → store_user_memory",
-    "- 'What do you remember about me?' → get_all_memories",
+    "- 'What do you remember about me?' → list_all_memories, no parameters -> return response immediately",
+    "- 'List all memories' → list_all_memories, no parameters",
+    "- 'list all memories stored' → list_all_memories, no parameters",
+    "- 'show all memories' → list_all_memories, no parameters",
+    "- 'what memories do you have' → list_all_memories, no parameters",
+    "- 'how many memories' → list_all_memories, no parameters",
+    "- 'memory summary' → list_all_memories, no parameters",
+    "- 'list detailed memory info' → get_all_memories, no parameters",
+    "- 'show detailed memories' → get_all_memories, no parameters",
+    "- 'get full memory details' → get_all_memories, no parameters",
+    "- 'complete memory information' → get_all_memories, no parameters",
     "- 'Store this poem/article' → ingest_knowledge_text",
-    "- 'List memories' → list_memories",
     "",
-    "Execute tools directly and provide natural responses.",
+    "PATTERN MATCHING GUIDELINES:",
+    "- Keywords for list_all_memories: 'list', 'show', 'what memories', 'how many', 'summary', 'stored'",
+    "- Keywords for get_all_memories: 'detailed', 'full', 'complete', 'everything about', 'all details'",
+    "- When in doubt, choose list_all_memories (more efficient and user-friendly)",
+    "",
+    "Execute tools directly. return the results directly.",
 ]
 
 _code_instructions = dedent(
@@ -390,9 +413,7 @@ _file_instructions = dedent(
 )
 
 
-def create_ollama_model(
-    model_name: str = LLM_MODEL, use_remote: bool = False
-):
+def create_ollama_model(model_name: str = LLM_MODEL, use_remote: bool = False):
     """Create a model using your AgentModelManager (supports both Ollama and OpenAI)."""
     # Use proper URL selection based on provider
     if PROVIDER == "openai":
@@ -401,7 +422,7 @@ def create_ollama_model(
             url = OPENAI_URL
         else:
             url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-        
+
         model_manager = AgentModelManager(
             model_provider=PROVIDER,
             model_name=model_name,
@@ -439,7 +460,7 @@ def create_model(
             url = OPENAI_URL
         else:
             url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-        
+
         model_manager = AgentModelManager(
             model_provider=provider,
             model_name=model_name,
@@ -730,7 +751,7 @@ def create_agents(
                 company_news=True,
             ),
         ],
-        instructions=["Use tables to display data. "],
+        instructions=["Use tables to display data."],
         show_tool_calls=True,
         debug_mode=debug,
     )
@@ -843,14 +864,18 @@ def create_agents(
 
 def create_personalized_instructions(agent, base_instructions: list) -> list:
     """Create personalized instructions using the agent's user_id."""
-    user_id = getattr(agent, "user_id", "user")
+    user_id = getattr(agent, "user_id", None)
 
-    # Use the user_id directly instead of generic "user" references
-    if user_id and user_id != "default_user":
+    # Get the actual current user_id if not available from agent
+    if not user_id:
+        user_id = get_userid()
+
+    # Always personalize instructions, even for default_user
+    if user_id:
         # Replace "the user" and "user" with the actual user_id in instructions
         personalized_instructions = []
         for instruction in base_instructions:
-            # Replace various forms of "user" references
+            # Replace various forms of "user" references with the actual user_id
             personalized_instruction = instruction.replace("the user", user_id)
             personalized_instruction = personalized_instruction.replace(
                 "ABOUT THE USER", f"ABOUT {user_id.upper()}"
@@ -864,12 +889,18 @@ def create_personalized_instructions(agent, base_instructions: list) -> list:
             personalized_instruction = personalized_instruction.replace(
                 "user ", f"{user_id} "
             )
+            # Also replace generic "user" at word boundaries to avoid partial replacements
+            import re
+
+            personalized_instruction = re.sub(
+                r"\buser\b", user_id, personalized_instruction
+            )
             personalized_instructions.append(personalized_instruction)
 
         logger.info(f"✅ Personalized instructions created for user: {user_id}")
         return personalized_instructions
     else:
-        logger.warning("⚠️ Using default user_id, keeping generic instructions")
+        logger.warning("⚠️ No user_id available, keeping generic instructions")
         return base_instructions
 
 
@@ -900,7 +931,7 @@ async def create_memory_agent(
 
     # Use provided model_name or fall back to config default
     effective_model = model_name if model_name else LLM_MODEL
-
+    # effective_model = "qwen3:1.7b"
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
@@ -913,6 +944,7 @@ async def create_memory_agent(
         alltools=False,
         ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
         openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
+        tool_caller=False,
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -1020,7 +1052,7 @@ async def create_team(use_remote: bool = False, model_name: str = None):
         user_id=current_user_id,
         debug=True,
         use_remote=use_remote,
-        model_name=effective_model,  # Pass the model name
+        model_name=MEMORY_AGENT_MODEL,  # Pass the model name
     )
 
     # Create all other agents with the correct remote/local configuration
@@ -1046,14 +1078,14 @@ async def create_team(use_remote: bool = False, model_name: str = None):
         ),
         memory=None,  # No team-level memory - only memory agent handles memory
         tools=[
-            # ReasoningTools(add_instructions=True, add_few_shot=True),
+            ReasoningTools(add_instructions=True, add_few_shot=True),
         ],
         members=[
             memory_agent,  # Memory agent with your managers
             web_agent,
             system_agent,  # SystemAgent for shell commands
             finance_agent,
-            writer_agent,
+            # writer_agent,
             image_agent,  # Image creation agent
             calculator_agent,
             medical_agent,
@@ -1062,20 +1094,28 @@ async def create_team(use_remote: bool = False, model_name: str = None):
         ],
         instructions=[
             "You are a team coordinator that delegates tasks to specialized agents.",
-            "Be friendly and greet users by name, {current_user_id} when possible.",
-            "Your primary role is to elicit memories and stories from your potentially neuro-degenerative impaired user",
-            "Help the user feel good about themselves!",
+            f"The user you are interacting with is {current_user_id}",
+            f"Be friendly and greet users by name, {current_user_id} when possible.",
+            f"Your primary role is to elicit memories and stories from your potentially neuro-degenerative impaired user {current_user_id}",
+            f"Help {current_user_id} feel good about themselves!",
             "",
             "CRITICAL SUCCESS RECOGNITION:",
             "- If you see 'Added memory for user' or 'ACCEPTED:' in the output, the memory storage was SUCCESSFUL",
             "- If you see 'Memory stored successfully' or similar confirmation, the task is COMPLETE",
             "- DO NOT make duplicate tool calls for the same task once you see success confirmation",
-            "- ONE successful tool call per task is sufficient",
+            "- Trust your team member responses. Don't overthink",
+            "",
+            "CRITICAL RESPONSE DISPLAY RULES:",
+            "- When a team member provides results, DISPLAY THEIR ACTUAL RESULTS directly to the user",
+            "- DO NOT interpret, summarize, or rewrite team member responses",
+            "- DO NOT add your own <think> tags or commentary when displaying results",
+            "- If a memory agent lists memories, show the actual list they provided",
+            "- If a web agent finds information, show their actual findings",
+            "- Your role is to PASS THROUGH the specialist results, not interpret them",
             "",
             "SIMPLE DELEGATION RULES:",
             "- Memory/personal info → Personal AI Agent (ONE call only per task)",
             "- Web searches → Web Agent",
-            "- Writing content → Writer Agent",
             "- Financial data → Finance Agent",
             "- Math/calculations → Calculator Agent",
             "- Images → Image Agent",
@@ -1084,23 +1124,14 @@ async def create_team(use_remote: bool = False, model_name: str = None):
             "- System commands → SystemAgent",
             "- Medical info → Medical Agent",
             "",
-            "TASK COMPLETION LOGIC:",
-            "- Make ONE tool call per task",
-            "- Wait for the response",
-            "- If the response shows success (memory stored, task completed), STOP",
-            "- Do NOT make additional tool calls for the same task",
+            "- Do NOT make duplicate tool calls for the same task",
             "- Only make multiple calls if the first one fails or for different subtasks",
             "",
-            "FOR COMPLEX REQUESTS:",
-            "- If request needs web search + writing: First delegate to Web Agent, then to Writer Agent with the search results",
-            "- If request needs memories + writing: First get memories from Personal AI Agent, then delegate to Writer Agent with memory content",
-            "",
             "RESPONSE HANDLING:",
-            "- Pass through agent responses without modification",
-            "- Show complete responses from agents",
+            "- Show complete responses from agents WITHOUT modification",
             "- For errors, show the error message to help the user",
-            "",
-            "You can answer simple questions directly without delegation.",
+            "- DO NOT add interpretation or commentary to specialist results",
+            f"You can answer simple questions directly without delegation. Remember you are helping {current_user_id}.",
         ],
         markdown=True,
         show_members_responses=True,
@@ -1281,7 +1312,7 @@ def display_welcome_panel(console: Console, command_parser: CommandParser):
 
 
 # Main execution
-async def main(use_remote: bool = False, query: Optional[str] = None):
+async def main(use_remote: bool = False, query: Optional[str] = None, recreate: bool = False, instruction_level: str = "STANDARD"):
     """Main function to run the team with an enhanced CLI interface."""
 
     # Initialize Rich console for better formatting
@@ -1305,10 +1336,20 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
         # Get the memory agent for CLI commands
         memory_agent = None
         if hasattr(team, "members") and team.members:
+            logger.debug(f"🔍 Searching for memory agent among {len(team.members)} team members")
             for member in team.members:
-                if hasattr(member, "name") and "Personal AI Agent" in member.name:
+                member_name = getattr(member, "name", "Unknown")
+                logger.debug(f"🔍 Checking member: {member_name}")
+                if hasattr(member, "name") and "Personal-Agent" in member.name:
                     memory_agent = member
+                    logger.info(f"✅ Found memory agent: {member.name}")
                     break
+            
+            if not memory_agent:
+                logger.warning("⚠️ Memory agent not found! Available members:")
+                for member in team.members:
+                    member_name = getattr(member, "name", "Unknown")
+                    logger.warning(f"   - {member_name}")
 
         console.print("\n✅ [bold green]Team initialized successfully![/bold green]")
         console.print("\n[bold cyan]Team Members:[/bold cyan]")
@@ -1336,9 +1377,10 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                     query
                 )
 
-                # If it's a memory command, execute it with the memory agent
+                # If it's a memory command, execute it directly with the memory agent
                 if command_handler and memory_agent:
                     try:
+                        console.print("🧠 [bold green]Memory Agent:[/bold green]")
                         if remaining_text is not None:
                             await command_handler(memory_agent, remaining_text, console)
                         else:
@@ -1386,44 +1428,14 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                 if not user_input:
                     continue
 
-                # Parse the command using the same system as agno_cli.py
-                command_handler, remaining_text, kwargs = command_parser.parse_command(
-                    user_input
-                )
-
-                # Handle quit command specially
-                if (
-                    command_handler
-                    and hasattr(command_handler, "__name__")
-                    and command_handler.__name__ == "_handle_quit"
-                ):
-                    console.print(
-                        "👋 Goodbye! Thanks for using the Personal Agent Team!"
-                    )
-                    await cleanup_team(team)
-                    break
-
-                # If it's a memory command, execute it with the memory agent
-                if command_handler and memory_agent:
-                    try:
-                        if remaining_text is not None:
-                            await command_handler(memory_agent, remaining_text, console)
-                        else:
-                            await command_handler(memory_agent, console)
-                        continue
-                    except Exception as e:
-                        console.print(f"💥 Error executing memory command: {e}")
-                        continue
-
-                # Handle team-specific commands
-                elif user_input.lower() == "help":
+                # Handle team-specific commands FIRST (before memory commands)
+                if user_input.lower() == "help":
                     console.print("\n")
                     display_welcome_panel(console, command_parser)
                     continue
 
                 elif user_input.lower() == "clear":
                     import os
-
                     os.system("clear" if os.name == "posix" else "cls")
                     console.print("🤖 Personal Agent Team")
                     console.print("💬 Chat cleared. How can I help you?")
@@ -1440,6 +1452,10 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                         "    - '! I work as a software engineer' (immediate storage)"
                     )
                     console.print("    - '? work' (query memories about work)")
+                    console.print("    - 'memories' - Show all stored memories")
+                    console.print("    - 'analysis' - Show memory analysis")
+                    console.print("    - 'stats' - Show memory statistics")
+                    console.print("    - 'wipe' - Clear all memories (requires confirmation)")
                     console.print("\n  [yellow]Web Search:[/yellow]")
                     console.print("    - 'What's the latest news about AI?'")
                     console.print("    - 'Search for information about climate change'")
@@ -1460,6 +1476,44 @@ async def main(use_remote: bool = False, query: Optional[str] = None):
                     console.print("\n  [yellow]Math & Calculations:[/yellow]")
                     console.print("    - 'Calculate the square root of 144'")
                     console.print("    - 'What's 15% of 250?'")
+                    continue
+
+                # Parse memory commands using CommandParser
+                command_handler, remaining_text, kwargs = command_parser.parse_command(
+                    user_input
+                )
+
+                # Handle quit command specially
+                if (
+                    command_handler
+                    and hasattr(command_handler, "__name__")
+                    and command_handler.__name__ == "_handle_quit"
+                ):
+                    console.print(
+                        "👋 Goodbye! Thanks for using the Personal Agent Team!"
+                    )
+                    await cleanup_team(team)
+                    break
+
+                # If it's a recognized memory command, execute it directly with the memory agent
+                if command_handler and memory_agent:
+                    try:
+                        console.print("🧠 [bold green]Memory Agent:[/bold green]")
+                        logger.debug(f"🔍 Executing command handler: {command_handler.__name__}")
+                        # The command handlers expect an AgnoPersonalAgent, so we pass the memory_agent
+                        # which is an AgnoPersonalAgent instance
+                        if remaining_text is not None:
+                            await command_handler(memory_agent, remaining_text, console)
+                        else:
+                            await command_handler(memory_agent, console)
+                        continue
+                    except Exception as e:
+                        console.print(f"💥 Error executing command: {e}")
+                        logger.error(f"Command execution failed: {e}", exc_info=True)
+                        continue
+                elif command_handler and not memory_agent:
+                    console.print("❌ Memory agent not available - cannot execute memory commands")
+                    logger.error("Command handler found but memory agent is None")
                     continue
 
                 # If not a command, treat as regular team chat
@@ -1504,7 +1558,7 @@ def cli_main():
     """Entry point for the paga_team_cli command."""
     # Declare global PROVIDER at the top to avoid pylint errors
     global PROVIDER
-    
+
     parser = argparse.ArgumentParser(
         description="Run the Ollama Multi-Purpose Reasoning Team"
     )
@@ -1519,6 +1573,15 @@ def cli_main():
         "--remote", action="store_true", help="Use remote Ollama server"
     )
     parser.add_argument(
+        "--recreate", action="store_true", help="Recreate the knowledge base"
+    )
+    parser.add_argument(
+        "--instruction-level",
+        type=str,
+        default="STANDARD",
+        help="Set the instruction level for the agent (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL)",
+    )
+    parser.add_argument(
         "-q",
         "--query",
         type=str,
@@ -1531,7 +1594,7 @@ def cli_main():
     PROVIDER = args.provider
 
     print(f"Starting Personal Agent Reasoning Team with provider: {PROVIDER}...")
-    asyncio.run(main(use_remote=args.remote, query=args.query))
+    asyncio.run(main(use_remote=args.remote, query=args.query, recreate=args.recreate, instruction_level=args.instruction_level))
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ class PersagMemoryTools(Toolkit):
             self.get_all_memories,
             self.get_memory_stats,
             self.get_memories_by_topic,
-            self.list_memories,
+            self.list_all_memories,
             self.store_graph_memory,
             self.query_graph_memory,
             self.get_memory_graph_labels,
@@ -118,7 +118,11 @@ class PersagMemoryTools(Toolkit):
         return await self.memory_manager.get_recent_memories(limit)
 
     async def get_all_memories(self) -> str:
-        """Get all user memories."""
+        """Get all user memories with full details including timestamps, IDs, and complete metadata.
+
+        Use this when the user specifically requests detailed information or complete memory data.
+        This provides comprehensive memory information but uses more context window space.
+        """
         return await self.memory_manager.get_all_memories()
 
     async def get_memory_stats(self) -> str:
@@ -131,9 +135,14 @@ class PersagMemoryTools(Toolkit):
         """Get memories by topic without similarity search."""
         return await self.memory_manager.get_memories_by_topic(topics, limit)
 
-    async def list_memories(self) -> str:
-        """List all memories in a simple, user-friendly format."""
-        return await self.memory_manager.list_memories()
+    async def list_all_memories(self) -> str:
+        """List all user memories in a concise, summary format optimized for quick overview.
+
+        Use this for general memory listing requests like 'list all memories', 'what do you know about me',
+        or 'show me all memories'. This provides a performance-optimized summary without full details.
+        PREFERRED for most listing requests to save context window space.
+        """
+        return await self.memory_manager.list_all_memories()
 
     async def store_graph_memory(
         self,

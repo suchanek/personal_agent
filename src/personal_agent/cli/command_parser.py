@@ -15,6 +15,7 @@ from .memory_commands import (
     delete_memories_by_topic_cli,
     delete_memory_by_id_cli,
     show_all_memories,
+    show_all_memories_brief,
     show_memories_by_topic_cli,
     show_memory_analysis,
     show_memory_stats,
@@ -28,9 +29,13 @@ class CommandParser:
     def __init__(self):
         self.commands: Dict[str, Callable] = {
             "memories": show_all_memories,
+            "brief": show_all_memories_brief,
             "analysis": show_memory_analysis,
             "stats": show_memory_stats,
-            "clear": clear_all_memories,
+            "wipe": clear_all_memories,
+            "help": self._handle_help,
+            "clear": self._handle_clear,
+            "examples": self._handle_examples,
         }
         
         # Commands that require additional parsing
@@ -99,6 +104,50 @@ class CommandParser:
         """Handle quit command - this is a special case handled by the main loop."""
         return "quit"
     
+    async def _handle_help(self, agent: "AgnoPersonalAgent", console: "Console"):
+        """Handle help command."""
+        from rich.panel import Panel
+        console.print("\n")
+        console.print(
+            Panel.fit(
+                "🚀 Enhanced Personal AI Agent with Agno Framework\n\n"
+                "This CLI provides an enhanced chat interface with memory management.\n\n"
+                f"{self.get_help_text()}\n\n"
+                "[bold yellow]Additional Commands:[/bold yellow]\n"
+                "• 'help' - Show this help message\n"
+                "• 'clear' - Clear the screen\n"
+                "• 'examples' - Show example queries\n"
+                "• 'quit' - Exit the agent",
+                style="bold blue",
+            )
+        )
+    
+    async def _handle_clear(self, agent: "AgnoPersonalAgent", console: "Console"):
+        """Handle clear command."""
+        import os
+        os.system("clear" if os.name == "posix" else "cls")
+        console.print("🤖 Personal AI Agent")
+        console.print("💬 Chat cleared. How can I help you?")
+    
+    async def _handle_examples(self, agent: "AgnoPersonalAgent", console: "Console"):
+        """Handle examples command."""
+        console.print("\n💡 [bold cyan]Example Queries:[/bold cyan]")
+        console.print("  [yellow]Memory & Personal:[/yellow]")
+        console.print("    - 'Remember that I love skiing and live in Colorado'")
+        console.print("    - 'What do you remember about me?'")
+        console.print("    - '! I work as a software engineer' (immediate storage)")
+        console.print("    - '? work' (query memories about work)")
+        console.print("    - 'memories' - Show all stored memories")
+        console.print("    - 'brief' - Show brief list of all memories")
+        console.print("    - 'analysis' - Show memory analysis")
+        console.print("    - 'stats' - Show memory statistics")
+        console.print("    - 'wipe' - Clear all memories (requires confirmation)")
+        console.print("\n  [yellow]General Chat:[/yellow]")
+        console.print("    - 'What's the weather like today?'")
+        console.print("    - 'Help me write an email'")
+        console.print("    - 'Explain quantum computing'")
+        console.print("    - 'What are the latest AI developments?'")
+    
     def get_help_text(self) -> str:
         """Return help text for available commands."""
         return """Commands:
@@ -106,9 +155,13 @@ class CommandParser:
 • Start with '!' to immediately store as memory
 • Start with '?' to query memories by topic (e.g., `? work`)
 • 'memories' - Show all memories
+• 'brief' - Show brief list of all memories
 • 'analysis' - Show memory analysis
 • 'stats' - Show memory statistics
-• 'clear' - Clear all memories
+• 'wipe' - Clear all memories (requires confirmation)
 • 'delete memory <id>' - Delete a memory by its ID
 • 'delete topic <topic>' - Delete all memories for a topic
+• 'help' - Show this help message
+• 'clear' - Clear the screen
+• 'examples' - Show example queries
 • 'quit' - Exit the CLI"""

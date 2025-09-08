@@ -18,7 +18,7 @@ if the tool function is not available.
 
 The following operations are supported:
 - Storing memories (store_immediate_memory)
-- Retrieving memories (show_all_memories, show_memories_by_topic_cli)
+- Retrieving memories (show_all_memories, show_all_memories_brief, show_memories_by_topic_cli)
 - Analyzing memories (show_memory_analysis, show_memory_stats)
 - Deleting memories (delete_memory_by_id_cli, delete_memories_by_topic_cli, clear_all_memories)
 
@@ -107,6 +107,48 @@ async def show_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
     except Exception as e:
         console.print(f"❌ Error retrieving memories: {e}")
         logger.exception(f"Exception while retrieving all memories: {e}")
+
+
+async def show_all_memories_brief(agent: "AgnoPersonalAgent", console: "Console"):
+    """Show a brief list of all memories for the user, using the agent's memory tools when available."""
+    try:
+        if not agent.agno_memory:
+            console.print("📝 No memory system available")
+            return
+
+        # Find the list_all_memories tool function
+        list_all_memories_func = find_tool_by_name(agent, "list_all_memories")
+
+        if list_all_memories_func:
+            # Use the tool function that provides consistent results
+            result = await list_all_memories_func()
+            console.print(result)
+            logger.debug("Retrieved brief memory list using agent tool function")
+        else:
+            # Fallback to direct memory manager call
+            results = agent.agno_memory.memory_manager.list_all_memories(
+                db=agent.agno_memory.db,
+                user_id=agent.user_id,
+            )
+
+            if not results:
+                console.print("📝 No memories found")
+                return
+
+            console.print(f"📝 Brief memory list ({len(results)}):")
+            for i, memory in enumerate(results, 1):
+                # Show a brief version - just the first 100 characters
+                # list_all_memories returns strings directly, not memory objects
+                brief_content = memory
+                console.print(f"  {i}. {brief_content}")
+
+            logger.debug(
+                f"Retrieved {len(results)} memories in brief format using direct memory manager"
+            )
+
+    except Exception as e:
+        console.print(f"❌ Error retrieving brief memory list: {e}")
+        logger.exception(f"Exception while retrieving brief memory list: {e}")
 
 
 async def show_memories_by_topic_cli(
@@ -247,6 +289,24 @@ async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
         if not agent.agno_memory:
             console.print("📝 No memory system available")
             return
+
+        # Show confirmation prompt for destructive operation
+        console.print(
+            "⚠️  [bold red]WARNING: This will permanently delete ALL memories![/bold red]"
+        )
+        console.print("This action cannot be undone.")
+
+        # Get user confirmation
+        try:
+            confirmation = input("Type 'YES' to confirm deletion: ").strip()
+            if confirmation != "YES":
+                console.print("❌ Memory deletion cancelled.")
+                return
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n❌ Memory deletion cancelled.")
+            return
+
+        console.print("🗑️  Proceeding with memory deletion...")
 
         # Find the clear_memories tool function that handles both storage systems
         clear_memories_func = find_tool_by_name(agent, "clear_all_memories")

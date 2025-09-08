@@ -82,7 +82,7 @@ async def run_agno_cli(
                         await command_handler(agent, console)
                     continue
                 except Exception as e:
-                    console.print(f"💥 Error executing command: {e}")
+                    console.print(f"� Error executing command: {e}")
                     continue
 
             # If not a command, treat as regular chat
