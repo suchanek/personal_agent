@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 class StreamlitMemoryHelper:
     """Simplified StreamlitMemoryHelper using the new agent memory function interfaces."""
-    
+
     def __init__(self, agent):
         self.agent = agent
 
@@ -70,19 +70,20 @@ class StreamlitMemoryHelper:
         """Ensure agent is available and has basic memory access."""
         if not self.agent:
             return False, "Agent not available"
-        
+
         # Check for basic memory access - either through direct functions or memory system
         has_memory_access = (
             # Direct memory functions (single agent)
-            hasattr(self.agent, 'store_user_memory') or
+            hasattr(self.agent, "store_user_memory")
+            or
             # Memory system access (both single agent and team wrapper)
-            (hasattr(self.agent, 'agno_memory') and self.agent.agno_memory) or
-            (hasattr(self.agent, 'memory_manager') and self.agent.memory_manager)
+            (hasattr(self.agent, "agno_memory") and self.agent.agno_memory)
+            or (hasattr(self.agent, "memory_manager") and self.agent.memory_manager)
         )
-        
+
         if not has_memory_access:
             return False, "Agent has no memory access"
-        
+
         return True, "Agent ready"
 
     def search_memories(
@@ -93,44 +94,46 @@ class StreamlitMemoryHelper:
         if not available:
             st.error(f"Memory search not available: {message}")
             return []
-        
+
         try:
             # For UI compatibility, we need to return memory objects, not formatted strings
             # Access the memory manager directly through the agent's initialized components
-            
+
             # Ensure agent is initialized first
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 self._run_async(self.agent._ensure_initialized())
-            
+
             # Access the memory manager directly for raw memory objects
-            if (hasattr(self.agent, 'memory_manager') and 
-                self.agent.memory_manager and 
-                hasattr(self.agent.memory_manager, 'agno_memory') and 
-                self.agent.memory_manager.agno_memory):
-                
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
                 # Use the SemanticMemoryManager's search method directly
                 raw_memories = self.agent.memory_manager.agno_memory.memory_manager.search_memories(
                     query=query,
                     db=self.agent.memory_manager.agno_memory.db,
                     user_id=self.agent.user_id,
                     limit=limit,
-                    similarity_threshold=similarity_threshold
+                    similarity_threshold=similarity_threshold,
                 )
                 return raw_memories
-            
+
             # Fallback: try to access through different paths for team wrappers
-            elif hasattr(self.agent, 'agno_memory') and self.agent.agno_memory:
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
                 raw_memories = self.agent.agno_memory.memory_manager.search_memories(
                     query=query,
                     db=self.agent.agno_memory.db,
                     user_id=self.agent.user_id,
                     limit=limit,
-                    similarity_threshold=similarity_threshold
+                    similarity_threshold=similarity_threshold,
                 )
                 return raw_memories
-            
+
             return []
-            
+
         except Exception as e:
             st.error(f"Error searching memories: {e}")
             return []
@@ -141,38 +144,77 @@ class StreamlitMemoryHelper:
         if not available:
             st.error(f"Get all memories not available: {message}")
             return []
-        
+
         try:
             # For UI compatibility, we need to return memory objects, not formatted strings
             # Access the memory manager directly through the agent's initialized components
-            
+
             # Ensure agent is initialized first
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 self._run_async(self.agent._ensure_initialized())
-            
+
             # Access the memory manager directly for raw memory objects
-            if (hasattr(self.agent, 'memory_manager') and 
-                self.agent.memory_manager and 
-                hasattr(self.agent.memory_manager, 'agno_memory') and 
-                self.agent.memory_manager.agno_memory):
-                
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
                 raw_memories = self.agent.memory_manager.agno_memory.memory_manager.get_all_memories(
                     self.agent.memory_manager.agno_memory.db, self.agent.user_id
                 )
                 return raw_memories
-            
+
             # Fallback: try to access through different paths for team wrappers
-            elif hasattr(self.agent, 'agno_memory') and self.agent.agno_memory:
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
                 raw_memories = self.agent.agno_memory.memory_manager.get_all_memories(
                     self.agent.agno_memory.db, self.agent.user_id
                 )
                 return raw_memories
-            
+
             return []
-            
+
         except Exception as e:
             st.error(f"Error getting all memories: {e}")
             return []
+
+    def list_all_memories(self):
+        """List all memories using the agent's list_all_memories function.
+
+        This method provides a simplified, user-friendly listing of all memories
+        by calling the agent's list_all_memories method which returns a formatted string.
+        """
+        available, message = self._ensure_agent_available()
+        if not available:
+            return f"List memories not available: {message}"
+
+        try:
+            # Check if the agent has the list_all_memories function
+            if hasattr(self.agent, "list_all_memories"):
+                # Check if the function returns a coroutine or a direct result
+                list_func = self.agent.list_all_memories
+                if asyncio.iscoroutinefunction(list_func):
+                    result = self._run_async(list_func())
+                else:
+                    # Function is already sync (like in TeamWrapper)
+                    result = list_func()
+                return result
+            else:
+                # Fallback: use get_all_memories and format the result
+                memories = self.get_all_memories()
+                if not memories:
+                    return "🔍 No memories found. Try storing some information first!"
+
+                # Format memories in a simple list format
+                result = f"📝 MEMORY LIST ({len(memories)} total):\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+
+                return result
+
+        except Exception as e:
+            return f"❌ Error listing memories: {str(e)}"
 
     def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
         """Add a memory using the agent's store_user_memory function."""
@@ -214,7 +256,7 @@ class StreamlitMemoryHelper:
             # If we're in a running loop, we need to use a different approach
             import concurrent.futures
             import threading
-            
+
             # Create a new event loop in a separate thread
             def run_in_thread():
                 new_loop = asyncio.new_event_loop()
@@ -223,11 +265,11 @@ class StreamlitMemoryHelper:
                     return new_loop.run_until_complete(coro)
                 finally:
                     new_loop.close()
-            
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(run_in_thread)
                 return future.result()
-                
+
         except RuntimeError:
             # No running event loop, safe to use asyncio.run()
             return asyncio.run(coro)
@@ -237,7 +279,7 @@ class StreamlitMemoryHelper:
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Clear memories not available: {message}"
-        
+
         try:
             # Check if the function returns a coroutine or a direct result
             clear_func = self.agent.clear_all_memories
@@ -246,13 +288,13 @@ class StreamlitMemoryHelper:
             else:
                 # Function is already sync (like in TeamWrapper)
                 result = clear_func()
-            
+
             # Parse the result string to determine success
             if "✅" in result:
                 return True, result
             else:
                 return False, result
-                
+
         except Exception as e:
             return False, f"Error clearing memories: {e}"
 
@@ -261,68 +303,76 @@ class StreamlitMemoryHelper:
         available, message = self._ensure_agent_available()
         if not available:
             return {"error": f"Memory stats not available: {message}"}
-        
+
         try:
             # Ensure agent is initialized first
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 self._run_async(self.agent._ensure_initialized())
-            
+
             # Access the memory manager directly to get raw memory data
             memories = []
-            
-            if (hasattr(self.agent, 'memory_manager') and 
-                self.agent.memory_manager and 
-                hasattr(self.agent.memory_manager, 'agno_memory') and 
-                self.agent.memory_manager.agno_memory):
-                
+
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
                 # Use the SemanticMemoryManager's get_all_memories method directly
                 memories = self.agent.memory_manager.agno_memory.memory_manager.get_all_memories(
                     self.agent.memory_manager.agno_memory.db, self.agent.user_id
                 )
-            elif hasattr(self.agent, 'agno_memory') and self.agent.agno_memory:
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
                 # Fallback: try to access through different paths for team wrappers
                 memories = self.agent.agno_memory.memory_manager.get_all_memories(
                     self.agent.agno_memory.db, self.agent.user_id
                 )
-            
+
             if not memories:
                 return {
                     "total_memories": 0,
                     "recent_memories_24h": 0,
                     "average_memory_length": 0,
-                    "topic_distribution": {}
+                    "topic_distribution": {},
                 }
-            
+
             # Calculate statistics from raw memory data
             total_memories = len(memories)
-            
+
             # Calculate recent memories (24h)
             import time
+
             current_time = time.time()
             twenty_four_hours_ago = current_time - (24 * 60 * 60)
             recent_memories_24h = sum(
-                1 for memory in memories 
-                if hasattr(memory, 'timestamp') and memory.timestamp and memory.timestamp > twenty_four_hours_ago
+                1
+                for memory in memories
+                if hasattr(memory, "timestamp")
+                and memory.timestamp
+                and memory.timestamp > twenty_four_hours_ago
             )
-            
+
             # Calculate average memory length
             total_length = sum(len(memory.memory) for memory in memories)
-            average_memory_length = total_length / total_memories if total_memories > 0 else 0
-            
+            average_memory_length = (
+                total_length / total_memories if total_memories > 0 else 0
+            )
+
             # Calculate topic distribution
             topic_distribution = {}
             for memory in memories:
-                if hasattr(memory, 'topics') and memory.topics:
+                if hasattr(memory, "topics") and memory.topics:
                     for topic in memory.topics:
                         topic_distribution[topic] = topic_distribution.get(topic, 0) + 1
-            
+
             return {
                 "total_memories": total_memories,
                 "recent_memories_24h": recent_memories_24h,
                 "average_memory_length": average_memory_length,
-                "topic_distribution": topic_distribution
+                "topic_distribution": topic_distribution,
             }
-            
+
         except Exception as e:
             return {"error": f"Error getting memory stats: {e}"}
 
@@ -334,7 +384,7 @@ class StreamlitMemoryHelper:
 
         try:
             logger.info(f"🗑️ Deleting memory using agent.delete_memory(): {memory_id}")
-            
+
             # Check if the function returns a coroutine or a direct result
             delete_func = self.agent.delete_memory
             if asyncio.iscoroutinefunction(delete_func):
@@ -342,7 +392,7 @@ class StreamlitMemoryHelper:
             else:
                 # Function is already sync (like in TeamWrapper)
                 result = delete_func(memory_id)
-            
+
             # Parse the result string to determine success
             if isinstance(result, str):
                 if "✅" in result or "Successfully deleted" in result:
@@ -370,7 +420,7 @@ class StreamlitMemoryHelper:
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Memory update not available: {message}"
-        
+
         try:
             # Check if the function returns a coroutine or a direct result
             update_func = self.agent.update_memory
@@ -379,13 +429,13 @@ class StreamlitMemoryHelper:
             else:
                 # Function is already sync (like in TeamWrapper)
                 result = update_func(memory_id, memory_text, topics)
-            
+
             # Parse the result string to determine success
             if "✅" in result:
                 return True, result
             else:
                 return False, result
-                
+
         except Exception as e:
             return False, f"Error updating memory: {e}"
 
@@ -394,7 +444,9 @@ class StreamlitMemoryHelper:
         # This functionality is now handled automatically by store_user_memory
         # which stores in both local SQLite and LightRAG graph systems
         try:
-            result = self._run_async(self.agent.store_user_memory(content=memory_text, topics=topics))
+            result = self._run_async(
+                self.agent.store_user_memory(content=memory_text, topics=topics)
+            )
             if hasattr(result, "graph_success") and result.graph_success:
                 return True, "Memory synced to graph successfully"
             else:
@@ -413,56 +465,68 @@ class StreamlitMemoryHelper:
                 "sync_ratio": 0,
                 "status": "error",
             }
-        
+
         try:
             # Ensure agent is initialized first
-            if hasattr(self.agent, '_ensure_initialized'):
+            if hasattr(self.agent, "_ensure_initialized"):
                 self._run_async(self.agent._ensure_initialized())
-            
+
             # Get local memory count
             local_memories = []
-            if (hasattr(self.agent, 'memory_manager') and 
-                self.agent.memory_manager and 
-                hasattr(self.agent.memory_manager, 'agno_memory') and 
-                self.agent.memory_manager.agno_memory):
-                
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
                 local_memories = self.agent.memory_manager.agno_memory.memory_manager.get_all_memories(
                     self.agent.memory_manager.agno_memory.db, self.agent.user_id
                 )
-            elif hasattr(self.agent, 'agno_memory') and self.agent.agno_memory:
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
                 local_memories = self.agent.agno_memory.memory_manager.get_all_memories(
                     self.agent.agno_memory.db, self.agent.user_id
                 )
-            
+
             local_memory_count = len(local_memories)
-            
+
             # Get graph entity count using the agent's new method
             graph_entity_count = 0
             try:
                 # Check if agent has the get_graph_entity_count method
-                if hasattr(self.agent, 'get_graph_entity_count'):
+                if hasattr(self.agent, "get_graph_entity_count"):
                     if asyncio.iscoroutinefunction(self.agent.get_graph_entity_count):
-                        graph_entity_count = self._run_async(self.agent.get_graph_entity_count())
+                        graph_entity_count = self._run_async(
+                            self.agent.get_graph_entity_count()
+                        )
                     else:
                         graph_entity_count = self.agent.get_graph_entity_count()
                 else:
                     # Fallback: try to access through team wrapper's knowledge agent
-                    if (hasattr(self.agent, 'team') and 
-                        hasattr(self.agent.team, 'members') and 
-                        self.agent.team.members):
+                    if (
+                        hasattr(self.agent, "team")
+                        and hasattr(self.agent.team, "members")
+                        and self.agent.team.members
+                    ):
                         knowledge_agent = self.agent.team.members[0]
-                        if hasattr(knowledge_agent, 'get_graph_entity_count'):
-                            if asyncio.iscoroutinefunction(knowledge_agent.get_graph_entity_count):
-                                graph_entity_count = self._run_async(knowledge_agent.get_graph_entity_count())
+                        if hasattr(knowledge_agent, "get_graph_entity_count"):
+                            if asyncio.iscoroutinefunction(
+                                knowledge_agent.get_graph_entity_count
+                            ):
+                                graph_entity_count = self._run_async(
+                                    knowledge_agent.get_graph_entity_count()
+                                )
                             else:
-                                graph_entity_count = knowledge_agent.get_graph_entity_count()
-                    
+                                graph_entity_count = (
+                                    knowledge_agent.get_graph_entity_count()
+                                )
+
                 logger.debug(f"Retrieved graph entity count: {graph_entity_count}")
-                    
+
             except Exception as e:
                 logger.warning(f"Error getting graph entity count: {e}")
                 graph_entity_count = 0
-            
+
             # Calculate sync ratio
             if local_memory_count == 0 and graph_entity_count == 0:
                 sync_ratio = 1.0  # Both empty = synced
@@ -474,9 +538,11 @@ class StreamlitMemoryHelper:
                 sync_ratio = 0.0
                 status = "out_of_sync"
             else:
-                sync_ratio = min(local_memory_count, graph_entity_count) / max(local_memory_count, graph_entity_count)
+                sync_ratio = min(local_memory_count, graph_entity_count) / max(
+                    local_memory_count, graph_entity_count
+                )
                 status = "synced" if sync_ratio > 0.9 else "out_of_sync"
-            
+
             return {
                 "local_memory_count": local_memory_count,
                 "graph_entity_count": graph_entity_count,
@@ -508,7 +574,7 @@ class StreamlitKnowledgeHelper:
             # If we're in a running loop, we need to use a different approach
             import concurrent.futures
             import threading
-            
+
             # Create a new event loop in a separate thread
             def run_in_thread():
                 new_loop = asyncio.new_event_loop()
@@ -517,11 +583,11 @@ class StreamlitKnowledgeHelper:
                     return new_loop.run_until_complete(coro)
                 finally:
                     new_loop.close()
-            
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(run_in_thread)
                 return future.result()
-                
+
         except RuntimeError:
             # No running event loop, safe to use asyncio.run()
             return asyncio.run(coro)
