@@ -561,6 +561,8 @@ class StreamlitMemoryHelper:
 
 
 class StreamlitKnowledgeHelper:
+    """Helper memory class for the Streamlit apps"""
+
     def __init__(self, agent):
         self.agent = agent
         # Don't cache knowledge_manager - get it fresh each time
@@ -623,7 +625,7 @@ class StreamlitKnowledgeHelper:
         """Dynamic property that always gets fresh knowledge manager."""
         return self._get_knowledge_manager()
 
-    def search_knowledge(self, query: str, limit: int = 10):
+    def search_knowledge(self, query: str, limit: int = None):
         km = self.knowledge_manager  # This will trigger initialization
         if not km:
             return []
