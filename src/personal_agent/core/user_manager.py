@@ -667,3 +667,258 @@ class UserManager:
                 user["profile_summary"] = {"error": "Could not get profile summary"}
         
         return users
+    
+    def backup_user(self, user_id: str) -> Dict[str, Any]:
+        """
+        Create a backup of a user's data directory.
+        
+        Args:
+            user_id: User ID to backup
+            
+        Returns:
+            Dictionary containing backup result information
+        """
+        try:
+            # Validate input
+            if not user_id:
+                return {"success": False, "error": "User ID is required"}
+            
+            # Check if user exists
+            if not self.registry.user_exists(user_id):
+                return {"success": False, "error": f"User '{user_id}' does not exist"}
+            
+            # Get user data directory path
+            user_data_dir = Path(self.data_dir) / self.storage_backend / user_id
+            
+            # Check if user data directory exists
+            if not user_data_dir.exists():
+                return {
+                    "success": False, 
+                    "error": f"User data directory does not exist: {user_data_dir}"
+                }
+            
+            # Create backup using existing method
+            backup_result = self._backup_user_data(user_id, user_data_dir)
+            
+            if backup_result["success"]:
+                return {
+                    "success": True,
+                    "message": f"User '{user_id}' backed up successfully",
+                    "user_id": user_id,
+                    "backup_path": backup_result["backup_path"],
+                    "backup_size_mb": backup_result["backup_size_mb"],
+                    "files_backed_up": backup_result["files_backed_up"],
+                    "timestamp": backup_result["timestamp"]
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Backup failed for user '{user_id}': {backup_result['error']}"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error backing up user '{user_id}': {str(e)}"
+            }
+    
+    def restore_user(self, user_id: str, backup_dir: str, overwrite_existing: bool = False) -> Dict[str, Any]:
+        """
+        Restore a user's data from a backup directory.
+        
+        Args:
+            user_id: User ID to restore
+            backup_dir: Path to the backup directory (can be relative to ./backups/users or absolute path)
+            overwrite_existing: Whether to overwrite existing user data (default: False)
+            
+        Returns:
+            Dictionary containing restore result information
+        """
+        try:
+            # Validate input
+            if not user_id:
+                return {"success": False, "error": "User ID is required"}
+            
+            if not backup_dir:
+                return {"success": False, "error": "Backup directory is required"}
+            
+            # Convert backup_dir to Path and handle relative paths
+            backup_path = Path(backup_dir)
+            if not backup_path.is_absolute():
+                # Try relative to ./backups/users first
+                backup_path = Path("./backups/users") / backup_dir
+                if not backup_path.exists():
+                    # Try as relative to current directory
+                    backup_path = Path(backup_dir)
+            
+            # Check if backup directory exists
+            if not backup_path.exists():
+                return {
+                    "success": False,
+                    "error": f"Backup directory does not exist: {backup_path}"
+                }
+            
+            if not backup_path.is_dir():
+                return {
+                    "success": False,
+                    "error": f"Backup path is not a directory: {backup_path}"
+                }
+            
+            # Get target user data directory path
+            user_data_dir = Path(self.data_dir) / self.storage_backend / user_id
+            
+            # Check if user data directory already exists
+            if user_data_dir.exists() and not overwrite_existing:
+                return {
+                    "success": False,
+                    "error": f"User data directory already exists: {user_data_dir}. Use overwrite_existing=True to overwrite."
+                }
+            
+            # Initialize result structure
+            results = {
+                "success": True,
+                "user_id": user_id,
+                "backup_path": str(backup_path),
+                "restore_path": str(user_data_dir),
+                "actions_performed": [],
+                "data_restored": {
+                    "files_restored": 0,
+                    "total_size_mb": 0.0,
+                    "overwrite_occurred": False
+                },
+                "warnings": [],
+                "errors": []
+            }
+            
+            # Calculate backup size for reporting
+            backup_size_info = self._calculate_directory_size(backup_path)
+            results["data_restored"]["files_restored"] = backup_size_info["file_count"]
+            results["data_restored"]["total_size_mb"] = backup_size_info["size_mb"]
+            
+            # Remove existing directory if overwriting
+            if user_data_dir.exists():
+                try:
+                    shutil.rmtree(user_data_dir)
+                    results["data_restored"]["overwrite_occurred"] = True
+                    results["actions_performed"].append(f"Removed existing user data directory: {user_data_dir}")
+                except Exception as e:
+                    results["errors"].append(f"Error removing existing directory: {str(e)}")
+                    results["success"] = False
+                    return results
+            
+            # Copy backup data to user directory
+            try:
+                shutil.copytree(backup_path, user_data_dir)
+                results["actions_performed"].append(f"Restored user data from backup: {backup_path}")
+                results["actions_performed"].append(f"Restored {backup_size_info['file_count']} files ({backup_size_info['size_mb']:.2f} MB)")
+            except Exception as e:
+                results["errors"].append(f"Error copying backup data: {str(e)}")
+                results["success"] = False
+                return results
+            
+            # Ensure user exists in registry (create if needed)
+            if not self.registry.user_exists(user_id):
+                try:
+                    # Create user with basic information
+                    create_result = self.create_user(user_id)
+                    if create_result["success"]:
+                        results["actions_performed"].append(f"Created user '{user_id}' in registry")
+                    else:
+                        results["warnings"].append(f"Could not create user in registry: {create_result.get('error', 'Unknown error')}")
+                except Exception as e:
+                    results["warnings"].append(f"Error creating user in registry: {str(e)}")
+            else:
+                results["actions_performed"].append(f"User '{user_id}' already exists in registry")
+            
+            # Update user's last_seen timestamp
+            try:
+                self.registry.update_last_seen(user_id)
+                results["actions_performed"].append("Updated user last_seen timestamp")
+            except Exception as e:
+                results["warnings"].append(f"Could not update last_seen timestamp: {str(e)}")
+            
+            # Set final message
+            if results["success"]:
+                results["message"] = f"User '{user_id}' restored successfully from backup"
+            else:
+                results["message"] = f"User '{user_id}' restore completed with errors"
+            
+            return results
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error restoring user '{user_id}': {str(e)}"
+            }
+    
+    def list_user_backups(self, user_id: str = None) -> Dict[str, Any]:
+        """
+        List available user backups.
+        
+        Args:
+            user_id: Optional user ID to filter backups (if None, lists all backups)
+            
+        Returns:
+            Dictionary containing backup listing information
+        """
+        try:
+            backup_base = Path("./backups/users")
+            
+            if not backup_base.exists():
+                return {
+                    "success": True,
+                    "backups": [],
+                    "message": "No backup directory found"
+                }
+            
+            backups = []
+            
+            for backup_dir in backup_base.iterdir():
+                if backup_dir.is_dir():
+                    # Parse backup directory name (format: user_id_timestamp)
+                    parts = backup_dir.name.split('_')
+                    if len(parts) >= 2:
+                        backup_user_id = '_'.join(parts[:-1])  # Handle user IDs with underscores
+                        timestamp = parts[-1]
+                        
+                        # Filter by user_id if specified
+                        if user_id and backup_user_id != user_id:
+                            continue
+                        
+                        # Calculate backup size
+                        size_info = self._calculate_directory_size(backup_dir)
+                        
+                        backup_info = {
+                            "user_id": backup_user_id,
+                            "timestamp": timestamp,
+                            "backup_name": backup_dir.name,
+                            "backup_path": str(backup_dir),
+                            "size_mb": size_info["size_mb"],
+                            "file_count": size_info["file_count"]
+                        }
+                        
+                        # Try to parse timestamp for better formatting
+                        try:
+                            from datetime import datetime
+                            dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+                            backup_info["formatted_date"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            backup_info["formatted_date"] = timestamp
+                        
+                        backups.append(backup_info)
+            
+            # Sort backups by timestamp (newest first)
+            backups.sort(key=lambda x: x["timestamp"], reverse=True)
+            
+            return {
+                "success": True,
+                "backups": backups,
+                "total_backups": len(backups),
+                "message": f"Found {len(backups)} backup(s)" + (f" for user '{user_id}'" if user_id else "")
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error listing backups: {str(e)}"
+            }
