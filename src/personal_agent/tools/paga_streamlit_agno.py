@@ -519,12 +519,12 @@ def create_team_wrapper(team):
                 return asyncio.run(coro)
 
         # Expose all memory functions from the knowledge agent
-        def list_memories(self):
+        def list_all_memories(self):
             """List all memories using the knowledge agent."""
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
-                if hasattr(knowledge_agent, "list_memories"):
-                    return self._run_async_safely(knowledge_agent.list_memories())
+                if hasattr(knowledge_agent, "list_all_memories"):
+                    return self._run_async_safely(knowledge_agent.list_all_memories())
             raise Exception("Team memory not available")
 
         def query_memory(self, query, limit=None):

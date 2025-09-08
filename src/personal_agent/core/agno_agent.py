@@ -823,7 +823,7 @@ class AgnoPersonalAgent(Agent):
             )
         return await self.memory_manager.clear_all_memories()
 
-    async def list_memories(self) -> str:
+    async def list_all_memories(self) -> str:
         """List all memories in a simple, user-friendly format.
 
         This is a public method that delegates to the memory_manager.
@@ -832,7 +832,7 @@ class AgnoPersonalAgent(Agent):
             str: Simplified list of all memories
         """
         await self._ensure_initialized()
-        return await self.memory_manager.list_memories()
+        return await self.memory_manager.list_all_memories()
 
     async def query_memory(self, query: str, limit: Union[int, None] = None) -> str:
         """Search user memories using semantic search.
