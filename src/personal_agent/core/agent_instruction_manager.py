@@ -269,14 +269,33 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
         return f"""
             ## CRITICAL MEMORY SYSTEM RULES - APPLIES TO ALL INSTRUCTION LEVELS
 
+            **FUNCTION SELECTION RULES:**
+            - Use list_all_memories for: summaries, overviews, quick lists, counts, general requests
+            - Use get_all_memories for: detailed content, full information, when explicitly asked for details
+            - Default to list_all_memories unless user specifically requests detailed information
+            - Always prefer concise responses (list_all_memories) unless details explicitly requested
+
             **PERFORMANCE-CRITICAL TOOL SELECTION:**
-            - "what do you know about me" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list everything you know" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "show me all memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "tell me everything" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "what have I told you" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list all my information" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - **CRITICAL: USE get_all_memories() FOR COMPLETE RETRIEVAL - NEVER query_memory() FOR FULL LISTS**
+            - "what do you know about me" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list everything you know" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "show me all memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "tell me everything" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "what have I told you" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all my information" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all memories stored" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "memory summary" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "how many memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "show detailed memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "get full memory details" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "complete memory information" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list detailed memory info" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - **CRITICAL: USE list_all_memories() FOR GENERAL LISTING - ONLY use get_all_memories() when details explicitly requested**
+
+            **PATTERN MATCHING GUIDELINES:**
+            - Keywords for list_all_memories: 'list', 'show', 'what memories', 'how many', 'summary', 'stored'
+            - Keywords for get_all_memories: 'detailed', 'full', 'complete', 'everything about', 'all details'
+            - When in doubt, choose list_all_memories (more efficient and user-friendly)
 
             **SPECIFIC SEARCH QUERIES:**
             - "do you remember..." → `query_memory(query="specific keywords")` RIGHT NOW
@@ -330,7 +349,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             **WHEN USER EXPLICITLY REQUESTS RAW LISTING:**
             - If user says "do not interpret", "just list", "just show", "raw list", or similar explicit listing requests
             - **BYPASS ALL MEMORY PRESENTATION RULES BELOW**
-            - **RETURN TOOL RESULTS DIRECTLY WITHOUT ANY PROCESSING**
+            - **DISPLAY TOOL RESULTS DIRECTLY WITHOUT ANY PROCESSING**
             - **DO NOT CONVERT, RESTATE, OR INTERPRET THE MEMORIES**
             - **PRESENT EXACTLY WHAT THE TOOL RETURNS**
             - This prevents unnecessary inference and ensures fast response times
@@ -486,13 +505,17 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - If no results, THEN use GoogleSearchTools
 
             **MEMORY QUERIES - USE IMMEDIATELY**:
-            - "what do you know about me" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list everything you know" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "show me all memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "tell me everything" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "what have I told you" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list all my information" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - **CRITICAL: USE get_all_memories() FOR COMPLETE RETRIEVAL - NEVER query_memory() FOR FULL LISTS**
+            - "what do you know about me" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list everything you know" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "show me all memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "tell me everything" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "what have I told you" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all my information" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "list all memories stored" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "show detailed memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - "get full memory details" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
+            - **CRITICAL: USE list_all_memories() FOR GENERAL LISTING - ONLY use get_all_memories() when details explicitly requested**
             - "do you remember..." → `query_memory(query="specific keywords")` RIGHT NOW
             - "tell me about my..." → `query_memory(query="specific keywords")` RIGHT NOW
             - Questions about user's past → `query_memory(query="relevant keywords")` RIGHT NOW

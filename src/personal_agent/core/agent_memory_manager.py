@@ -596,17 +596,22 @@ class AgentMemoryManager:
                 "raw list",
                 "simple list",
                 "list them",
-                "show them"
+                "show them",
             ]
-            
-            should_skip_interpretation = any(phrase in query.lower() for phrase in no_interpret_phrases)
 
-            if stripped_query in get_all_phrases or "list all memories" in query.lower():
+            should_skip_interpretation = any(
+                phrase in query.lower() for phrase in no_interpret_phrases
+            )
+
+            if (
+                stripped_query in get_all_phrases
+                or "list all memories" in query.lower()
+            ):
                 logger.info(
-                    "Generic/list query '%s' detected. Using optimized list_memories for performance.",
+                    "Generic/list query '%s' detected. Using optimized list_all_memories for performance.",
                     query,
                 )
-                return await self.list_memories()
+                return await self.list_all_memories()
 
             # Validate query parameter
             if not query or not query.strip():
@@ -635,14 +640,18 @@ class AgentMemoryManager:
             if should_skip_interpretation:
                 # PERFORMANCE OPTIMIZED: Skip interpretation instructions for explicit listing requests
                 result = f"{result_note}: The following memories were found for '{query}':\n\n"
-                
+
                 for i, (memory, score) in enumerate(display_memories, 1):
                     result += f"{i}. {memory.memory} (similarity: {score:.2f})\n"
                     if memory.topics:
                         result += f"   Topics: {', '.join(memory.topics)}\n"
                     result += "\n"
-                    
-                logger.info("Found %d matching memories for query: %s (no interpretation mode)", len(results), query)
+
+                logger.info(
+                    "Found %d matching memories for query: %s (no interpretation mode)",
+                    len(results),
+                    query,
+                )
             else:
                 # Standard mode with interpretation instructions
                 result = f"{result_note}: The following memories were found for '{query}'. You must restate this information addressing the user as 'you' (second person), not as if you are the user:\n\n"
@@ -654,8 +663,12 @@ class AgentMemoryManager:
                     result += "\n"
 
                 result += "\nREMEMBER: Restate this information as an AI assistant talking ABOUT the user, not AS the user. Use 'you' instead of 'I' when referring to the user's information."
-                
-                logger.info("Found %d matching memories for query: %s (standard mode)", len(results), query)
+
+                logger.info(
+                    "Found %d matching memories for query: %s (standard mode)",
+                    len(results),
+                    query,
+                )
 
             return result
 
@@ -1137,12 +1150,12 @@ class AgentMemoryManager:
             logger.error("Error retrieving memories by topic: %s", e)
             return f"❌ Error retrieving memories by topic: {str(e)}"
 
-    async def list_memories(self) -> str:
+    async def list_all_memories(self) -> str:
         """List all memories in a simple, user-friendly format.
 
         This method provides a more concise view of all memories compared to get_all_memories,
         focusing on just the content and topics without additional metadata.
-        
+
         PERFORMANCE OPTIMIZED: Returns raw memory data without interpretation instructions
         to avoid unnecessary LLM inference when user requests simple listing.
 
@@ -1170,19 +1183,9 @@ class AgentMemoryManager:
             result = f"📝 MEMORY LIST ({len(memories)} total):\n\n"
 
             for i, memory in enumerate(sorted_memories, 1):
-                # Just show the memory content and topics, omit other metadata
-                memory_preview = (
-                    memory.memory[:100] + "..."
-                    if len(memory.memory) > 100
-                    else memory.memory
-                )
+                # Just show the memory content, omit topics and other metadata
+                memory_preview = memory.memory
                 result += f"{i}. {memory_preview}\n"
-
-                # Add topics if available
-                if hasattr(memory, "topics") and memory.topics:
-                    result += f"   Topics: {', '.join(memory.topics)}\n"
-
-                result += "\n"
 
             logger.info(
                 "Listed all %d memories for user %s in simplified format (performance optimized)",
@@ -1482,14 +1485,14 @@ class AgentMemoryManager:
             if not self.lightrag_memory_url:
                 logger.warning("LightRAG memory URL not configured")
                 return 0
-            
+
             # Get documents from LightRAG memory server
             url = f"{self.lightrag_memory_url}/documents"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=10) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        
+
                         # Count documents from the response
                         doc_count = 0
                         if isinstance(data, dict) and "statuses" in data:
@@ -1501,7 +1504,7 @@ class AgentMemoryManager:
                             doc_count = len(data["documents"])
                         elif isinstance(data, list):
                             doc_count = len(data)
-                        
+
                         logger.debug(f"Graph entity count: {doc_count}")
                         return doc_count
                     else:

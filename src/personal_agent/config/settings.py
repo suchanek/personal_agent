@@ -18,7 +18,7 @@ PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
 
-INSTRUCTION_LEVEL = "CONCISE"
+INSTRUCTION_LEVEL = "STANDARD"
 
 # see below for the ollama server urls
 

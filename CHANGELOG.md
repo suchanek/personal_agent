@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.2.6] - 2025-09-08
+
+### Fixed
+- **Memory Verbosity**: Resolved a major behavioral issue where the agent provided overly detailed and verbose responses when asked to list memories. It now correctly uses a new, concise summary tool (`list_all_memories`) for general listing requests, improving user experience and reducing token usage. See [ADR-083](./refs/adr/083-differentiated-memory-retrieval.md) for details.
+
+### Changed
+- **Differentiated Memory Retrieval**: Overhauled the agent's instructions and tools to create a clear distinction between summary (`list_all_memories`) and detailed (`get_all_memories`) memory retrieval. The agent now defaults to concise summaries for general queries.
+- **Optimized Memory Listing**: The `list_all_memories` tool (formerly `list_memories`) has been optimized to return a clean, performance-optimized summary list of memories without extra metadata or topics.
+- **Enhanced CLI**: The command-line interface has been improved with a `brief` command for concise memory lists, a comprehensive `help` command, `examples` for user guidance, and a safer `wipe` command that now requires confirmation.
+
+### Added
+- **Comprehensive Memory Fix Tests**: Added an extensive suite of new tests (e.g., `test_memory_agent_complete_fix.py`, `test_list_memories_fix.py`) to validate the new differentiated memory retrieval logic from the unit to the integration level and prevent future regressions.
+- **Behavioral Analysis**: Added `memory_agent_behavior_analysis.md` to document the root cause analysis of the memory verbosity issue.
+
 ## [v0.2.6dev0] - 2025-09-05
 
 ### Added
