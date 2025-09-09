@@ -53,36 +53,56 @@ def _render_system_info():
 
 
 def _render_memory_stats():
-    """Display memory statistics."""
+    """Display memory statistics using the same robust approach as paga_streamlit_agno.py."""
     st.subheader("Memory Statistics")
     
     try:
-        # Import memory utilities
-        from personal_agent.streamlit.utils.memory_utils import get_memory_stats
+        # Try to get memory helper using the same approach as paga_streamlit_agno.py
+        from personal_agent.streamlit.utils.agent_utils import get_agent_instance
+        from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper
         
-        # Get real memory statistics
-        stats = get_memory_stats()
+        # Get agent instance
+        agent = get_agent_instance()
+        if not agent:
+            st.warning("⚠️ Agent not available - memory statistics unavailable")
+            st.info("Memory system requires an initialized agent instance")
+            return
         
-        if stats:
-            # Format the statistics for display
-            memory_stats = {
-                "Total Memories": str(stats.get("total_memories", 0)),
-                "Storage Size": stats.get("storage_size", "0 MB"),
-                "Last Updated": stats.get("last_sync", "Unknown"),
-            }
+        # Create memory helper
+        memory_helper = StreamlitMemoryHelper(agent)
+        
+        # Get memory statistics using the helper (same as paga_streamlit_agno.py)
+        stats = memory_helper.get_memory_stats()
+        
+        if "error" not in stats:
+            # Format the statistics for display (same structure as paga_streamlit_agno.py)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Memories", stats.get("total_memories", 0))
+            with col2:
+                st.metric("Recent (24h)", stats.get("recent_memories_24h", 0))
+            with col3:
+                avg_length = stats.get("average_memory_length", 0)
+                st.metric("Avg Length", f"{avg_length:.1f} chars" if avg_length else "N/A")
             
-            # Add type breakdown if available
-            type_counts = stats.get("by_type", {})
-            if type_counts:
-                for memory_type, count in type_counts.items():
-                    memory_stats[f"{memory_type.title()} Memories"] = str(count)
-            
-            st.table(pd.DataFrame(list(memory_stats.items()), columns=["Metric", "Value"]))
+            # Topic distribution (same as paga_streamlit_agno.py)
+            topic_dist = stats.get("topic_distribution", {})
+            if topic_dist:
+                st.subheader("📈 Topic Distribution")
+                for topic, count in sorted(topic_dist.items(), key=lambda x: x[1], reverse=True):
+                    st.write(f"**{topic.title()}:** {count} memories")
+            else:
+                st.info("No topic distribution data available")
         else:
-            st.warning("Unable to load memory statistics")
+            st.error(f"❌ Error getting memory statistics: {stats['error']}")
         
+    except ImportError as e:
+        st.error(f"❌ Import error: {str(e)}")
+        st.info("Required modules not available for memory statistics")
     except Exception as e:
-        st.error(f"Error loading memory statistics: {str(e)}")
+        st.error(f"❌ Error processing memory statistics: {str(e)}")
+        # Show fallback basic info
+        st.info("Memory statistics temporarily unavailable")
 
 
 def _render_docker_status():

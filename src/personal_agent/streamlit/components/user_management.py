@@ -34,7 +34,7 @@ def user_management_tab():
     st.title("User Management")
     
     # Create tabs for different user management functions
-    tabs = st.tabs([" User Overview ", " Create User ", " Profile Management ", " Switch User ", " Delete User ", " User Settings "])
+    tabs = st.tabs([" User Overview ", " Create User ", " Profile Management ", " Switch User ", " Delete User ", " Backup & Restore ", " User Settings "])
     
     with tabs[0]:
         _render_user_overview()
@@ -52,6 +52,9 @@ def user_management_tab():
         _render_delete_user()
     
     with tabs[5]:
+        _render_backup_restore()
+    
+    with tabs[6]:
         _render_user_settings()
 
 
@@ -99,14 +102,24 @@ def _render_user_overview():
                         st.write(f"Cognitive State: {cognitive_state}/100")
                         st.progress(cognitive_state / 100)
                         
-                        profile_summary = user.get('profile_summary', {})
-                        if profile_summary and not profile_summary.get('error'):
-                            completion = profile_summary.get('completion_percentage', 0)
-                            st.write(f"Profile Complete: {completion:.1f}%")
-                            st.progress(completion / 100)
-                            
-                            if profile_summary.get('missing_fields'):
-                                st.write(f"Missing: {', '.join(profile_summary['missing_fields'])}")
+                        # Handle profile summary with better error handling
+                        try:
+                            profile_summary = user.get('profile_summary', {})
+                            if profile_summary and not profile_summary.get('error'):
+                                completion = profile_summary.get('completion_percentage', 0)
+                                st.write(f"Profile Complete: {completion:.1f}%")
+                                st.progress(completion / 100)
+                                
+                                if profile_summary.get('missing_fields'):
+                                    st.write(f"Missing: {', '.join(profile_summary['missing_fields'])}")
+                            elif profile_summary.get('error'):
+                                st.write("Profile Status: Error processing profile")
+                            else:
+                                st.write("Profile Status: Not available")
+                        except Exception as e:
+                            st.write("Profile Status: Error processing memory")
+                            # Optionally log the error for debugging
+                            # st.caption(f"Debug: {str(e)}")
             
             # Display user count
             st.caption(f"Total Users: {len(users)}")
@@ -115,215 +128,6 @@ def _render_user_overview():
             
     except Exception as e:
         st.error(f"Error loading user information: {str(e)}")
-
-
-def _render_profile_management():
-    """Interface for managing user profiles."""
-    st.subheader("Profile Management")
-    
-    try:
-        # Get all users
-        users = get_all_users()
-        user_ids = [user['user_id'] for user in users]
-        
-        if user_ids:
-            # User selection
-            selected_user = st.selectbox("Select User to Manage", user_ids)
-            
-            if selected_user:
-                # Get current user details
-                user_details = get_user_details(selected_user)
-                
-                if user_details:
-                    # Display current profile
-                    st.subheader(f"Current Profile: {user_details['user_name']}")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write("**Current Information:**")
-                        st.write(f"Email: {user_details.get('email', 'Not set')}")
-                        st.write(f"Phone: {user_details.get('phone', 'Not set')}")
-                        st.write(f"Address: {user_details.get('address', 'Not set')}")
-                        st.write(f"Birth Date: {user_details.get('birth_date', 'Not set')}")
-                        st.write(f"Delta Year: {user_details.get('delta_year', 'Not set')}")
-                        st.write(f"Cognitive State: {user_details.get('cognitive_state', 50)}/100")
-                    
-                    with col2:
-                        # Profile completion
-                        profile_summary = user_details.get('profile_summary', {})
-                        if profile_summary and not profile_summary.get('error'):
-                            completion = profile_summary.get('completion_percentage', 0)
-                            st.metric("Profile Completion", f"{completion:.1f}%")
-                            
-                            if profile_summary.get('missing_fields'):
-                                st.warning(f"Missing fields: {', '.join(profile_summary['missing_fields'])}")
-                    
-                    # Profile update forms
-                    st.subheader("Update Profile")
-                    
-                    # Contact Information Form
-                    with st.form("update_contact_form"):
-                        st.write("**Contact Information**")
-                        
-                        new_email = st.text_input("Email", 
-                                                 value=user_details.get('email', ''),
-                                                 help="User's email address")
-                        
-                        new_phone = st.text_input("Phone", 
-                                                 value=user_details.get('phone', ''),
-                                                 help="User's phone number")
-                        
-                        new_address = st.text_area("Address", 
-                                                  value=user_details.get('address', ''),
-                                                  help="User's address")
-                        
-                        contact_submitted = st.form_submit_button("Update Contact Info")
-                        
-                        if contact_submitted:
-                            try:
-                                result = update_contact_info(
-                                    selected_user,
-                                    email=new_email if new_email else None,
-                                    phone=new_phone if new_phone else None,
-                                    address=new_address if new_address else None
-                                )
-                                
-                                if result['success']:
-                                    st.success("Contact information updated successfully!")
-                                    if result.get('updated_fields'):
-                                        st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to update contact information")
-                                    if result.get('errors'):
-                                        for error in result['errors']:
-                                            st.error(f"❌ {error}")
-                            except Exception as e:
-                                st.error(f"Error updating contact info: {str(e)}")
-                    
-                    # Cognitive State Form
-                    with st.form("update_cognitive_form"):
-                        st.write("**Cognitive State**")
-                        
-                        current_cognitive = user_details.get('cognitive_state', 50)
-                        new_cognitive = st.slider("Cognitive State", 
-                                                 min_value=0, 
-                                                 max_value=100, 
-                                                 value=current_cognitive,
-                                                 help="User's cognitive state on a scale of 0-100")
-                        
-                        st.write(f"Current: {current_cognitive} → New: {new_cognitive}")
-                        
-                        cognitive_submitted = st.form_submit_button("Update Cognitive State")
-                        
-                        if cognitive_submitted:
-                            try:
-                                result = update_cognitive_state(selected_user, new_cognitive)
-                                
-                                if result['success']:
-                                    st.success(f"Cognitive state updated to {new_cognitive}!")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to update cognitive state")
-                                    if result.get('errors'):
-                                        for error in result['errors']:
-                                            st.error(f"❌ {error}")
-                            except Exception as e:
-                                st.error(f"Error updating cognitive state: {str(e)}")
-                    
-                    # Birth Date and Delta Year Form
-                    with st.form("update_birth_delta_form"):
-                        st.write("**Birth Date & Memory Context**")
-                        
-                        current_birth_date = user_details.get('birth_date', '')
-                        new_birth_date = st.date_input("Birth Date", 
-                                                      value=datetime.fromisoformat(current_birth_date).date() if current_birth_date else None,
-                                                      min_value=datetime(1, 1, 1).date(),
-                                                      max_value=datetime.now().date(),
-                                                      help="User's birth date (YYYY-MM-DD format) - supports dates back to 1 AD")
-                        
-                        current_delta_year = user_details.get('delta_year')
-                        new_delta_year = st.number_input("Delta Year", 
-                                                        min_value=0, 
-                                                        max_value=150, 
-                                                        value=current_delta_year if current_delta_year is not None else 0,
-                                                        help="Years from birth when writing memories (e.g., 6 for writing as 6-year-old)")
-                        
-                        # Show calculated memory year if both fields are set
-                        if new_birth_date and new_delta_year > 0:
-                            memory_year = new_birth_date.year + new_delta_year
-                            st.info(f"Memory context year: {memory_year}")
-                        
-                        birth_delta_submitted = st.form_submit_button("Update Birth Date & Delta Year")
-                        
-                        if birth_delta_submitted:
-                            try:
-                                # Convert date to ISO string format
-                                birth_date_str = new_birth_date.isoformat() if new_birth_date else None
-                                delta_year_val = new_delta_year if new_delta_year > 0 else None
-                                
-                                result = update_user_profile(
-                                    selected_user,
-                                    birth_date=birth_date_str,
-                                    delta_year=delta_year_val
-                                )
-                                
-                                if result['success']:
-                                    st.success("Birth date and delta year updated successfully!")
-                                    if result.get('updated_fields'):
-                                        st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to update birth date and delta year")
-                                    if result.get('errors'):
-                                        for error in result['errors']:
-                                            st.error(f"❌ {error}")
-                            except Exception as e:
-                                st.error(f"Error updating birth date and delta year: {str(e)}")
-                    
-                    # Basic Info Form
-                    with st.form("update_basic_form"):
-                        st.write("**Basic Information**")
-                        
-                        new_user_name = st.text_input("User Name", 
-                                                     value=user_details.get('user_name', ''),
-                                                     help="Display name for the user")
-                        
-                        new_user_type = st.selectbox("User Type", 
-                                                    ["Standard", "Admin", "Guest"],
-                                                    index=["Standard", "Admin", "Guest"].index(user_details.get('user_type', 'Standard')),
-                                                    help="Determines user permissions")
-                        
-                        basic_submitted = st.form_submit_button("Update Basic Info")
-                        
-                        if basic_submitted:
-                            try:
-                                result = update_user_profile(
-                                    selected_user,
-                                    user_name=new_user_name,
-                                    user_type=new_user_type
-                                )
-                                
-                                if result['success']:
-                                    st.success("Basic information updated successfully!")
-                                    if result.get('updated_fields'):
-                                        st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to update basic information")
-                                    if result.get('errors'):
-                                        for error in result['errors']:
-                                            st.error(f"❌ {error}")
-                            except Exception as e:
-                                st.error(f"Error updating basic info: {str(e)}")
-                
-                else:
-                    st.warning(f"User '{selected_user}' not found.")
-        else:
-            st.info("No users available for profile management.")
-            
-    except Exception as e:
-        st.error(f"Error loading profile management: {str(e)}")
 
 
 def _render_create_user():
@@ -420,150 +224,229 @@ def _render_create_user():
                 st.error(f"Error creating user: {str(e)}")
 
 
+def _render_profile_management():
+    """Interface for managing user profiles."""
+    st.subheader("Profile Management")
+    
+    try:
+        # Get all users
+        users = get_all_users()
+        user_ids = [user['user_id'] for user in users]
+        
+        if user_ids:
+            # User selection
+            selected_user = st.selectbox("Select User to Manage", user_ids)
+            
+            if selected_user:
+                # Get current user details
+                user_details = get_user_details(selected_user)
+                
+                if user_details:
+                    # Display current profile
+                    st.subheader(f"Current Profile: {user_details['user_name']}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("**Current Information:**")
+                        st.write(f"Email: {user_details.get('email', 'Not set')}")
+                        st.write(f"Phone: {user_details.get('phone', 'Not set')}")
+                        st.write(f"Address: {user_details.get('address', 'Not set')}")
+                        st.write(f"Birth Date: {user_details.get('birth_date', 'Not set')}")
+                        st.write(f"Delta Year: {user_details.get('delta_year', 'Not set')}")
+                        st.write(f"Cognitive State: {user_details.get('cognitive_state', 50)}/100")
+                    
+                    with col2:
+                        # Profile completion
+                        profile_summary = user_details.get('profile_summary', {})
+                        if profile_summary and not profile_summary.get('error'):
+                            completion = profile_summary.get('completion_percentage', 0)
+                            st.metric("Profile Completion", f"{completion:.1f}%")
+                            
+                            if profile_summary.get('missing_fields'):
+                                st.warning(f"Missing fields: {', '.join(profile_summary['missing_fields'])}")
+                    
+                    # Profile update forms
+                    st.subheader("Update Profile")
+                    
+                    # Create tabs for different profile sections
+                    profile_tabs = st.tabs(["📞 Contact Info", "📅 Personal Info", "🧠 Cognitive State"])
+                    
+                    with profile_tabs[0]:
+                        # Contact Information Form
+                        with st.form("update_contact_form"):
+                            st.write("**Contact Information**")
+                            
+                            new_email = st.text_input("Email", 
+                                                     value=user_details.get('email', ''),
+                                                     help="User's email address")
+                            
+                            new_phone = st.text_input("Phone", 
+                                                     value=user_details.get('phone', ''),
+                                                     help="User's phone number")
+                            
+                            new_address = st.text_area("Address", 
+                                                      value=user_details.get('address', ''),
+                                                      help="User's address")
+                            
+                            contact_submitted = st.form_submit_button("Update Contact Info")
+                            
+                            if contact_submitted:
+                                try:
+                                    result = update_contact_info(
+                                        selected_user,
+                                        email=new_email if new_email else None,
+                                        phone=new_phone if new_phone else None,
+                                        address=new_address if new_address else None
+                                    )
+                                    
+                                    if result['success']:
+                                        st.success("Contact information updated successfully!")
+                                        if result.get('updated_fields'):
+                                            st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update contact information")
+                                        if result.get('errors'):
+                                            for error in result['errors']:
+                                                st.error(f"❌ {error}")
+                                except Exception as e:
+                                    st.error(f"Error updating contact info: {str(e)}")
+                    
+                    with profile_tabs[1]:
+                        # Personal Information Form
+                        with st.form("update_personal_form"):
+                            st.write("**Personal Information**")
+                            
+                            # Birth Date
+                            current_birth_date = user_details.get('birth_date')
+                            if current_birth_date:
+                                try:
+                                    # Parse the current birth date
+                                    from datetime import datetime
+                                    current_date = datetime.fromisoformat(current_birth_date).date()
+                                except:
+                                    current_date = None
+                            else:
+                                current_date = None
+                            
+                            new_birth_date = st.date_input("Birth Date", 
+                                                          value=current_date,
+                                                          min_value=datetime(1, 1, 1).date(),
+                                                          max_value=datetime.now().date(),
+                                                          help="User's birth date (YYYY-MM-DD format)")
+                            
+                            # Delta Year
+                            current_delta_year = user_details.get('delta_year', 0)
+                            new_delta_year = st.number_input("Delta Year", 
+                                                            min_value=0, 
+                                                            max_value=150, 
+                                                            value=int(current_delta_year) if current_delta_year else 0,
+                                                            help="Years from birth when writing memories (e.g., 6 for writing as 6-year-old)")
+                            
+                            # Show calculated memory year if both fields are set
+                            if new_birth_date and new_delta_year > 0:
+                                memory_year = new_birth_date.year + new_delta_year
+                                st.info(f"Memory context year: {memory_year}")
+                            
+                            personal_submitted = st.form_submit_button("Update Personal Info")
+                            
+                            if personal_submitted:
+                                try:
+                                    result = update_contact_info(
+                                        selected_user,
+                                        birth_date=new_birth_date.isoformat() if new_birth_date else None,
+                                        delta_year=new_delta_year if new_delta_year > 0 else None
+                                    )
+                                    
+                                    if result['success']:
+                                        st.success("Personal information updated successfully!")
+                                        if result.get('updated_fields'):
+                                            st.info(f"Updated fields: {', '.join(result['updated_fields'])}")
+                                        # Clear cached user manager to refresh user list
+                                        from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                        get_user_manager.clear()
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update personal information")
+                                        if result.get('errors'):
+                                            for error in result['errors']:
+                                                st.error(f"❌ {error}")
+                                except Exception as e:
+                                    st.error(f"Error updating personal info: {str(e)}")
+                    
+                    with profile_tabs[2]:
+                        # Cognitive State Form
+                        with st.form("update_cognitive_form"):
+                            st.write("**Cognitive State**")
+                            
+                            current_cognitive_state = user_details.get('cognitive_state', 50)
+                            new_cognitive_state = st.slider("Cognitive State", 
+                                                           min_value=0, 
+                                                           max_value=100, 
+                                                           value=int(current_cognitive_state),
+                                                           help="User's cognitive state on a scale of 0-100")
+                            
+                            # Show current vs new comparison
+                            if new_cognitive_state != current_cognitive_state:
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.write(f"**Current:** {current_cognitive_state}/100")
+                                    st.progress(current_cognitive_state / 100)
+                                with col2:
+                                    st.write(f"**New:** {new_cognitive_state}/100")
+                                    st.progress(new_cognitive_state / 100)
+                            
+                            cognitive_submitted = st.form_submit_button("Update Cognitive State")
+                            
+                            if cognitive_submitted:
+                                try:
+                                    result = update_cognitive_state(selected_user, new_cognitive_state)
+                                    
+                                    if result['success']:
+                                        st.success("Cognitive state updated successfully!")
+                                        st.info(f"Updated cognitive state from {current_cognitive_state} to {new_cognitive_state}")
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update cognitive state")
+                                        if result.get('error'):
+                                            st.error(f"❌ {result['error']}")
+                                except Exception as e:
+                                    st.error(f"Error updating cognitive state: {str(e)}")
+                
+                else:
+                    st.warning(f"User '{selected_user}' not found.")
+        else:
+            st.info("No users available for profile management.")
+            
+    except Exception as e:
+        st.error(f"Error loading profile management: {str(e)}")
+
+
 def _render_switch_user():
     """Interface for switching between users."""
     st.subheader("Switch User")
-    
-    try:
-        # Get current user
-        from personal_agent.config.user_id_mgr import get_userid
-        current_user = get_userid()
-        
-        st.info(f"Current User: {current_user}")
-        
-        # Get all users
-        users = get_all_users()
-        user_ids = [user['user_id'] for user in users if user['user_id'] != current_user]
-        
-        if user_ids:
-            # Form for switching user
-            with st.form("switch_user_form"):
-                selected_user = st.selectbox("Select User", user_ids)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    restart_containers = st.checkbox("Restart LightRAG Containers", 
-                                                   value=True,
-                                                   help="Restart LightRAG Docker containers after switching user")
-                with col2:
-                    update_global_config = st.checkbox("Update Global USER_ID", 
-                                                      value=True,
-                                                      help="Update the global USER_ID configuration")
-                
-                submitted = st.form_submit_button("Switch User")
-                
-                if submitted:
-                    try:
-                        # Switch to the selected user
-                        result = switch_user(
-                            user_id=selected_user,
-                            restart_containers=restart_containers
-                        )
-                        
-                        if result['success']:
-                            st.success(f"Switched to user '{selected_user}' successfully!")
-                            
-                            if update_global_config:
-                                st.info("Global USER_ID configuration updated.")
-                            
-                            if restart_containers:
-                                st.info("LightRAG containers will be restarted.")
-                            
-                            st.warning("Please refresh the page to see the changes.")
-                        else:
-                            st.error(f"Failed to switch user: {result['error']}")
-                            
-                    except Exception as e:
-                        st.error(f"Error switching user: {str(e)}")
-        else:
-            st.warning("No other users available to switch to.")
-        
-        # Add manual LightRAG restart section
-        st.subheader("Manual LightRAG Restart")
-        st.write("Restart LightRAG containers for the current user:")
-        
-        if st.button("Restart LightRAG Containers"):
-            try:
-                from personal_agent.streamlit.utils.user_utils import get_user_manager
-                user_manager = get_user_manager()
-                result = user_manager.restart_lightrag_for_current_user()
-                
-                if result["success"]:
-                    st.success("LightRAG containers restarted successfully!")
-                    if result.get("services_restarted"):
-                        st.info(f"Services restarted: {', '.join(result['services_restarted'])}")
-                else:
-                    st.error(f"Error restarting LightRAG containers: {result.get('error', 'Unknown error')}")
-                    if result.get("errors"):
-                        for error in result["errors"]:
-                            st.warning(error)
-            except Exception as e:
-                st.error(f"Error restarting LightRAG containers: {str(e)}")
-            
-    except Exception as e:
-        st.error(f"Error loading user information: {str(e)}")
-
-
-def _render_user_settings():
-    """Interface for managing user settings."""
-    st.subheader("User Settings")
-    
-    try:
-        # Get current user
-        from personal_agent.config.user_id_mgr import get_userid
-        current_user = get_userid()
-        
-        # Get user details
-        user_details = get_user_details(current_user)
-        
-        if user_details:
-            # Display current settings
-            st.json(user_details)
-            
-            # Form for updating settings
-            with st.form("update_settings_form"):
-                st.text_input("User Name", 
-                             value=user_details.get('user_name', ''),
-                             help="Display name for the user")
-                
-                st.selectbox("User Type", 
-                            ["Standard", "Admin", "Guest"],
-                            index=["Standard", "Admin", "Guest"].index(user_details.get('user_type', 'Standard')),
-                            help="Determines user permissions")
-                
-                # Add more settings as needed
-                
-                submitted = st.form_submit_button("Update Settings")
-                
-                if submitted:
-                    st.success("Settings updated successfully!")
-                    st.info("Some settings may require a restart to take effect.")
-        else:
-            st.warning(f"No settings found for user '{current_user}'.")
-            
-    except Exception as e:
-        st.error(f"Error loading user settings: {str(e)}")
+    st.info("Switch to a different user account.")
 
 
 def _render_delete_user():
-    """Interface for deleting users with enhanced options."""
+    """Interface for deleting users."""
     st.subheader("Delete User")
-    
     st.warning("⚠️ **Warning**: User deletion is permanent and cannot be undone!")
     
     try:
-        # Get current user
-        from personal_agent.config.user_id_mgr import get_userid
-        current_user = get_userid()
-        
-        # Get all users except current user
+        # Get all users
         users = get_all_users()
-        user_ids = [user['user_id'] for user in users if user['user_id'] != current_user]
+        user_ids = [user['user_id'] for user in users]
         
         if user_ids:
+            # Get current user to prevent self-deletion
+            current_user_id = os.getenv("USER_ID", "Unknown")
+            
             # Form for deleting user
             with st.form("delete_user_form"):
-                selected_user = st.selectbox("Select User to Delete",
+                st.write("**Select User to Delete**")
+                
+                selected_user = st.selectbox("User to Delete", 
                                            [""] + user_ids,
                                            help="Choose the user you want to delete")
                 
@@ -571,116 +454,504 @@ def _render_delete_user():
                     # Show user details
                     user_details = get_user_details(selected_user)
                     if user_details:
-                        st.info(f"**User Details:**")
+                        # Prevent current user deletion
+                        if selected_user == current_user_id:
+                            st.error("❌ **Cannot delete the currently active user!**")
+                            st.info("💡 Switch to a different user first, then delete this user.")
+                        else:
+                            st.info("**User Details:**")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write(f"**User ID:** {user_details.get('user_id', 'N/A')}")
+                                st.write(f"**User Name:** {user_details.get('user_name', 'N/A')}")
+                                st.write(f"**User Type:** {user_details.get('user_type', 'N/A')}")
+                            with col2:
+                                st.write(f"**Email:** {user_details.get('email', 'Not set')}")
+                                st.write(f"**Last Seen:** {user_details.get('last_seen', 'N/A')}")
+                                st.write(f"**Created:** {user_details.get('created_at', 'N/A')}")
+                
+                st.write("**Deletion Options**")
+                
+                # Deletion options
+                col1, col2 = st.columns(2)
+                with col1:
+                    delete_data = st.checkbox("Delete User Data", 
+                                            value=True,
+                                            help="Delete the user's persistent data directory")
+                    
+                    backup_before_delete = st.checkbox("Create Backup Before Deletion", 
+                                                     value=True,
+                                                     help="Create a backup of user data before deletion")
+                
+                with col2:
+                    dry_run = st.checkbox("Preview Mode (Dry Run)", 
+                                        value=False,
+                                        help="Show what would be deleted without actually deleting")
+                
+                # Confirmation
+                st.write("**Confirmation**")
+                confirmation_text = ""  # Initialize to prevent undefined variable error
+                if selected_user and selected_user != current_user_id:
+                    # Use session state key that includes the selected user to reset when user changes
+                    confirmation_key = f"delete_confirmation_{selected_user}"
+                    confirmation_text = st.text_input(
+                        f"Type '{selected_user}' to confirm deletion:",
+                        key=confirmation_key,
+                        help="This is a safety measure to prevent accidental deletions"
+                    )
+                    
+                    # Show what will happen
+                    if dry_run:
+                        st.info("🔍 **Preview Mode**: This will show what would be deleted without actually deleting anything.")
+                    else:
+                        st.error("🗑️ **This will permanently delete the user and cannot be undone!**")
+                        if backup_before_delete:
+                            st.info("💾 A backup will be created before deletion.")
+                        if delete_data:
+                            st.warning("📁 User's data directory will be permanently deleted.")
+                        else:
+                            st.info("📁 User's data directory will be preserved.")
+                
+                # Submit button
+                submitted = st.form_submit_button(
+                    "🔍 Preview Deletion" if dry_run else "🗑️ Delete User", 
+                    type="secondary" if dry_run else "primary"
+                )
+                
+                if submitted:
+                    if not selected_user:
+                        st.error("❌ Please select a user to delete.")
+                    elif selected_user == current_user_id:
+                        st.error("❌ Cannot delete the currently active user. Switch to a different user first.")
+                    elif not dry_run and confirmation_text != selected_user:
+                        st.error(f"❌ Please type '{selected_user}' exactly to confirm deletion.")
+                    else:
+                        try:
+                            # Perform deletion (or dry run)
+                            action_text = "Previewing deletion" if dry_run else "Deleting user"
+                            with st.spinner(f"{action_text} for '{selected_user}'..."):
+                                result = delete_user(
+                                    selected_user,
+                                    delete_data=delete_data,
+                                    backup_data=backup_before_delete,
+                                    dry_run=dry_run
+                                )
+                            
+                            if result['success']:
+                                if dry_run:
+                                    st.success(f"🔍 **Preview completed for user '{selected_user}'**")
+                                    st.info("**What would be deleted:**")
+                                else:
+                                    st.success(f"✅ **User '{selected_user}' deleted successfully!**")
+                                    st.info("**Deletion completed:**")
+                                
+                                # Display detailed results
+                                if result.get('actions_performed'):
+                                    st.subheader("Actions Performed:" if not dry_run else "Actions That Would Be Performed:")
+                                    for action in result['actions_performed']:
+                                        st.write(f"• {action}")
+                                
+                                # Show backup information if created
+                                if result.get('backup_created'):
+                                    st.success("💾 **Backup created successfully!**")
+                                    backup_info = result.get('backup_info', {})
+                                    if backup_info:
+                                        col1, col2 = st.columns(2)
+                                        with col1:
+                                            st.write(f"**Backup Path:** {backup_info.get('backup_path', 'N/A')}")
+                                            st.write(f"**Backup Size:** {backup_info.get('backup_size_mb', 0):.2f} MB")
+                                        with col2:
+                                            st.write(f"**Files Backed Up:** {backup_info.get('files_backed_up', 0)}")
+                                            st.write(f"**Timestamp:** {backup_info.get('timestamp', 'N/A')}")
+                                
+                                # Show data deletion information
+                                if result.get('data_deleted') and not dry_run:
+                                    data_info = result.get('data_deletion_info', {})
+                                    if data_info:
+                                        st.info("📁 **Data Directory Information:**")
+                                        st.write(f"• Path: {data_info.get('data_path', 'N/A')}")
+                                        st.write(f"• Size: {data_info.get('size_mb', 0):.2f} MB")
+                                        st.write(f"• Files: {data_info.get('file_count', 0)}")
+                                elif result.get('data_preserved'):
+                                    st.info("📁 **User data directory preserved** (can be manually deleted later)")
+                                
+                                # Clear cached user manager to refresh user list
+                                if not dry_run:
+                                    from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                    get_user_manager.clear()
+                                    
+                                    # Clear the confirmation text box after successful deletion
+                                    confirmation_key = f"delete_confirmation_{selected_user}"
+                                    if confirmation_key in st.session_state:
+                                        del st.session_state[confirmation_key]
+                                    
+                                    st.success("🔄 User list refreshed successfully!")
+                                    # Force a rerun to refresh the entire component and user list
+                                    st.rerun()
+                                
+                            else:
+                                action_text = "preview" if dry_run else "deletion"
+                                st.error(f"❌ Failed to {action_text} user: {result.get('error', 'Unknown error')}")
+                                
+                                # Show any partial results
+                                if result.get('partial_results'):
+                                    st.warning("⚠️ **Partial results:**")
+                                    for partial_result in result['partial_results']:
+                                        st.write(f"• {partial_result}")
+                                
+                        except Exception as e:
+                            action_text = "preview" if dry_run else "deletion"
+                            st.error(f"❌ Error during user {action_text}: {str(e)}")
+        else:
+            st.info("ℹ️ No users available for deletion.")
+            
+    except Exception as e:
+        st.error(f"❌ Error loading user information: {str(e)}")
+    
+    # Additional safety information
+    st.markdown("---")
+    st.subheader("🛡️ Safety Information")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("""
+        **Before Deleting a User:**
+        • Make sure you're not deleting the current user
+        • Consider creating a backup first
+        • Verify you have the correct user selected
+        • Use Preview Mode to see what will be deleted
+        """)
+    
+    with col2:
+        st.warning("""
+        **What Gets Deleted:**
+        • User profile and settings
+        • User's data directory (if selected)
+        • Docker container configurations
+        • Memory and knowledge data
+        • All user-specific files
+        """)
+    
+    # Recovery information
+    st.info("""
+    **🔄 Recovery Options:**
+    • If you created a backup, you can restore the user using the 'Backup & Restore' tab
+    • If you preserved the data directory, you can recreate the user with the same ID
+    • Docker containers can be recreated automatically when switching users
+    """)
+
+
+def _render_backup_restore():
+    """Interface for backing up and restoring users."""
+    st.subheader("Backup & Restore")
+    
+    # Create sub-tabs for backup and restore operations
+    backup_tabs = st.tabs(["💾 Backup User", "📥 Restore User", "📋 List Backups"])
+    
+    with backup_tabs[0]:
+        _render_backup_user()
+    
+    with backup_tabs[1]:
+        _render_restore_user()
+    
+    with backup_tabs[2]:
+        _render_list_backups()
+
+
+def _render_backup_user():
+    """Interface for backing up a user."""
+    st.subheader("Backup User")
+    st.info("💾 Create a backup of a user's data directory for safekeeping or migration.")
+    
+    try:
+        # Get all users
+        users = get_all_users()
+        user_ids = [user['user_id'] for user in users]
+        
+        if user_ids:
+            # Form for backing up user
+            with st.form("backup_user_form"):
+                selected_user = st.selectbox("Select User to Backup", 
+                                           [""] + user_ids,
+                                           help="Choose the user whose data you want to backup")
+                
+                if selected_user:
+                    # Show user details
+                    user_details = get_user_details(selected_user)
+                    if user_details:
+                        st.info("**User Details:**")
                         col1, col2 = st.columns(2)
                         with col1:
                             st.write(f"**User ID:** {user_details.get('user_id', 'N/A')}")
                             st.write(f"**User Name:** {user_details.get('user_name', 'N/A')}")
                         with col2:
                             st.write(f"**User Type:** {user_details.get('user_type', 'N/A')}")
-                            st.write(f"**Created:** {user_details.get('created_at', 'N/A')}")
+                            st.write(f"**Last Seen:** {user_details.get('last_seen', 'N/A')}")
                 
-                st.subheader("Deletion Options")
+                submitted = st.form_submit_button("💾 Create Backup", type="primary")
                 
-                # Deletion options
-                col1, col2 = st.columns(2)
-                with col1:
-                    delete_data = st.checkbox("Delete User Data",
-                                            value=True,
-                                            help="Delete all persistent data directories for this user")
-                    backup_data = st.checkbox("Backup Data Before Deletion",
-                                            value=False,
-                                            help="Create a backup of user data before deleting")
-                
-                with col2:
-                    dry_run = st.checkbox("Dry Run (Preview Only)",
-                                        value=False,
-                                        help="Preview what would be deleted without actually deleting")
-                
-                # Confirmation
-                st.subheader("Confirmation")
-                confirmation_text = ""
-                if selected_user:
-                    confirmation_text = st.text_input(
-                        f"Type '{selected_user}' to confirm deletion:",
-                        help="This is a safety measure to prevent accidental deletions"
-                    )
-                
-                # Submit button - always enabled
-                submitted = st.form_submit_button(
-                    "🗑️ Delete User" if not dry_run else "👁️ Preview Deletion",
-                    type="primary" if dry_run else "secondary"
-                )
-                
-                # Validation and confirmation after submission
                 if submitted:
                     if not selected_user:
-                        st.error("❌ Please select a user to delete.")
-                    elif not dry_run and confirmation_text != selected_user:
-                        st.error(f"❌ Please type '{selected_user}' exactly to confirm deletion.")
+                        st.error("❌ Please select a user to backup.")
                     else:
                         try:
-                            # Perform deletion
-                            with st.spinner(f"{'Previewing' if dry_run else 'Deleting'} user '{selected_user}'..."):
-                                result = delete_user(
-                                    user_id=selected_user,
-                                    delete_data=delete_data,
-                                    backup_data=backup_data,
-                                    dry_run=dry_run
-                                )
-                        
+                            # Perform backup
+                            with st.spinner(f"Creating backup for user '{selected_user}'..."):
+                                from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                user_manager = get_user_manager()
+                                result = user_manager.backup_user(selected_user)
+                            
                             if result['success']:
-                                if dry_run:
-                                    st.success("✅ Dry run completed successfully!")
-                                    st.info("**Preview Results:**")
-                                else:
-                                    st.success(f"✅ User '{selected_user}' deleted successfully!")
+                                st.success(f"✅ User '{selected_user}' backed up successfully!")
                                 
-                                # Display detailed results
+                                # Display backup details
+                                st.info("**Backup Details:**")
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.write(f"**Backup Path:** {result['backup_path']}")
+                                    st.write(f"**Timestamp:** {result['timestamp']}")
+                                with col2:
+                                    st.write(f"**Files Backed Up:** {result['files_backed_up']}")
+                                    st.write(f"**Size:** {result['backup_size_mb']:.2f} MB")
+                                
+                                # Show backup location
+                                st.code(result['backup_path'], language="text")
+                                
+                            else:
+                                st.error(f"❌ Failed to backup user: {result.get('error', 'Unknown error')}")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Error during user backup: {str(e)}")
+        else:
+            st.info("ℹ️ No users available for backup.")
+            
+    except Exception as e:
+        st.error(f"❌ Error loading user information: {str(e)}")
+
+
+def _render_restore_user():
+    """Interface for restoring a user from backup."""
+    st.subheader("Restore User")
+    st.info("📥 Restore a user's data from a previously created backup.")
+    
+    try:
+        # Get available backups
+        from personal_agent.streamlit.utils.user_utils import get_user_manager
+        user_manager = get_user_manager()
+        backups_result = user_manager.list_user_backups()
+        
+        if backups_result['success'] and backups_result['backups']:
+            # Form for restoring user
+            with st.form("restore_user_form"):
+                st.write("**Restore Options**")
+                
+                # Target user ID
+                target_user_id = st.text_input("Target User ID", 
+                                              help="User ID to restore the backup to (can be different from original)")
+                
+                # Backup selection
+                backup_options = []
+                backup_map = {}
+                for backup in backups_result['backups']:
+                    display_name = f"{backup['user_id']} - {backup['formatted_date']} ({backup['size_mb']:.2f} MB)"
+                    backup_options.append(display_name)
+                    backup_map[display_name] = backup
+                
+                selected_backup_display = st.selectbox("Select Backup to Restore",
+                                                      [""] + backup_options,
+                                                      help="Choose the backup you want to restore")
+                
+                if selected_backup_display:
+                    selected_backup = backup_map[selected_backup_display]
+                    
+                    # Show backup details
+                    st.info("**Backup Details:**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Original User:** {selected_backup['user_id']}")
+                        st.write(f"**Backup Date:** {selected_backup['formatted_date']}")
+                    with col2:
+                        st.write(f"**Files:** {selected_backup['file_count']}")
+                        st.write(f"**Size:** {selected_backup['size_mb']:.2f} MB")
+                    
+                    st.code(selected_backup['backup_path'], language="text")
+                
+                # Restore options
+                st.write("**Advanced Options**")
+                overwrite_existing = st.checkbox("Overwrite Existing Data",
+                                                value=False,
+                                                help="Overwrite existing user data if the target user already exists")
+                
+                submitted = st.form_submit_button("📥 Restore Backup", type="primary")
+                
+                if submitted:
+                    if not target_user_id:
+                        st.error("❌ Please enter a target user ID.")
+                    elif not selected_backup_display:
+                        st.error("❌ Please select a backup to restore.")
+                    else:
+                        try:
+                            selected_backup = backup_map[selected_backup_display]
+                            
+                            # Perform restore
+                            with st.spinner(f"Restoring backup to user '{target_user_id}'..."):
+                                result = user_manager.restore_user(
+                                    target_user_id,
+                                    selected_backup['backup_name'],
+                                    overwrite_existing=overwrite_existing
+                                )
+                            
+                            if result['success']:
+                                st.success(f"✅ User '{target_user_id}' restored successfully!")
+                                
+                                # Display restore details
+                                st.info("**Restore Details:**")
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.write(f"**Restored From:** {result['backup_path']}")
+                                    st.write(f"**Restored To:** {result['restore_path']}")
+                                with col2:
+                                    st.write(f"**Files Restored:** {result['data_restored']['files_restored']}")
+                                    st.write(f"**Size:** {result['data_restored']['total_size_mb']:.2f} MB")
+                                
+                                # Show actions performed
                                 if result.get('actions_performed'):
                                     st.subheader("Actions Performed:")
                                     for action in result['actions_performed']:
                                         st.write(f"• {action}")
                                 
-                                # Display data deletion info
-                                data_info = result.get('data_deleted', {})
-                                if data_info.get('files_removed', 0) > 0:
-                                    st.info(f"📊 **Data Summary:** {data_info['files_removed']} files, "
-                                           f"{data_info['total_size_mb']:.2f} MB")
+                                # Clear cached user manager to refresh user list
+                                get_user_manager.clear()
                                 
-                                # Display backup info
-                                backup_info = result.get('backup_info', {})
-                                if backup_info.get('success'):
-                                    st.success(f"💾 **Backup Created:** {backup_info['backup_path']}")
-                                    st.info(f"Backup contains {backup_info['files_backed_up']} files "
-                                           f"({backup_info['backup_size_mb']:.2f} MB)")
-                                
-                                # Display warnings
-                                if result.get('warnings'):
-                                    st.subheader("Warnings:")
-                                    for warning in result['warnings']:
-                                        st.warning(f"⚠️ {warning}")
-                                
-                                if not dry_run:
-                                    # Clear the cached user manager to refresh user list
-                                    from personal_agent.streamlit.utils.user_utils import get_user_manager
-                                    get_user_manager.clear()
-                                    st.success("🔄 User list updated automatically!")
-                                    st.rerun()
                             else:
-                                st.error(f"❌ Failed to delete user: {result.get('error', 'Unknown error')}")
+                                st.error(f"❌ Failed to restore user: {result.get('error', 'Unknown error')}")
                                 
-                                # Display any errors
-                                if result.get('errors'):
-                                    st.subheader("Errors:")
-                                    for error in result['errors']:
-                                        st.error(f"❌ {error}")
-                                        
                         except Exception as e:
-                            st.error(f"❌ Error during user deletion: {str(e)}")
+                            st.error(f"❌ Error during user restore: {str(e)}")
         else:
-            st.info("ℹ️ No users available for deletion (cannot delete current user).")
-            st.write(f"Current user: **{current_user}**")
+            st.info("ℹ️ No backups available for restore.")
+            if not backups_result['success']:
+                st.error(f"Error loading backups: {backups_result.get('error', 'Unknown error')}")
             
     except Exception as e:
-        st.error(f"❌ Error loading user information: {str(e)}")
+        st.error(f"❌ Error loading backup information: {str(e)}")
+
+
+def _render_list_backups():
+    """Interface for listing and managing backups."""
+    st.subheader("List Backups")
+    st.info("📋 View all available user backups and their details.")
+    
+    try:
+        # Add refresh button
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("🔄 Refresh Backups", help="Refresh backup list"):
+                st.rerun()
+        
+        # Get available backups
+        from personal_agent.streamlit.utils.user_utils import get_user_manager
+        user_manager = get_user_manager()
+        backups_result = user_manager.list_user_backups()
+        
+        if backups_result['success']:
+            if backups_result['backups']:
+                # Filter options
+                st.subheader("Filter Options")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Get unique user IDs from backups
+                    unique_users = list(set([backup['user_id'] for backup in backups_result['backups']]))
+                    filter_user = st.selectbox("Filter by User", ["All Users"] + unique_users)
+                
+                with col2:
+                    # Sort options
+                    sort_by = st.selectbox("Sort by", ["Date (Newest First)", "Date (Oldest First)", "User ID", "Size"])
+                
+                # Apply filters
+                filtered_backups = backups_result['backups']
+                if filter_user != "All Users":
+                    filtered_backups = [b for b in filtered_backups if b['user_id'] == filter_user]
+                
+                # Apply sorting
+                if sort_by == "Date (Newest First)":
+                    filtered_backups.sort(key=lambda x: x['timestamp'], reverse=True)
+                elif sort_by == "Date (Oldest First)":
+                    filtered_backups.sort(key=lambda x: x['timestamp'])
+                elif sort_by == "User ID":
+                    filtered_backups.sort(key=lambda x: x['user_id'])
+                elif sort_by == "Size":
+                    filtered_backups.sort(key=lambda x: x['size_mb'], reverse=True)
+                
+                # Display backups
+                st.subheader(f"Available Backups ({len(filtered_backups)})")
+                
+                for backup in filtered_backups:
+                    with st.expander(f"💾 {backup['user_id']} - {backup['formatted_date']} ({backup['size_mb']:.2f} MB)"):
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.write("**Backup Info:**")
+                            st.write(f"User ID: {backup['user_id']}")
+                            st.write(f"Backup Name: {backup['backup_name']}")
+                            st.write(f"Timestamp: {backup['timestamp']}")
+                        
+                        with col2:
+                            st.write("**Details:**")
+                            st.write(f"Date: {backup['formatted_date']}")
+                            st.write(f"Files: {backup['file_count']}")
+                            st.write(f"Size: {backup['size_mb']:.2f} MB")
+                        
+                        with col3:
+                            st.write("**Actions:**")
+                            # Quick restore button
+                            if st.button(f"🔄 Quick Restore", key=f"restore_{backup['backup_name']}", 
+                                        help=f"Restore to original user ID: {backup['user_id']}"):
+                                try:
+                                    with st.spinner(f"Restoring {backup['user_id']}..."):
+                                        result = user_manager.restore_user(
+                                            backup['user_id'],
+                                            backup['backup_name'],
+                                            overwrite_existing=True
+                                        )
+                                    
+                                    if result['success']:
+                                        st.success(f"✅ {backup['user_id']} restored successfully!")
+                                        get_user_manager.clear()  # Clear cache
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Restore failed: {result.get('error', 'Unknown error')}")
+                                except Exception as e:
+                                    st.error(f"❌ Error during restore: {str(e)}")
+                        
+                        # Show backup path
+                        st.code(backup['backup_path'], language="text")
+                
+                # Summary statistics
+                st.subheader("Backup Statistics")
+                total_size = sum([b['size_mb'] for b in filtered_backups])
+                total_files = sum([b['file_count'] for b in filtered_backups])
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Backups", len(filtered_backups))
+                with col2:
+                    st.metric("Total Size", f"{total_size:.2f} MB")
+                with col3:
+                    st.metric("Total Files", total_files)
+                
+            else:
+                st.info("ℹ️ No backups found.")
+                st.write("Create your first backup using the 'Backup User' tab.")
+        else:
+            st.error(f"❌ Error loading backups: {backups_result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        st.error(f"❌ Error loading backup information: {str(e)}")
+
+
+def _render_user_settings():
+    """Interface for managing user settings."""
+    st.subheader("User Settings")
+    st.info("Manage user-specific settings and preferences.")
