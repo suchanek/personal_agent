@@ -172,11 +172,12 @@ except ImportError:
     )
     from personal_agent.utils import setup_logging
 
-WRITER_MODEL = "llama3.1:8b"
-CODING_MODEL = "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest"
+WRITER_MODEL = LLM_MODEL
 SYSTEM_MODEL = "qwen3:1.7b"
+CODING_MODEL = SYSTEM_MODEL
+
 # MEMORY_AGENT_MODEL = "gpt-4o"
-MEMORY_AGENT_MODEL = "qwen3:4b"
+MEMORY_AGENT_MODEL = LLM_MODEL
 
 # Load environment variables
 load_dotenv()
@@ -254,39 +255,26 @@ _instructions = dedent(
 )
 
 _memory_specific_instructions = [
-    "- You are a memory and knowledge agent.",
-    "- Return your tool responses immediately",
-    "- Optimize token use. Use the list_all_memories over get_all_memories to save output tokens!",
-    "SIMPLE TOOL SELECTION:",
-    "- Personal info about user → use memory tools (store_user_memory, get_all_memories, etc.)",
-    "- Documents, articles, poems → use knowledge tools (ingest_knowledge_text, query_knowledge_base)",
-    "FUNCTION SELECTION RULES:",
-    "- Use list_all_memories for: summaries, overviews, quick lists, counts, general requests",
-    "- Use get_all_memories for: detailed content, full information, when explicitly asked for details",
-    "- Default to list_all_memories unless user specifically requests detailed information",
-    "- Always prefer concise responses (list_all_memories) unless details explicitly requested",
-    "",
+    "- You are a memory and knowledge agent. Return tool responses immediately.",
+    "- Optimize token use: prefer list_all_memories over get_all_memories to save tokens!",
+    "TOOL SELECTION:",
+    "- Personal info → memory tools (store_user_memory, get_all_memories, etc.)",
+    "- Documents/articles → knowledge tools (ingest_knowledge_text, query_knowledge_base)",
+    "FUNCTION SELECTION:",
+    "- list_all_memories: summaries, overviews, quick lists, counts, general requests",
+    "- get_all_memories: detailed content, full information, when explicitly requested",
+    "- Default to list_all_memories unless details specifically requested",
     "COMMON PATTERNS:",
     "- 'Remember I...' → store_user_memory",
-    "- 'What do you remember about me?' → list_all_memories, no parameters -> return response immediately",
-    "- 'List all memories' → list_all_memories, no parameters",
-    "- 'list all memories stored' → list_all_memories, no parameters",
-    "- 'show all memories' → list_all_memories, no parameters",
-    "- 'what memories do you have' → list_all_memories, no parameters",
-    "- 'how many memories' → list_all_memories, no parameters",
-    "- 'memory summary' → list_all_memories, no parameters",
-    "- 'list detailed memory info' → get_all_memories, no parameters",
-    "- 'show detailed memories' → get_all_memories, no parameters",
-    "- 'get full memory details' → get_all_memories, no parameters",
-    "- 'complete memory information' → get_all_memories, no parameters",
+    "- 'What do you remember about me?' → list_all_memories (no params) → return immediately",
+    "- 'list/show memories', 'how many', 'summary' → list_all_memories (no params)",
+    "- 'detailed/full/complete memory info' → get_all_memories (no params)",
     "- 'Store this poem/article' → ingest_knowledge_text",
-    "",
-    "PATTERN MATCHING GUIDELINES:",
-    "- Keywords for list_all_memories: 'list', 'show', 'what memories', 'how many', 'summary', 'stored'",
-    "- Keywords for get_all_memories: 'detailed', 'full', 'complete', 'everything about', 'all details'",
+    "PATTERN MATCHING:",
+    "- list_all_memories keywords: 'list', 'show', 'what memories', 'how many', 'summary', 'stored'",
+    "- get_all_memories keywords: 'detailed', 'full', 'complete', 'everything about', 'all details'",
     "- When in doubt, choose list_all_memories (more efficient and user-friendly)",
-    "",
-    "Execute tools directly. return the results directly.",
+    "Execute tools directly and return results directly.",
 ]
 
 _code_instructions = dedent(
@@ -606,7 +594,7 @@ Conclusion about {topic}."""
 
 def create_writer_agent(
     model_provider: str = PROVIDER,
-    model_name: str = WRITER_MODEL,
+    model_name: str = LLM_MODEL,
     ollama_base_url: str = OLLAMA_URL,
     debug: bool = False,
     use_remote: bool = False,
@@ -625,7 +613,7 @@ def create_writer_agent(
     writing_tools = WritingTools()
 
     # Use provided model_name or fall back to WRITER_MODEL default
-    effective_model = WRITER_MODEL
+    effective_model = model_name
 
     agent = Agent(
         name="Writer Agent",
@@ -1312,7 +1300,12 @@ def display_welcome_panel(console: Console, command_parser: CommandParser):
 
 
 # Main execution
-async def main(use_remote: bool = False, query: Optional[str] = None, recreate: bool = False, instruction_level: str = "STANDARD"):
+async def main(
+    use_remote: bool = False,
+    query: Optional[str] = None,
+    recreate: bool = False,
+    instruction_level: str = "STANDARD",
+):
     """Main function to run the team with an enhanced CLI interface."""
 
     # Initialize Rich console for better formatting
@@ -1336,7 +1329,9 @@ async def main(use_remote: bool = False, query: Optional[str] = None, recreate: 
         # Get the memory agent for CLI commands
         memory_agent = None
         if hasattr(team, "members") and team.members:
-            logger.debug(f"🔍 Searching for memory agent among {len(team.members)} team members")
+            logger.debug(
+                f"🔍 Searching for memory agent among {len(team.members)} team members"
+            )
             for member in team.members:
                 member_name = getattr(member, "name", "Unknown")
                 logger.debug(f"🔍 Checking member: {member_name}")
@@ -1344,7 +1339,7 @@ async def main(use_remote: bool = False, query: Optional[str] = None, recreate: 
                     memory_agent = member
                     logger.info(f"✅ Found memory agent: {member.name}")
                     break
-            
+
             if not memory_agent:
                 logger.warning("⚠️ Memory agent not found! Available members:")
                 for member in team.members:
@@ -1436,6 +1431,7 @@ async def main(use_remote: bool = False, query: Optional[str] = None, recreate: 
 
                 elif user_input.lower() == "clear":
                     import os
+
                     os.system("clear" if os.name == "posix" else "cls")
                     console.print("🤖 Personal Agent Team")
                     console.print("💬 Chat cleared. How can I help you?")
@@ -1455,7 +1451,9 @@ async def main(use_remote: bool = False, query: Optional[str] = None, recreate: 
                     console.print("    - 'memories' - Show all stored memories")
                     console.print("    - 'analysis' - Show memory analysis")
                     console.print("    - 'stats' - Show memory statistics")
-                    console.print("    - 'wipe' - Clear all memories (requires confirmation)")
+                    console.print(
+                        "    - 'wipe' - Clear all memories (requires confirmation)"
+                    )
                     console.print("\n  [yellow]Web Search:[/yellow]")
                     console.print("    - 'What's the latest news about AI?'")
                     console.print("    - 'Search for information about climate change'")
@@ -1499,7 +1497,9 @@ async def main(use_remote: bool = False, query: Optional[str] = None, recreate: 
                 if command_handler and memory_agent:
                     try:
                         console.print("🧠 [bold green]Memory Agent:[/bold green]")
-                        logger.debug(f"🔍 Executing command handler: {command_handler.__name__}")
+                        logger.debug(
+                            f"🔍 Executing command handler: {command_handler.__name__}"
+                        )
                         # The command handlers expect an AgnoPersonalAgent, so we pass the memory_agent
                         # which is an AgnoPersonalAgent instance
                         if remaining_text is not None:
@@ -1512,7 +1512,9 @@ async def main(use_remote: bool = False, query: Optional[str] = None, recreate: 
                         logger.error(f"Command execution failed: {e}", exc_info=True)
                         continue
                 elif command_handler and not memory_agent:
-                    console.print("❌ Memory agent not available - cannot execute memory commands")
+                    console.print(
+                        "❌ Memory agent not available - cannot execute memory commands"
+                    )
                     logger.error("Command handler found but memory agent is None")
                     continue
 
@@ -1594,7 +1596,14 @@ def cli_main():
     PROVIDER = args.provider
 
     print(f"Starting Personal Agent Reasoning Team with provider: {PROVIDER}...")
-    asyncio.run(main(use_remote=args.remote, query=args.query, recreate=args.recreate, instruction_level=args.instruction_level))
+    asyncio.run(
+        main(
+            use_remote=args.remote,
+            query=args.query,
+            recreate=args.recreate,
+            instruction_level=args.instruction_level,
+        )
+    )
 
 
 if __name__ == "__main__":
