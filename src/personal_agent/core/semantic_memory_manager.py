@@ -360,7 +360,7 @@ class SemanticMemoryManager:
         if self.config.debug_mode:
             logger.setLevel(logging.DEBUG)
 
-        logger.info(
+        logger.debug(
             "Initialized SemanticMemoryManager with similarity_threshold=%.2f",
             config.similarity_threshold,
         )
@@ -774,7 +774,7 @@ class SemanticMemoryManager:
 
             self.memories_updated = True
 
-            logger.info("Cleared all memories for user %s", user_id)
+            logger.warning("Cleared all memories for user %s", user_id)
             if self.config.debug_mode:
                 print(f"🧹 CLEARED: All memories for user {user_id}")
 
@@ -811,7 +811,7 @@ class SemanticMemoryManager:
 
         # LATENCY DEBUG: Start timing memory search
         search_start_time = time.perf_counter()
-        logger.info(
+        logger.debug(
             "🔍 MEMORY LATENCY: Starting search_memories for query: %s", query[:50]
         )
 
@@ -824,7 +824,7 @@ class SemanticMemoryManager:
             expand_start = time.perf_counter()
             expanded_queries = self._expand_query(query)
             expand_time = time.perf_counter() - expand_start
-            logger.info(
+            logger.debug(
                 "🔍 MEMORY LATENCY: Query expansion took %.3f seconds (%d queries)",
                 expand_time,
                 len(expanded_queries),
@@ -834,7 +834,7 @@ class SemanticMemoryManager:
             db_start = time.perf_counter()
             memory_rows = db.read_memories(user_id=user_id)
             db_time = time.perf_counter() - db_start
-            logger.info(
+            logger.debug(
                 "🔍 MEMORY LATENCY: Database read took %.3f seconds (%d rows)",
                 db_time,
                 len(memory_rows),
@@ -853,7 +853,7 @@ class SemanticMemoryManager:
                             "Failed to convert memory row to UserMemory: %s", e
                         )
             convert_time = time.perf_counter() - convert_start
-            logger.info(
+            logger.debug(
                 "🔍 MEMORY LATENCY: Memory conversion took %.3f seconds (%d memories)",
                 convert_time,
                 len(user_memories),
@@ -934,7 +934,7 @@ class SemanticMemoryManager:
                         )
 
             similarity_time = time.perf_counter() - similarity_start
-            logger.info(
+            logger.debug(
                 "🔍 MEMORY LATENCY: Similarity calculations took %.3f seconds (%d memories processed)",
                 similarity_time,
                 len(user_memories),
@@ -944,11 +944,11 @@ class SemanticMemoryManager:
             sort_start = time.perf_counter()
             results.sort(key=lambda x: x[1], reverse=True)
             sort_time = time.perf_counter() - sort_start
-            logger.info("🔍 MEMORY LATENCY: Sorting took %.3f seconds", sort_time)
+            logger.debug("🔍 MEMORY LATENCY: Sorting took %.3f seconds", sort_time)
 
             # LATENCY DEBUG: Total timing
             total_time = time.perf_counter() - search_start_time
-            logger.info(
+            logger.debug(
                 "🔍 MEMORY LATENCY: Total search_memories time: %.3f seconds (expand: %.3f, db: %.3f, convert: %.3f, similarity: %.3f, sort: %.3f)",
                 total_time,
                 expand_time,

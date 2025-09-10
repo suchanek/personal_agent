@@ -92,7 +92,7 @@ def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
         auto_upgrade_schema=True,
     )
 
-    logger.info(
+    logger.debug(
         "Created Agno SQLite storage at: %s", storage_path / "agent_sessions.db"
     )
     return storage
@@ -149,7 +149,7 @@ def create_agno_memory(storage_dir: str = None, debug_mode: bool = False) -> Mem
         memory_manager=semantic_memory_manager,
     )
 
-    logger.info(
+    logger.debug(
         "Created Memory with SemanticMemoryManager at: %s (debug_mode=%s)",
         storage_path / "agent_memory.db",
         debug_mode,
@@ -183,7 +183,7 @@ def create_combined_knowledge_base(
     knowledge_path = Path(knowledge_dir)
     # Ensure the knowledge directory exists, creating it if necessary.
     knowledge_path.mkdir(parents=True, exist_ok=True)
-    logger.info("Knowledge directory is ready at %s", knowledge_path)
+    logger.debug("Knowledge directory is ready at %s", knowledge_path)
 
     # Check for available knowledge files
     text_files = list(knowledge_path.glob("*.txt")) + list(knowledge_path.glob("*.md")) + list(knowledge_path.glob("*.html"))
@@ -253,7 +253,7 @@ def create_combined_knowledge_base(
 
     # Log if no local knowledge files were found, but continue with ArXiv
     if not text_files and not pdf_files:
-        logger.info("No local knowledge files found in %s, but ArXiv knowledge base will be available", knowledge_path)
+        logger.warning("No local knowledge files found in %s, but ArXiv knowledge base will be available", knowledge_path)
 
     # Create combined knowledge base
     if knowledge_sources:

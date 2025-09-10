@@ -56,19 +56,19 @@ class AgentModelManager:
         """
         if self.model_provider == "openai":
             # Check if LMSTUDIO_URL is configured and points to LMStudio
-            lmstudio_url = getattr(settings, 'LMSTUDIO_URL', None)
-            
+            lmstudio_url = getattr(settings, "LMSTUDIO_URL", None)
+
             # Use LMStudio if LMSTUDIO_URL is set and contains localhost:1234
-            if lmstudio_url and ("localhost:1234" in lmstudio_url or "127.0.0.1:1234" in lmstudio_url):
+            if lmstudio_url and (
+                "localhost:1234" in lmstudio_url or "127.0.0.1:1234" in lmstudio_url
+            ):
                 # Use LMStudio with OpenAI-compatible API
                 # Ensure the base URL has the correct /v1 endpoint for LMStudio
                 base_url = lmstudio_url
                 if not base_url.endswith("/v1"):
                     base_url = base_url.rstrip("/") + "/v1"
 
-                logger.info(
-                    f"Using LMStudio with OpenAI-compatible API at: {base_url}"
-                )
+                logger.info(f"Using LMStudio with OpenAI-compatible API at: {base_url}")
                 logger.info(f"Model: {self.model_name}")
                 logger.info(
                     "This will use /v1/chat/completions endpoint (OpenAI format)"

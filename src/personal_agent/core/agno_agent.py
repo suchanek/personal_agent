@@ -272,7 +272,7 @@ class AgnoPersonalAgent(Agent):
             model_name=model_name,
             ollama_base_url=ollama_base_url,
             openai_base_url=openai_base_url,  # Pass the OpenAI base URL parameter
-            seed=seed
+            seed=seed,
         )
 
         initial_model = None
@@ -309,7 +309,7 @@ class AgnoPersonalAgent(Agent):
 
         # Force initialization if requested
         if self._force_init:
-            logger.info(
+            logger.debug(
                 "Force initialization requested - initializing agent synchronously"
             )
             try:
@@ -323,12 +323,13 @@ class AgnoPersonalAgent(Agent):
                 # No running event loop, safe to initialize now
                 try:
                     asyncio.run(self.initialize())
-                    logger.info(
+                    logger.warning(
                         "Agent initialized synchronously with %d tools",
                         len(self.tools) if self.tools else 0,
                     )
-                except Exception as e:
+                except RuntimeError as e:
                     logger.error("Failed to force initialize agent: %s", e)
+                    raise e
 
     def _setup_storage_paths(
         self, storage_dir: str, knowledge_dir: str, user_id: str
@@ -409,7 +410,7 @@ class AgnoPersonalAgent(Agent):
         Returns:
             True if initialization successful, False otherwise
         """
-        logger.info(
+        logger.debug(
             "🚀 AgnoPersonalAgent._do_initialization() called with recreate=%s",
             recreate,
         )
@@ -417,7 +418,7 @@ class AgnoPersonalAgent(Agent):
         try:
             # 1. Create Agno storage (CRITICAL: Must be done first)
             self.agno_storage = create_agno_storage(self.storage_dir)
-            logger.info("Created Agno storage at: %s", self.storage_dir)
+            logger.debug("Created Agno storage at: %s", self.storage_dir)
 
             # 2. Create combined knowledge base (CRITICAL: Must be done before loading)
             self.agno_knowledge = create_combined_knowledge_base(
@@ -429,7 +430,7 @@ class AgnoPersonalAgent(Agent):
                 await load_combined_knowledge_base(
                     self.agno_knowledge, recreate=recreate
                 )
-                logger.info("Loaded Agno combined knowledge base content")
+                logger.debug("Loaded Agno combined knowledge base content")
 
             # 4. Create memory with SemanticMemoryManager (CRITICAL: Must be done after storage)
             self.agno_memory = create_agno_memory(
@@ -437,7 +438,7 @@ class AgnoPersonalAgent(Agent):
             )
 
             if self.agno_memory:
-                logger.info(
+                logger.debug(
                     "Created Agno memory with SemanticMemoryManager at: %s",
                     self.storage_dir,
                 )
@@ -451,7 +452,7 @@ class AgnoPersonalAgent(Agent):
                 model_name=self.model_name,
                 ollama_base_url=self.ollama_base_url,
                 openai_base_url=self.openai_base_url,  # Pass the OpenAI base URL parameter
-                seed=self.seed
+                seed=self.seed,
             )
 
             self.instruction_manager = AgentInstructionManager(
@@ -489,7 +490,7 @@ class AgnoPersonalAgent(Agent):
 
             # 7. Create the model
             model = self.model_manager.create_model()
-            logger.info("Created model: %s", self.model_name)
+            logger.debug("Created model: %s", self.model_name)
             tools = []
             # 8. Prepare tools list
             tools = []
@@ -521,7 +522,7 @@ class AgnoPersonalAgent(Agent):
                     ),
                 ]
                 tools.extend(all_tools)
-                logger.info(f"Added {len(all_tools)} built-in tools")
+                logger.debug(f"Added {len(all_tools)} built-in tools")
 
             # ALWAYS add memory tools if memory is enabled, regardless of alltools setting
             if self.enable_memory:
@@ -531,7 +532,7 @@ class AgnoPersonalAgent(Agent):
                         self.memory_tools,
                     ]
                     tools.extend(memory_tools)
-                    logger.info(
+                    logger.debug(
                         "Added consolidated KnowledgeTools and PersagMemoryTools"
                     )
                 else:
@@ -567,7 +568,7 @@ class AgnoPersonalAgent(Agent):
                     lightrag_url=LIGHTRAG_URL,
                     debug=self.debug,
                 )
-                logger.info(
+                logger.debug(
                     "Created Knowledge Coordinator for unified knowledge queries"
                 )
 
@@ -729,7 +730,7 @@ class AgnoPersonalAgent(Agent):
                     if hasattr(self._last_response, attr):
                         alt_content = getattr(self._last_response, attr)
                         if alt_content and str(alt_content).strip():
-                            logger.info(f"Recovered content from {attr} attribute")
+                            logger.debug(f"Recovered content from {attr} attribute")
                             return str(alt_content)
 
             # Generate a simple fallback based on query
@@ -1233,7 +1234,7 @@ class AgnoPersonalAgent(Agent):
         clean up any resources, connections, or background tasks.
         """
         try:
-            logger.info("Cleaning up AgnoPersonalAgent resources...")
+            logger.debug("Cleaning up AgnoPersonalAgent resources...")
 
             # Clean up storage references
             if self.agno_storage:
@@ -1273,7 +1274,7 @@ class AgnoPersonalAgent(Agent):
                 self.tool_manager = None
                 logger.debug("Cleared tool manager reference")
 
-            logger.info("AgnoPersonalAgent cleanup completed successfully")
+            logger.debug("AgnoPersonalAgent cleanup completed successfully")
 
         except Exception as e:
             logger.warning("Error during AgnoPersonalAgent cleanup: %s", e)
@@ -1428,12 +1429,12 @@ def create_simple_personal_agent(
         ],
     )
 
-    logger.info("✅ Created simple personal agent")
+    logger.debug("✅ Created simple personal agent")
     if knowledge_base:
-        logger.info("   Knowledge base: Enabled")
-        logger.info("   Search enabled: %s", agent.search_knowledge)
+        logger.debug("   Knowledge base: Enabled")
+        logger.debug("   Search enabled: %s", agent.search_knowledge)
     else:
-        logger.info("   Knowledge base: None (no knowledge files found)")
+        logger.debug("   Knowledge base: None (no knowledge files found)")
 
     return agent, knowledge_base
 
@@ -1452,9 +1453,9 @@ async def load_agent_knowledge(knowledge_base, recreate: bool = False) -> None:
     """
     if knowledge_base:
         await load_combined_knowledge_base(knowledge_base, recreate=recreate)
-        logger.info("✅ Knowledge base loaded successfully")
+        logger.debug("✅ Knowledge base loaded successfully")
     else:
-        logger.info("No knowledge base to load")
+        logger.debug("No knowledge base to load")
 
 
 async def create_agno_agent(
@@ -1468,7 +1469,7 @@ async def create_agno_agent(
     ollama_base_url: str = OLLAMA_URL,
     user_id: str = None,
     recreate: bool = False,
-    instruction_level: InstructionLevel = InstructionLevel.EXPLICIT,
+    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
     alltools: Optional[bool] = True,  # Add alltools parameter
     seed: Optional[int] = None,
 ) -> AgnoPersonalAgent:
@@ -1495,7 +1496,7 @@ async def create_agno_agent(
     Returns:
         Fully initialized AgnoPersonalAgent instance
     """
-    logger.info(
+    logger.debug(
         "create_agno_agent() called - creating and initializing agent with proper init"
     )
 

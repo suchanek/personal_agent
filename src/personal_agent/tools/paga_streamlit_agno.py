@@ -3025,6 +3025,9 @@ def main():
                 st.stop()
         
         st.markdown("---")
+        
+        # Don't show any other content when shutdown confirmation is active
+        return
 
     # Sidebar navigation (replaces top-level tabs)
     st.sidebar.title(f"🧠 {USER_ID}'s Personal Agent")
