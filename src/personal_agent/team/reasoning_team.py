@@ -632,7 +632,7 @@ def create_writer_agent(
             "Write something that would be good enough to be published in a newspaper like the New York Times.",
         ],
         markdown=True,
-        show_tool_calls=True,  # CRITICAL: Always show tool calls to ensure execution
+        show_tool_calls=False,  # CRITICAL: Always show tool calls to ensure execution
         add_name_to_instructions=True,
     )
 
@@ -675,7 +675,7 @@ def create_image_agent(
             "**CRITICAL:** Do NOT add any text, thoughts, comments, or any other formatting. Your response must be ONLY the tool's output.",
         ],
         markdown=True,
-        show_tool_calls=True,  # Enable tool call display for better debugging
+        show_tool_calls=False,  # Enable tool call display for better debugging
         add_name_to_instructions=True,
     )
 
@@ -704,7 +704,7 @@ def create_agents(
         instructions=[
             "Search the web for information based on the input. Always include sources"
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -720,7 +720,7 @@ def create_agents(
             "You are a system agent that can execute shell commands safely.",
             "Provide clear output and error messages from command execution.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -740,7 +740,7 @@ def create_agents(
             ),
         ],
         instructions=["Use tables to display data."],
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -758,7 +758,7 @@ def create_agents(
             "Search PubMed for medical information and write about it.",
             "Use tables to display data.",
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -787,7 +787,7 @@ def create_agents(
                 square_root=True,
             ),
         ],
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -812,7 +812,7 @@ def create_agents(
             ),
         ],
         instructions=dedent(_code_instructions),
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -833,7 +833,7 @@ def create_agents(
             )
         ],
         instructions=dedent(_file_instructions),
-        show_tool_calls=True,
+        show_tool_calls=False,
         debug_mode=debug,
     )
 
@@ -1123,7 +1123,7 @@ async def create_team(use_remote: bool = False, model_name: str = None):
         ],
         markdown=True,
         show_members_responses=True,
-        show_tool_calls=True,
+        show_tool_calls=False,
         enable_agentic_context=False,
         share_member_interactions=True,  # Disable shared interactions - memory agent handles this
         enable_user_memories=False,  # Disable team-level memory - memory agent handles this
