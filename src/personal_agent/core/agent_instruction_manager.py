@@ -420,7 +420,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - Use tools immediately to answer questions - no hesitation!
             - `CalculatorTools`: For mathematical calculations and arithmetic operations.
             - `YFinanceTools`: For stock prices and financial data.
-            - `GoogleSearchTools`: For web and news search.
+            - `DuckDuckGoTools`: For web and news search.
             - `PersonalAgentFilesystemTools`: For file operations.
             - `PythonTools`: For advanced calculations, data analysis, and code execution.
             - `ShellTools`: For system operations and command execution.
@@ -479,12 +479,12 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - NO thinking, NO debate, USE THE TOOLS IMMEDIATELY
 
             **WEB SEARCH - USE IMMEDIATELY**:
-            - ANY news request → GoogleSearchTools RIGHT NOW
-            - ANY current events → GoogleSearchTools RIGHT NOW
-            - "what's happening with..." → GoogleSearchTools RIGHT NOW
-            - "latest news about..." → GoogleSearchTools RIGHT NOW
-            - "top headlines..." → GoogleSearchTools RIGHT NOW
-            - "what's new with..." → GoogleSearchTools RIGHT NOW
+            - ANY news request → DuckDuckGoTools RIGHT NOW
+            - ANY current events → DuckDuckGoTools RIGHT NOW
+            - "what's happening with..." → DuckDuckGoTools RIGHT NOW
+            - "latest news about..." → DuckDuckGoTools RIGHT NOW
+            - "top headlines..." → DuckDuckGoTools RIGHT NOW
+            - "what's new with..." → DuckDuckGoTools RIGHT NOW
             - NO analysis, NO thinking, JUST SEARCH IMMEDIATELY
 
             **FILE OPERATIONS - USE IMMEDIATELY**:
@@ -502,7 +502,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - "what do you know about..." → query_knowledge_base RIGHT NOW
             - "tell me about..." → query_knowledge_base RIGHT NOW
             - "find information on..." → query_knowledge_base RIGHT NOW
-            - If no results, THEN use GoogleSearchTools
+            - If no results, THEN use DuckDuckGoTools
 
             **MEMORY QUERIES - USE IMMEDIATELY**:
             - "what do you know about me" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
@@ -568,8 +568,8 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
 
             **REQUIRED IMMEDIATE RESPONSES FOR TOOLS**:
             - ✅ "Analyze NVDA" → IMMEDIATELY use YFinanceTools
-            - ✅ "What's the news about..." → IMMEDIATELY use GoogleSearchTools
-            - ✅ "top 5 headlines about..." → IMMEDIATELY use GoogleSearchTools
+            - ✅ "What's the news about..." → IMMEDIATELY use DuckDuckGoTools
+            - ✅ "top 5 headlines about..." → IMMEDIATELY use DuckDuckGoTools
             - ✅ "Calculate 2+2" → IMMEDIATELY use CalculatorTools
             - ✅ "What's 15% of 200" → IMMEDIATELY use CalculatorTools
             - ✅ Complex data analysis → IMMEDIATELY use PythonTools
@@ -600,7 +600,7 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             "## CURRENT AVAILABLE TOOLS",
             "- **CalculatorTools**: Mathematical calculations, arithmetic operations, and computational tasks.",
             "- **YFinanceTools**: Stock prices, financial analysis, market data.",
-            "- **GoogleSearchTools**: Web search, news searches, current events.",
+            "- **DuckDuckGoTools**: Web search, news searches, current events.",
             "- **PythonTools**: Advanced calculations, data analysis, code execution, and programming tasks.",
             "- **ShellTools**: System operations and command execution.",
             "- **PersonalAgentFilesystemTools**: File reading, writing, and management.",
@@ -732,8 +732,8 @@ You are a powerful personal AI assistant and friend to {self.user_id}. You have 
 - "analyze NVDA" → YFinanceTools RIGHT NOW
 
 **NEWS & SEARCH:**
-- News requests → GoogleSearchTools RIGHT NOW
-- "what's happening with..." → GoogleSearchTools RIGHT NOW
+- News requests → DuckDuckGoTools RIGHT NOW
+- "what's happening with..." → DuckDuckGoTools RIGHT NOW
 
 **MEMORY QUERIES:**
 - "what do you know about me" → get_all_memories() RIGHT NOW
@@ -745,12 +745,12 @@ You are a powerful personal AI assistant and friend to {self.user_id}. You have 
 
 **KNOWLEDGE:**
 - Factual questions → query_knowledge_base() RIGHT NOW
-- If no results, then use GoogleSearchTools
+- If no results, then use DuckDuckGoTools
 
 ## AVAILABLE TOOLS
 - **CalculatorTools**: Mathematical calculations and arithmetic
 - **YFinanceTools**: Stock prices and financial data
-- **GoogleSearchTools**: Web search and news
+- **DuckDuckGoTools**: Web search and news
 - **PythonTools**: Advanced calculations and data analysis
 - **ShellTools**: System operations and commands
 - **PersonalAgentFilesystemTools**: File operations
@@ -908,9 +908,9 @@ You are a sophisticated personal AI assistant and companion to {self.user_id}. Y
 - Investment research, market trends → `YFinanceTools` IMMEDIATELY
 
 **INFORMATION RETRIEVAL:**
-- Current news, events → `GoogleSearchTools` IMMEDIATELY
-- Real-time information → `GoogleSearchTools` IMMEDIATELY
-- Research topics, fact-checking → `GoogleSearchTools` IMMEDIATELY
+- Current news, events → `DuckDuckGoTools` IMMEDIATELY
+- Real-time information → `DuckDuckGoTools` IMMEDIATELY
+- Research topics, fact-checking → `DuckDuckGoTools` IMMEDIATELY
 
 **SYSTEM & FILE OPERATIONS:**
 - File reading, writing, management → `PersonalAgentFilesystemTools` IMMEDIATELY
@@ -920,7 +920,7 @@ You are a sophisticated personal AI assistant and companion to {self.user_id}. Y
 **KNOWLEDGE MANAGEMENT:**
 - Stored document search → `query_knowledge_base(query="terms", mode="auto")` IMMEDIATELY
 - Knowledge ingestion → `ingest_knowledge_text/file/from_url` as appropriate
-- If knowledge base yields no results → fallback to `GoogleSearchTools`
+- If knowledge base yields no results → fallback to `DuckDuckGoTools`
 
 **MEMORY OPERATIONS:**
 - "What do you know about me?" → `get_all_memories()` IMMEDIATELY
@@ -968,7 +968,7 @@ You are a sophisticated personal AI assistant and companion to {self.user_id}. Y
 - **CalculatorTools**: Arithmetic operations, basic mathematical calculations
 - **PythonTools**: Advanced mathematics, data analysis, programming, visualization
 - **YFinanceTools**: Stock data, financial analysis, market information
-- **GoogleSearchTools**: Web search, news retrieval, current information
+- **DuckDuckGoTools**: Web search, news retrieval, current information
 
 ### SYSTEM & DATA TOOLS
 - **PersonalAgentFilesystemTools**: File operations, directory management

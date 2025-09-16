@@ -14,7 +14,7 @@ Key Components:
 
 Specialized Agents:
     - **Memory Agent**: Manages personal information and factual knowledge storage/retrieval
-    - **Web Agent**: Performs web searches using Google Search
+    - **Web Agent**: Performs web searches using DuckDuckGo search
     - **SystemAgent**: Executes system commands and shell operations safely
     - **Finance Agent**: Retrieves and analyzes financial data using YFinance
     - **Medical Agent**: Searches PubMed for medical information and research
@@ -112,7 +112,7 @@ from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
 from agno.tools.dalle import DalleTools
 from agno.tools.file import FileTools
-from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
@@ -700,7 +700,7 @@ def create_agents(
         model=create_model(
             provider=PROVIDER, model_name=effective_model, use_remote=use_remote
         ),
-        tools=[GoogleSearchTools()],
+        tools=[DuckDuckGoTools()],
         instructions=[
             "Search the web for information based on the input. Always include sources"
         ],
@@ -795,15 +795,13 @@ def create_agents(
         name="Python Agent",
         model=create_model(
             provider=PROVIDER,
-            model_name=CODING_MODEL,
+            model_name=effective_model,
             use_remote=use_remote,
         ),
         role="Create and Execute Python code",
         tools=[
             PythonTools(
-                base_dir=Path(
-                    HOME_DIR
-                ),  # Use user home directory as base with Path object
+                base_dir=HOME_DIR,  # Use user home directory as base with string
                 save_and_run=True,
                 run_files=True,
                 read_files=True,
@@ -824,9 +822,7 @@ def create_agents(
         role="Read and write files in the system",
         tools=[
             FileTools(
-                base_dir=Path(
-                    HOME_DIR
-                ),  # Use user home directory as base with Path object
+                base_dir=HOME_DIR,  # Use user home directory as base with string
                 save_files=True,
                 list_files=True,
                 search_files=True,
@@ -929,10 +925,11 @@ async def create_memory_agent(
         debug=debug,
         user_id=user_id,
         recreate=recreate,
-        alltools=False,
+        alltools=True,
         ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
         openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
         tool_caller=False,
+        instruction_level="STANDARD",
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -943,9 +940,9 @@ async def create_memory_agent(
     personalized_instructions = create_personalized_instructions(
         memory_agent, _memory_specific_instructions
     )
-    memory_agent.instructions = personalized_instructions
+    # memory_agent.instructions = personalized_instructions
 
-    logger.info("✅ Memory agent created with personalized instructions")
+    logger.info("✅ Memory agent created with STANDARD instructions")
     return memory_agent
 
 

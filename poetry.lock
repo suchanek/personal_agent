@@ -1340,6 +1340,27 @@ marshmallow = ">=3.18.0,<4.0.0"
 typing-inspect = ">=0.4.0,<1"
 
 [[package]]
+name = "ddgs"
+version = "9.5.5"
+description = "Dux Distributed Global Search. A metasearch library that aggregates results from diverse web search services."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "ddgs-9.5.5-py3-none-any.whl", hash = "sha256:01fc8017a653ad16501bd8ac9fedcd29291f6500b1f8a7e92a916cdad7fc2fa2"},
+    {file = "ddgs-9.5.5.tar.gz", hash = "sha256:9a09aa9ba24173d14321137c8c1bc54040ed0bf3bad956cb2f9feeda77968770"},
+]
+
+[package.dependencies]
+click = ">=8.1.8"
+lxml = ">=6.0.0"
+primp = ">=0.15.0"
+
+[package.extras]
+dev = ["mypy (>=1.17.1)", "pytest (>=8.4.1)", "pytest-dependency (>=0.6.0)", "ruff (>=0.12.9)"]
+
+[[package]]
 name = "debugpy"
 version = "1.8.16"
 description = "An implementation of the Debug Adapter Protocol for Python"
@@ -9539,4 +9560,4 @@ cffi = ["cffi (>=1.17)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "3c21bb53d05b179d25a9ed3a18b955354a28949aa8148a4a30fb0a73d3baf132"
+content-hash = "64bbfcdf52baae7568b0cb677c45d531416ffefe264ee2e4181c5da86912098b"
