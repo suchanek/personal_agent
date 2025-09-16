@@ -8,26 +8,22 @@ Cutting Knowledge Date: December 2023
 {{- end }}
 
 {{- if .Tools }}
-You have access to the following tools (JSON Schema):
-{{ json .Tools }}
 
-IF a tool is needed, reply ONLY with a JSON object in this exact format:
+# Tools
 
-{
-  "tool_calls": [
-    {
-      "type": "function",
-      "function": {
-        "name": "<tool_name>",
-        "arguments": { ... }
-      }
-    }
-  ]
-}
+You may call one or more functions to assist with the user query.
 
-- When NO tool is required, respond **naturally in plain text** to the user.
-- NEVER mix JSON and natural language in the same response.
-- NEVER output the words "Your answer should follow..." or other meta-instructions.
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{{- range .Tools }}
+{"type": "function", "function": {{ .Function }}}
+{{- end }}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>
 {{- end }}
 <|eot_id|>
 
@@ -44,28 +40,19 @@ IF a tool is needed, reply ONLY with a JSON object in this exact format:
   {{- else if eq .Role "assistant" -}}
 <|start_header_id|>assistant<|end_header_id|>
     {{- if .ToolCalls -}}
-{
-  "tool_calls": [
-    {{- range $j, $tc := .ToolCalls -}}
-      {{- if $j }},{{ end -}}
-      {
-        "type": "function",
-        "function": {
-          "name": "{{ $tc.Function.Name }}",
-          "arguments": {{ $tc.Function.Arguments }}
-        }
-      }
-    {{- end -}}
-  ]
-}
+<tool_call>
+{{ range .ToolCalls }}{"name": "{{ .Function.Name }}", "arguments": {{ .Function.Arguments }}}
+{{ end }}</tool_call>
     {{- else -}}
 {{ .Content }}
     {{- end -}}
 {{- if not $last }}<|eot_id|>{{ end }}
 
   {{- else if eq .Role "tool" -}}
-<|start_header_id|>tool<|end_header_id|>
+<|start_header_id|>user<|end_header_id|>
+<tool_response>
 {{ .Content }}
+</tool_response>
 <|eot_id|>
     {{- if $last -}}
 <|start_header_id|>assistant<|end_header_id|>

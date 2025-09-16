@@ -13,15 +13,16 @@ Options:
     show_config(no_color=False, json_output=False)
 """
 
-import sys
-import json
 import argparse
+import json
+import sys
 from pathlib import Path
+
 import yaml
 
 # Import settings from the config module
 try:
-    from ..config import settings, get_userid
+    from ..config import get_userid, settings
     from ..config.mcp_servers import get_mcp_servers
 except ImportError:
     # Fallback for direct execution
@@ -31,7 +32,7 @@ except ImportError:
     project_root = script_dir.parent.parent.parent
     src_dir = project_root / "src"
     sys.path.insert(0, str(src_dir))
-    from personal_agent.config import settings, get_userid, get_mcp_servers
+    from personal_agent.config import get_mcp_servers, get_userid, settings
 
 
 def get_project_root():
@@ -204,7 +205,7 @@ def get_agentic_tools():
             "description": "Built-in Agno framework tools",
             "tools": [
                 {
-                    "name": "GoogleSearchTools",
+                    "name": "DuckDuckGoTools",
                     "description": "Web search functionality using Google Search API",
                     "category": "web"
                 },

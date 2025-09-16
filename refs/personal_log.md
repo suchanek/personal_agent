@@ -1,5 +1,11 @@
 # Personal Log
 
+**2025-09-11**
+
+- trying to make llama models work properly with ollama. created new modelfiles, they still return json at times
+- in general the llama models can call tools, but will not correctly act as a team coordinator. they fail on the transfer_to_agent tool
+
+
 **2025-08-13**
 
 - branch `refactorknowledgetools/v0.11.38dev1` - we are consolidating the knowledge ingestion stuff

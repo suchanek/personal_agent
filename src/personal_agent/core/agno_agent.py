@@ -61,7 +61,7 @@ from agno.agent import Agent, RunResponse
 from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.dalle import DalleTools
-from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
@@ -491,14 +491,19 @@ class AgnoPersonalAgent(Agent):
             # 7. Create the model
             model = self.model_manager.create_model()
             logger.debug("Created model: %s", self.model_name)
-            tools = []
-            # 8. Prepare tools list
-            tools = []
+            # we are using a subset for now
+            tools = [
+                self.store_user_memory,
+                self.query_memory,
+                self.get_all_memories,
+                self.list_all_memories,
+                self.update_memory,
+            ]
 
             # Add built-in tools if alltools is enabled
             if self.alltools:
                 all_tools = [
-                    GoogleSearchTools(),
+                    DuckDuckGoTools(),
                     CalculatorTools(enable_all=True),
                     YFinanceTools(
                         stock_price=True,
@@ -529,7 +534,7 @@ class AgnoPersonalAgent(Agent):
                 if self.knowledge_tools and self.memory_tools:
                     memory_tools = [
                         self.knowledge_tools,  # Now contains all knowledge functionality
-                        self.memory_tools,
+                        # self.memory_tools,
                     ]
                     tools.extend(memory_tools)
                     logger.debug(

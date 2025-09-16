@@ -1,0 +1,105 @@
+# Llama 3.1 (8B) with OpenAI-style tool calling, Qwen-style XML wrappers
+
+FROM llama3.1:8b
+
+TEMPLATE """
+{{- $lastUserIdx := -1 -}}
+{{- range $idx, $m := .Messages -}}
+  {{- if eq $m.Role "user" }}{{ $lastUserIdx = $idx }}{{ end -}}
+{{- end }}
+
+{{- if or .System .Tools -}}
+<|start_header_id|>system<|end_header_id|>
+
+{{- if .System -}}
+{{ .System }}
+{{- end -}}
+
+{{- if .Tools }}
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{{- range .Tools }}
+{"type": "function", "function": {{ .Function }}}
+{{- end }}
+</tools>
+
+To invoke a function, return a JSON object inside <tool_call></tool_call>:
+
+<tool_call>
+{"name": "<function-name>", "arguments": { /* JSON arguments */ }}
+</tool_call>
+
+Rules:
+- Use one <tool_call> block per function call. You may output multiple <tool_call> blocks if needed.
+- Always use the "arguments" field (object) matching the provided schema.
+- Do not add extra commentary alongside <tool_call>. If you need to call a tool, output ONLY the tool call(s).
+- After tool responses are provided (they arrive as a user message containing <tool_response>...</tool_response>), synthesize a final helpful answer for the user unless more tool calls are necessary.
+- Be concise and accurate.
+
+Cutting Knowledge Date: December 2023
+{{- end }}
+
+<|eot_id|>
+{{- end }}
+
+{{- range $i, $msg := .Messages -}}
+  {{- $last := eq (len (slice $.Messages $i)) 1 -}}
+
+  {{- if eq $msg.Role "user" -}}
+<|start_header_id|>user<|end_header_id|>
+{{- if and $.Tools (eq $i $lastUserIdx) -}}
+{{ $msg.Content }}
+{{- else -}}
+{{ $msg.Content }}
+{{- end }}
+<|eot_id|>
+{{- if $last -}}<|start_header_id|>assistant<|end_header_id|>
+{{- end -}}
+
+  {{- else if eq $msg.Role "assistant" -}}
+<|start_header_id|>assistant<|end_header_id|>
+{{- if $msg.ToolCalls -}}
+{{- range $tc := $msg.ToolCalls -}}
+<tool_call>
+{"name":"{{ $tc.Function.Name }}","arguments":{{ $tc.Function.Arguments }}}
+</tool_call>
+{{- end -}}
+{{- else -}}
+{{ $msg.Content }}
+{{- end -}}
+{{- if not $last -}}<|eot_id|>{{- end -}}
+
+  {{- else if eq $msg.Role "tool" -}}
+# Tool responses are re-injected as a user turn so the model can read them.
+<|start_header_id|>user<|end_header_id|>
+<tool_response>
+{{ $msg.Content }}
+</tool_response>
+<|eot_id|>
+{{- if $last -}}<|start_header_id|>assistant<|end_header_id|>
+{{- end -}}
+
+  {{- end -}}
+{{- end -}}
+"""
+
+# Llama 3.1 chat stops
+PARAMETER stop <|start_header_id|>
+PARAMETER stop <|end_header_id|>
+PARAMETER stop <|eot_id|>
+
+# Sensible decoding defaults (tune as you like)
+PARAMETER temperature 0.2
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.05
+
+# Notes:
+# - Use your runtime/SDK to pass actual tool definitions & handle tool execution.
+# - The template enforces "arguments" (not "parameters") for tool calls, matching the Qwen/OpenAI style.
+# - Tool outputs are wrapped in <tool_response> under a user turn, prompting the assistant to continue.

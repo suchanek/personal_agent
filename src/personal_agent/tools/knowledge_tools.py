@@ -541,7 +541,7 @@ class KnowledgeTools(Toolkit):
             return f"❌ Error in batch ingestion: {str(e)}"
 
     async def query_knowledge_base(
-        self, query: str, mode: str = "auto", limit: Optional[int] = 5
+        self, query: str, mode: Optional[str] = "auto", limit: Optional[int] = 5
     ) -> str:
         """Query the unified knowledge base to retrieve stored factual information and documents.
 
@@ -612,9 +612,9 @@ class KnowledgeTools(Toolkit):
                     )
                     return f"❌ This appears to be a creative request ('{query}'). The knowledge base is for searching existing stored information, not for generating new content. Please rephrase as a search for existing knowledge, or ask me to create content directly without using knowledge tools."
 
-            # Validate mode
+            # Validate mode - handle None case
             valid_modes = ["local", "global", "hybrid", "naive"]
-            if mode not in valid_modes:
+            if mode is None or mode not in valid_modes:
                 mode = "auto"
 
             # Handle None limit

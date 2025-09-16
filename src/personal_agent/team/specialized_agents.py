@@ -16,7 +16,7 @@ from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.file import FileTools
 from agno.tools.github import GithubTools
-from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.knowledge import KnowledgeTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
@@ -141,7 +141,7 @@ def create_web_research_agent(
         role="Search the web for information and current events",
         model=model,
         debug_mode=debug,
-        tools=[GoogleSearchTools()],
+        tools=[DuckDuckGoTools()],
         instructions=[
             "You are a specialized web research agent focused on finding current information online.",
             "Your primary functions are:",

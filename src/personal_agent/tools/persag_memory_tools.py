@@ -43,18 +43,18 @@ class PersagMemoryTools(Toolkit):
             self.store_user_memory,
             self.query_memory,
             self.update_memory,
-            self.delete_memory,
+            #self.delete_memory,
             self.get_recent_memories,
             self.get_all_memories,
             self.get_memory_stats,
             self.get_memories_by_topic,
             self.list_all_memories,
-            self.store_graph_memory,
-            self.query_graph_memory,
+            #self.store_graph_memory,
+            #self.query_graph_memory,
             self.get_memory_graph_labels,
-            self.clear_semantic_memories,
+            #self.clear_semantic_memories,
             self.delete_memories_by_topic,
-            self.clear_all_memories,
+            #self.clear_all_memories,
         ]
 
         # Initialize the Toolkit
