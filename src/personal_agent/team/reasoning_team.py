@@ -917,6 +917,8 @@ async def create_memory_agent(
     effective_model = model_name if model_name else LLM_MODEL
     # effective_model = "qwen3:1.7b"
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
+    from ..core.agent_instruction_manager import InstructionLevel
+    
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
         model_name=effective_model,  # Use the effective model
@@ -929,7 +931,7 @@ async def create_memory_agent(
         ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
         openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
         tool_caller=False,
-        instruction_level="STANDARD",
+        instruction_level=InstructionLevel.STANDARD,
     )
 
     # After initialization, we need to set the shared memory and add the tools

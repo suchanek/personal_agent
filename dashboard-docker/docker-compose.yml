@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: personal-agent-dashboard
+    ports:
+      - "8502:8502"
+    volumes:
+      # Mount Docker socket for container management (read-only)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount data directory for persistence
+      - ./data:/app/data
+      # Mount logs directory
+      - ./logs:/app/logs
+      # Mount host user data directories to container
+      - ${HOME}/.persag:/app/.persag
+      - ${HOME}/.persag:/home/dashboard/.persag
+      # Mount the entire personal_agent project for access to source code
+      - ../:/app/personal_agent_project:ro
+      # Mount host data directory to container data directory
+      - /Users/Shared/personal_agent_data:/app/shared_data
+    env_file:
+      - ./config/.env.docker
+    environment:
+      # Override any environment variables here if needed
+      # Most configuration is now in ./config/.env.docker
+      THEME_MODE: light
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+# Optional: Network configuration for connecting to other services
+networks:
+  default:
+    name: personal-agent-network
+    external: false
+
+# Optional: Volumes for data persistence
+volumes:
+  dashboard_data:
+    driver: local
+  dashboard_logs:
+    driver: local

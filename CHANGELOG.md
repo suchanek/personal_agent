@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-16
+
+### Added
+- **Standalone Dockerized Dashboard**: Introduced a new, standalone, containerized Streamlit dashboard for managing the personal agent system. The dashboard can be deployed and run independently, providing a flexible and scalable solution for system management. See [ADR-085](./refs/adr/085-standalone-dockerized-dashboard.md) for details.
+
+### Changed
+- **Refactored Memory Management**: Overhauled the memory management system to improve modularity and reduce code duplication. All memory operations are now centralized in a new `src/personal_agent/tools/memory_functions.py` module, which serves as a single source of truth for memory-related logic. See [ADR-084](./refs/adr/084-standalone-memory-functions.md) for details.
+- **Deprecated `PersagMemoryTools`**: The `PersagMemoryTools` class has been deprecated and now simply re-exports the new standalone memory functions for backward compatibility.
+
+### Removed
+- **Unused Dependencies**: Removed `pathlib` and `langfuse` from project dependencies to streamline the environment.
+
 ## [v0.2.6] - 2025-09-08
 
 ### Fixed
