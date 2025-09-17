@@ -57,7 +57,8 @@ async def store_user_memory(
         MemoryStorageResult: Structured result with detailed status information
     """
     await agent._ensure_initialized()
-    return await agent.memory_manager.store_user_memory(content, topics)
+    # Pass the user instance for delta_year timestamp adjustment
+    return await agent.memory_manager.store_user_memory(content, topics, user=agent.user)
 
 
 async def query_memory(agent, query: str, limit: Union[int, None] = None) -> str:

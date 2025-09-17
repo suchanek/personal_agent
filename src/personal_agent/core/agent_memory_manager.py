@@ -95,13 +95,14 @@ class AgentMemoryManager:
             return []
 
     async def store_user_memory(
-        self, content: str = "", topics: Union[List[str], str, None] = None
+        self, content: str = "", topics: Union[List[str], str, None] = None, user=None
     ) -> MemoryStorageResult:
         """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
 
         Args:
             content: The information to store as a memory
             topics: Optional list of topics/categories for the memory (None = auto-classify)
+            user: Optional User instance for delta_year timestamp adjustment
 
         Returns:
             MemoryStorageResult: Structured result with detailed status information
@@ -139,12 +140,18 @@ class AgentMemoryManager:
                 topic_str = str(topics).strip()
                 topics = [topic_str] if topic_str and topic_str != "None" else None
 
+            # Get custom timestamp if user is provided and has delta_year set
+            custom_timestamp = None
+            if user and hasattr(user, 'get_memory_timestamp'):
+                custom_timestamp = user.get_memory_timestamp()
+
             # 1. Store in local SQLite memory system
             local_result = self.agno_memory.memory_manager.add_memory(
                 memory_text=restated_content,
                 db=self.agno_memory.db,
                 user_id=self.user_id,
                 topics=topics,
+                custom_timestamp=custom_timestamp,
             )
 
             # Handle different rejection cases

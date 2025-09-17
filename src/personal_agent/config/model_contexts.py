@@ -113,6 +113,28 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         repetition_penalty=1.0,
         context_size=32768,
     ),
+    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.05,
+        context_size=32768,
+    ),
+    "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:q8_0": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.05,
+        context_size=32768,
+    ),
+    # Lowercase variant for case-insensitive matching
+    "hf.co/unsloth/qwen3-4b-instruct-2507-gguf:q8_0": ModelParameters(
+        temperature=0.6,
+        top_p=0.95,
+        top_k=20,
+        repetition_penalty=1.05,
+        context_size=32768,
+    ),
     "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K": ModelParameters(
         temperature=0.6,
         top_p=0.95,

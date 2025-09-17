@@ -461,6 +461,7 @@ class SemanticMemoryManager:
         user_id: str = None,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
+        custom_timestamp: Optional[datetime] = None,
     ) -> MemoryStorageResult:
         """
         Add a memory with duplicate detection and topic classification.
@@ -534,7 +535,7 @@ class SemanticMemoryManager:
             from uuid import uuid4
 
             memory_id = str(uuid4())
-            last_updated = datetime.now()
+            last_updated = custom_timestamp if custom_timestamp is not None else datetime.now()
 
             user_memory = UserMemory(
                 memory_id=memory_id,

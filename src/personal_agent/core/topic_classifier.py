@@ -274,6 +274,7 @@ def demo():
             "I love tea",
             "I hate hot weather",
             "I'm feeling a bit stressed today.",
+            "I wrote in my journal about my feelings.",
             "Completely unrelated sentence.",
         ]
 
