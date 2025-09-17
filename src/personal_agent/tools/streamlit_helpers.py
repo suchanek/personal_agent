@@ -217,20 +217,16 @@ class StreamlitMemoryHelper:
             return f"❌ Error listing memories: {str(e)}"
 
     def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
-        """Add a memory using the agent's store_user_memory function."""
+        """Add a memory using the standalone memory function."""
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Memory storage not available: {message}", None, None
 
         try:
-            # Check if the function returns a coroutine or a direct result
-            store_func = self.agent.store_user_memory
-            if asyncio.iscoroutinefunction(store_func):
-                # Agent method is async - use _run_async
-                result = self._run_async(store_func(content=memory_text, topics=topics))
-            else:
-                # TeamWrapper method is already sync - call directly
-                result = store_func(content=memory_text, topics=topics)
+            from personal_agent.tools.memory_functions import store_user_memory
+            
+            # Use the standalone function
+            result = self._run_async(store_user_memory(self.agent, memory_text, topics))
 
             # Handle MemoryStorageResult object
             if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or (
@@ -275,19 +271,16 @@ class StreamlitMemoryHelper:
             return asyncio.run(coro)
 
     def clear_memories(self):
-        """Clear all memories using the agent's clear_all_memories function."""
+        """Clear all memories using the standalone memory function."""
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Clear memories not available: {message}"
 
         try:
-            # Check if the function returns a coroutine or a direct result
-            clear_func = self.agent.clear_all_memories
-            if asyncio.iscoroutinefunction(clear_func):
-                result = self._run_async(clear_func())
-            else:
-                # Function is already sync (like in TeamWrapper)
-                result = clear_func()
+            from personal_agent.tools.memory_functions import clear_all_memories
+            
+            # Use the standalone function
+            result = self._run_async(clear_all_memories(self.agent))
 
             # Parse the result string to determine success
             if "✅" in result:

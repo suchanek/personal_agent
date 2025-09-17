@@ -87,7 +87,8 @@ from ..config.settings import (
 )
 from ..config.user_id_mgr import get_userid
 from ..tools.knowledge_tools import KnowledgeTools
-from ..tools.persag_memory_tools import PersagMemoryTools
+# PersagMemoryTools is no longer used - memory functions are now standalone
+# from ..tools.persag_memory_tools import PersagMemoryTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
     PersonalAgentSystemTools,
@@ -486,7 +487,8 @@ class AgnoPersonalAgent(Agent):
                 self.knowledge_tools = KnowledgeTools(
                     self.knowledge_manager, self.agno_knowledge
                 )
-                self.memory_tools = PersagMemoryTools(self.memory_manager)
+                # PersagMemoryTools is no longer used - memory functions are now standalone
+                self.memory_tools = None
 
             # 7. Create the model
             model = self.model_manager.create_model()
@@ -531,18 +533,17 @@ class AgnoPersonalAgent(Agent):
 
             # ALWAYS add memory tools if memory is enabled, regardless of alltools setting
             if self.enable_memory:
-                if self.knowledge_tools and self.memory_tools:
+                if self.knowledge_tools:
                     memory_tools = [
                         self.knowledge_tools,  # Now contains all knowledge functionality
-                        # self.memory_tools,
                     ]
                     tools.extend(memory_tools)
                     logger.debug(
-                        "Added consolidated KnowledgeTools and PersagMemoryTools"
+                        "Added KnowledgeTools (memory functions are now standalone methods)"
                     )
                 else:
                     logger.warning(
-                        "Memory enabled but memory tools not properly initialized"
+                        "Memory enabled but knowledge tools not properly initialized"
                     )
             else:
                 logger.warning("Memory disabled - no memory tools added")
@@ -751,7 +752,7 @@ class AgnoPersonalAgent(Agent):
     ) -> MemoryStorageResult:
         """Store information as a user memory in both local SQLite and LightRAG graph systems.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             content: The information to store as a memory
@@ -760,90 +761,13 @@ class AgnoPersonalAgent(Agent):
         Returns:
             MemoryStorageResult: Structured result with detailed status information
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.store_user_memory(content, topics)
-
-    async def _restate_user_fact(self, content: str) -> str:
-        """Restate a user fact from first-person to third-person.
-
-        Delegates to the memory_manager for processing.
-
-        Args:
-            content: The original fact from the user
-
-        Returns:
-            The restated fact
-        """
-        if not self.memory_manager:
-            raise RuntimeError(
-                "Memory manager not initialized. Call initialize() first."
-            )
-        return self.memory_manager.restate_user_fact(content)
-
-    async def seed_entity_in_graph(self, entity_name: str, entity_type: str) -> bool:
-        """Seed an entity into the graph by creating and uploading a physical file.
-
-        Delegates to the memory_manager for processing.
-
-        Args:
-            entity_name: Name of the entity to create
-            entity_type: Type of the entity
-
-        Returns:
-            True if entity was successfully seeded
-        """
-        if not self.memory_manager:
-            raise RuntimeError(
-                "Memory manager not initialized. Call initialize() first."
-            )
-        return await self.memory_manager.seed_entity_in_graph(entity_name, entity_type)
-
-    async def check_entity_exists(self, entity_name: str) -> bool:
-        """Check if entity exists in the graph.
-
-        Delegates to the memory_manager for processing.
-
-        Args:
-            entity_name: Name of the entity to check
-
-        Returns:
-            True if entity exists
-        """
-        if not self.memory_manager:
-            raise RuntimeError(
-                "Memory manager not initialized. Call initialize() first."
-            )
-        return await self.memory_manager.check_entity_exists(entity_name)
-
-    async def clear_all_memories(self) -> str:
-        """Clear all memories from both SQLite and LightRAG systems.
-
-        Delegates to the memory_manager for processing.
-
-        Returns:
-            str: Success or error message
-        """
-        if not self.memory_manager:
-            raise RuntimeError(
-                "Memory manager not initialized. Call initialize() first."
-            )
-        return await self.memory_manager.clear_all_memories()
-
-    async def list_all_memories(self) -> str:
-        """List all memories in a simple, user-friendly format.
-
-        This is a public method that delegates to the memory_manager.
-
-        Returns:
-            str: Simplified list of all memories
-        """
-        await self._ensure_initialized()
-        return await self.memory_manager.list_all_memories()
+        from ..tools.memory_functions import store_user_memory
+        return await store_user_memory(self, content, topics)
 
     async def query_memory(self, query: str, limit: Union[int, None] = None) -> str:
         """Search user memories using semantic search.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             query: The query to search for in memories
@@ -852,15 +776,37 @@ class AgnoPersonalAgent(Agent):
         Returns:
             str: Found memories or message if none found
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.query_memory(query, limit)
+        from ..tools.memory_functions import query_memory
+        return await query_memory(self, query, limit)
+
+    async def list_all_memories(self) -> str:
+        """List all memories in a simple, user-friendly format.
+
+        This method delegates to the standalone memory function.
+
+        Returns:
+            str: Simplified list of all memories
+        """
+        from ..tools.memory_functions import list_all_memories
+        return await list_all_memories(self)
+
+    async def get_all_memories(self) -> str:
+        """Get all user memories with full details.
+
+        This method delegates to the standalone memory function.
+
+        Returns:
+            str: Formatted string of all memories
+        """
+        from ..tools.memory_functions import get_all_memories
+        return await get_all_memories(self)
 
     async def update_memory(
         self, memory_id: str, content: str, topics: Union[List[str], str, None] = None
     ) -> str:
         """Update an existing memory.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             memory_id: ID of the memory to update
@@ -870,13 +816,13 @@ class AgnoPersonalAgent(Agent):
         Returns:
             str: Success or error message
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.update_memory(memory_id, content, topics)
+        from ..tools.memory_functions import update_memory
+        return await update_memory(self, memory_id, content, topics)
 
     async def delete_memory(self, memory_id: str) -> str:
         """Delete a memory from both SQLite and LightRAG systems.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             memory_id: ID of the memory to delete
@@ -884,13 +830,13 @@ class AgnoPersonalAgent(Agent):
         Returns:
             str: Success or error message
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.delete_memory(memory_id)
+        from ..tools.memory_functions import delete_memory
+        return await delete_memory(self, memory_id)
 
     async def get_recent_memories(self, limit: int = 10) -> str:
         """Get recent memories sorted by date.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             limit: Maximum number of memories to return
@@ -898,37 +844,26 @@ class AgnoPersonalAgent(Agent):
         Returns:
             str: Formatted string of recent memories
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.get_recent_memories(limit)
-
-    async def get_all_memories(self) -> str:
-        """Get all user memories with full details.
-
-        This is a public method that delegates to the memory_manager.
-
-        Returns:
-            str: Formatted string of all memories
-        """
-        await self._ensure_initialized()
-        return await self.memory_manager.get_all_memories()
+        from ..tools.memory_functions import get_recent_memories
+        return await get_recent_memories(self, limit)
 
     async def get_memory_stats(self) -> str:
         """Get memory statistics including counts and topics.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Returns:
             str: Formatted string with memory statistics
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.get_memory_stats()
+        from ..tools.memory_functions import get_memory_stats
+        return await get_memory_stats(self)
 
     async def get_memories_by_topic(
         self, topics: Union[List[str], str, None] = None, limit: Union[int, None] = None
     ) -> str:
         """Get memories filtered by topic.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             topics: Topic or list of topics to filter memories by
@@ -937,13 +872,13 @@ class AgnoPersonalAgent(Agent):
         Returns:
             str: Formatted string of memories matching the topics
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.get_memories_by_topic(topics, limit)
+        from ..tools.memory_functions import get_memories_by_topic
+        return await get_memories_by_topic(self, topics, limit)
 
     async def delete_memories_by_topic(self, topics: Union[List[str], str]) -> str:
         """Delete all memories associated with specific topics.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Args:
             topics: Topic or list of topics to delete memories for
@@ -951,30 +886,41 @@ class AgnoPersonalAgent(Agent):
         Returns:
             str: Success or error message
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.delete_memories_by_topic(topics)
+        from ..tools.memory_functions import delete_memories_by_topic
+        return await delete_memories_by_topic(self, topics)
 
     async def get_memory_graph_labels(self) -> str:
         """Get the list of all entity and relation labels from the memory graph.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Returns:
             str: Formatted string with entity and relation labels
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.get_memory_graph_labels()
+        from ..tools.memory_functions import get_memory_graph_labels
+        return await get_memory_graph_labels(self)
+
+    async def clear_all_memories(self) -> str:
+        """Clear all memories from both SQLite and LightRAG systems.
+
+        This method delegates to the standalone memory function.
+
+        Returns:
+            str: Success or error message
+        """
+        from ..tools.memory_functions import clear_all_memories
+        return await clear_all_memories(self)
 
     async def get_graph_entity_count(self) -> int:
         """Get the count of entities/documents in the LightRAG memory graph.
 
-        This is a public method that delegates to the memory_manager.
+        This method delegates to the standalone memory function.
 
         Returns:
             int: Number of entities/documents in the graph
         """
-        await self._ensure_initialized()
-        return await self.memory_manager.get_graph_entity_count()
+        from ..tools.memory_functions import get_graph_entity_count
+        return await get_graph_entity_count(self)
 
     async def query_lightrag_knowledge_direct(
         self, query: str, params: dict = None, url: str = LIGHTRAG_URL

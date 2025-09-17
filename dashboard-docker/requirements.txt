@@ -1,0 +1,9 @@
+# Install the personal-agent package from the wheel file
+# This includes all dependencies automatically
+./personal_agent-0.2.4-py3-none-any.whl
+
+# Use a more recent streamlit version that's compatible with rich>=14.0.0
+streamlit>=1.35.0
+
+# Add compatibility fixes for Python 3.11
+typing-extensions>=4.0.0
