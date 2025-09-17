@@ -255,13 +255,13 @@ class User:
     def update_last_seen(self):
         """Update the last_seen timestamp, respecting delta_year if set."""
         current_time = datetime.now()
-        
+
         # If delta_year is set and we have a birth_date, adjust the year
         if self.delta_year is not None and self.delta_year > 0 and self.birth_date:
             try:
                 birth_datetime = datetime.fromisoformat(self.birth_date)
                 memory_year = birth_datetime.year + self.delta_year
-                
+
                 # Create timestamp with memory year but current month/day/time
                 adjusted_time = current_time.replace(year=memory_year)
                 self.last_seen = adjusted_time.isoformat()
@@ -271,6 +271,31 @@ class User:
         else:
             # Normal case: use current time
             self.last_seen = current_time.isoformat()
+
+    def get_memory_timestamp(self) -> datetime:
+        """
+        Get the appropriate timestamp for memory creation, respecting delta_year if set.
+
+        Returns:
+            datetime: The timestamp to use for memory creation
+        """
+        current_time = datetime.now()
+
+        # If delta_year is set and we have a birth_date, adjust the year
+        if self.delta_year is not None and self.delta_year > 0 and self.birth_date:
+            try:
+                birth_datetime = datetime.fromisoformat(self.birth_date)
+                memory_year = birth_datetime.year + self.delta_year
+
+                # Create timestamp with memory year but current month/day/time
+                adjusted_time = current_time.replace(year=memory_year)
+                return adjusted_time
+            except (ValueError, OverflowError):
+                # If there's any issue with date calculation, fall back to current time
+                return current_time
+        else:
+            # Normal case: use current time
+            return current_time
 
     def update_profile(self, **kwargs) -> Dict[str, Any]:
         """
