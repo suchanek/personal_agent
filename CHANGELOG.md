@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-17
+
+### Added
+- **Age-Perspective Memory Creation**: Introduced a `delta_year` attribute to the `User` model, allowing memories to be created from the perspective of the user at a specific age. The system adjusts the memory's timestamp to `user.birth_year + delta_year` for chronological consistency. See [ADR-086](./refs/adr/086-age-perspective-memory-creation.md) for details.
+- **Qwen Model Configurations**: Added new model configurations for `Qwen3-4B-Instruct-2507-GGUF`.
+
+### Changed
+- **Memory Timestamp Handling**: Updated `AgentMemoryManager` and `SemanticMemoryManager` to support custom timestamps, enabling the `delta_year` feature.
+- The `store_user_memory` tool now passes the user's context to the memory managers to enable age-specific timestamp adjustments.
+
 ## [v0.2.6dev0] - 2025-09-16
 
 ### Added
