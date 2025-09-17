@@ -136,13 +136,8 @@ class User:
             # Parse the date string in ISO format (YYYY-MM-DD)
             birth_datetime = datetime.fromisoformat(self.birth_date)
 
-            # Check if the date is not in the future
-            if birth_datetime.date() > datetime.now().date():
-                raise ValueError(
-                    f"Birth date cannot be in the future: {self.birth_date}"
-                )
-
             # Allow dates back to year 1 AD (no year 0 in Gregorian calendar)
+            # Future dates are now allowed for fictional characters, unborn children, etc.
             if birth_datetime.year < 1:
                 raise ValueError(
                     f"Birth date cannot be before year 1 AD: {self.birth_date}"
@@ -185,14 +180,16 @@ class User:
                 f"Delta year cannot be more than 150 years: {self.delta_year}"
             )
 
-        # If birth_date is provided, validate that delta_year + birth_year doesn't exceed current year
+        # If birth_date is provided, validate memory year logic
         if self.birth_date:
             try:
                 birth_datetime = datetime.fromisoformat(self.birth_date)
                 memory_year = birth_datetime.year + self.delta_year
                 current_year = datetime.now().year
 
-                if memory_year > current_year:
+                # Only validate memory year if birth_date is in the past
+                # If birth_date is in the future, allow any reasonable delta_year
+                if birth_datetime.date() <= datetime.now().date() and memory_year > current_year:
                     raise ValueError(
                         f"Delta year {self.delta_year} from birth year {birth_datetime.year} "
                         f"results in memory year {memory_year}, which is in the future"
@@ -397,7 +394,7 @@ class User:
                     ("birth_date", self.birth_date),
                     ("delta_year", self.delta_year),
                 ]
-                if not value
+                if value is None
             ],
         }
 
