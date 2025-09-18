@@ -176,9 +176,9 @@ def _render_create_user():
         birth_date = st.date_input(
             "Birth Date",
             value=None,
-            min_value=datetime(1, 1, -9999).date(),
-            max_value=date(9999, 12, 31),
-            help="User's birth date (YYYY-MM-DD format) - supports dates back to 1 AD and future dates up to year 9999",
+            min_value=datetime.min.date(),
+            max_value=datetime.max.date(),
+            help="User's birth date (YYYY-MM-DD format) - supports dates from year 1 to year 9999",
         )
 
         delta_year = st.number_input(
@@ -383,9 +383,9 @@ def _render_profile_management():
                             new_birth_date = st.date_input(
                                 "Birth Date",
                                 value=current_date,
-                                min_value=datetime(1, 1, 1).date(),
-                                max_value=date(9999, 12, 31),
-                                help="User's birth date (YYYY-MM-DD format) - supports future dates up to year 9999",
+                                min_value=datetime.min.date(),
+                                max_value=datetime.max.date(),
+                                help="User's birth date (YYYY-MM-DD format) - supports dates from year 1 to year 9999",
                             )
 
                             # Delta Year
