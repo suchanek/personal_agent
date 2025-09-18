@@ -57,8 +57,20 @@ async def store_user_memory(
         MemoryStorageResult: Structured result with detailed status information
     """
     await agent._ensure_initialized()
-    # Pass the user instance for delta_year timestamp adjustment
-    return await agent.memory_manager.store_user_memory(content, topics, user=agent.user)
+    # Pass the user_details for delta_year timestamp adjustment
+    # AgnoPersonalAgent has user_details, not user
+    user_data = getattr(agent, 'user_details', None) or getattr(agent, 'user', None)
+
+    # Convert user_data to User object if it's a dictionary for delta_year support
+    user_obj = None
+    if user_data:
+        if isinstance(user_data, dict):
+            from ..core.user_model import User
+            user_obj = User.from_dict(user_data)
+        elif hasattr(user_data, 'get_memory_timestamp'):
+            user_obj = user_data
+
+    return await agent.memory_manager.store_user_memory(content, topics, user=user_obj)
 
 
 async def query_memory(agent, query: str, limit: Union[int, None] = None) -> str:

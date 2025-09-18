@@ -374,6 +374,9 @@ def create_team_wrapper(team):
             # Now get memory and tools after initialization
             self.agno_memory = self._get_team_memory()
             self.memory_tools = self._get_memory_tools()
+            
+            # Add memory_manager attribute for StreamlitMemoryHelper compatibility
+            self.memory_manager = self._create_memory_manager_wrapper()
 
             # Add debugging info
             logger.info(f"TeamWrapper initialized:")
@@ -381,6 +384,7 @@ def create_team_wrapper(team):
             logger.info(f"  - Team members: {len(getattr(self.team, 'members', []))}")
             logger.info(f"  - Memory available: {self.agno_memory is not None}")
             logger.info(f"  - Memory tools available: {self.memory_tools is not None}")
+            logger.info(f"  - Memory manager wrapper: {self.memory_manager is not None}")
 
         def _force_knowledge_agent_init(self):
             """Force initialization of the knowledge agent (first team member)."""
@@ -462,6 +466,17 @@ def create_team_wrapper(team):
                     return knowledge_agent._ensure_initialized()
             return None
 
+        def _create_memory_manager_wrapper(self):
+            """Create a memory manager wrapper for StreamlitMemoryHelper compatibility."""
+            if self.agno_memory:
+                # Create a wrapper that exposes the agno_memory for StreamlitMemoryHelper
+                class MemoryManagerWrapper:
+                    def __init__(self, agno_memory):
+                        self.agno_memory = agno_memory
+                
+                return MemoryManagerWrapper(self.agno_memory)
+            return None
+
         def store_user_memory(self, content, topics=None):
             # Use the knowledge agent (first team member) for memory storage with fact restating
             if hasattr(self.team, "members") and self.team.members:
@@ -469,27 +484,15 @@ def create_team_wrapper(team):
                     0
                 ]  # First member is the knowledge agent
                 if hasattr(knowledge_agent, "store_user_memory"):
-
                     # This will properly restate facts and process them through the LLM
+                    # The knowledge agent now properly handles delta_year through the fixed memory_functions.py
                     return self._run_async_safely(
                         knowledge_agent.store_user_memory(
                             content=content, topics=topics
                         )
                     )
 
-            # Fallback to direct memory storage (bypasses LLM processing)
-            if self.agno_memory and hasattr(self.agno_memory, "memory_manager"):
-                # Use the SemanticMemoryManager's add_memory method directly
-                result = self.agno_memory.memory_manager.add_memory(
-                    memory_text=content,
-                    db=self.agno_memory.db,
-                    user_id=self.user_id,
-                    topics=topics,
-                )
-                logger.warning(f"Memory stored in team memory: {result}")
-                return result
-
-            raise Exception("Team memory not available")
+            raise Exception("Team memory not available - knowledge agent not properly initialized")
 
         # Helper method to safely run async functions in Streamlit environment
         def _run_async_safely(self, coro):
@@ -685,12 +688,19 @@ def initialize_session_state():
                 recreate=RECREATE_FLAG,
             )
 
-        # Create team wrapper for helpers
+        # Create memory helper using the knowledge agent directly
         if SESSION_KEY_MEMORY_HELPER not in st.session_state:
-            team_wrapper = create_team_wrapper(st.session_state[SESSION_KEY_TEAM])
-            st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
-                team_wrapper
-            )
+            team = st.session_state[SESSION_KEY_TEAM]
+            if hasattr(team, "members") and team.members:
+                knowledge_agent = team.members[0]  # First member is the knowledge agent
+                st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
+                    knowledge_agent
+                )
+            else:
+                # Fallback: create with team object
+                st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
+                    team
+                )
 
         if SESSION_KEY_KNOWLEDGE_HELPER not in st.session_state:
             # For team mode, pass the knowledge agent (first team member) to the knowledge helper
@@ -2574,18 +2584,24 @@ def render_sidebar():
                                 st.session_state.get(SESSION_KEY_TEAM),
                             )
 
-                            # Update helper classes with new team
-                            team_wrapper = create_team_wrapper(
-                                st.session_state[SESSION_KEY_TEAM]
-                            )
-                            st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                StreamlitMemoryHelper(team_wrapper)
-                            )
-                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                StreamlitKnowledgeHelper(
-                                    st.session_state[SESSION_KEY_TEAM]
+                            # Update helper classes with new team - use knowledge agent directly
+                            team = st.session_state[SESSION_KEY_TEAM]
+                            if hasattr(team, "members") and team.members:
+                                knowledge_agent = team.members[0]  # First member is the knowledge agent
+                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                    StreamlitMemoryHelper(knowledge_agent)
                                 )
-                            )
+                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                    StreamlitKnowledgeHelper(knowledge_agent)
+                                )
+                            else:
+                                # Fallback: create with team object
+                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                    StreamlitMemoryHelper(team)
+                                )
+                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                    StreamlitKnowledgeHelper(team)
+                                )
 
                             success_msg = f"Team updated to use model: {selected_model}"
                             logger.info("✅ TEAM UPDATE COMPLETE: %s", success_msg)
@@ -2899,9 +2915,8 @@ def render_sidebar():
         st.header("🚨 System Control")
         if st.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
             # Show confirmation dialog
-            if not st.session_state.get("show_power_off_confirmation", False):
-                st.session_state["show_power_off_confirmation"] = True
-                st.rerun()
+            st.session_state["show_power_off_confirmation"] = True
+            st.rerun()
 
             st.subheader("🔍 Recent Request Details")
             if st.session_state[SESSION_KEY_DEBUG_METRICS]:
