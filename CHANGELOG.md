@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-18
+
+### Fixed
+- **Streamlit Memory Storage in Team Mode**: Resolved a critical bug where storing memories from the Streamlit UI would fail in team mode. The architecture has been simplified to have the UI interact directly with the dedicated Knowledge Agent, removing a complex and faulty wrapper layer.
+- **`delta_year` Timestamping**: Fixed a bug that prevented the `delta_year` feature from working. The memory storage pipeline now correctly converts user data into a `User` object, ensuring that age-perspective timestamps are calculated and applied as intended. See [ADR-087](./refs/adr/087-robust-ui-memory-storage-and-context-handling.md) for details on both fixes.
+
 ## [v0.2.6dev0] - 2025-09-17
 
 ### Added
