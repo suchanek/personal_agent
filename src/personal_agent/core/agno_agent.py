@@ -162,6 +162,7 @@ class AgnoPersonalAgent(Agent):
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
         openai_base_url: str = None,  # Add OpenAI base URL parameter
+        lmstudio_base_url: str = None,  # Add LM Studio base URL parameter
         user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
@@ -216,6 +217,7 @@ class AgnoPersonalAgent(Agent):
         self.debug = debug
         self.ollama_base_url = ollama_base_url
         self.openai_base_url = openai_base_url  # Store OpenAI base URL
+        self.lmstudio_base_url = lmstudio_base_url  # Store LM Studio base URL
         self.recreate = recreate
         self.instruction_level = instruction_level
         self.seed = seed
@@ -267,12 +269,13 @@ class AgnoPersonalAgent(Agent):
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
 
         # Create the model immediately to avoid agno defaulting to OpenAI
-        # FIX: Pass openai_base_url parameter for proper OpenAI endpoint configuration
+        # FIX: Pass openai_base_url and lmstudio_base_url parameters for proper endpoint configuration
         temp_model_manager = AgentModelManager(
             model_provider=model_provider,
             model_name=model_name,
             ollama_base_url=ollama_base_url,
             openai_base_url=openai_base_url,  # Pass the OpenAI base URL parameter
+            lmstudio_base_url=lmstudio_base_url,  # Pass the LM Studio base URL parameter
             seed=seed,
         )
 
@@ -453,6 +456,7 @@ class AgnoPersonalAgent(Agent):
                 model_name=self.model_name,
                 ollama_base_url=self.ollama_base_url,
                 openai_base_url=self.openai_base_url,  # Pass the OpenAI base URL parameter
+                lmstudio_base_url=self.lmstudio_base_url,  # Pass the LM Studio base URL parameter
                 seed=self.seed,
             )
 
@@ -500,6 +504,7 @@ class AgnoPersonalAgent(Agent):
                 self.get_all_memories,
                 self.list_all_memories,
                 self.update_memory,
+                DuckDuckGoTools(),
             ]
 
             # Add built-in tools if alltools is enabled
@@ -549,11 +554,21 @@ class AgnoPersonalAgent(Agent):
                 logger.warning("Memory disabled - no memory tools added")
 
             # 9. Create instructions using the AgentInstructionManager
-            instructions = self.instruction_manager.create_instructions()
-            logger.info(
-                "Generated dynamic instructions using AgentInstructionManager with level: %s",
-                self.instruction_level.name,
-            )
+            # For LM Studio, use minimal instructions to avoid context issues
+            if self.model_provider == "lm-studio":
+                # Use minimal instructions for LM Studio to avoid context window issues
+                instructions = [
+                    "You are a helpful AI assistant.",
+                    "Be direct and helpful in your responses.",
+                    "Use tools when needed for calculations or information.",
+                ]
+                logger.info("Using minimal instructions for LM Studio to avoid context issues")
+            else:
+                instructions = self.instruction_manager.create_instructions()
+                logger.info(
+                    "Generated dynamic instructions using AgentInstructionManager with level: %s",
+                    self.instruction_level.name,
+                )
 
             # 10. Update the Agent's components (KEY: Update inherited Agent properties)
             self.model = model
@@ -620,25 +635,32 @@ class AgnoPersonalAgent(Agent):
             add_thought_callback("🚀 Executing agent...")
 
         # Use the proper pattern: call super().run() with stream parameter
-        run_stream: Iterator[RunResponse] = super().run(
+        run_result = super().run(
             query, user_id=self.user_id, stream=stream, **kwargs
         )
 
         if stream:
             # Return the stream directly for proper RunResponse handling
-            return run_stream
+            return run_result
         else:
             # Collect all chunks from the stream for backward compatibility
             content_parts = []
             self._collected_tool_calls = []
 
-            for chunk in run_stream:  # Use regular for loop, not async for
-                # Store the last response for tool call extraction
-                self._last_response = chunk
+            # Handle both iterator and single response cases
+            if hasattr(run_result, '__iter__'):
+                for chunk in run_result:  # Use regular for loop, not async for
+                    # Store the last response for tool call extraction
+                    self._last_response = chunk
 
-                # Collect content from chunks
-                if hasattr(chunk, "content") and chunk.content:
-                    content_parts.append(chunk.content)
+                    # Collect content from chunks
+                    if hasattr(chunk, "content") and chunk.content:
+                        content_parts.append(chunk.content)
+            else:
+                # Single response case
+                self._last_response = run_result
+                if hasattr(run_result, "content") and run_result.content:
+                    content_parts.append(run_result.content)
 
             # Join all content parts
             content = "".join(content_parts)
@@ -1279,6 +1301,8 @@ class AgnoPersonalAgent(Agent):
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
         ollama_base_url: str = OLLAMA_URL,
+        openai_base_url: str = None,
+        lmstudio_base_url: str = None,
         user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.STANDARD,
@@ -1308,6 +1332,8 @@ class AgnoPersonalAgent(Agent):
             knowledge_dir=knowledge_dir,
             debug=debug,
             ollama_base_url=ollama_base_url,
+            openai_base_url=openai_base_url,
+            lmstudio_base_url=lmstudio_base_url,
             user_id=user_id,
             recreate=recreate,
             instruction_level=instruction_level,
@@ -1418,6 +1444,8 @@ async def create_agno_agent(
     knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
     debug: bool = False,
     ollama_base_url: str = OLLAMA_URL,
+    openai_base_url: str = None,
+    lmstudio_base_url: str = None,
     user_id: str = None,
     recreate: bool = False,
     instruction_level: InstructionLevel = InstructionLevel.STANDARD,
@@ -1465,6 +1493,8 @@ async def create_agno_agent(
         knowledge_dir=knowledge_dir,
         debug=debug,
         ollama_base_url=ollama_base_url,
+        openai_base_url=openai_base_url,
+        lmstudio_base_url=lmstudio_base_url,
         user_id=user_id,
         recreate=recreate,
         instruction_level=instruction_level,

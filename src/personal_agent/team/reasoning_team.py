@@ -927,7 +927,7 @@ async def create_memory_agent(
         debug=debug,
         user_id=user_id,
         recreate=recreate,
-        alltools=True,
+        alltools=False,
         ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
         openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
         tool_caller=False,
