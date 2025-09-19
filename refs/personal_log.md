@@ -1,5 +1,9 @@
 # Personal Log
 
+**2025-09-19**
+
+- integrating lmstudio into the personal agent. it won't work with the personalagent alltools=True, exceeds context length. am unable to adjust server side or pass context directly
+
 **2025-09-11**
 
 - trying to make llama models work properly with ollama. created new modelfiles, they still return json at times

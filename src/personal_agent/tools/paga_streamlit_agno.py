@@ -105,6 +105,7 @@ Last Revision: 2025-08-17
 import argparse
 import asyncio
 import logging
+import os
 import sys
 import time
 from datetime import datetime
@@ -117,7 +118,7 @@ import requests
 import streamlit as st
 
 # Fix Altair deprecation warning by setting theme using new API
-alt.theme.enable('default')
+alt.theme.enable("default")
 
 PANDAS_AVAILABLE = True
 
@@ -228,19 +229,42 @@ SINGLE_FLAG = args.single
 db_path = Path(AGNO_STORAGE_DIR) / "agent_memory.db"
 
 
-def get_ollama_models(ollama_url):
-    """Query Ollama API to get available models."""
+def get_available_models(base_url):
+    """Query API to get available models - supports both Ollama and LM Studio."""
+    provider = os.getenv("PROVIDER", "ollama")
+
     try:
-        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            models = [model["name"] for model in data.get("models", [])]
-            return models
+        if provider == "lm-studio":
+            # LM Studio uses OpenAI-compatible /v1/models endpoint
+            response = requests.get(f"{base_url}/v1/models", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                # LM Studio returns models in a different format
+                models = []
+                if "data" in data:
+                    models = [model["id"] for model in data["data"]]
+                elif isinstance(data, dict) and "models" in data:
+                    models = [model["id"] for model in data.get("models", [])]
+                return models
+            else:
+                st.warning(
+                    f"Failed to fetch models from LM Studio: {response.status_code}"
+                )
+                # Return a default model list for LM Studio
+                return ["qwen3-4b-mlx", LLM_MODEL]
         else:
-            st.error(f"Failed to fetch models from Ollama: {response.status_code}")
-            return []
+            # Ollama uses /api/tags endpoint
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                models = [model["name"] for model in data.get("models", [])]
+                return models
+            else:
+                st.error(f"Failed to fetch models from Ollama: {response.status_code}")
+                return []
     except requests.exceptions.RequestException as e:
-        st.error(f"Error connecting to Ollama at {ollama_url}: {str(e)}")
+        provider_name = "LM Studio" if provider == "lm-studio" else "Ollama"
+        st.error(f"Error connecting to {provider_name} at {base_url}: {str(e)}")
         return []
 
 
@@ -248,20 +272,57 @@ async def initialize_agent_async(
     model_name, ollama_url, existing_agent=None, recreate=False
 ):
     """Initialize AgnoPersonalAgent with proper async handling."""
+    # Read provider from environment variable, default to ollama if not set
+    provider = os.getenv("PROVIDER", "ollama")
+
+    # Determine the correct base URLs based on provider
+    if provider == "lm-studio":
+        # For LM Studio, use the LM Studio URL
+        lmstudio_base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
+        # Still pass ollama_url for compatibility, but it won't be used
+        agent_ollama_url = ollama_url
+        agent_lmstudio_url = lmstudio_base_url
+    else:
+        # For other providers, use the provided ollama_url
+        agent_ollama_url = ollama_url
+        agent_lmstudio_url = None
+
     # Always create a new agent when URL or model changes to ensure proper configuration
     # This is more reliable than trying to update existing agent configuration
-    return await AgnoPersonalAgent.create_with_init(
-        model_provider="ollama",
-        model_name=model_name,
-        ollama_base_url=ollama_url,
-        user_id=USER_ID,
-        debug=True,
-        enable_memory=True,
-        enable_mcp=True,
-        storage_dir=AGNO_STORAGE_DIR,
-        knowledge_dir=AGNO_KNOWLEDGE_DIR,
-        recreate=recreate,
-    )
+
+    # For LM Studio, use optimized settings to avoid context window issues
+    if provider == "lm-studio":
+        # Use lightweight configuration for LM Studio to avoid context issues
+        return await AgnoPersonalAgent.create_with_init(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url=agent_ollama_url,
+            lmstudio_base_url=agent_lmstudio_url,
+            user_id=USER_ID,
+            debug=True,
+            enable_memory=True,  # Disable memory to reduce context usage
+            enable_mcp=False,  # Disable MCP to reduce context usage
+            alltools=False,  # Disable all tools to reduce context usage
+            storage_dir=AGNO_STORAGE_DIR,
+            knowledge_dir=AGNO_KNOWLEDGE_DIR,
+            recreate=recreate,
+        )
+    else:
+        # Full configuration for other providers
+        return await AgnoPersonalAgent.create_with_init(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url=agent_ollama_url,
+            lmstudio_base_url=agent_lmstudio_url,
+            user_id=USER_ID,
+            debug=True,
+            enable_memory=True,
+            enable_mcp=False,
+            storage_dir=AGNO_STORAGE_DIR,
+            knowledge_dir=AGNO_KNOWLEDGE_DIR,
+            recreate=recreate,
+            alltools=True,
+        )
 
 
 def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False):
@@ -279,7 +340,7 @@ def _run_async_team_init(coro):
         # If we're in a running loop, we need to use a different approach
         import concurrent.futures
         import threading
-        
+
         # Create a new event loop in a separate thread
         def run_in_thread():
             new_loop = asyncio.new_event_loop()
@@ -288,11 +349,11 @@ def _run_async_team_init(coro):
                 return new_loop.run_until_complete(coro)
             finally:
                 new_loop.close()
-        
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_in_thread)
             return future.result()
-            
+
     except RuntimeError:
         # No running event loop, safe to use asyncio.run()
         return asyncio.run(coro)
@@ -307,7 +368,9 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
         use_remote = ollama_url == REMOTE_OLLAMA_URL
 
         # Create team using the factory function from reasoning_team with model_name parameter
-        team = _run_async_team_init(create_personal_agent_team(use_remote=use_remote, model_name=model_name))
+        team = _run_async_team_init(
+            create_personal_agent_team(use_remote=use_remote, model_name=model_name)
+        )
 
         # Validate team creation
         if not team:
@@ -374,7 +437,7 @@ def create_team_wrapper(team):
             # Now get memory and tools after initialization
             self.agno_memory = self._get_team_memory()
             self.memory_tools = self._get_memory_tools()
-            
+
             # Add memory_manager attribute for StreamlitMemoryHelper compatibility
             self.memory_manager = self._create_memory_manager_wrapper()
 
@@ -384,7 +447,9 @@ def create_team_wrapper(team):
             logger.info(f"  - Team members: {len(getattr(self.team, 'members', []))}")
             logger.info(f"  - Memory available: {self.agno_memory is not None}")
             logger.info(f"  - Memory tools available: {self.memory_tools is not None}")
-            logger.info(f"  - Memory manager wrapper: {self.memory_manager is not None}")
+            logger.info(
+                f"  - Memory manager wrapper: {self.memory_manager is not None}"
+            )
 
         def _force_knowledge_agent_init(self):
             """Force initialization of the knowledge agent (first team member)."""
@@ -473,7 +538,7 @@ def create_team_wrapper(team):
                 class MemoryManagerWrapper:
                     def __init__(self, agno_memory):
                         self.agno_memory = agno_memory
-                
+
                 return MemoryManagerWrapper(self.agno_memory)
             return None
 
@@ -492,7 +557,9 @@ def create_team_wrapper(team):
                         )
                     )
 
-            raise Exception("Team memory not available - knowledge agent not properly initialized")
+            raise Exception(
+                "Team memory not available - knowledge agent not properly initialized"
+            )
 
         # Helper method to safely run async functions in Streamlit environment
         def _run_async_safely(self, coro):
@@ -503,7 +570,7 @@ def create_team_wrapper(team):
                 # If we're in a running loop, create a new thread to run the coroutine
                 import concurrent.futures
                 import threading
-                
+
                 def run_in_thread():
                     # Create a new event loop for this thread
                     new_loop = asyncio.new_event_loop()
@@ -512,11 +579,11 @@ def create_team_wrapper(team):
                         return new_loop.run_until_complete(coro)
                     finally:
                         new_loop.close()
-                
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(run_in_thread)
                     return future.result(timeout=30)  # 30 second timeout
-                    
+
             except RuntimeError:
                 # No running event loop, safe to use asyncio.run()
                 return asyncio.run(coro)
@@ -535,7 +602,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "query_memory"):
-                    return self._run_async_safely(knowledge_agent.query_memory(query, limit))
+                    return self._run_async_safely(
+                        knowledge_agent.query_memory(query, limit)
+                    )
             raise Exception("Team memory not available")
 
         def update_memory(self, memory_id, content, topics=None):
@@ -543,7 +612,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "update_memory"):
-                    return self._run_async_safely(knowledge_agent.update_memory(memory_id, content, topics))
+                    return self._run_async_safely(
+                        knowledge_agent.update_memory(memory_id, content, topics)
+                    )
             raise Exception("Team memory not available")
 
         def delete_memory(self, memory_id):
@@ -551,7 +622,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "delete_memory"):
-                    return self._run_async_safely(knowledge_agent.delete_memory(memory_id))
+                    return self._run_async_safely(
+                        knowledge_agent.delete_memory(memory_id)
+                    )
             raise Exception("Team memory not available")
 
         def get_recent_memories(self, limit=10):
@@ -559,7 +632,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "get_recent_memories"):
-                    return self._run_async_safely(knowledge_agent.get_recent_memories(limit))
+                    return self._run_async_safely(
+                        knowledge_agent.get_recent_memories(limit)
+                    )
             raise Exception("Team memory not available")
 
         def get_all_memories(self):
@@ -583,7 +658,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "get_memories_by_topic"):
-                    return self._run_async_safely(knowledge_agent.get_memories_by_topic(topics, limit))
+                    return self._run_async_safely(
+                        knowledge_agent.get_memories_by_topic(topics, limit)
+                    )
             raise Exception("Team memory not available")
 
         def delete_memories_by_topic(self, topics):
@@ -591,7 +668,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "delete_memories_by_topic"):
-                    return self._run_async_safely(knowledge_agent.delete_memories_by_topic(topics))
+                    return self._run_async_safely(
+                        knowledge_agent.delete_memories_by_topic(topics)
+                    )
             raise Exception("Team memory not available")
 
         def get_memory_graph_labels(self):
@@ -599,7 +678,9 @@ def create_team_wrapper(team):
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
                 if hasattr(knowledge_agent, "get_memory_graph_labels"):
-                    return self._run_async_safely(knowledge_agent.get_memory_graph_labels())
+                    return self._run_async_safely(
+                        knowledge_agent.get_memory_graph_labels()
+                    )
             raise Exception("Team memory not available")
 
         def clear_all_memories(self):
@@ -628,13 +709,13 @@ def apply_custom_theme():
             css_file = "tools/dark_theme.css"
             with open(css_file) as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-        
+
         # Apply Altair dark theme for charts
-        alt.theme.enable('dark')
+        alt.theme.enable("dark")
     else:
         # Light mode: use default Streamlit styling and default Altair theme
-        alt.theme.enable('default')
-        
+        alt.theme.enable("default")
+
         # Apply light mode dimming CSS for sidebar navigation
         light_mode_dimming_css = """
         <style>
@@ -666,7 +747,15 @@ def apply_custom_theme():
 def initialize_session_state():
     """Initialize all session state variables."""
     if SESSION_KEY_CURRENT_OLLAMA_URL not in st.session_state:
-        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = EFFECTIVE_OLLAMA_URL
+        # Determine the correct URL based on the provider
+        provider = os.getenv("PROVIDER", "ollama")
+        if provider == "lm-studio":
+            # Use LM Studio URL for LM Studio provider
+            lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
+            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = lmstudio_url
+        else:
+            # Use Ollama URL for other providers
+            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = EFFECTIVE_OLLAMA_URL
 
     if SESSION_KEY_CURRENT_MODEL not in st.session_state:
         st.session_state[SESSION_KEY_CURRENT_MODEL] = LLM_MODEL
@@ -1176,45 +1265,80 @@ def render_chat_tab():
                             ) = extract_tool_calls_and_metrics(response_obj)
 
                             # 🚨 SIMPLIFIED RESPONSE PARSING - NO FILTERING
-                            print(f"🔍 SIMPLE_DEBUG: Starting response parsing for query: '{prompt[:50]}...'")
-                            
+                            print(
+                                f"🔍 SIMPLE_DEBUG: Starting response parsing for query: '{prompt[:50]}...'"
+                            )
+
                             # Step 1: Try main response content first
-                            if hasattr(response_obj, "content") and response_obj.content:
+                            if (
+                                hasattr(response_obj, "content")
+                                and response_obj.content
+                            ):
                                 response = str(response_obj.content)
-                                print(f"🔍 SIMPLE_DEBUG: Using main response content: '{response[:100]}...' ({len(response)} chars)")
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: Using main response content: '{response[:100]}...' ({len(response)} chars)"
+                                )
                             else:
                                 response = ""
-                                print(f"🔍 SIMPLE_DEBUG: No main response content found")
-                            
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: No main response content found"
+                                )
+
                             # Step 2: If no main content or it's empty, check member responses
-                            if not response.strip() and hasattr(response_obj, "member_responses") and response_obj.member_responses:
-                                print(f"🔍 SIMPLE_DEBUG: Main response empty, checking {len(response_obj.member_responses)} member responses")
-                                
+                            if (
+                                not response.strip()
+                                and hasattr(response_obj, "member_responses")
+                                and response_obj.member_responses
+                            ):
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: Main response empty, checking {len(response_obj.member_responses)} member responses"
+                                )
+
                                 # Get ALL assistant messages from ALL members - no filtering
                                 all_assistant_messages = []
-                                for i, member_resp in enumerate(response_obj.member_responses):
-                                    if hasattr(member_resp, "messages") and member_resp.messages:
+                                for i, member_resp in enumerate(
+                                    response_obj.member_responses
+                                ):
+                                    if (
+                                        hasattr(member_resp, "messages")
+                                        and member_resp.messages
+                                    ):
                                         for j, msg in enumerate(member_resp.messages):
-                                            if hasattr(msg, "role") and msg.role == "assistant" and hasattr(msg, "content") and msg.content:
-                                                all_assistant_messages.append({
-                                                    'member': i,
-                                                    'message': j,
-                                                    'content': str(msg.content),
-                                                    'length': len(str(msg.content))
-                                                })
-                                                print(f"🔍 SIMPLE_DEBUG: Found assistant message from member {i}: '{str(msg.content)[:100]}...' ({len(str(msg.content))} chars)")
-                                
+                                            if (
+                                                hasattr(msg, "role")
+                                                and msg.role == "assistant"
+                                                and hasattr(msg, "content")
+                                                and msg.content
+                                            ):
+                                                all_assistant_messages.append(
+                                                    {
+                                                        "member": i,
+                                                        "message": j,
+                                                        "content": str(msg.content),
+                                                        "length": len(str(msg.content)),
+                                                    }
+                                                )
+                                                print(
+                                                    f"🔍 SIMPLE_DEBUG: Found assistant message from member {i}: '{str(msg.content)[:100]}...' ({len(str(msg.content))} chars)"
+                                                )
+
                                 # Use the LAST assistant message (most recent)
                                 if all_assistant_messages:
                                     last_message = all_assistant_messages[-1]
-                                    response = last_message['content']
-                                    print(f"🔍 SIMPLE_DEBUG: Using LAST assistant message from member {last_message['member']}: '{response[:100]}...' ({len(response)} chars)")
+                                    response = last_message["content"]
+                                    print(
+                                        f"🔍 SIMPLE_DEBUG: Using LAST assistant message from member {last_message['member']}: '{response[:100]}...' ({len(response)} chars)"
+                                    )
                                 else:
-                                    print(f"🔍 SIMPLE_DEBUG: No assistant messages found in member responses")
-                            
+                                    print(
+                                        f"🔍 SIMPLE_DEBUG: No assistant messages found in member responses"
+                                    )
+
                             # Step 3: Handle </think> tags if present - PRESERVE them for now (don't strip)
-                            if '</think>' in response:
-                                print(f"🔍 SIMPLE_DEBUG: Found <think> tags in response, preserving them as requested")
+                            if "</think>" in response:
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: Found <think> tags in response, preserving them as requested"
+                                )
                                 # Keep the full response including <think> tags
                                 # Original stripping logic commented out:
                                 # parts = response.split('</think>')
@@ -1222,8 +1346,10 @@ def render_chat_tab():
                                 #     after_think = parts[-1].strip()
                                 #     if after_think:
                                 #         response = after_think
-                            
-                            print(f"🔍 SIMPLE_DEBUG: ✅ FINAL RESPONSE: '{response[:200]}...' ({len(response)} chars)")
+
+                            print(
+                                f"🔍 SIMPLE_DEBUG: ✅ FINAL RESPONSE: '{response[:200]}...' ({len(response)} chars)"
+                            )
 
                             # Display tool calls if any
                             if tool_call_details:
@@ -2508,11 +2634,11 @@ def render_sidebar():
 
         st.header("Model Selection")
         new_ollama_url = st.text_input(
-            "Ollama URL:", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+            "Provider URL:", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
         )
         if st.button("🔄 Fetch Available Models"):
             with st.spinner("Fetching models..."):
-                available_models = get_ollama_models(new_ollama_url)
+                available_models = get_available_models(new_ollama_url)
                 if available_models:
                     st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
                     st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_ollama_url
@@ -2587,7 +2713,9 @@ def render_sidebar():
                             # Update helper classes with new team - use knowledge agent directly
                             team = st.session_state[SESSION_KEY_TEAM]
                             if hasattr(team, "members") and team.members:
-                                knowledge_agent = team.members[0]  # First member is the knowledge agent
+                                knowledge_agent = team.members[
+                                    0
+                                ]  # First member is the knowledge agent
                                 st.session_state[SESSION_KEY_MEMORY_HELPER] = (
                                     StreamlitMemoryHelper(knowledge_agent)
                                 )
@@ -2711,30 +2839,32 @@ def render_sidebar():
         # Show comprehensive model configuration for current model
         current_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
         current_ollama_url = st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
-        
+
         with st.expander("⚙️ Model Configuration", expanded=False):
             try:
                 # Get comprehensive model configuration
                 model_config = get_model_config_dict(current_model, current_ollama_url)
-                
+
                 st.write("**Model Parameters:**")
                 params = model_config.get("parameters", {})
                 st.write(f"• Temperature: {params.get('temperature', 'N/A')}")
                 st.write(f"• Top P: {params.get('top_p', 'N/A')}")
                 st.write(f"• Top K: {params.get('top_k', 'N/A')}")
-                st.write(f"• Repetition Penalty: {params.get('repetition_penalty', 'N/A')}")
-                
+                st.write(
+                    f"• Repetition Penalty: {params.get('repetition_penalty', 'N/A')}"
+                )
+
                 st.write("**Context Configuration:**")
                 context_size = model_config.get("context_size", "N/A")
                 if isinstance(context_size, int):
                     st.write(f"• Context Size: {context_size:,} tokens")
                 else:
                     st.write(f"• Context Size: {context_size}")
-                
+
                 st.caption(
                     "Configuration sourced from model_contexts.py and environment variables"
                 )
-                
+
             except Exception as e:
                 st.error(f"Error loading model configuration: {e}")
                 # Fallback to basic model info
@@ -2753,6 +2883,9 @@ def render_sidebar():
                 )
 
                 # Show agent/team specific debug info
+                provider = os.getenv("PROVIDER", "ollama")
+                st.write(f"**Current Provider:** {provider}")
+
                 if current_mode == "team":
                     team = st.session_state.get(SESSION_KEY_TEAM)
                     if team and hasattr(team, "ollama_base_url"):
@@ -2761,18 +2894,39 @@ def render_sidebar():
                         st.write("**Team URL:** Not accessible")
                 else:
                     agent = st.session_state.get(SESSION_KEY_AGENT)
-                    if agent and hasattr(agent, "ollama_base_url"):
-                        st.write(f"**Agent's Ollama URL:** {agent.ollama_base_url}")
-                    elif (
-                        agent
-                        and hasattr(agent, "model_manager")
-                        and hasattr(agent.model_manager, "ollama_base_url")
-                    ):
-                        st.write(
-                            f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}"
-                        )
+                    if agent:
+                        # Show provider-specific URLs
+                        if provider == "lm-studio":
+                            if hasattr(agent, "model_manager") and hasattr(
+                                agent.model_manager, "lmstudio_base_url"
+                            ):
+                                st.write(
+                                    f"**Agent's LM Studio URL:** {agent.model_manager.lmstudio_base_url}"
+                                )
+                            else:
+                                lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "Not set")
+                                st.write(f"**LM Studio URL (env):** {lmstudio_url}")
+                        else:
+                            if hasattr(agent, "ollama_base_url"):
+                                st.write(
+                                    f"**Agent's Ollama URL:** {agent.ollama_base_url}"
+                                )
+                            elif hasattr(agent, "model_manager") and hasattr(
+                                agent.model_manager, "ollama_base_url"
+                            ):
+                                st.write(
+                                    f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}"
+                                )
+                            else:
+                                st.write("**Agent URL:** Not accessible")
+
+                        # Show model manager provider info
+                        if hasattr(agent, "model_manager"):
+                            st.write(
+                                f"**Model Manager Provider:** {getattr(agent.model_manager, 'model_provider', 'Unknown')}"
+                            )
                     else:
-                        st.write("**Agent URL:** Not accessible")
+                        st.write("**Agent:** Not accessible")
 
         st.header("Controls")
         if st.button("Clear Chat History"):
@@ -2913,11 +3067,17 @@ def render_sidebar():
         # Power off button at the bottom of the sidebar
         st.markdown("---")
         st.header("🚨 System Control")
-        if st.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
+        if st.button(
+            "🔴 Power Off System",
+            key="sidebar_power_off_btn",
+            type="primary",
+            use_container_width=True,
+        ):
             # Show confirmation dialog
             st.session_state["show_power_off_confirmation"] = True
             st.rerun()
 
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
             st.subheader("🔍 Recent Request Details")
             if st.session_state[SESSION_KEY_DEBUG_METRICS]:
                 for entry in reversed(st.session_state[SESSION_KEY_DEBUG_METRICS][-5:]):
@@ -2945,7 +3105,8 @@ def main():
     apply_custom_theme()
 
     # Add power button to actual top banner using custom HTML/CSS
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     .power-button-container {
         position: fixed;
@@ -2976,7 +3137,9 @@ def main():
         transform: scale(1.05);
     }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     # Streamlit UI
     st.title("🤖 Personal AI Friend with Memory")
@@ -2992,17 +3155,28 @@ def main():
         st.markdown("---")
         st.error("⚠️ **SYSTEM SHUTDOWN CONFIRMATION**")
         st.warning("This will permanently shut down the Personal Agent application.")
-        
+
         # Create wider columns for better button layout
-        col_spacer1, col_cancel, col_spacer2, col_confirm, col_spacer3 = st.columns([1, 2, 1, 2, 1])
-        
+        col_spacer1, col_cancel, col_spacer2, col_confirm, col_spacer3 = st.columns(
+            [1, 2, 1, 2, 1]
+        )
+
         with col_cancel:
-            if st.button("❌ Cancel Shutdown", key="wide_cancel_power_off", use_container_width=True):
+            if st.button(
+                "❌ Cancel Shutdown",
+                key="wide_cancel_power_off",
+                use_container_width=True,
+            ):
                 st.session_state["show_power_off_confirmation"] = False
                 st.rerun()
-        
+
         with col_confirm:
-            if st.button("🔴 CONFIRM SHUTDOWN", key="wide_confirm_power_off", type="primary", use_container_width=True):
+            if st.button(
+                "🔴 CONFIRM SHUTDOWN",
+                key="wide_confirm_power_off",
+                type="primary",
+                use_container_width=True,
+            ):
                 # Clear confirmation state
                 st.session_state["show_power_off_confirmation"] = False
 
@@ -3038,9 +3212,9 @@ def main():
 
                 # Stop Streamlit execution
                 st.stop()
-        
+
         st.markdown("---")
-        
+
         # Don't show any other content when shutdown confirmation is active
         return
 

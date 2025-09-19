@@ -149,6 +149,14 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         context_size=32768,
         repetition_penalty=1.05,
     ),
+    # LM Studio Qwen models - using LM Studio defaults with increased context
+    "qwen3-4b-mlx": ModelParameters(
+        temperature=0.8,
+        top_p=0.9,  # Default top_p when not specified
+        top_k=100,
+        repetition_penalty=1.1,
+        context_size=131072,  # Increased to 128K context for LM Studio
+    ),
     "sam860/qwen3-embedding:0.6b-F16": ModelParameters(
         temperature=0.1,
         top_p=0.95,
