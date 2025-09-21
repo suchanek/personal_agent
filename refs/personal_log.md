@@ -1,7 +1,12 @@
 # Personal Log
 
+**2025-09-20**
+
+- i've gotten lm-studio integration to work! i've consolidated the knowledgetools to expose combined ingestion functions. these need testing still. now single agent mode works properly with lm-studio without context explosion
+
 **2025-09-19**
 
+- i have persag running with lm-studio but - if we include all of the knowledgetools in the toolkit it blows up with too large context. Leaving them out entirely allows persag to run as a single agent with all tools with lmstudio
 - integrating lmstudio into the personal agent. it won't work with the personalagent alltools=True, exceeds context length. am unable to adjust server side or pass context directly
 
 **2025-09-11**

@@ -49,8 +49,11 @@ class AgentModelManager:
         self.lmstudio_base_url = lmstudio_base_url
         self.seed = seed
 
-    def create_model(self) -> Union[OpenAIChat, Ollama, LMStudio]:
+    def create_model(self, use_remote: bool = False) -> Union[OpenAIChat, Ollama, LMStudio]:
         """Create the appropriate model instance based on provider.
+
+        Args:
+            use_remote: Whether to use remote endpoints instead of local ones
 
         Returns:
             Configured model instance
@@ -184,20 +187,51 @@ class AgentModelManager:
 
                 return model
         elif self.model_provider == "lm-studio":
-            # Use official Agno LMStudio class - simplified to match working example
-            base_url = self.lmstudio_base_url or getattr(settings, "LMSTUDIO_BASE_URL", "http://localhost:1234")
+            # SIMPLIFIED: Use remote/local URLs based on use_remote flag
+            if use_remote:
+                # Use remote LM Studio URL from settings
+                base_url = getattr(settings, "REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234")
+                logger.info(f"🌐 Using REMOTE LM Studio URL: {base_url}")
+            else:
+                # Use local LM Studio URL (passed parameter or fallback)
+                base_url = self.lmstudio_base_url or getattr(settings, "LMSTUDIO_BASE_URL", "http://localhost:1234")
+                logger.info(f"🏠 Using LOCAL LM Studio URL: {base_url}")
+            
+            # Ensure the base URL has the correct /v1 endpoint for LMStudio
+            if not base_url.endswith("/v1"):
+                base_url = base_url.rstrip("/") + "/v1"
+
+            # CRITICAL DEBUG: Log all URL information
+            logger.warning(f"🚨 LM STUDIO DEBUG: use_remote = {use_remote}")
+            logger.warning(f"🚨 LM STUDIO DEBUG: self.lmstudio_base_url = {self.lmstudio_base_url}")
+            logger.warning(f"🚨 LM STUDIO DEBUG: final base_url = {base_url}")
+            logger.warning(f"🚨 LM STUDIO DEBUG: model_name = {self.model_name}")
 
             logger.info(f"Using official Agno LMStudio provider at: {base_url}")
             logger.info(f"Model: {self.model_name}")
             logger.info("Using agno.models.lmstudio.LMStudio class (simplified approach)")
 
-            # Create LMStudio model using official Agno class - exactly like working example
-            # The working example: Agent(model=LMStudio(id="qwen2.5-7b-instruct-1m"))
-            model = LMStudio(id=self.model_name)
+            # Create LMStudio model using official Agno class with proper base_url
+            model = LMStudio(id=self.model_name, base_url=base_url)
 
+            # CRITICAL DEBUG: Verify the model's actual base_url after creation
+            if hasattr(model, 'base_url'):
+                logger.warning(f"🚨 LM STUDIO DEBUG: model.base_url after creation = {model.base_url}")
+            # Remove client debug since it causes pylint errors
+            
             logger.info(f"✅ Created official Agno LMStudio model: {self.model_name}")
             return model
         elif self.model_provider == "ollama":
+            # SIMPLIFIED: Use remote/local URLs based on use_remote flag
+            if use_remote:
+                # Use remote Ollama URL from settings
+                host_url = getattr(settings, "REMOTE_OLLAMA_URL", "http://100.100.248.61:11434")
+                logger.info(f"🌐 Using REMOTE Ollama URL: {host_url}")
+            else:
+                # Use local Ollama URL (passed parameter or fallback)
+                host_url = self.ollama_base_url or getattr(settings, "OLLAMA_URL", "http://localhost:11434")
+                logger.info(f"🏠 Using LOCAL Ollama URL: {host_url}")
+
             # Get unified model configuration (parameters + context size)
             model_config = get_model_parameters_dict(self.model_name)
 
@@ -281,7 +315,7 @@ class AgentModelManager:
 
             model = Ollama(
                 id=self.model_name,
-                host=self.ollama_base_url,  # Use host parameter for Ollama
+                host=host_url,  # Use the selected host URL (remote or local)
                 options=model_options,
             )
 

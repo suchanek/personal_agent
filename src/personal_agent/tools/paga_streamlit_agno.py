@@ -140,6 +140,7 @@ from personal_agent.config import (
     LLM_MODEL,
     OLLAMA_URL,
     REMOTE_OLLAMA_URL,
+    REMOTE_LMSTUDIO_URL,
     USER_DATA_DIR,
     get_current_user_id,
     get_qwen_instruct_settings,
@@ -277,11 +278,10 @@ async def initialize_agent_async(
 
     # Determine the correct base URLs based on provider
     if provider == "lm-studio":
-        # For LM Studio, use the LM Studio URL
-        lmstudio_base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
-        # Still pass ollama_url for compatibility, but it won't be used
-        agent_ollama_url = ollama_url
-        agent_lmstudio_url = lmstudio_base_url
+        # For LM Studio, use the LM Studio URL passed from session state
+        # This now respects the --remote flag through the session state URL
+        agent_lmstudio_url = ollama_url  # Use the URL from session state (respects --remote)
+        agent_ollama_url = ollama_url    # For compatibility
     else:
         # For other providers, use the provided ollama_url
         agent_ollama_url = ollama_url
@@ -300,9 +300,9 @@ async def initialize_agent_async(
             lmstudio_base_url=agent_lmstudio_url,
             user_id=USER_ID,
             debug=True,
-            enable_memory=True,  # Disable memory to reduce context usage
+            enable_memory=True,  # Enable memory
             enable_mcp=False,  # Disable MCP to reduce context usage
-            alltools=False,  # Disable all tools to reduce context usage
+            alltools=SINGLE_FLAG,  # Use SINGLE_FLAG to control all tools
             storage_dir=AGNO_STORAGE_DIR,
             knowledge_dir=AGNO_KNOWLEDGE_DIR,
             recreate=recreate,
@@ -321,7 +321,7 @@ async def initialize_agent_async(
             storage_dir=AGNO_STORAGE_DIR,
             knowledge_dir=AGNO_KNOWLEDGE_DIR,
             recreate=recreate,
-            alltools=True,
+            alltools=SINGLE_FLAG,  # Use SINGLE_FLAG to control all tools
         )
 
 
@@ -364,8 +364,8 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
     try:
         logger.info(f"Initializing team with model {model_name} at {ollama_url}")
 
-        # Determine if we should use remote Ollama based on the URL
-        use_remote = ollama_url == REMOTE_OLLAMA_URL
+        # SIMPLIFIED: Just pass the --remote flag directly!
+        use_remote = args.remote
 
         # Create team using the factory function from reasoning_team with model_name parameter
         team = _run_async_team_init(
@@ -747,14 +747,19 @@ def apply_custom_theme():
 def initialize_session_state():
     """Initialize all session state variables."""
     if SESSION_KEY_CURRENT_OLLAMA_URL not in st.session_state:
-        # Determine the correct URL based on the provider
+        # SIMPLIFIED: Just use the appropriate URL based on provider and --remote flag
         provider = os.getenv("PROVIDER", "ollama")
         if provider == "lm-studio":
-            # Use LM Studio URL for LM Studio provider
-            lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
-            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = lmstudio_url
+            if args.remote:
+                url = REMOTE_LMSTUDIO_URL
+                # Remove /v1 suffix if present since we add it in the model manager
+                if url.endswith("/v1"):
+                    url = url[:-3]
+            else:
+                url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
+            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = url
         else:
-            # Use Ollama URL for other providers
+            # For Ollama and other providers, use EFFECTIVE_OLLAMA_URL which already respects --remote
             st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = EFFECTIVE_OLLAMA_URL
 
     if SESSION_KEY_CURRENT_MODEL not in st.session_state:

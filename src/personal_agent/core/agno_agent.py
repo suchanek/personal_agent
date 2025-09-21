@@ -62,6 +62,7 @@ from agno.models.openai import OpenAIChat
 from agno.tools.calculator import CalculatorTools
 from agno.tools.dalle import DalleTools
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
 from agno.tools.yfinance import YFinanceTools
@@ -87,6 +88,7 @@ from ..config.settings import (
 )
 from ..config.user_id_mgr import get_userid
 from ..tools.knowledge_tools import KnowledgeTools
+
 # PersagMemoryTools is no longer used - memory functions are now standalone
 # from ..tools.persag_memory_tools import PersagMemoryTools
 from ..tools.personal_agent_tools import (
@@ -165,12 +167,11 @@ class AgnoPersonalAgent(Agent):
         lmstudio_base_url: str = None,  # Add LM Studio base URL parameter
         user_id: str = None,
         recreate: bool = False,
-        instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+        instruction_level: InstructionLevel = InstructionLevel.CONCISE,
         seed: Optional[int] = None,
         alltools: Optional[bool] = True,
         initialize_agent: Optional[bool] = False,
         stream: Optional[bool] = False,
-        tool_caller: Optional[bool] = True,
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -280,8 +281,6 @@ class AgnoPersonalAgent(Agent):
         )
 
         initial_model = None
-        if not tool_caller:
-            initial_model = temp_model_manager.create_model()
 
         # Initialize base Agent with proper model to prevent OpenAI default
         super().__init__(
@@ -504,14 +503,13 @@ class AgnoPersonalAgent(Agent):
                 self.get_all_memories,
                 self.list_all_memories,
                 self.update_memory,
-                DuckDuckGoTools(),
             ]
 
             # Add built-in tools if alltools is enabled
             if self.alltools:
                 all_tools = [
                     DuckDuckGoTools(),
-                    CalculatorTools(enable_all=True),
+                    # CalculatorTools(enable_all=True),
                     YFinanceTools(
                         stock_price=True,
                         company_info=True,
@@ -529,20 +527,20 @@ class AgnoPersonalAgent(Agent):
                     ),
                     ShellTools(base_dir=Path(HOME_DIR)),
                     PersonalAgentFilesystemTools(),
-                    DalleTools(
-                        model="dall-e-3", size="1792x1024", quality="hd", style="vivid"
-                    ),
+                    PubmedTools(),
                 ]
                 tools.extend(all_tools)
-                logger.debug(f"Added {len(all_tools)} built-in tools")
+                logger.info(f"Added {len(all_tools)} built-in tools")
+            else:
+                logger.info("alltools=False, only memory tools will be available")
 
             # ALWAYS add memory tools if memory is enabled, regardless of alltools setting
             if self.enable_memory:
                 if self.knowledge_tools:
-                    memory_tools = [
+                    knowledge_tools = [
                         self.knowledge_tools,  # Now contains all knowledge functionality
                     ]
-                    tools.extend(memory_tools)
+                    tools.extend(knowledge_tools)
                     logger.debug(
                         "Added KnowledgeTools (memory functions are now standalone methods)"
                     )
@@ -562,7 +560,9 @@ class AgnoPersonalAgent(Agent):
                     "Be direct and helpful in your responses.",
                     "Use tools when needed for calculations or information.",
                 ]
-                logger.info("Using minimal instructions for LM Studio to avoid context issues")
+                logger.info(
+                    "Using minimal instructions for LM Studio to avoid context issues"
+                )
             else:
                 instructions = self.instruction_manager.create_instructions()
                 logger.info(
@@ -635,9 +635,7 @@ class AgnoPersonalAgent(Agent):
             add_thought_callback("🚀 Executing agent...")
 
         # Use the proper pattern: call super().run() with stream parameter
-        run_result = super().run(
-            query, user_id=self.user_id, stream=stream, **kwargs
-        )
+        run_result = super().run(query, user_id=self.user_id, stream=stream, **kwargs)
 
         if stream:
             # Return the stream directly for proper RunResponse handling
@@ -648,7 +646,7 @@ class AgnoPersonalAgent(Agent):
             self._collected_tool_calls = []
 
             # Handle both iterator and single response cases
-            if hasattr(run_result, '__iter__'):
+            if hasattr(run_result, "__iter__"):
                 for chunk in run_result:  # Use regular for loop, not async for
                     # Store the last response for tool call extraction
                     self._last_response = chunk
@@ -784,6 +782,7 @@ class AgnoPersonalAgent(Agent):
             MemoryStorageResult: Structured result with detailed status information
         """
         from ..tools.memory_functions import store_user_memory
+
         return await store_user_memory(self, content, topics)
 
     async def query_memory(self, query: str, limit: Union[int, None] = None) -> str:
@@ -799,6 +798,7 @@ class AgnoPersonalAgent(Agent):
             str: Found memories or message if none found
         """
         from ..tools.memory_functions import query_memory
+
         return await query_memory(self, query, limit)
 
     async def list_all_memories(self) -> str:
@@ -810,6 +810,7 @@ class AgnoPersonalAgent(Agent):
             str: Simplified list of all memories
         """
         from ..tools.memory_functions import list_all_memories
+
         return await list_all_memories(self)
 
     async def get_all_memories(self) -> str:
@@ -821,6 +822,7 @@ class AgnoPersonalAgent(Agent):
             str: Formatted string of all memories
         """
         from ..tools.memory_functions import get_all_memories
+
         return await get_all_memories(self)
 
     async def update_memory(
@@ -839,6 +841,7 @@ class AgnoPersonalAgent(Agent):
             str: Success or error message
         """
         from ..tools.memory_functions import update_memory
+
         return await update_memory(self, memory_id, content, topics)
 
     async def delete_memory(self, memory_id: str) -> str:
@@ -853,6 +856,7 @@ class AgnoPersonalAgent(Agent):
             str: Success or error message
         """
         from ..tools.memory_functions import delete_memory
+
         return await delete_memory(self, memory_id)
 
     async def get_recent_memories(self, limit: int = 10) -> str:
@@ -867,6 +871,7 @@ class AgnoPersonalAgent(Agent):
             str: Formatted string of recent memories
         """
         from ..tools.memory_functions import get_recent_memories
+
         return await get_recent_memories(self, limit)
 
     async def get_memory_stats(self) -> str:
@@ -878,6 +883,7 @@ class AgnoPersonalAgent(Agent):
             str: Formatted string with memory statistics
         """
         from ..tools.memory_functions import get_memory_stats
+
         return await get_memory_stats(self)
 
     async def get_memories_by_topic(
@@ -895,6 +901,7 @@ class AgnoPersonalAgent(Agent):
             str: Formatted string of memories matching the topics
         """
         from ..tools.memory_functions import get_memories_by_topic
+
         return await get_memories_by_topic(self, topics, limit)
 
     async def delete_memories_by_topic(self, topics: Union[List[str], str]) -> str:
@@ -909,6 +916,7 @@ class AgnoPersonalAgent(Agent):
             str: Success or error message
         """
         from ..tools.memory_functions import delete_memories_by_topic
+
         return await delete_memories_by_topic(self, topics)
 
     async def get_memory_graph_labels(self) -> str:
@@ -920,6 +928,7 @@ class AgnoPersonalAgent(Agent):
             str: Formatted string with entity and relation labels
         """
         from ..tools.memory_functions import get_memory_graph_labels
+
         return await get_memory_graph_labels(self)
 
     async def clear_all_memories(self) -> str:
@@ -931,6 +940,7 @@ class AgnoPersonalAgent(Agent):
             str: Success or error message
         """
         from ..tools.memory_functions import clear_all_memories
+
         return await clear_all_memories(self)
 
     async def get_graph_entity_count(self) -> int:
@@ -942,6 +952,7 @@ class AgnoPersonalAgent(Agent):
             int: Number of entities/documents in the graph
         """
         from ..tools.memory_functions import get_graph_entity_count
+
         return await get_graph_entity_count(self)
 
     async def query_lightrag_knowledge_direct(
@@ -1305,9 +1316,9 @@ class AgnoPersonalAgent(Agent):
         lmstudio_base_url: str = None,
         user_id: str = None,
         recreate: bool = False,
-        instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+        instruction_level: InstructionLevel = InstructionLevel.CONCISE,
         seed: Optional[int] = None,
-        alltools: Optional[bool] = True,
+        alltools: Optional[bool] = False,
         **kwargs,
     ) -> "AgnoPersonalAgent":
         """Create and fully initialize an AgnoPersonalAgent.
@@ -1448,7 +1459,7 @@ async def create_agno_agent(
     lmstudio_base_url: str = None,
     user_id: str = None,
     recreate: bool = False,
-    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
+    instruction_level: InstructionLevel = InstructionLevel.CONCISE,
     alltools: Optional[bool] = True,  # Add alltools parameter
     seed: Optional[int] = None,
 ) -> AgnoPersonalAgent:
