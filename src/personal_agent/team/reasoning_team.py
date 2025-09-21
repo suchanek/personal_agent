@@ -111,8 +111,8 @@ from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
 from agno.tools.dalle import DalleTools
-from agno.tools.file import FileTools
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.file import FileTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
 from agno.tools.reasoning import ReasoningTools
@@ -173,7 +173,7 @@ except ImportError:
     from personal_agent.utils import setup_logging
 
 WRITER_MODEL = LLM_MODEL
-SYSTEM_MODEL = "qwen3:1.7b"
+SYSTEM_MODEL = LLM_MODEL
 CODING_MODEL = SYSTEM_MODEL
 
 # MEMORY_AGENT_MODEL = "gpt-4o"
@@ -418,7 +418,18 @@ def create_ollama_model(model_name: str = LLM_MODEL, use_remote: bool = False):
             openai_base_url=url,
             seed=None,
         )
+    elif PROVIDER == "lmstudio":
+        # For LM Studio provider, use LM Studio URLs explicitly
+        url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
+        model_manager = AgentModelManager(
+            model_provider=PROVIDER,
+            model_name=model_name,
+            ollama_base_url="",
+            openai_base_url=url,
+            seed=None,
+        )
     else:
+        # For Ollama and other providers
         url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
         model_manager = AgentModelManager(
             model_provider=PROVIDER,
@@ -433,31 +444,44 @@ def create_ollama_model(model_name: str = LLM_MODEL, use_remote: bool = False):
 def create_model(
     provider: str = "ollama", model_name: str = LLM_MODEL, use_remote: bool = False
 ):
-    """Create a model using AgentModelManager."""
+    """Create a model using AgentModelManager with simplified URL handling."""
+    # SIMPLIFIED: Let AgentModelManager handle the URL logic based on use_remote flag
     if provider == "ollama":
-        url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
         model_manager = AgentModelManager(
             model_provider=provider,
             model_name=model_name,
-            ollama_base_url=url,
+            ollama_base_url="",  # Will be determined by AgentModelManager based on use_remote
             seed=None,
         )
-    else:
-        # FIX: For OpenAI provider, use proper OpenAI URL logic
-        if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
-            url = OPENAI_URL
-        else:
-            url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-
+    elif provider == "openai":
         model_manager = AgentModelManager(
             model_provider=provider,
             model_name=model_name,
             ollama_base_url="",
-            openai_base_url=url,
+            openai_base_url="",  # Will be determined by AgentModelManager based on use_remote
+            seed=None,
+        )
+    elif provider == "lmstudio":
+        model_manager = AgentModelManager(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url="",
+            openai_base_url="",
+            lmstudio_base_url="",  # Will be determined by AgentModelManager based on use_remote
+            seed=None,
+        )
+    else:
+        # For other providers, default to OpenAI-compatible API
+        model_manager = AgentModelManager(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url="",
+            openai_base_url="",
             seed=None,
         )
 
-    model = model_manager.create_model()
+    # CRITICAL: Pass the use_remote flag to create_model()
+    model = model_manager.create_model(use_remote=use_remote)
     return model
 
 
@@ -894,31 +918,51 @@ async def create_memory_agent(
     use_remote: bool = False,
     recreate: bool = False,
     model_name: str = None,
+    single: bool = False,  # Simplified: just use single flag directly
 ) -> Agent:
-    """Create a memory agent that uses the shared memory system."""
+    """Create a memory agent that uses the shared memory system.
+
+    Args:
+        user_id: User identifier for memory operations
+        debug: Enable debug mode
+        use_remote: Whether to use remote server endpoints
+        recreate: Whether to recreate knowledge bases
+        model_name: Model name to use
+        single: Whether to enable all tools (single-agent mode)
+    """
     # Get user_id dynamically if not provided
     if user_id is None:
         user_id = get_userid()
 
+    # Simple logic: single flag directly controls alltools
+    logger.info(
+        f"🔧 Memory agent mode: {'single-agent (all tools)' if single else 'team mode (memory tools only)'}"
+    )
+
     # Determine the correct URL based on use_remote flag and provider
+    # Initialize variables to avoid undefined variable errors
+    ollama_url = ""
+    openai_url = ""
+
     if PROVIDER == "openai":
         # For OpenAI provider, use proper OpenAI URL logic
         if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
             openai_url = OPENAI_URL
-            ollama_url = ""  # Empty for OpenAI
         else:
             openai_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-            ollama_url = ""  # Empty for OpenAI
+    elif PROVIDER == "lmstudio":
+        # For LM Studio provider, use LM Studio URLs explicitly
+        openai_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
     else:
+        # For Ollama and other providers
         ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
-        openai_url = ""  # Empty for Ollama
 
     # Use provided model_name or fall back to config default
     effective_model = model_name if model_name else LLM_MODEL
     # effective_model = "qwen3:1.7b"
     # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     from ..core.agent_instruction_manager import InstructionLevel
-    
+
     memory_agent = AgnoPersonalAgent(
         model_provider=PROVIDER,  # Use the correct provider
         model_name=effective_model,  # Use the effective model
@@ -927,11 +971,11 @@ async def create_memory_agent(
         debug=debug,
         user_id=user_id,
         recreate=recreate,
-        alltools=False,
+        alltools=single,  # Use single flag directly to control alltools
         ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
         openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
-        tool_caller=False,
-        instruction_level=InstructionLevel.STANDARD,
+        lmstudio_base_url=openai_url,  # Pass LM Studio URL when using LM Studio provider
+        instruction_level=InstructionLevel.CONCISE,
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -996,12 +1040,15 @@ async def create_memory_writer_agent(
 
 
 # Create the team
-async def create_team(use_remote: bool = False, model_name: str = None):
+async def create_team(
+    use_remote: bool = False, model_name: str = None, single: bool = False
+):
     """Create the team with shared memory context and your existing managers.
 
     Args:
         use_remote: Whether to use remote Ollama server
         model_name: Specific model name to use (overrides LLM_MODEL from config)
+        single: Whether to run in single-agent mode with all tools enabled
     """
 
     # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
@@ -1040,6 +1087,7 @@ async def create_team(use_remote: bool = False, model_name: str = None):
         debug=True,
         use_remote=use_remote,
         model_name=MEMORY_AGENT_MODEL,  # Pass the model name
+        single=single,  # Pass the single flag directly
     )
 
     # Create all other agents with the correct remote/local configuration
@@ -1304,6 +1352,7 @@ async def main(
     query: Optional[str] = None,
     recreate: bool = False,
     instruction_level: str = "STANDARD",
+    single: bool = False,
 ):
     """Main function to run the team with an enhanced CLI interface."""
 
@@ -1323,7 +1372,7 @@ async def main(
 
     try:
         # Create the team
-        team = await create_team(use_remote=use_remote)
+        team = await create_team(use_remote=use_remote, single=single)
 
         # Get the memory agent for CLI commands
         memory_agent = None
@@ -1574,6 +1623,11 @@ def cli_main():
         "--remote", action="store_true", help="Use remote Ollama server"
     )
     parser.add_argument(
+        "--single",
+        action="store_true",
+        help="Run in single-agent mode with all tools enabled",
+    )
+    parser.add_argument(
         "--recreate", action="store_true", help="Recreate the knowledge base"
     )
     parser.add_argument(
@@ -1601,6 +1655,7 @@ def cli_main():
             query=args.query,
             recreate=args.recreate,
             instruction_level=args.instruction_level,
+            single=args.single,
         )
     )
 

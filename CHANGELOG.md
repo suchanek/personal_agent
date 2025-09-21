@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-21
+
+### Added
+- **Native LM Studio Provider**: Integrated a dedicated `lm-studio` model provider, allowing seamless use of models served from LM Studio for both local and remote setups. See [ADR-088](./refs/adr/088-native-lm-studio-provider-and-unified-agent-mode.md) for details.
+- **Explicit Standalone Agent Mode**: Introduced a `--single` command-line flag to explicitly run the agent in a standalone mode with its full suite of tools. This removes ambiguity and provides clear control over the agent's capabilities.
+- **Unified Knowledge Ingestion Tools**: The `KnowledgeTools` toolkit now features unified `ingest_file`, `ingest_text`, and `ingest_url` methods that ingest data into both the LightRAG (graph) and local (semantic) knowledge bases simultaneously, streamlining the data ingestion process.
+- **Comprehensive Tooling Tests**: Added new test scripts (`test_alltools_fix.py`, `test_remote_alltools_toggle.py`) to validate the new agent mode logic and prevent regressions.
+
+### Changed
+- **Simplified Agent Mode Configuration**: The agent's operational mode (standalone vs. team) is now exclusively controlled by the `--single` flag, decoupling it from the `--remote` flag. This simplifies configuration and makes agent behavior more predictable.
+- **Refactored Knowledge Ingestion**: Overhauled the `KnowledgeTools` and `batch_ingest_directory` to use the new unified ingestion methods, improving code clarity and maintainability.
+
+### Fixed
+- **Agent Tool Loading**: Corrected a critical bug where the `alltools` parameter in `AgnoPersonalAgent` was not correctly loading the full suite of tools. The agent now reliably loads the appropriate toolset based on the `--single` flag.
+
 ## [v0.2.6dev0] - 2025-09-18
 
 ### Fixed
