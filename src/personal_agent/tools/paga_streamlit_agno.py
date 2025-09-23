@@ -139,8 +139,8 @@ from personal_agent.config import (
     LIGHTRAG_URL,
     LLM_MODEL,
     OLLAMA_URL,
-    REMOTE_OLLAMA_URL,
     REMOTE_LMSTUDIO_URL,
+    REMOTE_OLLAMA_URL,
     USER_DATA_DIR,
     get_current_user_id,
     get_qwen_instruct_settings,
@@ -276,16 +276,8 @@ async def initialize_agent_async(
     # Read provider from environment variable, default to ollama if not set
     provider = os.getenv("PROVIDER", "ollama")
 
-    # Determine the correct base URLs based on provider
-    if provider == "lm-studio":
-        # For LM Studio, use the LM Studio URL passed from session state
-        # This now respects the --remote flag through the session state URL
-        agent_lmstudio_url = ollama_url  # Use the URL from session state (respects --remote)
-        agent_ollama_url = ollama_url    # For compatibility
-    else:
-        # For other providers, use the provided ollama_url
-        agent_ollama_url = ollama_url
-        agent_lmstudio_url = None
+    # Determine use_remote flag based on the URL passed in
+    use_remote = args.remote  # Use the --remote flag directly
 
     # Always create a new agent when URL or model changes to ensure proper configuration
     # This is more reliable than trying to update existing agent configuration
@@ -296,8 +288,6 @@ async def initialize_agent_async(
         return await AgnoPersonalAgent.create_with_init(
             model_provider=provider,
             model_name=model_name,
-            ollama_base_url=agent_ollama_url,
-            lmstudio_base_url=agent_lmstudio_url,
             user_id=USER_ID,
             debug=True,
             enable_memory=True,  # Enable memory
@@ -306,14 +296,13 @@ async def initialize_agent_async(
             storage_dir=AGNO_STORAGE_DIR,
             knowledge_dir=AGNO_KNOWLEDGE_DIR,
             recreate=recreate,
+            use_remote=use_remote,  # Pass use_remote flag
         )
     else:
         # Full configuration for other providers
         return await AgnoPersonalAgent.create_with_init(
             model_provider=provider,
             model_name=model_name,
-            ollama_base_url=agent_ollama_url,
-            lmstudio_base_url=agent_lmstudio_url,
             user_id=USER_ID,
             debug=True,
             enable_memory=True,
@@ -322,11 +311,14 @@ async def initialize_agent_async(
             knowledge_dir=AGNO_KNOWLEDGE_DIR,
             recreate=recreate,
             alltools=SINGLE_FLAG,  # Use SINGLE_FLAG to control all tools
+            use_remote=use_remote,  # Pass use_remote flag
         )
 
 
 def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False):
     """Sync wrapper for agent initialization."""
+    # Note: ollama_url parameter is kept for compatibility but not used
+    # The use_remote flag from args is used instead
     return asyncio.run(
         initialize_agent_async(model_name, ollama_url, existing_agent, recreate)
     )
@@ -1945,29 +1937,6 @@ def render_memory_tab():
                 f"Error checking sync status: {sync_status.get('error', 'Unknown error')}"
             )
 
-    # Memory Settings Section
-    st.markdown("---")
-    st.subheader("⚙️ Memory Settings")
-    st.markdown("*Configure and manage memory system settings*")
-    if st.button("🗑️ Reset All Memories", key="reset_memories_btn"):
-        st.session_state[SESSION_KEY_SHOW_MEMORY_CONFIRMATION] = True
-    if st.session_state.get(SESSION_KEY_SHOW_MEMORY_CONFIRMATION):
-        st.error("**WARNING**: This will permanently delete ALL stored memories.")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("❌ Cancel", key="cancel_reset"):
-                st.session_state[SESSION_KEY_SHOW_MEMORY_CONFIRMATION] = False
-                st.rerun()
-        with col2:
-            if st.button("🗑️ Yes, Delete All", type="primary", key="confirm_reset"):
-                success, message = memory_helper.clear_memories()
-                st.session_state[SESSION_KEY_SHOW_MEMORY_CONFIRMATION] = False
-                if success:
-                    st.success(f"✅ {message}")
-                    st.balloons()
-                else:
-                    st.error(f"❌ {message}")
-                st.rerun()
 
 
 def render_knowledge_status(knowledge_helper):
@@ -2639,7 +2608,7 @@ def render_sidebar():
 
         st.header("Model Selection")
         new_ollama_url = st.text_input(
-            "Provider URL:", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+            "**Provider URL:**", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
         )
         if st.button("🔄 Fetch Available Models"):
             with st.spinner("Fetching models..."):
@@ -2783,9 +2752,9 @@ def render_sidebar():
             st.header("Agent Information")
 
         st.write(f"**Current Model:** {st.session_state[SESSION_KEY_CURRENT_MODEL]}")
-        st.write(
-            f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
-        )
+        # st.write(
+        #    f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
+        # )
 
         # Show mode-specific information
         if current_mode == "team":

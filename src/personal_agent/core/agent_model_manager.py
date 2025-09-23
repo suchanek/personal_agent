@@ -27,7 +27,7 @@ class AgentModelManager:
         self,
         model_provider: str,
         model_name: str,
-        ollama_base_url: str,
+        ollama_base_url: str = "",
         openai_base_url: Optional[str] = None,
         lmstudio_base_url: Optional[str] = None,
         seed: Optional[int] = None,
@@ -37,7 +37,7 @@ class AgentModelManager:
         Args:
             model_provider: LLM provider ('ollama', 'openai', or 'lm-studio')
             model_name: Model name to use
-            ollama_base_url: Base URL for Ollama API
+            ollama_base_url: Base URL for Ollama API (empty string lets manager decide)
             openai_base_url: Optional base URL for OpenAI-compatible APIs.
             lmstudio_base_url: Optional base URL for LM Studio API.
             seed: Optional seed for model reproducibility
@@ -62,130 +62,34 @@ class AgentModelManager:
             ValueError: If unsupported model provider is specified
         """
         if self.model_provider == "openai":
-            # Check if LMSTUDIO_URL is configured and points to LMStudio
-            lmstudio_url = getattr(settings, "LMSTUDIO_URL", None)
-
-            # Use LMStudio if LMSTUDIO_URL is set and contains localhost:1234 or the user's IP
-            if lmstudio_url and (
-                "localhost:1234" in lmstudio_url or
-                "127.0.0.1:1234" in lmstudio_url or
-                "100.73.95.100:1234" in lmstudio_url
-            ):
-                # Use LMStudio with direct OpenAI client (exactly like the LM Studio example)
-                # Ensure the base URL has the correct /v1 endpoint for LMStudio
-                base_url = lmstudio_url
-                if not base_url.endswith("/v1"):
-                    base_url = base_url.rstrip("/") + "/v1"
-
-                logger.info(f"Using LM Studio with direct OpenAI client at: {base_url}")
-                logger.info(f"Model: {self.model_name}")
-                logger.info("Following LM Studio documentation example exactly")
-
-                # Create direct OpenAI client exactly like the LM Studio example
-                from openai import OpenAI
-
-                # This is exactly what the LM Studio documentation shows
-                client = OpenAI(base_url=base_url, api_key="lm-studio")
-
-                # Create a simple wrapper that Agno can use
-                class LMStudioDirectWrapper:
-                    """Simple wrapper for direct OpenAI client (like LM Studio example)"""
-
-                    def __init__(self, client, model_name, base_url):
-                        self.client = client
-                        self.model_name = model_name
-                        self.id = model_name
-                        self.base_url = base_url
-
-                    def __call__(self, messages, **kwargs):
-                        """Make this callable like Agno models expect"""
-                        # Convert Agno messages to OpenAI format
-                        openai_messages = []
-                        for msg in messages:
-                            if hasattr(msg, 'role') and hasattr(msg, 'content'):
-                                role = msg.role
-                                content = msg.content
-
-                                # Handle tool messages
-                                if role == "tool":
-                                    tool_call_id = getattr(msg, 'tool_call_id', None)
-                                    if tool_call_id:
-                                        openai_messages.append({
-                                            "role": "tool",
-                                            "content": content,
-                                            "tool_call_id": tool_call_id
-                                        })
-                                    else:
-                                        openai_messages.append({
-                                            "role": "system",
-                                            "content": f"Tool result: {content}"
-                                        })
-                                else:
-                                    # Fix role mapping
-                                    if role == "model":
-                                        role = "assistant"
-                                    openai_messages.append({
-                                        "role": role,
-                                        "content": content
-                                    })
-                            elif isinstance(msg, dict):
-                                role = msg.get('role', 'user')
-                                content = msg.get('content', '')
-                                if role == "model":
-                                    role = "assistant"
-                                openai_messages.append({
-                                    "role": role,
-                                    "content": content
-                                })
-
-                        # Prepare API call
-                        api_kwargs = {
-                            "model": self.model_name,
-                            "messages": openai_messages,
-                        }
-
-                        # Handle tools and streaming
-                        if "tools" in kwargs and kwargs["tools"]:
-                            api_kwargs["tools"] = kwargs["tools"]
-                        if kwargs.get("stream", False):
-                            api_kwargs["stream"] = True
-
-                        # Make the API call using the direct client
-                        return self.client.chat.completions.create(**api_kwargs)
-
-                model = LMStudioDirectWrapper(client, self.model_name, base_url)
-                logger.info(f"✅ Created LM Studio direct OpenAI wrapper for model: {self.model_name}")
-
-                return model
+            # Standard OpenAI API - uses OPENAI_API_KEY from environment
+            logger.info(f"Using standard OpenAI API with model: {self.model_name}")
+            if self.openai_base_url:
+                logger.info(f"Using custom OpenAI base URL: {self.openai_base_url}")
             else:
-                # Standard OpenAI API - uses OPENAI_API_KEY from environment
-                logger.info(f"Using standard OpenAI API with model: {self.model_name}")
-                if self.openai_base_url:
-                    logger.info(f"Using custom OpenAI base URL: {self.openai_base_url}")
-                else:
-                    logger.info("Using default OpenAI API endpoint.")
+                logger.info("Using default OpenAI API endpoint.")
+            logger.info(
+                "API Key will be read from OPENAI_API_KEY environment variable"
+            )
+
+            model = OpenAIChat(id=self.model_name, base_url=self.openai_base_url)
+
+            # WORKAROUND: Fix incorrect role mapping in Agno framework
+            # The default_role_map incorrectly maps "system" -> "developer"
+            # but OpenAI API only accepts: user, assistant, system, tool
+            if hasattr(model, "role_map"):
+                model.role_map = {
+                    "system": "system",  # Fix: should be "system", not "developer"
+                    "user": "user",
+                    "assistant": "assistant",
+                    "tool": "tool",
+                    "model": "assistant",
+                }
                 logger.info(
-                    "API Key will be read from OPENAI_API_KEY environment variable"
+                    f"🔧 Applied role mapping fix to OpenAI model: {self.model_name}"
                 )
 
-                model = OpenAIChat(id=self.model_name, base_url=self.openai_base_url)
-
-                # WORKAROUND: Fix incorrect role mapping in Agno framework
-                # The default_role_map incorrectly maps "system" -> "developer"
-                # but OpenAI API only accepts: user, assistant, system, tool
-                if hasattr(model, "role_map"):
-                    model.role_map = {
-                        "system": "system",  # Fix: should be "system", not "developer"
-                        "user": "user",
-                        "assistant": "assistant",
-                        "tool": "tool",
-                        "model": "assistant",
-                    }
-                    logger.info(
-                        f"🔧 Applied role mapping fix to OpenAI model: {self.model_name}"
-                    )
-
-                return model
+            return model
         elif self.model_provider == "lm-studio":
             # SIMPLIFIED: Use remote/local URLs based on use_remote flag
             if use_remote:
@@ -337,3 +241,25 @@ class AgentModelManager:
             return model
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
+
+    @classmethod
+    def create_model_for_provider(
+        cls, provider: str, model_name: str, use_remote: bool = False
+    ) -> Union[OpenAIChat, Ollama, LMStudio]:
+        """Class method to create a model for a specific provider.
+        
+        Args:
+            provider: Model provider ('ollama', 'openai', 'lm-studio')
+            model_name: Model name to use
+            use_remote: Whether to use remote endpoints
+            
+        Returns:
+            Configured model instance
+        """
+        manager = cls(
+            model_provider=provider,
+            model_name=model_name,
+            ollama_base_url="",  # Let manager decide based on use_remote
+            seed=None,
+        )
+        return manager.create_model(use_remote=use_remote)
