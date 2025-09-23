@@ -401,105 +401,6 @@ _file_instructions = dedent(
 )
 
 
-def create_ollama_model(model_name: str = LLM_MODEL, use_remote: bool = False):
-    """Create a model using your AgentModelManager (supports both Ollama and OpenAI)."""
-    # Use proper URL selection based on provider
-    if PROVIDER == "openai":
-        # For OpenAI provider, use proper OpenAI URL logic
-        if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
-            url = OPENAI_URL
-        else:
-            url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-
-        model_manager = AgentModelManager(
-            model_provider=PROVIDER,
-            model_name=model_name,
-            ollama_base_url="",
-            openai_base_url=url,
-            seed=None,
-        )
-    elif PROVIDER == "lmstudio":
-        # For LM Studio provider, use LM Studio URLs explicitly
-        url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-        model_manager = AgentModelManager(
-            model_provider=PROVIDER,
-            model_name=model_name,
-            ollama_base_url="",
-            openai_base_url=url,
-            seed=None,
-        )
-    else:
-        # For Ollama and other providers
-        url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
-        model_manager = AgentModelManager(
-            model_provider=PROVIDER,
-            model_name=model_name,
-            ollama_base_url=url,
-            openai_base_url="",
-            seed=None,
-        )
-    return model_manager.create_model()
-
-
-def create_model(
-    provider: str = "ollama", model_name: str = LLM_MODEL, use_remote: bool = False
-):
-    """Create a model using AgentModelManager with simplified URL handling."""
-    # SIMPLIFIED: Let AgentModelManager handle the URL logic based on use_remote flag
-    if provider == "ollama":
-        model_manager = AgentModelManager(
-            model_provider=provider,
-            model_name=model_name,
-            ollama_base_url="",  # Will be determined by AgentModelManager based on use_remote
-            seed=None,
-        )
-    elif provider == "openai":
-        model_manager = AgentModelManager(
-            model_provider=provider,
-            model_name=model_name,
-            ollama_base_url="",
-            openai_base_url="",  # Will be determined by AgentModelManager based on use_remote
-            seed=None,
-        )
-    elif provider == "lmstudio":
-        model_manager = AgentModelManager(
-            model_provider=provider,
-            model_name=model_name,
-            ollama_base_url="",
-            openai_base_url="",
-            lmstudio_base_url="",  # Will be determined by AgentModelManager based on use_remote
-            seed=None,
-        )
-    else:
-        # For other providers, default to OpenAI-compatible API
-        model_manager = AgentModelManager(
-            model_provider=provider,
-            model_name=model_name,
-            ollama_base_url="",
-            openai_base_url="",
-            seed=None,
-        )
-
-    # CRITICAL: Pass the use_remote flag to create_model()
-    model = model_manager.create_model(use_remote=use_remote)
-    return model
-
-
-def create_openai_model(
-    model_name: str = LLM_MODEL, use_remote: bool = False
-) -> OpenAIChat:
-    """Create an OpenAI model using AgentModelManager."""
-    openai_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-    model_manager = AgentModelManager(
-        model_provider="openai",
-        model_name=model_name,
-        ollama_base_url="",
-        openai_base_url=openai_url,
-        seed=None,
-    )
-    model = model_manager.create_model()
-
-    return model
 
 
 class WritingTools(Toolkit):
@@ -619,7 +520,6 @@ Conclusion about {topic}."""
 def create_writer_agent(
     model_provider: str = PROVIDER,
     model_name: str = LLM_MODEL,
-    ollama_base_url: str = OLLAMA_URL,
     debug: bool = False,
     use_remote: bool = False,
 ) -> Agent:
@@ -627,7 +527,6 @@ def create_writer_agent(
 
     :param model_provider: LLM provider ('ollama' or 'openai')
     :param model_name: Model name to use
-    :param ollama_base_url: Base URL for Ollama API
     :param debug: Enable debug mode
     :param use_remote: Use remote Ollama
     :return: Configured writing agent
@@ -642,7 +541,7 @@ def create_writer_agent(
     agent = Agent(
         name="Writer Agent",
         role="Create written content in the requested tone and style",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=model_provider, model_name=effective_model, use_remote=use_remote
         ),
         debug_mode=debug,
@@ -685,7 +584,7 @@ def create_image_agent(
     agent = Agent(
         name="Image Agent",
         role="Create images using DALL-E based on text descriptions with comprehensive error handling",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=model_provider, model_name=effective_model, use_remote=use_remote
         ),
         debug_mode=debug,  # Always enable debug mode for better error tracking
@@ -721,7 +620,7 @@ def create_agents(
     web_agent = Agent(
         name="Web Agent",
         role="Search the web for information",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=effective_model, use_remote=use_remote
         ),
         tools=[DuckDuckGoTools()],
@@ -736,7 +635,7 @@ def create_agents(
     system_agent = Agent(
         name="SystemAgent",
         role="Execute system commands and shell operations",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=SYSTEM_MODEL, use_remote=use_remote
         ),
         tools=[PersonalAgentSystemTools(shell_command=True)],
@@ -752,7 +651,7 @@ def create_agents(
     finance_agent = Agent(
         name="Finance Agent",
         role="Get financial data",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=effective_model, use_remote=use_remote
         ),
         tools=[
@@ -772,7 +671,7 @@ def create_agents(
     medical_agent = Agent(
         name="Medical Agent",
         role="Search pubmed for medical information",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=effective_model, use_remote=use_remote
         ),
         description="You are an AI agent that search PubMed for medical information.",
@@ -795,7 +694,7 @@ def create_agents(
     # Calculator agent using Ollama
     calculator_agent = Agent(
         name="Calculator Agent",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=SYSTEM_MODEL, use_remote=use_remote
         ),
         role="Calculate mathematical expressions",
@@ -817,7 +716,7 @@ def create_agents(
 
     python_agent = Agent(
         name="Python Agent",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER,
             model_name=effective_model,
             use_remote=use_remote,
@@ -840,7 +739,7 @@ def create_agents(
 
     file_agent = Agent(
         name="File System Agent",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=effective_model, use_remote=use_remote
         ),
         role="Read and write files in the system",
@@ -972,9 +871,6 @@ async def create_memory_agent(
         user_id=user_id,
         recreate=recreate,
         alltools=single,  # Use single flag directly to control alltools
-        ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
-        openai_base_url=openai_url,  # Pass OpenAI URL when using OpenAI provider
-        lmstudio_base_url=openai_url,  # Pass LM Studio URL when using LM Studio provider
         instruction_level=InstructionLevel.CONCISE,
     )
 
@@ -1025,7 +921,7 @@ async def create_memory_writer_agent(
         recreate=recreate,
         alltools=False,
         initialize_agent=True,
-        ollama_base_url=ollama_url,  # Pass the correct URL based on use_remote flag
+        use_remote=use_remote,  # Pass use_remote flag instead of ollama_base_url
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -1108,7 +1004,7 @@ async def create_team(
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
-        model=create_model(
+        model=AgentModelManager.create_model_for_provider(
             provider=PROVIDER, model_name=effective_model, use_remote=use_remote
         ),
         memory=None,  # No team-level memory - only memory agent handles memory

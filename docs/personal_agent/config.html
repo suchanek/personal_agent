@@ -681,7 +681,7 @@
                 <section id="LMSTUDIO_URL">
                     <div class="attr variable">
             <span class="name">LMSTUDIO_URL</span>        =
-<span class="default_value">&#39;&#39;</span>
+<span class="default_value">$LMSTUDIO_URL</span>
 
         
     </div>
@@ -705,7 +705,7 @@
                 <section id="REMOTE_LMSTUDIO_URL">
                     <div class="attr variable">
             <span class="name">REMOTE_LMSTUDIO_URL</span>        =
-<span class="default_value">$REMOTE_OLLAMA_URL</span>
+<span class="default_value">$REMOTE_LMSTUDIO_URL</span>
 
         
     </div>
@@ -921,7 +921,7 @@
                 <section id="PROVIDER">
                     <div class="attr variable">
             <span class="name">PROVIDER</span>        =
-<span class="default_value">&#39;ollama&#39;</span>
+<span class="default_value">$PROVIDER</span>
 
         
     </div>
@@ -1142,27 +1142,27 @@ back to system environment variables if not found or if dotenv loading failed.</
 
     </div>
     <a class="headerlink" href="#get_package_version"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_package_version-227"><a href="#get_package_version-227"><span class="linenos">227</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_package_version</span><span class="p">():</span>
-</span><span id="get_package_version-228"><a href="#get_package_version-228"><span class="linenos">228</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve package version with import path handling.</span>
-</span><span id="get_package_version-229"><a href="#get_package_version-229"><span class="linenos">229</span></a>
-</span><span id="get_package_version-230"><a href="#get_package_version-230"><span class="linenos">230</span></a><span class="sd">    Attempts to import the version from the package&#39;s __init__.py file,</span>
-</span><span id="get_package_version-231"><a href="#get_package_version-231"><span class="linenos">231</span></a><span class="sd">    handling both standalone script execution and module import scenarios.</span>
-</span><span id="get_package_version-232"><a href="#get_package_version-232"><span class="linenos">232</span></a><span class="sd">    Uses different import strategies based on execution context.</span>
-</span><span id="get_package_version-233"><a href="#get_package_version-233"><span class="linenos">233</span></a>
-</span><span id="get_package_version-234"><a href="#get_package_version-234"><span class="linenos">234</span></a><span class="sd">    Returns:</span>
-</span><span id="get_package_version-235"><a href="#get_package_version-235"><span class="linenos">235</span></a><span class="sd">        str: Package version string or &#39;unknown&#39; if import fails</span>
-</span><span id="get_package_version-236"><a href="#get_package_version-236"><span class="linenos">236</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_package_version-237"><a href="#get_package_version-237"><span class="linenos">237</span></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="get_package_version-238"><a href="#get_package_version-238"><span class="linenos">238</span></a>        <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-</span><span id="get_package_version-239"><a href="#get_package_version-239"><span class="linenos">239</span></a>            <span class="c1"># When run as standalone, try absolute import</span>
-</span><span id="get_package_version-240"><a href="#get_package_version-240"><span class="linenos">240</span></a>            <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">BASE_DIR</span><span class="p">))</span>
-</span><span id="get_package_version-241"><a href="#get_package_version-241"><span class="linenos">241</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">personal_agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
-</span><span id="get_package_version-242"><a href="#get_package_version-242"><span class="linenos">242</span></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="get_package_version-243"><a href="#get_package_version-243"><span class="linenos">243</span></a>            <span class="c1"># When imported as module, use relative import</span>
-</span><span id="get_package_version-244"><a href="#get_package_version-244"><span class="linenos">244</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">...</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
-</span><span id="get_package_version-245"><a href="#get_package_version-245"><span class="linenos">245</span></a>        <span class="k">return</span> <span class="n">__version__</span>
-</span><span id="get_package_version-246"><a href="#get_package_version-246"><span class="linenos">246</span></a>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-</span><span id="get_package_version-247"><a href="#get_package_version-247"><span class="linenos">247</span></a>        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_package_version-229"><a href="#get_package_version-229"><span class="linenos">229</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_package_version</span><span class="p">():</span>
+</span><span id="get_package_version-230"><a href="#get_package_version-230"><span class="linenos">230</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Retrieve package version with import path handling.</span>
+</span><span id="get_package_version-231"><a href="#get_package_version-231"><span class="linenos">231</span></a>
+</span><span id="get_package_version-232"><a href="#get_package_version-232"><span class="linenos">232</span></a><span class="sd">    Attempts to import the version from the package&#39;s __init__.py file,</span>
+</span><span id="get_package_version-233"><a href="#get_package_version-233"><span class="linenos">233</span></a><span class="sd">    handling both standalone script execution and module import scenarios.</span>
+</span><span id="get_package_version-234"><a href="#get_package_version-234"><span class="linenos">234</span></a><span class="sd">    Uses different import strategies based on execution context.</span>
+</span><span id="get_package_version-235"><a href="#get_package_version-235"><span class="linenos">235</span></a>
+</span><span id="get_package_version-236"><a href="#get_package_version-236"><span class="linenos">236</span></a><span class="sd">    Returns:</span>
+</span><span id="get_package_version-237"><a href="#get_package_version-237"><span class="linenos">237</span></a><span class="sd">        str: Package version string or &#39;unknown&#39; if import fails</span>
+</span><span id="get_package_version-238"><a href="#get_package_version-238"><span class="linenos">238</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_package_version-239"><a href="#get_package_version-239"><span class="linenos">239</span></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="get_package_version-240"><a href="#get_package_version-240"><span class="linenos">240</span></a>        <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+</span><span id="get_package_version-241"><a href="#get_package_version-241"><span class="linenos">241</span></a>            <span class="c1"># When run as standalone, try absolute import</span>
+</span><span id="get_package_version-242"><a href="#get_package_version-242"><span class="linenos">242</span></a>            <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">BASE_DIR</span><span class="p">))</span>
+</span><span id="get_package_version-243"><a href="#get_package_version-243"><span class="linenos">243</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">personal_agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+</span><span id="get_package_version-244"><a href="#get_package_version-244"><span class="linenos">244</span></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="get_package_version-245"><a href="#get_package_version-245"><span class="linenos">245</span></a>            <span class="c1"># When imported as module, use relative import</span>
+</span><span id="get_package_version-246"><a href="#get_package_version-246"><span class="linenos">246</span></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">...</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+</span><span id="get_package_version-247"><a href="#get_package_version-247"><span class="linenos">247</span></a>        <span class="k">return</span> <span class="n">__version__</span>
+</span><span id="get_package_version-248"><a href="#get_package_version-248"><span class="linenos">248</span></a>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+</span><span id="get_package_version-249"><a href="#get_package_version-249"><span class="linenos">249</span></a>        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
 </span></pre></div>
 
 
@@ -1189,18 +1189,18 @@ Uses different import strategies based on execution context.</p>
 
     </div>
     <a class="headerlink" href="#get_qwen_instruct_settings"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_qwen_instruct_settings-175"><a href="#get_qwen_instruct_settings-175"><span class="linenos">175</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_qwen_instruct_settings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-</span><span id="get_qwen_instruct_settings-176"><a href="#get_qwen_instruct_settings-176"><span class="linenos">176</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Qwen instruct model settings as a dictionary.</span>
-</span><span id="get_qwen_instruct_settings-177"><a href="#get_qwen_instruct_settings-177"><span class="linenos">177</span></a>
-</span><span id="get_qwen_instruct_settings-178"><a href="#get_qwen_instruct_settings-178"><span class="linenos">178</span></a><span class="sd">    Returns:</span>
-</span><span id="get_qwen_instruct_settings-179"><a href="#get_qwen_instruct_settings-179"><span class="linenos">179</span></a><span class="sd">        dict: Dictionary containing instruct model parameters</span>
-</span><span id="get_qwen_instruct_settings-180"><a href="#get_qwen_instruct_settings-180"><span class="linenos">180</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_qwen_instruct_settings-181"><a href="#get_qwen_instruct_settings-181"><span class="linenos">181</span></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="get_qwen_instruct_settings-182"><a href="#get_qwen_instruct_settings-182"><span class="linenos">182</span></a>        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TEMPERATURE</span><span class="p">),</span>
-</span><span id="get_qwen_instruct_settings-183"><a href="#get_qwen_instruct_settings-183"><span class="linenos">183</span></a>        <span class="s2">&quot;min_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_MIN_P</span><span class="p">),</span>
-</span><span id="get_qwen_instruct_settings-184"><a href="#get_qwen_instruct_settings-184"><span class="linenos">184</span></a>        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TOP_P</span><span class="p">),</span>
-</span><span id="get_qwen_instruct_settings-185"><a href="#get_qwen_instruct_settings-185"><span class="linenos">185</span></a>        <span class="s2">&quot;top_k&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TOP_K</span><span class="p">),</span>
-</span><span id="get_qwen_instruct_settings-186"><a href="#get_qwen_instruct_settings-186"><span class="linenos">186</span></a>    <span class="p">}</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_qwen_instruct_settings-177"><a href="#get_qwen_instruct_settings-177"><span class="linenos">177</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_qwen_instruct_settings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="get_qwen_instruct_settings-178"><a href="#get_qwen_instruct_settings-178"><span class="linenos">178</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Qwen instruct model settings as a dictionary.</span>
+</span><span id="get_qwen_instruct_settings-179"><a href="#get_qwen_instruct_settings-179"><span class="linenos">179</span></a>
+</span><span id="get_qwen_instruct_settings-180"><a href="#get_qwen_instruct_settings-180"><span class="linenos">180</span></a><span class="sd">    Returns:</span>
+</span><span id="get_qwen_instruct_settings-181"><a href="#get_qwen_instruct_settings-181"><span class="linenos">181</span></a><span class="sd">        dict: Dictionary containing instruct model parameters</span>
+</span><span id="get_qwen_instruct_settings-182"><a href="#get_qwen_instruct_settings-182"><span class="linenos">182</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_qwen_instruct_settings-183"><a href="#get_qwen_instruct_settings-183"><span class="linenos">183</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="get_qwen_instruct_settings-184"><a href="#get_qwen_instruct_settings-184"><span class="linenos">184</span></a>        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TEMPERATURE</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-185"><a href="#get_qwen_instruct_settings-185"><span class="linenos">185</span></a>        <span class="s2">&quot;min_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_MIN_P</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-186"><a href="#get_qwen_instruct_settings-186"><span class="linenos">186</span></a>        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TOP_P</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-187"><a href="#get_qwen_instruct_settings-187"><span class="linenos">187</span></a>        <span class="s2">&quot;top_k&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">QWEN_INSTRUCT_TOP_K</span><span class="p">),</span>
+</span><span id="get_qwen_instruct_settings-188"><a href="#get_qwen_instruct_settings-188"><span class="linenos">188</span></a>    <span class="p">}</span>
 </span></pre></div>
 
 
@@ -1223,17 +1223,17 @@ Uses different import strategies based on execution context.</p>
 
     </div>
     <a class="headerlink" href="#get_qwen_thinking_settings"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="get_qwen_thinking_settings-189"><a href="#get_qwen_thinking_settings-189"><span class="linenos">189</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_qwen_thinking_settings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-</span><span id="get_qwen_thinking_settings-190"><a href="#get_qwen_thinking_settings-190"><span class="linenos">190</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Qwen thinking model settings as a dictionary.</span>
-</span><span id="get_qwen_thinking_settings-191"><a href="#get_qwen_thinking_settings-191"><span class="linenos">191</span></a>
-</span><span id="get_qwen_thinking_settings-192"><a href="#get_qwen_thinking_settings-192"><span class="linenos">192</span></a><span class="sd">    Returns:</span>
-</span><span id="get_qwen_thinking_settings-193"><a href="#get_qwen_thinking_settings-193"><span class="linenos">193</span></a><span class="sd">        dict: Dictionary containing thinking model parameters</span>
-</span><span id="get_qwen_thinking_settings-194"><a href="#get_qwen_thinking_settings-194"><span class="linenos">194</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="get_qwen_thinking_settings-195"><a href="#get_qwen_thinking_settings-195"><span class="linenos">195</span></a>    <span class="k">return</span> <span class="p">{</span>
-</span><span id="get_qwen_thinking_settings-196"><a href="#get_qwen_thinking_settings-196"><span class="linenos">196</span></a>        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_TEMPERATURE</span><span class="p">),</span>
-</span><span id="get_qwen_thinking_settings-197"><a href="#get_qwen_thinking_settings-197"><span class="linenos">197</span></a>        <span class="s2">&quot;min_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_MIN_P</span><span class="p">),</span>
-</span><span id="get_qwen_thinking_settings-198"><a href="#get_qwen_thinking_settings-198"><span class="linenos">198</span></a>        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_TOP_P</span><span class="p">),</span>
-</span><span id="get_qwen_thinking_settings-199"><a href="#get_qwen_thinking_settings-199"><span class="linenos">199</span></a>    <span class="p">}</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="get_qwen_thinking_settings-191"><a href="#get_qwen_thinking_settings-191"><span class="linenos">191</span></a><span class="k">def</span><span class="w"> </span><span class="nf">get_qwen_thinking_settings</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="get_qwen_thinking_settings-192"><a href="#get_qwen_thinking_settings-192"><span class="linenos">192</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get Qwen thinking model settings as a dictionary.</span>
+</span><span id="get_qwen_thinking_settings-193"><a href="#get_qwen_thinking_settings-193"><span class="linenos">193</span></a>
+</span><span id="get_qwen_thinking_settings-194"><a href="#get_qwen_thinking_settings-194"><span class="linenos">194</span></a><span class="sd">    Returns:</span>
+</span><span id="get_qwen_thinking_settings-195"><a href="#get_qwen_thinking_settings-195"><span class="linenos">195</span></a><span class="sd">        dict: Dictionary containing thinking model parameters</span>
+</span><span id="get_qwen_thinking_settings-196"><a href="#get_qwen_thinking_settings-196"><span class="linenos">196</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="get_qwen_thinking_settings-197"><a href="#get_qwen_thinking_settings-197"><span class="linenos">197</span></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="get_qwen_thinking_settings-198"><a href="#get_qwen_thinking_settings-198"><span class="linenos">198</span></a>        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_TEMPERATURE</span><span class="p">),</span>
+</span><span id="get_qwen_thinking_settings-199"><a href="#get_qwen_thinking_settings-199"><span class="linenos">199</span></a>        <span class="s2">&quot;min_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_MIN_P</span><span class="p">),</span>
+</span><span id="get_qwen_thinking_settings-200"><a href="#get_qwen_thinking_settings-200"><span class="linenos">200</span></a>        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">QWEN_THINKING_TOP_P</span><span class="p">),</span>
+</span><span id="get_qwen_thinking_settings-201"><a href="#get_qwen_thinking_settings-201"><span class="linenos">201</span></a>    <span class="p">}</span>
 </span></pre></div>
 
 

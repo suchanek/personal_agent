@@ -134,17 +134,6 @@ class AgnoPersonalAgentConfig:
     seed: Optional[int] = None
 
 
-def create_ollama_model(model_name: str = LLM_MODEL) -> Any:
-    """Create an Ollama model using AgentModelManager."""
-    model_manager = AgentModelManager(
-        model_provider="ollama",
-        model_name=model_name,
-        ollama_base_url=OLLAMA_URL,
-        seed=None,
-    )
-    return model_manager.create_model()
-
-
 class AgnoPersonalAgent(Agent):
     """
     Refactored Agno-based Personal AI Agent that inherits directly from Agent.
@@ -157,14 +146,12 @@ class AgnoPersonalAgent(Agent):
         self,
         model_provider: str = "ollama",
         model_name: str = LLM_MODEL,
+        model: Optional[Any] = None,  # Accept pre-created model
         enable_memory: bool = True,
         enable_mcp: bool = True,  # Simplified: disable MCP by default
         storage_dir: str = AGNO_STORAGE_DIR,
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
-        ollama_base_url: str = OLLAMA_URL,
-        openai_base_url: str = None,  # Add OpenAI base URL parameter
-        lmstudio_base_url: str = None,  # Add LM Studio base URL parameter
         user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.CONCISE,
@@ -172,6 +159,7 @@ class AgnoPersonalAgent(Agent):
         alltools: Optional[bool] = True,
         initialize_agent: Optional[bool] = False,
         stream: Optional[bool] = False,
+        use_remote: bool = False,  # Add use_remote parameter
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
@@ -179,18 +167,19 @@ class AgnoPersonalAgent(Agent):
         Args:
             model_provider: LLM provider ('ollama' or 'openai')
             model_name: Model name to use
+            model: Optional pre-created model instance (if provided, model_provider and model_name are ignored)
             enable_memory: Whether to enable memory and knowledge features
             enable_mcp: Whether to enable MCP tool integration (simplified)
             storage_dir: Directory for Agno storage files
             knowledge_dir: Directory containing knowledge files to load
             debug: Enable debug logging and tool call visibility
-            ollama_base_url: Base URL for Ollama API
             user_id: User identifier for memory operations
             recreate: Whether to recreate knowledge bases
             instruction_level: The sophistication level for agent instructions (kept for compatibility)
             seed: Optional seed for model reproducibility
             alltools: Whether to enable all built-in tools (Google Search, Calculator, YFinance, Python, Shell, etc.)
             initialize_agent: Whether to force immediate initialization instead of lazy initialization
+            use_remote: Whether to use remote endpoints for model creation
             **kwargs: Additional keyword arguments for backward compatibility with base Agent class
         """
         # Store configuration
@@ -201,7 +190,6 @@ class AgnoPersonalAgent(Agent):
             storage_dir=storage_dir,
             knowledge_dir=knowledge_dir,
             debug=debug,
-            ollama_base_url=ollama_base_url,
             user_id=user_id,
             recreate=recreate,
             seed=seed,
@@ -216,13 +204,11 @@ class AgnoPersonalAgent(Agent):
         )  # Keep for compatibility but simplified
 
         self.debug = debug
-        self.ollama_base_url = ollama_base_url
-        self.openai_base_url = openai_base_url  # Store OpenAI base URL
-        self.lmstudio_base_url = lmstudio_base_url  # Store LM Studio base URL
         self.recreate = recreate
         self.instruction_level = instruction_level
         self.seed = seed
         self.alltools = alltools
+        self.use_remote = use_remote  # Store use_remote flag
 
         # Set user_id with fallback
         if user_id is None:
@@ -270,17 +256,19 @@ class AgnoPersonalAgent(Agent):
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
 
         # Create the model immediately to avoid agno defaulting to OpenAI
-        # FIX: Pass openai_base_url and lmstudio_base_url parameters for proper endpoint configuration
+        # Use centralized model creation with use_remote flag
         temp_model_manager = AgentModelManager(
             model_provider=model_provider,
             model_name=model_name,
-            ollama_base_url=ollama_base_url,
-            openai_base_url=openai_base_url,  # Pass the OpenAI base URL parameter
-            lmstudio_base_url=lmstudio_base_url,  # Pass the LM Studio base URL parameter
             seed=seed,
         )
 
-        initial_model = None
+        # Create the initial model to pass to super().__init__()
+        # Use the provided model if available, otherwise create one
+        if model is not None:
+            initial_model = model
+        else:
+            initial_model = temp_model_manager.create_model(use_remote=use_remote)
 
         # Initialize base Agent with proper model to prevent OpenAI default
         super().__init__(
@@ -453,9 +441,9 @@ class AgnoPersonalAgent(Agent):
             self.model_manager = AgentModelManager(
                 model_provider=self.model_provider,
                 model_name=self.model_name,
-                ollama_base_url=self.ollama_base_url,
-                openai_base_url=self.openai_base_url,  # Pass the OpenAI base URL parameter
-                lmstudio_base_url=self.lmstudio_base_url,  # Pass the LM Studio base URL parameter
+                ollama_base_url="",  # Let AgentModelManager handle URL selection
+                openai_base_url="",  # Let AgentModelManager handle URL selection
+                lmstudio_base_url="",  # Let AgentModelManager handle URL selection
                 seed=self.seed,
             )
 
@@ -494,7 +482,7 @@ class AgnoPersonalAgent(Agent):
                 self.memory_tools = None
 
             # 7. Create the model
-            model = self.model_manager.create_model()
+            model = self.model_manager.create_model(use_remote=self.use_remote)
             logger.debug("Created model: %s", self.model_name)
             # we are using a subset for now
             tools = [
@@ -1124,7 +1112,7 @@ class AgnoPersonalAgent(Agent):
             "initialized": self._initialized,
             "storage_dir": self.storage_dir,
             "knowledge_dir": self.knowledge_dir,
-            "ollama_base_url": self.ollama_base_url,
+            "ollama_base_url": OLLAMA_URL,
             "lightrag_url": LIGHTRAG_URL,
             "lightrag_memory_url": LIGHTRAG_MEMORY_URL,
             "tool_counts": {
@@ -1311,14 +1299,12 @@ class AgnoPersonalAgent(Agent):
         storage_dir: str = AGNO_STORAGE_DIR,
         knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
         debug: bool = False,
-        ollama_base_url: str = OLLAMA_URL,
-        openai_base_url: str = None,
-        lmstudio_base_url: str = None,
         user_id: str = None,
         recreate: bool = False,
         instruction_level: InstructionLevel = InstructionLevel.CONCISE,
         seed: Optional[int] = None,
         alltools: Optional[bool] = False,
+        use_remote: bool = False,  # Use use_remote instead of URL parameters
         **kwargs,
     ) -> "AgnoPersonalAgent":
         """Create and fully initialize an AgnoPersonalAgent.
@@ -1328,7 +1314,20 @@ class AgnoPersonalAgent(Agent):
         to use immediately.
 
         Args:
-            Same as __init__ method
+            model_provider: LLM provider ('ollama' or 'openai')
+            model_name: Model name to use
+            enable_memory: Whether to enable memory and knowledge features
+            enable_mcp: Whether to enable MCP tool integration
+            storage_dir: Directory for Agno storage files
+            knowledge_dir: Directory containing knowledge files to load
+            debug: Enable debug mode
+            user_id: User identifier for memory operations
+            recreate: Whether to recreate knowledge bases
+            instruction_level: The sophistication level for agent instructions
+            seed: Optional seed for model reproducibility
+            alltools: Whether to enable all built-in tools
+            use_remote: Whether to use remote endpoints for model creation
+            **kwargs: Additional keyword arguments
 
         Returns:
             Fully initialized AgnoPersonalAgent instance
@@ -1342,14 +1341,12 @@ class AgnoPersonalAgent(Agent):
             storage_dir=storage_dir,
             knowledge_dir=knowledge_dir,
             debug=debug,
-            ollama_base_url=ollama_base_url,
-            openai_base_url=openai_base_url,
-            lmstudio_base_url=lmstudio_base_url,
             user_id=user_id,
             recreate=recreate,
             instruction_level=instruction_level,
             seed=seed,
             alltools=alltools,
+            use_remote=use_remote,  # Pass use_remote flag instead of URL parameters
             initialize_agent=False,  # Don't try to force init in constructor
             **kwargs,
         )

@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-22
+
+### Changed
+- **Streamlined Streamlit UI and Default Team Mode**: The Streamlit application now defaults to the more capable team-based mode, with a `--single` flag to run in a single-agent configuration. The runtime mode-switching UI has been removed to simplify the user experience. This change is documented in [ADR-072](./refs/adr/072-streamlit-ui-simplification.md).
+- **Team Delegation and Reasoning**: Switched the `personal_agent_team` from `route` to `coordinate` mode and integrated `ReasoningTools` to significantly improve the coordinator's ability to delegate tasks to the correct specialized agents.
+
+### Fixed
+- **Tool Call Extraction and Response Handling**: Overhauled the response handling logic to correctly parse and display tool calls and their results. This resolves a critical bug where the Streamlit UI would show raw tool call syntax instead of the executed content from the writer agent. The new `extract_tool_calls_and_metrics` function now robustly handles various tool call formats from different models and agents.
+- **Streamlit `arun` Compatibility**: Fixed a bug that caused the Streamlit app to crash when using `agent.arun()` with asynchronous tools in single-agent mode.
+- **File Tools Path Handling**: Corrected a recurring issue where file-related tools (`FileTools`, `ShellTools`, `PythonTools`) were failing due to being initialized with string paths instead of the required `pathlib.Path` objects. All tools now correctly use `Path` objects and consistently point to the user's home directory, resolving multiple `'str' object has no attribute 'iterdir'` and `'str' object has no attribute 'joinpath'` errors. This is documented in [ADR-073](./refs/adr/073-file-tools-path-fix.md).
+
 ## [v0.2.6dev0] - 2025-09-21
 
 ### Added

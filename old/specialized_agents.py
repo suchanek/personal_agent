@@ -8,11 +8,14 @@ examples/teams/reasoning_multi_purpose_team.py
 
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 from agno.agent import Agent
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat
+
+if TYPE_CHECKING:
+    from ..core.agno_agent import AgnoPersonalAgent
 from agno.tools.calculator import CalculatorTools
 from agno.tools.file import FileTools
 from agno.tools.github import GithubTools
@@ -33,7 +36,7 @@ from ..config import (
     OLLAMA_URL,
     USE_MCP,
 )
-from ..config.model_contexts import get_model_context_size_sync
+from ..core.agent_model_manager import AgentModelManager
 from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
 from ..utils import setup_logging
 
@@ -47,77 +50,25 @@ def _create_model(
     model_name: str = LLM_MODEL,
     ollama_base_url: str = OLLAMA_URL,
     temperature: float = 0.3,
+    use_remote: bool = False,
 ) -> Union[OpenAIChat, Ollama]:
-    """Create the appropriate model instance based on provider.
+    """Create the appropriate model instance using centralized AgentModelManager.
 
     :param model_provider: LLM provider ('ollama' or 'openai')
     :param model_name: Model name to use
-    :param ollama_base_url: Base URL for Ollama API
-    :param temperature: Model Temperature
+    :param ollama_base_url: Base URL for Ollama API (deprecated, use use_remote instead)
+    :param temperature: Model Temperature (deprecated, handled by AgentModelManager)
+    :param use_remote: Whether to use remote endpoints
     :return: Configured model instance
-    :raises ValueError: If unsupported model provider is specified
     """
-    match model_provider:
-        case "openai":
-            logger.info("Using OpenAI model %s", model_name)
-            return OpenAIChat(id=model_name)
-        case "ollama":
-            # DIAGNOSTIC: Log model loading attempt
-            logger.info(
-                "🔍 DIAGNOSTIC: Attempting to load Ollama model: %s at %s",
-                model_name,
-                ollama_base_url,
-            )
-
-            # Get dynamic context size for this model
-            try:
-                context_size, detection_method = get_model_context_size_sync(
-                    model_name, ollama_base_url
-                )
-                logger.info(
-                    "🔍 DIAGNOSTIC: Context size detection successful for %s: %d (method: %s)",
-                    model_name,
-                    context_size,
-                    detection_method,
-                )
-            except Exception as e:
-                logger.error(
-                    "🔍 DIAGNOSTIC: Context size detection failed for %s: %s",
-                    model_name,
-                    e,
-                )
-                raise
-
-            logger.info(
-                "Using context size %d for model %s (detected via: %s)",
-                context_size,
-                model_name,
-                detection_method,
-            )
-
-            try:
-                model = Ollama(
-                    id=model_name,
-                    host=ollama_base_url,
-                    options={
-                        "num_ctx": context_size,
-                        "temperature": temperature,
-                    },
-                )
-                logger.info(
-                    "🔍 DIAGNOSTIC: Successfully created Ollama model instance for %s",
-                    model_name,
-                )
-                return model
-            except Exception as e:
-                logger.error(
-                    "🔍 DIAGNOSTIC: Failed to create Ollama model instance for %s: %s",
-                    model_name,
-                    e,
-                )
-                raise
-        case _:
-            raise ValueError(f"Unsupported model provider: {model_provider}")
+    logger.info("Creating model using centralized AgentModelManager: %s", model_name)
+    
+    # Use the centralized model creation
+    return AgentModelManager.create_model_for_provider(
+        provider=model_provider,
+        model_name=model_name,
+        use_remote=use_remote
+    )
 
 
 def create_web_research_agent(
@@ -303,7 +254,7 @@ def create_file_operations_agent(
     agent = Agent(
         name="File Operations Agent",
         role="Handle file system operations and shell commands",
-        # model=model,
+        model=model,
         debug_mode=debug,
         tools=[
             PersonalAgentFilesystemTools(),
