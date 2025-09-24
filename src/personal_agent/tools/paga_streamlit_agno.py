@@ -157,6 +157,8 @@ from personal_agent.tools.streamlit_helpers import (
     StreamlitKnowledgeHelper,
     StreamlitMemoryHelper,
 )
+from personal_agent.tools.rest_api import start_rest_api
+from personal_agent.tools.global_state import update_global_state_from_streamlit
 
 # Apply dashboard-style layout but keep original page title/icon
 st.set_page_config(
@@ -764,61 +766,69 @@ def initialize_session_state():
     if SESSION_KEY_AGENT_MODE not in st.session_state:
         st.session_state[SESSION_KEY_AGENT_MODE] = "single" if SINGLE_FLAG else "team"
 
-    # Initialize based on mode
+    # Initialize based on mode - FORCE initialization to ensure REST API can detect systems
     if st.session_state[SESSION_KEY_AGENT_MODE] == "team":
         # Team mode initialization
         if SESSION_KEY_TEAM not in st.session_state:
-            st.session_state[SESSION_KEY_TEAM] = initialize_team(
-                st.session_state[SESSION_KEY_CURRENT_MODEL],
-                st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
-                recreate=RECREATE_FLAG,
-            )
+            with st.spinner("Initializing AI Team..."):
+                st.session_state[SESSION_KEY_TEAM] = initialize_team(
+                    st.session_state[SESSION_KEY_CURRENT_MODEL],
+                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
+                    recreate=RECREATE_FLAG,
+                )
 
         # Create memory helper using the knowledge agent directly
         if SESSION_KEY_MEMORY_HELPER not in st.session_state:
             team = st.session_state[SESSION_KEY_TEAM]
-            if hasattr(team, "members") and team.members:
+            if team and hasattr(team, "members") and team.members:
                 knowledge_agent = team.members[0]  # First member is the knowledge agent
                 st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
                     knowledge_agent
                 )
             else:
-                # Fallback: create with team object
-                st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
-                    team
-                )
+                # Fallback: create with team object if available
+                if team:
+                    st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
+                        team
+                    )
 
         if SESSION_KEY_KNOWLEDGE_HELPER not in st.session_state:
             # For team mode, pass the knowledge agent (first team member) to the knowledge helper
             team = st.session_state[SESSION_KEY_TEAM]
-            if hasattr(team, "members") and team.members:
+            if team and hasattr(team, "members") and team.members:
                 knowledge_agent = team.members[0]  # First member is the knowledge agent
                 st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
                     StreamlitKnowledgeHelper(knowledge_agent)
                 )
             else:
-                # Fallback: create with team object
-                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                    StreamlitKnowledgeHelper(team)
-                )
+                # Fallback: create with team object if available
+                if team:
+                    st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                        StreamlitKnowledgeHelper(team)
+                    )
     else:
         # Single agent mode initialization (default)
         if SESSION_KEY_AGENT not in st.session_state:
-            st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-                st.session_state[SESSION_KEY_CURRENT_MODEL],
-                st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
-                recreate=RECREATE_FLAG,
-            )
+            with st.spinner("Initializing AI Agent..."):
+                st.session_state[SESSION_KEY_AGENT] = initialize_agent(
+                    st.session_state[SESSION_KEY_CURRENT_MODEL],
+                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL],
+                    recreate=RECREATE_FLAG,
+                )
 
         if SESSION_KEY_MEMORY_HELPER not in st.session_state:
-            st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
-                st.session_state[SESSION_KEY_AGENT]
-            )
+            agent = st.session_state[SESSION_KEY_AGENT]
+            if agent:
+                st.session_state[SESSION_KEY_MEMORY_HELPER] = StreamlitMemoryHelper(
+                    agent
+                )
 
         if SESSION_KEY_KNOWLEDGE_HELPER not in st.session_state:
-            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(
-                st.session_state[SESSION_KEY_AGENT]
-            )
+            agent = st.session_state[SESSION_KEY_AGENT]
+            if agent:
+                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = StreamlitKnowledgeHelper(
+                    agent
+                )
 
     if SESSION_KEY_MESSAGES not in st.session_state:
         st.session_state[SESSION_KEY_MESSAGES] = []
@@ -3084,6 +3094,28 @@ def main():
     initialize_session_state()
     apply_custom_theme()
 
+    # Update global state with current session state for REST API access
+    update_global_state_from_streamlit(st.session_state)
+    
+    # Initialize REST API server AFTER session state is fully initialized
+    if "rest_api_server" not in st.session_state:
+        try:
+            # Start the REST API server with access to Streamlit session state
+            api_server = start_rest_api(st.session_state, port=8001, host="0.0.0.0")
+            st.session_state["rest_api_server"] = api_server
+            logger.info("REST API server initialized and started on port 8001")
+        except Exception as e:
+            logger.error(f"Failed to start REST API server: {e}")
+            # Don't fail the entire app if REST API fails to start
+            st.session_state["rest_api_server"] = None
+    else:
+        # Update the REST API server with current session state (in case it changed)
+        api_server = st.session_state.get("rest_api_server")
+        if api_server:
+            api_server.set_streamlit_session(st.session_state)
+        # Also update global state on every run
+        update_global_state_from_streamlit(st.session_state)
+
     # Add power button to actual top banner using custom HTML/CSS
     st.markdown(
         """
@@ -3126,6 +3158,44 @@ def main():
     st.markdown(
         "*A friendly AI agent that remembers your conversations and learns about you*"
     )
+    
+    # Show REST API status
+    if st.session_state.get("rest_api_server"):
+        st.success("🌐 REST API server running on http://localhost:8001")
+        with st.expander("📡 REST API Endpoints", expanded=False):
+            st.markdown("""
+            **Memory Endpoints:**
+            - `POST /api/v1/memory/store` - Store text as memory
+            - `POST /api/v1/memory/store-url` - Store content from URL as memory
+            - `GET /api/v1/memory/search?q=query` - Search memories
+            - `GET /api/v1/memory/list` - List all memories
+            - `GET /api/v1/memory/stats` - Get memory statistics
+            
+            **Knowledge Endpoints:**
+            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
+            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
+            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
+            - `GET /api/v1/knowledge/status` - Get knowledge base status
+            
+            **System Endpoints:**
+            - `GET /api/v1/health` - Health check
+            - `GET /api/v1/status` - System status
+            
+            **Example Usage:**
+            ```bash
+            # Store memory
+            curl -X POST http://localhost:8001/api/v1/memory/store \\
+              -H "Content-Type: application/json" \\
+              -d '{"content": "I work at Google", "topics": ["work"]}'
+            
+            # Store knowledge from URL
+            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
+              -H "Content-Type: application/json" \\
+              -d '{"url": "https://example.com/article", "title": "Important Article"}'
+            ```
+            """)
+    else:
+        st.warning("⚠️ REST API server failed to start")
 
     # Power off button moved to bottom of sidebar (in render_sidebar function)
 

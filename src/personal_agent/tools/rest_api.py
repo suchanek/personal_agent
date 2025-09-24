@@ -1,0 +1,693 @@
+"""
+REST API Module for Personal Agent Streamlit Application
+
+This module provides REST API endpoints that run alongside the Streamlit web interface,
+allowing external systems to interact with memory and knowledge storage capabilities
+via standard HTTP requests.
+
+The API runs on a separate port (default 8001) while sharing the same agent instances
+and session state with the Streamlit UI for consistency.
+
+Endpoints:
+    Memory:
+    - POST /api/v1/memory/store - Store text content as memory
+    - POST /api/v1/memory/store-url - Extract and store URL content as memory
+    - GET /api/v1/memory/search - Search existing memories
+    - GET /api/v1/memory/list - List all memories
+    - DELETE /api/v1/memory/{memory_id} - Delete specific memory
+    - GET /api/v1/memory/stats - Get memory statistics
+
+    Knowledge:
+    - POST /api/v1/knowledge/store-text - Store text in knowledge base
+    - POST /api/v1/knowledge/store-url - Extract and store URL content in knowledge base
+    - GET /api/v1/knowledge/search - Search knowledge base
+    - GET /api/v1/knowledge/status - Get knowledge base status
+
+    System:
+    - GET /api/v1/health - Health check
+    - GET /api/v1/status - System status
+
+Usage:
+    # Store memory
+    curl -X POST http://localhost:8001/api/v1/memory/store \
+      -H "Content-Type: application/json" \
+      -d '{"content": "I work at Google", "topics": ["work"]}'
+
+    # Store knowledge from URL
+    curl -X POST http://localhost:8001/api/v1/knowledge/store-url \
+      -H "Content-Type: application/json" \
+      -d '{"url": "https://example.com", "title": "Example"}'
+
+Author: Personal Agent Development Team
+Version: v1.0.0
+Last Revision: 2025-01-24
+"""
+
+import asyncio
+import json
+import logging
+import threading
+import time
+from datetime import datetime
+from typing import Dict, List, Optional, Union
+from urllib.parse import urlparse
+
+import requests
+from bs4 import BeautifulSoup
+from flask import Flask, jsonify, request
+
+# Try to import CORS, but make it optional
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
+
+from ..utils import setup_logging
+from .global_state import get_global_state
+
+logger = setup_logging(__name__)
+
+
+class PersonalAgentRestAPI:
+    """REST API server for Personal Agent memory and knowledge operations."""
+
+    def __init__(self, port: int = 8001, host: str = "0.0.0.0"):
+        self.port = port
+        self.host = host
+        self.app = Flask(__name__)
+        
+        # Enable CORS if available
+        if CORS_AVAILABLE:
+            CORS(self.app)
+        else:
+            # Add basic CORS headers manually
+            @self.app.after_request
+            def after_request(response):
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+                response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+                return response
+        
+        # Reference to Streamlit session state (will be set externally)
+        self.streamlit_session = None
+        
+        # Setup routes
+        self._setup_routes()
+        
+        # Server thread
+        self._server_thread = None
+        self._running = False
+
+    def set_streamlit_session(self, session_state):
+        """Set reference to Streamlit session state for shared agent access."""
+        self.streamlit_session = session_state
+
+    def _setup_routes(self):
+        """Setup all API routes."""
+        
+        # Health and status endpoints
+        @self.app.route('/api/v1/health', methods=['GET'])
+        def health_check():
+            return jsonify({
+                "status": "healthy",
+                "timestamp": datetime.now().isoformat(),
+                "service": "personal-agent-api",
+                "version": "1.0.0"
+            })
+
+        @self.app.route('/api/v1/status', methods=['GET'])
+        def system_status():
+            try:
+                # Use global state instead of Streamlit session state
+                global_state = get_global_state()
+                global_status = global_state.get_status()
+                
+                status = {
+                    "status": "running",
+                    "timestamp": datetime.now().isoformat(),
+                    "streamlit_connected": self.streamlit_session is not None,
+                    "agent_available": global_status["agent_available"],
+                    "team_available": global_status["team_available"],
+                    "memory_available": global_status["memory_helper_available"],
+                    "knowledge_available": global_status["knowledge_helper_available"]
+                }
+                
+                return jsonify(status)
+            except Exception as e:
+                logger.error(f"Error getting system status: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        # Memory endpoints
+        @self.app.route('/api/v1/memory/store', methods=['POST'])
+        def store_memory():
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No JSON data provided"}), 400
+                
+                content = data.get('content', '').strip()
+                if not content:
+                    return jsonify({"error": "Content is required"}), 400
+                
+                topics = data.get('topics', [])
+                if isinstance(topics, str):
+                    topics = [t.strip() for t in topics.split(',') if t.strip()]
+                
+                # Get memory helper from Streamlit session
+                memory_helper = self._get_memory_helper()
+                if not memory_helper:
+                    return jsonify({"error": "Memory system not available"}), 503
+                
+                # Store memory
+                result = memory_helper.add_memory(
+                    memory_text=content,
+                    topics=topics if topics else None,
+                    input_text="REST API"
+                )
+                
+                # Parse result
+                if hasattr(result, 'is_success'):
+                    success = result.is_success
+                    message = result.message
+                    memory_id = getattr(result, 'memory_id', None)
+                    generated_topics = getattr(result, 'topics', topics)
+                elif isinstance(result, tuple) and len(result) >= 2:
+                    success, message = result[0], result[1]
+                    memory_id = result[2] if len(result) > 2 else None
+                    generated_topics = result[3] if len(result) > 3 else topics
+                else:
+                    success = False
+                    message = f"Unexpected result format: {result}"
+                    memory_id = None
+                    generated_topics = topics
+                
+                if success:
+                    logger.info(f"Successfully stored memory via API: {content[:50]}...")
+                    return jsonify({
+                        "success": True,
+                        "message": message,
+                        "memory_id": memory_id,
+                        "topics": generated_topics,
+                        "content_length": len(content)
+                    })
+                else:
+                    logger.warning(f"Failed to store memory via API: {message}")
+                    return jsonify({"error": message}), 400
+                    
+            except Exception as e:
+                logger.error(f"Error storing memory via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/memory/store-url', methods=['POST'])
+        def store_memory_from_url():
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No JSON data provided"}), 400
+                
+                url = data.get('url', '').strip()
+                if not url:
+                    return jsonify({"error": "URL is required"}), 400
+                
+                # Validate URL
+                parsed_url = urlparse(url)
+                if not parsed_url.scheme or not parsed_url.netloc:
+                    return jsonify({"error": "Invalid URL format"}), 400
+                
+                title = data.get('title', '').strip()
+                topics = data.get('topics', [])
+                if isinstance(topics, str):
+                    topics = [t.strip() for t in topics.split(',') if t.strip()]
+                
+                extract_method = data.get('extract_method', 'full_text')
+                
+                # Extract content from URL
+                try:
+                    content, extracted_title = self._extract_url_content(url, extract_method)
+                    if not content:
+                        return jsonify({"error": "No content could be extracted from URL"}), 400
+                    
+                    # Use provided title or extracted title
+                    final_title = title or extracted_title or parsed_url.netloc
+                    
+                    # Add source URL to content
+                    content_with_source = f"Source: {url}\nTitle: {final_title}\n\n{content}"
+                    
+                except Exception as e:
+                    logger.error(f"Error extracting content from URL {url}: {e}")
+                    return jsonify({"error": f"Failed to extract content from URL: {str(e)}"}), 400
+                
+                # Get memory helper
+                memory_helper = self._get_memory_helper()
+                if not memory_helper:
+                    return jsonify({"error": "Memory system not available"}), 503
+                
+                # Store memory
+                result = memory_helper.add_memory(
+                    memory_text=content_with_source,
+                    topics=topics if topics else None,
+                    input_text=f"REST API - URL: {url}"
+                )
+                
+                # Parse result
+                if hasattr(result, 'is_success'):
+                    success = result.is_success
+                    message = result.message
+                    memory_id = getattr(result, 'memory_id', None)
+                    generated_topics = getattr(result, 'topics', topics)
+                elif isinstance(result, tuple) and len(result) >= 2:
+                    success, message = result[0], result[1]
+                    memory_id = result[2] if len(result) > 2 else None
+                    generated_topics = result[3] if len(result) > 3 else topics
+                else:
+                    success = False
+                    message = f"Unexpected result format: {result}"
+                    memory_id = None
+                    generated_topics = topics
+                
+                if success:
+                    logger.info(f"Successfully stored memory from URL via API: {url}")
+                    return jsonify({
+                        "success": True,
+                        "message": message,
+                        "memory_id": memory_id,
+                        "topics": generated_topics,
+                        "url": url,
+                        "extracted_title": final_title,
+                        "content_length": len(content_with_source)
+                    })
+                else:
+                    logger.warning(f"Failed to store memory from URL via API: {message}")
+                    return jsonify({"error": message}), 400
+                    
+            except Exception as e:
+                logger.error(f"Error storing memory from URL via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/memory/search', methods=['GET'])
+        def search_memories():
+            try:
+                query = request.args.get('q', '').strip()
+                if not query:
+                    return jsonify({"error": "Query parameter 'q' is required"}), 400
+                
+                limit = request.args.get('limit', 10, type=int)
+                similarity_threshold = request.args.get('similarity_threshold', 0.3, type=float)
+                
+                # Get memory helper
+                memory_helper = self._get_memory_helper()
+                if not memory_helper:
+                    return jsonify({"error": "Memory system not available"}), 503
+                
+                # Search memories
+                search_results = memory_helper.search_memories(
+                    query=query,
+                    limit=limit,
+                    similarity_threshold=similarity_threshold
+                )
+                
+                # Format results
+                results = []
+                for memory, score in search_results:
+                    results.append({
+                        "memory_id": getattr(memory, 'memory_id', None),
+                        "content": memory.memory,
+                        "similarity_score": round(score, 3),
+                        "topics": getattr(memory, 'topics', []),
+                        "last_updated": getattr(memory, 'last_updated', None),
+                        "input": getattr(memory, 'input', None)
+                    })
+                
+                logger.info(f"Memory search via API: {query} - {len(results)} results")
+                return jsonify({
+                    "success": True,
+                    "query": query,
+                    "results": results,
+                    "total_results": len(results),
+                    "limit": limit,
+                    "similarity_threshold": similarity_threshold
+                })
+                
+            except Exception as e:
+                logger.error(f"Error searching memories via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/memory/list', methods=['GET'])
+        def list_memories():
+            try:
+                limit = request.args.get('limit', None, type=int)
+                
+                # Get memory helper
+                memory_helper = self._get_memory_helper()
+                if not memory_helper:
+                    return jsonify({"error": "Memory system not available"}), 503
+                
+                # Get all memories
+                memories = memory_helper.get_all_memories()
+                
+                # Apply limit if specified
+                if limit and len(memories) > limit:
+                    memories = memories[:limit]
+                
+                # Format results
+                results = []
+                for memory in memories:
+                    results.append({
+                        "memory_id": getattr(memory, 'memory_id', None),
+                        "content": memory.memory,
+                        "topics": getattr(memory, 'topics', []),
+                        "last_updated": getattr(memory, 'last_updated', None),
+                        "input": getattr(memory, 'input', None)
+                    })
+                
+                logger.info(f"Memory list via API: {len(results)} memories")
+                return jsonify({
+                    "success": True,
+                    "memories": results,
+                    "total_count": len(results),
+                    "limit": limit
+                })
+                
+            except Exception as e:
+                logger.error(f"Error listing memories via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/memory/stats', methods=['GET'])
+        def memory_stats():
+            try:
+                # Get memory helper
+                memory_helper = self._get_memory_helper()
+                if not memory_helper:
+                    return jsonify({"error": "Memory system not available"}), 503
+                
+                # Get memory statistics
+                stats = memory_helper.get_memory_stats()
+                
+                if "error" in stats:
+                    return jsonify({"error": stats["error"]}), 500
+                
+                logger.info("Memory stats retrieved via API")
+                return jsonify({
+                    "success": True,
+                    "stats": stats
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting memory stats via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        # Knowledge endpoints
+        @self.app.route('/api/v1/knowledge/store-text', methods=['POST'])
+        def store_knowledge_text():
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No JSON data provided"}), 400
+                
+                content = data.get('content', '').strip()
+                if not content:
+                    return jsonify({"error": "Content is required"}), 400
+                
+                title = data.get('title', '').strip()
+                if not title:
+                    return jsonify({"error": "Title is required"}), 400
+                
+                file_type = data.get('file_type', 'txt')
+                
+                # Get knowledge helper
+                knowledge_helper = self._get_knowledge_helper()
+                if not knowledge_helper:
+                    return jsonify({"error": "Knowledge system not available"}), 503
+                
+                # Get the agent to access knowledge tools
+                agent = self._get_agent()
+                if not agent:
+                    return jsonify({"error": "Agent not available"}), 503
+                
+                # Find knowledge tools
+                knowledge_tools = self._get_knowledge_tools(agent)
+                if not knowledge_tools:
+                    return jsonify({"error": "Knowledge tools not available"}), 503
+                
+                # Store knowledge using unified method
+                result = knowledge_tools.ingest_knowledge_text(content, title, file_type)
+                
+                if "✅" in result:
+                    logger.info(f"Successfully stored knowledge text via API: {title}")
+                    return jsonify({
+                        "success": True,
+                        "message": result,
+                        "title": title,
+                        "content_length": len(content),
+                        "file_type": file_type
+                    })
+                else:
+                    logger.warning(f"Failed to store knowledge text via API: {result}")
+                    return jsonify({"error": result}), 400
+                    
+            except Exception as e:
+                logger.error(f"Error storing knowledge text via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/knowledge/store-url', methods=['POST'])
+        def store_knowledge_from_url():
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No JSON data provided"}), 400
+                
+                url = data.get('url', '').strip()
+                if not url:
+                    return jsonify({"error": "URL is required"}), 400
+                
+                # Validate URL
+                parsed_url = urlparse(url)
+                if not parsed_url.scheme or not parsed_url.netloc:
+                    return jsonify({"error": "Invalid URL format"}), 400
+                
+                title = data.get('title', '').strip()
+                
+                # Get agent
+                agent = self._get_agent()
+                if not agent:
+                    return jsonify({"error": "Agent not available"}), 503
+                
+                # Find knowledge tools
+                knowledge_tools = self._get_knowledge_tools(agent)
+                if not knowledge_tools:
+                    return jsonify({"error": "Knowledge tools not available"}), 503
+                
+                # Store knowledge from URL using unified method
+                result = knowledge_tools.ingest_knowledge_from_url(url, title)
+                
+                if "✅" in result:
+                    logger.info(f"Successfully stored knowledge from URL via API: {url}")
+                    return jsonify({
+                        "success": True,
+                        "message": result,
+                        "url": url,
+                        "title": title or parsed_url.netloc
+                    })
+                else:
+                    logger.warning(f"Failed to store knowledge from URL via API: {result}")
+                    return jsonify({"error": result}), 400
+                    
+            except Exception as e:
+                logger.error(f"Error storing knowledge from URL via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/knowledge/search', methods=['GET'])
+        def search_knowledge():
+            try:
+                query = request.args.get('q', '').strip()
+                if not query:
+                    return jsonify({"error": "Query parameter 'q' is required"}), 400
+                
+                mode = request.args.get('mode', 'auto')
+                limit = request.args.get('limit', 5, type=int)
+                
+                # Get agent
+                agent = self._get_agent()
+                if not agent:
+                    return jsonify({"error": "Agent not available"}), 503
+                
+                # Find knowledge tools
+                knowledge_tools = self._get_knowledge_tools(agent)
+                if not knowledge_tools:
+                    return jsonify({"error": "Knowledge tools not available"}), 503
+                
+                # Search knowledge base
+                result = asyncio.run(knowledge_tools.query_knowledge_base(query, mode, limit))
+                
+                logger.info(f"Knowledge search via API: {query}")
+                return jsonify({
+                    "success": True,
+                    "query": query,
+                    "mode": mode,
+                    "limit": limit,
+                    "result": result
+                })
+                
+            except Exception as e:
+                logger.error(f"Error searching knowledge via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route('/api/v1/knowledge/status', methods=['GET'])
+        def knowledge_status():
+            try:
+                # Get knowledge helper
+                knowledge_helper = self._get_knowledge_helper()
+                if not knowledge_helper:
+                    return jsonify({"error": "Knowledge system not available"}), 503
+                
+                # Check knowledge manager status
+                km = knowledge_helper.knowledge_manager
+                status = {
+                    "knowledge_manager_available": km is not None,
+                    "semantic_kb_available": knowledge_helper.agno_knowledge is not None,
+                    "lightrag_available": False
+                }
+                
+                # Test LightRAG connection
+                try:
+                    from ..config import settings
+                    response = requests.get(f"{settings.LIGHTRAG_URL}/health", timeout=5)
+                    status["lightrag_available"] = response.status_code == 200
+                    status["lightrag_url"] = settings.LIGHTRAG_URL
+                except:
+                    status["lightrag_available"] = False
+                
+                logger.info("Knowledge status retrieved via API")
+                return jsonify({
+                    "success": True,
+                    "status": status
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting knowledge status via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+    def _get_memory_helper(self):
+        """Get memory helper from global state."""
+        global_state = get_global_state()
+        return global_state.get("memory_helper")
+
+    def _get_knowledge_helper(self):
+        """Get knowledge helper from global state."""
+        global_state = get_global_state()
+        return global_state.get("knowledge_helper")
+
+    def _get_agent(self):
+        """Get agent from global state (single or team mode)."""
+        global_state = get_global_state()
+        agent_mode = global_state.get("agent_mode", "single")
+        
+        if agent_mode == "team":
+            # Team mode - get the knowledge agent (first team member)
+            team = global_state.get("team")
+            if team and hasattr(team, "members") and team.members:
+                return team.members[0]
+        else:
+            # Single agent mode
+            return global_state.get("agent")
+        
+        return None
+
+    def _get_knowledge_tools(self, agent):
+        """Get knowledge tools from agent."""
+        if not agent or not hasattr(agent, "agent") or not hasattr(agent.agent, "tools"):
+            return None
+        
+        # Find knowledge tools
+        for tool in agent.agent.tools:
+            if hasattr(tool, "__class__") and "KnowledgeTools" in str(tool.__class__):
+                return tool
+        
+        return None
+
+    def _extract_url_content(self, url: str, method: str = "full_text") -> tuple:
+        """Extract content from URL."""
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        content_type = response.headers.get("content-type", "").lower()
+        
+        if "text/html" in content_type:
+            soup = BeautifulSoup(response.content, "html.parser")
+            
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            # Get title
+            title_tag = soup.find("title")
+            title = title_tag.get_text().strip() if title_tag else ""
+            
+            # Get text content
+            content = soup.get_text()
+            
+            # Clean up content
+            content = "\n".join(
+                line.strip() for line in content.splitlines() if line.strip()
+            )
+            
+            return content, title
+            
+        elif "text/" in content_type or "application/json" in content_type:
+            return response.text, ""
+        else:
+            raise ValueError(f"Unsupported content type: {content_type}")
+
+    def start(self):
+        """Start the REST API server in a background thread."""
+        if self._running:
+            logger.warning("REST API server is already running")
+            return
+        
+        def run_server():
+            try:
+                logger.info(f"Starting REST API server on {self.host}:{self.port}")
+                self.app.run(host=self.host, port=self.port, debug=False, threaded=True)
+            except Exception as e:
+                logger.error(f"Error starting REST API server: {e}")
+        
+        self._server_thread = threading.Thread(target=run_server, daemon=True)
+        self._server_thread.start()
+        self._running = True
+        
+        # Give server time to start
+        time.sleep(1)
+        logger.info(f"REST API server started at http://{self.host}:{self.port}")
+
+    def stop(self):
+        """Stop the REST API server."""
+        if not self._running:
+            return
+        
+        self._running = False
+        logger.info("REST API server stopped")
+
+
+# Global instance
+_rest_api_instance = None
+
+
+def get_rest_api_instance(port: int = 8001, host: str = "0.0.0.0") -> PersonalAgentRestAPI:
+    """Get or create the global REST API instance."""
+    global _rest_api_instance
+    if _rest_api_instance is None:
+        _rest_api_instance = PersonalAgentRestAPI(port=port, host=host)
+    return _rest_api_instance
+
+
+def start_rest_api(streamlit_session, port: int = 8001, host: str = "0.0.0.0"):
+    """Start the REST API server with Streamlit session reference."""
+    api = get_rest_api_instance(port=port, host=host)
+    api.set_streamlit_session(streamlit_session)
+    api.start()
+    return api

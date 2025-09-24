@@ -2,6 +2,9 @@
 
 ## [v0.2.6dev0] - 2025-09-24
 
+### Added
+- **REST API for Memory and Knowledge**: Introduced a RESTful API to provide programmatic access to the agent's memory and knowledge management capabilities. The API, which runs alongside the Streamlit application, exposes endpoints for storing, searching, and managing memories and knowledge, enabling integration with external systems and automation of data ingestion. The architecture uses a global state manager to safely share the agent instance between the Streamlit and API server threads. See [ADR-090](./refs/adr/090-rest-api-for-memory-and-knowledge.md) for details.
+
 ### Changed
 - **Standardized Agent and Team Interfaces**: Introduced `BaseAgent` and `BaseTeam` abstract base classes to create a unified interface for all agents and teams. This refactoring promotes polymorphism, simplifies the architecture, and improves modularity by ensuring that all agentic components share a consistent `run` and `arun` method signature. See [ADR-089](./refs/adr/089-standardized-agent-and-team-interfaces.md) for details.
 
