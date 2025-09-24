@@ -1492,6 +1492,7 @@ async def create_agno_agent(
         user_id = get_userid()
 
     # Use the create_with_init class method to ensure proper initialization
+    # Note: URL parameters are no longer passed - AgentModelManager handles URL selection
     return await AgnoPersonalAgent.create_with_init(
         model_provider=model_provider,
         model_name=model_name,
@@ -1500,12 +1501,10 @@ async def create_agno_agent(
         storage_dir=storage_dir,
         knowledge_dir=knowledge_dir,
         debug=debug,
-        ollama_base_url=ollama_base_url,
-        openai_base_url=openai_base_url,
-        lmstudio_base_url=lmstudio_base_url,
         user_id=user_id,
         recreate=recreate,
         instruction_level=instruction_level,
         seed=seed,
         alltools=alltools,
+        use_remote=False,  # Use local endpoints by default
     )

@@ -52,7 +52,6 @@ def get_agent_instance() -> Optional[AgnoPersonalAgent]:
             create_agno_agent(
                 model_provider="ollama",
                 model_name=LLM_MODEL,
-                ollama_base_url=OLLAMA_URL,
                 user_id=get_userid(),
                 debug=False,  # Disable debug for cleaner Streamlit output
                 enable_memory=True,

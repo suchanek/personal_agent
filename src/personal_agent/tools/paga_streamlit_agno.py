@@ -2607,6 +2607,12 @@ def render_sidebar():
             st.rerun()
 
         st.header("Model Selection")
+        
+        # Show current provider prominently
+        provider = os.getenv("PROVIDER", "ollama")
+        provider_display = provider.upper() if provider == "ollama" else "LM Studio" if provider == "lm-studio" else provider.title()
+        st.write(f"**Current Provider:** {provider_display}")
+        
         new_ollama_url = st.text_input(
             "**Provider URL:**", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
         )

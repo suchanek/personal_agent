@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.2.6dev0] - 2025-09-24
+
+### Changed
+- **Standardized Agent and Team Interfaces**: Introduced `BaseAgent` and `BaseTeam` abstract base classes to create a unified interface for all agents and teams. This refactoring promotes polymorphism, simplifies the architecture, and improves modularity by ensuring that all agentic components share a consistent `run` and `arun` method signature. See [ADR-089](./refs/adr/089-standardized-agent-and-team-interfaces.md) for details.
+
 ## [v0.2.6dev0] - 2025-09-22
 
 ### Changed
