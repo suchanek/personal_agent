@@ -408,6 +408,46 @@ class DockerUserSync:
             return True
 
         try:
+            # Get the environment file path and read the environment variables
+            env_file_path = server_dir / server_config.get("env_file", ".env")
+            docker_env = os.environ.copy()
+            
+            # Read environment variables from the env file and add them to the environment
+            if env_file_path.exists():
+                try:
+                    with open(env_file_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith("#") and "=" in line:
+                                key, value = line.split("=", 1)
+                                key = key.strip()
+                                value = value.strip().strip('\'"')
+                                
+                                # Remove inline comments from the value
+                                if "#" in value:
+                                    value = value.split("#")[0].strip()
+                                
+                                # Handle variable expansion for AGNO_STORAGE_DIR
+                                if "${" in value:
+                                    # Simple variable expansion for common patterns
+                                    import re
+                                    def expand_var(match):
+                                        var_name = match.group(1)
+                                        return docker_env.get(var_name, "")
+                                    value = re.sub(r'\$\{([^}]+)\}', expand_var, value)
+                                
+                                docker_env[key] = value
+                                logger.debug("Set environment variable %s=%s", key, value)
+                except Exception as e:
+                    logger.warning("Error reading environment file %s: %s", env_file_path, e)
+            
+            # Ensure critical environment variables are set
+            if "AGNO_STORAGE_DIR" not in docker_env or not docker_env["AGNO_STORAGE_DIR"]:
+                logger.error("AGNO_STORAGE_DIR not set in environment - Docker mount will fail")
+                return False
+            
+            logger.info("Starting Docker service with AGNO_STORAGE_DIR=%s", docker_env.get("AGNO_STORAGE_DIR"))
+            
             result = subprocess.run(
                 ["docker-compose", "-f", compose_file, "up", "-d", "--wait"],
                 cwd=server_dir,
@@ -415,6 +455,7 @@ class DockerUserSync:
                 text=True,
                 check=True,
                 timeout=120,  # Longer timeout for startup
+                env=docker_env,  # Pass the environment variables
             )
             logger.info("Started Docker service in %s", server_dir)
             logger.debug("Docker compose up output: %s", result.stdout)

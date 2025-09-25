@@ -2,6 +2,12 @@
 
 ## [v0.2.6dev0] - 2025-09-24
 
+### Fixed
+- **Ollama Docker Connectivity**: Resolved a critical bug that prevented LightRAG Docker containers from connecting to the Ollama server on the host machine. The `OLLAMA_URL` has been corrected to `http://host.docker.internal:11434` to ensure reliable communication from within the container environment. See [ADR-091](./refs/adr/091-ollama-docker-connectivity-and-configuration-standardization.md) for details.
+
+### Changed
+- **Docker Configuration Standardization**: Migrated Docker Compose configurations to use visible and documented `env.server` and `env.memory_server` files instead of hidden `.env` files. This improves configuration transparency and maintainability. See [ADR-091](./refs/adr/091-ollama-docker-connectivity-and-configuration-standardization.md) for details.
+
 ### Added
 - **REST API for Memory and Knowledge**: Introduced a RESTful API to provide programmatic access to the agent's memory and knowledge management capabilities. The API, which runs alongside the Streamlit application, exposes endpoints for storing, searching, and managing memories and knowledge, enabling integration with external systems and automation of data ingestion. The architecture uses a global state manager to safely share the agent instance between the Streamlit and API server threads. See [ADR-090](./refs/adr/090-rest-api-for-memory-and-knowledge.md) for details.
 

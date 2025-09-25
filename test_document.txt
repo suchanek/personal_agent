@@ -1,0 +1,7 @@
+This is a simple test document to verify that the LightRAG embedding dimension fix is working correctly.
+
+The issue was that qwen3-embedding:4b produces 2560-dimensional embeddings, but the configuration was set to 768 dimensions.
+
+This mismatch caused numpy vstack errors when trying to combine embeddings of different dimensions in the vector database.
+
+Now that all configurations have been updated to use 2560 dimensions, document ingestion should work properly.
