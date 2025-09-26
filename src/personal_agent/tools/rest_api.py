@@ -63,10 +63,16 @@ try:
 except ImportError:
     CORS_AVAILABLE = False
 
-from ..utils import setup_logging
-from .global_state import get_global_state
-
-logger = setup_logging(__name__)
+# Handle imports for both module import and direct execution
+try:
+    from ..utils import setup_logging
+    from .global_state import get_global_state
+    logger = setup_logging(__name__)
+except ImportError:
+    # Fallback for when running directly before main block
+    import logging
+    logger = logging.getLogger(__name__)
+    get_global_state = None
 
 
 class PersonalAgentRestAPI:
@@ -105,16 +111,55 @@ class PersonalAgentRestAPI:
 
     def _setup_routes(self):
         """Setup all API routes."""
-        
+
         # Health and status endpoints
         @self.app.route('/api/v1/health', methods=['GET'])
         def health_check():
-            return jsonify({
-                "status": "healthy",
-                "timestamp": datetime.now().isoformat(),
-                "service": "personal-agent-api",
-                "version": "1.0.0"
-            })
+            try:
+                # Use global state to check system health
+                global_state = get_global_state()
+                global_status = global_state.get_status()
+
+                # Check all required conditions
+                streamlit_connected = self.streamlit_session is not None
+                agent_available = global_status["agent_available"]
+                team_available = global_status["team_available"]
+                memory_available = global_status["memory_helper_available"]
+                knowledge_available = global_status["knowledge_helper_available"]
+
+                # System is healthy if all conditions are met, with exception that either team or agent must be available
+                is_healthy = (
+                    streamlit_connected and
+                    memory_available and
+                    knowledge_available and
+                    (agent_available or team_available)
+                )
+
+                status = "healthy" if is_healthy else "unhealthy"
+
+                return jsonify({
+                    "status": status,
+                    "timestamp": datetime.now().isoformat(),
+                    "service": "personal-agent-api",
+                    "version": "1.0.0",
+                    "checks": {
+                        "streamlit_connected": streamlit_connected,
+                        "agent_available": agent_available,
+                        "team_available": team_available,
+                        "memory_available": memory_available,
+                        "knowledge_available": knowledge_available
+                    }
+                })
+
+            except Exception as e:
+                logger.error(f"Error in health check: {e}")
+                return jsonify({
+                    "status": "unhealthy",
+                    "timestamp": datetime.now().isoformat(),
+                    "service": "personal-agent-api",
+                    "version": "1.0.0",
+                    "error": str(e)
+                }), 503
 
         @self.app.route('/api/v1/status', methods=['GET'])
         def system_status():
@@ -122,7 +167,7 @@ class PersonalAgentRestAPI:
                 # Use global state instead of Streamlit session state
                 global_state = get_global_state()
                 global_status = global_state.get_status()
-                
+
                 status = {
                     "status": "running",
                     "timestamp": datetime.now().isoformat(),
@@ -132,10 +177,10 @@ class PersonalAgentRestAPI:
                     "memory_available": global_status["memory_helper_available"],
                     "knowledge_available": global_status["knowledge_helper_available"]
                 }
-                
+
                 return jsonify(status)
             except Exception as e:
-                logger.error(f"Error getting system status: {e}")
+                print(f"Error getting system status: {e}")  # Use print since logger may not be available
                 return jsonify({"error": str(e)}), 500
 
         # Memory endpoints
@@ -691,3 +736,52 @@ def start_rest_api(streamlit_session, port: int = 8001, host: str = "0.0.0.0"):
     api.set_streamlit_session(streamlit_session)
     api.start()
     return api
+
+
+if __name__ == "__main__":
+    """Run the REST API server directly."""
+    import argparse
+    import sys
+    from pathlib import Path
+
+    # Add src to path for imports when running directly
+    project_root = Path(__file__).parent.parent.parent
+    src_path = project_root / "src"
+    if src_path not in sys.path:
+        sys.path.insert(0, str(src_path))
+
+    # Re-import with proper path setup
+    try:
+        from personal_agent.utils import setup_logging
+        from personal_agent.tools.global_state import get_global_state
+        logger = setup_logging(__name__)
+    except ImportError:
+        # Fallback if absolute imports also fail
+        import logging
+        logger = logging.getLogger(__name__)
+        print("Warning: Using fallback logging - some features may not work")
+
+    parser = argparse.ArgumentParser(description="Personal Agent REST API Server")
+    parser.add_argument("--port", type=int, default=8001, help="Port to run the server on")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind the server to")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+
+    args = parser.parse_args()
+
+    # Configure logging
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    logger.info(f"Starting REST API server on {args.host}:{args.port}")
+
+    # Create and start the API server
+    api = PersonalAgentRestAPI(port=args.port, host=args.host)
+    api.start()
+
+    # Keep the server running
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Shutting down REST API server...")
+        api.stop()
