@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.8.7dev] - 2025-09-25
+
+### Added
+- **Enhanced REST API Health Checks**: The `/api/v1/health` endpoint now performs a comprehensive check on all critical system components (Agent, Team, Memory, Knowledge) and provides a detailed status report, ensuring the API only reports as healthy when the entire system is operational. See [ADR-092](./refs/adr/092-enhanced-rest-api-health-checks.md) for details.
+
+### Changed
+- **Dynamic Docker Storage Paths**: The `smart-restart-lightrag.sh` script now dynamically retrieves the `AGNO_STORAGE_DIR` from the application's settings, making the Docker startup process more robust and less reliant on manual environment configuration.
+- **Theme-Aware UI Charts**: The response time chart in the Streamlit UI is now theme-aware, with styles that adapt to both light and dark modes for improved visibility.
+
+### Fixed
+- **Agent Response Handling**: Resolved a bug that could cause the agent to crash when receiving a non-streaming response from a language model. The response handling logic is now more robust and can gracefully handle both streaming and single responses.
+- **Streamlit Dark Theme**: Corrected several CSS issues in the Streamlit dark theme, particularly for select boxes and dropdown menus, to ensure a consistent and usable interface.
+
+### Removed
+- **Obsolete Test Files**: Removed several outdated and unused test scripts related to LM Studio and Llama32 to clean up the codebase.
+
 ## [v0.2.6dev0] - 2025-09-24
 
 ### Fixed

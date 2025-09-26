@@ -417,3 +417,91 @@ div[style*="background: rgb(255, 255, 255)"] {
     background-color: #1e1e1e !important;
     color: #fafafa !important;
 }
+
+/* Dark mode: Streamlit selectbox and dropdown menu fixes */
+
+/* Selectbox input and control surface */
+.stSelectbox [data-baseweb="select"],
+.stSelectbox [data-baseweb="select"] > div,
+.stSelectbox [data-baseweb="select"] input {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4f4f4f !important;
+}
+
+/* Multiselect control surface */
+.stMultiSelect [data-baseweb="select"],
+.stMultiSelect [data-baseweb="select"] > div,
+.stMultiSelect [data-baseweb="select"] input {
+    background-color: #262730 !important;
+    color: #fafafa !important;
+    border-color: #4f4f4f !important;
+}
+
+/* Focus state for select controls */
+.stSelectbox > div > div:focus-within,
+.stMultiSelect > div > div:focus-within,
+[data-baseweb="select"]:focus-within,
+[data-baseweb="select"] > div:focus-within {
+    border-color: #4c78e0 !important;
+    box-shadow: 0 0 0 1px #4c78e0 inset !important;
+}
+
+/* Caret and icons inside select controls */
+.stSelectbox svg,
+.stMultiSelect svg,
+[data-baseweb="select"] svg {
+    fill: #fafafa !important;
+    color: #fafafa !important;
+}
+
+/* BaseWeb popover/menu (the dropdown list is rendered in a portal) */
+[data-baseweb="popover"],
+[data-baseweb="menu"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+/* Listbox and options (ARIA roles) */
+[role="listbox"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}
+
+[role="option"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+}
+
+/* Hovered and selected option styling for better contrast */
+[role="option"]:hover,
+[role="option"][aria-selected="true"],
+[data-baseweb="menu"] [aria-selected="true"],
+[data-baseweb="menu"] [data-baseweb="menu-item"]:hover {
+    background-color: #2b2b2b !important;
+    color: #ffffff !important;
+}
+
+/* BaseWeb menu items */
+[data-baseweb="menu"] [data-baseweb="menu-item"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+}
+
+/* Placeholder text inside select */
+[data-baseweb="select"] [aria-selected="false"],
+[data-baseweb="select"] [data-baseweb="input"]::placeholder,
+.stSelectbox ::placeholder,
+.stMultiSelect ::placeholder {
+    color: #b0b0b0 !important;
+}
+
+/* Ensure any portal menus also inherit dark background */
+body > div[role="dialog"],
+body > div[role="tooltip"] {
+    background-color: #1e1e1e !important;
+    color: #fafafa !important;
+    border: 1px solid #4a4a4a !important;
+}

@@ -2965,9 +2965,14 @@ def render_sidebar():
                     chart_data = (
                         df[["timestamp", "response_time"]].copy().set_index("timestamp")
                     )
+                    
+                    # Apply theme-aware styling for the chart
+                    is_dark_theme = st.session_state.get(SESSION_KEY_DARK_THEME, False)
+                    
+                    # Create base chart
                     chart = (
                         alt.Chart(chart_data.reset_index())
-                        .mark_line(point=True)
+                        .mark_line(point=True, color="#1f77b4" if not is_dark_theme else "#ff7f0e")
                         .encode(
                             x=alt.X("timestamp:O", title="Time"),
                             y=alt.Y("response_time:Q", title="Response Time (s)"),
@@ -2975,6 +2980,45 @@ def render_sidebar():
                         )
                         .properties(title="Response Time Trend")
                     )
+                    
+                    # Apply theme-specific configuration
+                    if is_dark_theme:
+                        # Configure for dark theme
+                        chart = chart.configure_view(
+                            strokeWidth=0,
+                            fill='#0e1117'  # Dark background color matching Streamlit dark theme
+                        ).configure_axis(
+                            labelColor='white',
+                            titleColor='white',
+                            gridColor='#444444',
+                            domainColor='white'
+                        ).configure_title(
+                            color='white'
+                        ).configure_legend(
+                            labelColor='white',
+                            titleColor='white'
+                        ).configure(
+                            background='#0e1117'  # Set overall chart background
+                        )
+                    else:
+                        # Configure for light theme (default)
+                        chart = chart.configure_view(
+                            strokeWidth=0,
+                            fill='white'  # Light background color
+                        ).configure_axis(
+                            labelColor='black',
+                            titleColor='black',
+                            gridColor='#e0e0e0',
+                            domainColor='black'
+                        ).configure_title(
+                            color='black'
+                        ).configure_legend(
+                            labelColor='black',
+                            titleColor='black'
+                        ).configure(
+                            background='white'  # Set overall chart background
+                        )
+                    
                     st.altair_chart(chart, use_container_width=True)
 
             st.subheader("🔧 Recent Tool Calls")
@@ -3054,19 +3098,47 @@ def render_sidebar():
             else:
                 st.info("No debug metrics available yet.")
 
-        # Power off button at the bottom of the sidebar
-        st.markdown("---")
-        st.header("🚨 System Control")
-        if st.button(
-            "🔴 Power Off System",
-            key="sidebar_power_off_btn",
-            type="primary",
-            use_container_width=True,
-        ):
-            # Show confirmation dialog
-            st.session_state["show_power_off_confirmation"] = True
-            st.rerun()
+            # REST API (debug-only) moved to sidebar to avoid cluttering pages
+            if False and st.session_state.get(SESSION_KEY_SHOW_DEBUG):
+                st.subheader("📡 REST API")
+                if st.session_state.get("rest_api_server"):
+                    st.success("🌐 REST API server running on http://localhost:8001")
+                    with st.expander("📡 REST API Endpoints", expanded=False):
+                        st.markdown("""
+            **Memory Endpoints:**
+            - `POST /api/v1/memory/store` - Store text as memory
+            - `POST /api/v1/memory/store-url` - Store content from URL as memory
+            - `GET /api/v1/memory/search?q=query` - Search memories
+            - `GET /api/v1/memory/list` - List all memories
+            - `GET /api/v1/memory/stats` - Get memory statistics
 
+            **Knowledge Endpoints:**
+            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
+            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
+            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
+            - `GET /api/v1/knowledge/status` - Get knowledge base status
+
+            **System Endpoints:**
+            - `GET /api/v1/health` - Health check
+            - `GET /api/v1/status` - System status
+
+            **Example Usage:**
+            ```bash
+            # Store memory
+            curl -X POST http://localhost:8001/api/v1/memory/store \\
+              -H "Content-Type: application/json" \\
+              -d '{"content": "I work at Google", "topics": ["work"]}'
+
+            # Store knowledge from URL
+            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
+              -H "Content-Type: application/json" \\
+              -d '{"url": "https://example.com/article", "title": "Important Article"}'
+            ```
+                        """)
+                else:
+                    st.warning("⚠️ REST API server failed to start")
+
+        # Show recent request details above system controls to keep power button last
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
             st.subheader("🔍 Recent Request Details")
             if st.session_state[SESSION_KEY_DEBUG_METRICS]:
@@ -3087,6 +3159,60 @@ def render_sidebar():
                             )
             else:
                 st.info("No debug metrics available yet.")
+
+        # REST API (debug-only) placed below Recent Request Details
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
+            st.subheader("📡 REST API")
+            if st.session_state.get("rest_api_server"):
+                st.success("🌐 REST API server running on http://localhost:8001")
+                with st.expander("📡 REST API Endpoints", expanded=False):
+                    st.markdown("""
+            **Memory Endpoints:**
+            - `POST /api/v1/memory/store` - Store text as memory
+            - `POST /api/v1/memory/store-url` - Store content from URL as memory
+            - `GET /api/v1/memory/search?q=query` - Search memories
+            - `GET /api/v1/memory/list` - List all memories
+            - `GET /api/v1/memory/stats` - Get memory statistics
+
+            **Knowledge Endpoints:**
+            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
+            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
+            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
+            - `GET /api/v1/knowledge/status` - Get knowledge base status
+
+            **System Endpoints:**
+            - `GET /api/v1/health` - Health check
+            - `GET /api/v1/status` - System status
+
+            **Example Usage:**
+            ```bash
+            # Store memory
+            curl -X POST http://localhost:8001/api/v1/memory/store \\
+              -H "Content-Type: application/json" \\
+              -d '{"content": "I work at Google", "topics": ["work"]}'
+
+            # Store knowledge from URL
+            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
+              -H "Content-Type: application/json" \\
+              -d '{"url": "https://example.com/article", "title": "Important Article"}'
+            ```
+                    """)
+            else:
+                st.warning("⚠️ REST API server failed to start")
+
+        # Power off button at the bottom of the sidebar
+        st.markdown("---")
+        st.header("🚨 System Control")
+        if st.button(
+            "🔴 Power Off System",
+            key="sidebar_power_off_btn",
+            type="primary",
+            use_container_width=True,
+        ):
+            # Show confirmation dialog
+            st.session_state["show_power_off_confirmation"] = True
+            st.rerun()
+
 
 
 def main():
@@ -3160,7 +3286,7 @@ def main():
     )
     
     # Show REST API status
-    if st.session_state.get("rest_api_server"):
+    if False and st.session_state.get("rest_api_server"):
         st.success("🌐 REST API server running on http://localhost:8001")
         with st.expander("📡 REST API Endpoints", expanded=False):
             st.markdown("""
@@ -3194,8 +3320,8 @@ def main():
               -d '{"url": "https://example.com/article", "title": "Important Article"}'
             ```
             """)
-    else:
-        st.warning("⚠️ REST API server failed to start")
+    elif False:
+        pass
 
     # Power off button moved to bottom of sidebar (in render_sidebar function)
 

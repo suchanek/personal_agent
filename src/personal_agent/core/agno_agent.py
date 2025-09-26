@@ -634,7 +634,8 @@ class AgnoPersonalAgent(Agent):
             self._collected_tool_calls = []
 
             # Handle both iterator and single response cases
-            if hasattr(run_result, "__iter__"):
+            try:
+                # Try to iterate over the result
                 for chunk in run_result:  # Use regular for loop, not async for
                     # Store the last response for tool call extraction
                     self._last_response = chunk
@@ -642,8 +643,8 @@ class AgnoPersonalAgent(Agent):
                     # Collect content from chunks
                     if hasattr(chunk, "content") and chunk.content:
                         content_parts.append(chunk.content)
-            else:
-                # Single response case
+            except TypeError:
+                # Single response case - not iterable
                 self._last_response = run_result
                 if hasattr(run_result, "content") and run_result.content:
                     content_parts.append(run_result.content)
