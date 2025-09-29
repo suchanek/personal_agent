@@ -319,6 +319,21 @@ async def initialize_agent_async(
 
 def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False):
     """Sync wrapper for agent initialization."""
+    # Update the environment variable to ensure all components use the new model
+    import os
+    old_model = os.environ.get("LLM_MODEL")
+    os.environ["LLM_MODEL"] = model_name
+    logger.info(f"🔄 Updated LLM_MODEL environment variable from '{old_model}' to '{model_name}'")
+    
+    # Force refresh of config module to pick up new environment variable
+    try:
+        import importlib
+        from personal_agent import config
+        importlib.reload(config.settings)
+        logger.info("🔄 Refreshed config.settings module to pick up new LLM_MODEL")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not refresh config module: {e}")
+    
     # Note: ollama_url parameter is kept for compatibility but not used
     # The use_remote flag from args is used instead
     return asyncio.run(
@@ -356,6 +371,21 @@ def _run_async_team_init(coro):
 def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
     """Initialize the team using the reasoning_team create_team function."""
     try:
+        # Update the environment variable to ensure all components use the new model
+        import os
+        old_model = os.environ.get("LLM_MODEL")
+        os.environ["LLM_MODEL"] = model_name
+        logger.info(f"🔄 Updated LLM_MODEL environment variable from '{old_model}' to '{model_name}'")
+        
+        # Force refresh of config module to pick up new environment variable
+        try:
+            import importlib
+            from personal_agent import config
+            importlib.reload(config.settings)
+            logger.info("🔄 Refreshed config.settings module to pick up new LLM_MODEL")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not refresh config module: {e}")
+        
         logger.info(f"Initializing team with model {model_name} at {ollama_url}")
 
         # SIMPLIFIED: Just pass the --remote flag directly!

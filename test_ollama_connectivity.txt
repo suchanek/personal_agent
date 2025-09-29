@@ -1,1 +1,0 @@
-This is a test document to verify that the Ollama connectivity issue has been resolved. The LightRAG server should now be able to successfully connect to Ollama running on the host machine and process this document using the qwen3:1.7b model for text generation and nomic-embed-text for embeddings.
