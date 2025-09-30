@@ -52,6 +52,7 @@ from .settings import (
     get_env_bool,
     get_env_var,
     get_package_version,
+    get_provider_default_model,
     get_qwen_instruct_settings,
     get_qwen_thinking_settings,
 )
@@ -155,6 +156,7 @@ __all__ = [
     "get_env_var",
     "get_mcp_servers",
     "get_package_version",
+    "get_provider_default_model",
     "get_qwen_instruct_settings",
     "get_qwen_thinking_settings",
     "get_settings",
