@@ -153,7 +153,20 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
     try:
         from personal_agent.config import DATA_DIR, PERSAG_HOME
         from personal_agent.core.user_manager import UserManager
-        from personal_agent.core.docker_integration import ensure_docker_user_consistency
+        from personal_agent.core.docker_integration import (
+            ensure_docker_user_consistency,
+            stop_lightrag_services,
+        )
+
+        # Shut down services before switching user to ensure a clean restart
+        if restart_services:
+            print_step("SHUTDOWN", "Stopping LightRAG services before user switch...")
+            success, message = stop_lightrag_services()
+            if success:
+                print_success("LightRAG services stopped successfully.")
+            else:
+                # This is a warning because services might already be stopped
+                print_warning(f"Could not stop all LightRAG services: {message}")
 
         user_manager = UserManager(data_dir=DATA_DIR, project_root=PERSAG_HOME)
 
@@ -162,7 +175,7 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
         # Perform the user switch
         result = user_manager.switch_user(
             user_id=user_id,
-            restart_lightrag=False, # We will handle this with the more robust docker_integration module
+            restart_lightrag=False,  # We handle this with the docker_integration module
             update_global_config=True,
         )
 
@@ -193,7 +206,9 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
             # Restart services using the robust docker_integration module
             if restart_services:
                 print_step("SYNC", "Ensuring Docker services are synchronized...")
-                success, message = ensure_docker_user_consistency(user_id=user_id, auto_fix=True, force_restart=True)
+                success, message = ensure_docker_user_consistency(
+                    user_id=user_id, auto_fix=True, force_restart=True
+                )
                 if success:
                     print_success("Docker services synchronized successfully.")
                 else:
