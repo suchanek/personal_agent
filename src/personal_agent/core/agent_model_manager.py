@@ -14,6 +14,7 @@ from agno.models.openai import OpenAIChat
 from agno.models.lmstudio import LMStudio
 
 from ..config import settings
+from ..config.settings import get_effective_model_name
 from ..config.model_contexts import get_model_parameters_dict
 from ..utils import setup_logging
 
@@ -26,7 +27,7 @@ class AgentModelManager:
     def __init__(
         self,
         model_provider: str,
-        model_name: str,
+        model_name: str = None,
         ollama_base_url: str = "",
         openai_base_url: Optional[str] = None,
         lmstudio_base_url: Optional[str] = None,
@@ -36,18 +37,21 @@ class AgentModelManager:
 
         Args:
             model_provider: LLM provider ('ollama', 'openai', or 'lm-studio')
-            model_name: Model name to use
+            model_name: Model name to use (optional - will use provider default if not specified)
             ollama_base_url: Base URL for Ollama API (empty string lets manager decide)
             openai_base_url: Optional base URL for OpenAI-compatible APIs.
             lmstudio_base_url: Optional base URL for LM Studio API.
             seed: Optional seed for model reproducibility
         """
         self.model_provider = model_provider
-        self.model_name = model_name
+        # Use provider-specific default model if none specified or incompatible
+        self.model_name = get_effective_model_name(model_provider, model_name)
         self.ollama_base_url = ollama_base_url
         self.openai_base_url = openai_base_url
         self.lmstudio_base_url = lmstudio_base_url
         self.seed = seed
+
+        logger.info(f"AgentModelManager initialized for provider '{model_provider}' with model '{self.model_name}'")
 
     def create_model(self, use_remote: bool = False) -> Union[OpenAIChat, Ollama, LMStudio]:
         """Create the appropriate model instance based on provider.

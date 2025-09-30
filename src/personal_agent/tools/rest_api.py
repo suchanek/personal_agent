@@ -257,7 +257,7 @@ class PersonalAgentRestAPI:
                     )
                     return jsonify(
                         {
-                            "success": True,
+                            "success": "True",
                             "message": message,
                             "memory_id": memory_id,
                             "topics": generated_topics,
@@ -357,7 +357,7 @@ class PersonalAgentRestAPI:
                     logger.info(f"Successfully stored memory from URL via API: {url}")
                     return jsonify(
                         {
-                            "success": True,
+                            "success": "True",
                             "message": message,
                             "memory_id": memory_id,
                             "topics": generated_topics,
@@ -415,7 +415,7 @@ class PersonalAgentRestAPI:
                 logger.info(f"Memory search via API: {query} - {len(results)} results")
                 return jsonify(
                     {
-                        "success": True,
+                        "success": "True",
                         "query": query,
                         "results": results,
                         "total_results": len(results),
@@ -461,7 +461,7 @@ class PersonalAgentRestAPI:
                 logger.info(f"Memory list via API: {len(results)} memories")
                 return jsonify(
                     {
-                        "success": True,
+                        "success": "True",
                         "memories": results,
                         "total_count": len(results),
                         "limit": limit,
@@ -487,7 +487,7 @@ class PersonalAgentRestAPI:
                     return jsonify({"error": stats["error"]}), 500
 
                 logger.info("Memory stats retrieved via API")
-                return jsonify({"success": True, "stats": stats})
+                return jsonify({"success": "True", "stats": stats})
 
             except Exception as e:
                 logger.error(f"Error getting memory stats via API: {e}")
@@ -535,7 +535,7 @@ class PersonalAgentRestAPI:
                     logger.info(f"Successfully stored knowledge text via API: {title}")
                     return jsonify(
                         {
-                            "success": True,
+                            "success": "True",
                             "message": result,
                             "title": title,
                             "content_length": len(content),
@@ -544,11 +544,11 @@ class PersonalAgentRestAPI:
                     )
                 else:
                     logger.warning(f"Failed to store knowledge text via API: {result}")
-                    return jsonify({"error": result}), 400
+                    return jsonify({"success": "False", "error": result}), 400
 
             except Exception as e:
                 logger.error(f"Error storing knowledge text via API: {e}")
-                return jsonify({"error": str(e)}), 500
+                return jsonify({"success": "False", "error": str(e)}), 500
 
         @self.app.route("/api/v1/knowledge/store-url", methods=["POST"])
         def store_knowledge_from_url():
@@ -587,7 +587,7 @@ class PersonalAgentRestAPI:
                     )
                     return jsonify(
                         {
-                            "success": True,
+                            "success": "True",
                             "message": result,
                             "url": url,
                             "title": title or parsed_url.netloc,
@@ -597,11 +597,11 @@ class PersonalAgentRestAPI:
                     logger.warning(
                         f"Failed to store knowledge from URL via API: {result}"
                     )
-                    return jsonify({"error": result}), 400
+                    return jsonify({"success": "False", "error": result}), 400
 
             except Exception as e:
                 logger.error(f"Error storing knowledge from URL via API: {e}")
-                return jsonify({"error": str(e)}), 500
+                return jsonify({"success": "False", "error": str(e)}), 500
 
         @self.app.route("/api/v1/knowledge/search", methods=["GET"])
         def search_knowledge():
@@ -631,7 +631,7 @@ class PersonalAgentRestAPI:
                 logger.info(f"Knowledge search via API: {query}")
                 return jsonify(
                     {
-                        "success": True,
+                        "success": "True",
                         "query": query,
                         "mode": mode,
                         "limit": limit,
@@ -641,7 +641,7 @@ class PersonalAgentRestAPI:
 
             except Exception as e:
                 logger.error(f"Error searching knowledge via API: {e}")
-                return jsonify({"error": str(e)}), 500
+                return jsonify({"success": "False", "error": str(e)}), 500
 
         @self.app.route("/api/v1/knowledge/status", methods=["GET"])
         def knowledge_status():
@@ -673,11 +673,11 @@ class PersonalAgentRestAPI:
                     status["lightrag_available"] = False
 
                 logger.info("Knowledge status retrieved via API")
-                return jsonify({"success": True, "status": status})
+                return jsonify({"success": "True", "status": status})
 
             except Exception as e:
                 logger.error(f"Error getting knowledge status via API: {e}")
-                return jsonify({"error": str(e)}), 500
+                return jsonify({"success": "False", "error": str(e)}), 500
 
     def _get_memory_helper(self):
         """Get memory helper from global state."""

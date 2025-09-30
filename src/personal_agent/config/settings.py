@@ -158,6 +158,13 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 # Update logger level to use the configured level
 logger.setLevel(LOG_LEVEL)
 
+# Provider-specific default models
+PROVIDER_DEFAULT_MODELS = {
+    "ollama": "qwen3:4b",
+    "lm-studio": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+    "openai": "gpt-4o-mini",
+}
+
 # LLM Model configuration
 LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7b")
 
@@ -198,6 +205,69 @@ def get_qwen_thinking_settings() -> dict:
         "min_p": float(QWEN_THINKING_MIN_P),
         "top_p": float(QWEN_THINKING_TOP_P),
     }
+
+
+def get_provider_default_model(provider: str) -> str:
+    """Get the default model for a specific provider.
+
+    Args:
+        provider: The provider name ('ollama', 'lm-studio', 'openai')
+
+    Returns:
+        str: The default model name for the provider
+    """
+    return PROVIDER_DEFAULT_MODELS.get(provider, "qwen3:1.7b")
+
+
+def get_effective_model_name(provider: str, specified_model: str = None) -> str:
+    """Get the effective model name to use, with provider-specific defaults.
+
+    If no model is specified or the specified model appears incompatible with the provider,
+    returns the provider's default model. Otherwise returns the specified model.
+
+    Args:
+        provider: The provider name ('ollama', 'lm-studio', 'openai')
+        specified_model: The model name specified by user (can be None)
+
+    Returns:
+        str: The effective model name to use
+    """
+    if not specified_model or specified_model.strip() == "":
+        logger.info(
+            f"No model specified for provider '{provider}', using default: {get_provider_default_model(provider)}"
+        )
+        return get_provider_default_model(provider)
+
+    # Basic compatibility checks - if model seems incompatible with provider, use default
+    specified_model_lower = specified_model.lower()
+
+    if provider == "openai":
+        # OpenAI models should not contain colons (Ollama-style) or end with -mlx (MLX-style)
+        if ":" in specified_model or specified_model.endswith("-mlx"):
+            logger.warning(
+                f"Model '{specified_model}' appears incompatible with OpenAI provider, using default"
+            )
+            return get_provider_default_model(provider)
+    elif provider == "lm-studio":
+        # LM Studio models typically end with -mlx or are specific LM Studio models
+        # Allow some flexibility but warn about obvious mismatches
+        if specified_model.startswith("gpt-") and not any(
+            term in specified_model_lower for term in ["mlx", "lm", "studio"]
+        ):
+            logger.warning(
+                f"Model '{specified_model}' appears to be an OpenAI model used with LM Studio provider, using default"
+            )
+            return get_provider_default_model(provider)
+    elif provider == "ollama":
+        # Ollama models typically contain colons or are specific Ollama model names
+        # Allow some flexibility but warn about obvious OpenAI models
+        if specified_model.startswith("gpt-") and ":" not in specified_model:
+            logger.warning(
+                f"Model '{specified_model}' appears to be an OpenAI model used with Ollama provider, using default"
+            )
+            return get_provider_default_model(provider)
+
+    return specified_model
 
 
 # Docker environment variables for LightRAG containers

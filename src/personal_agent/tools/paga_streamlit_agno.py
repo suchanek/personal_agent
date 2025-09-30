@@ -139,10 +139,12 @@ from personal_agent.config import (
     LIGHTRAG_URL,
     LLM_MODEL,
     OLLAMA_URL,
+    PROVIDER,
     REMOTE_LMSTUDIO_URL,
     REMOTE_OLLAMA_URL,
     USER_DATA_DIR,
     get_current_user_id,
+    get_provider_default_model,
     get_qwen_instruct_settings,
     get_qwen_thinking_settings,
 )
@@ -2646,8 +2648,79 @@ def render_sidebar():
             st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
             st.rerun()
 
+        st.header("Provider Selection")
+
+        # Provider selector
+        available_providers = ["ollama", "lm-studio", "openai"]
+        current_provider = os.getenv("PROVIDER", "ollama")
+
+        selected_provider = st.selectbox(
+            "Select AI Provider:",
+            available_providers,
+            index=available_providers.index(current_provider) if current_provider in available_providers else 0,
+            help="Choose your AI model provider. Each provider has different default models."
+        )
+
+        # Show provider-specific information
+        if selected_provider == "ollama":
+            st.caption("🐳 **Ollama**: Local models, full control, no API costs")
+            default_model = get_provider_default_model("ollama")
+        elif selected_provider == "lm-studio":
+            st.caption("🎭 **LM Studio**: Local models with user-friendly interface")
+            default_model = get_provider_default_model("lm-studio")
+        elif selected_provider == "openai":
+            st.caption("🔗 **OpenAI**: Cloud models, requires API key")
+            default_model = get_provider_default_model("openai")
+
+        st.caption(f"📋 **Default Model:** {default_model}")
+
+        # Apply provider change
+        if selected_provider != current_provider:
+            if st.button(f"🔄 Switch to {selected_provider.title()}", type="primary"):
+                with st.spinner(f"Switching to {selected_provider.title()} provider..."):
+                    # Update environment variable
+                    os.environ["PROVIDER"] = selected_provider
+
+                    # Update default model to provider default
+                    new_default_model = get_provider_default_model(selected_provider)
+                    os.environ["LLM_MODEL"] = new_default_model
+
+                    # Force refresh of config module
+                    try:
+                        import importlib
+                        from personal_agent import config
+                        importlib.reload(config.settings)
+                        logger.info(f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not refresh config module: {e}")
+
+                    # Clear available models cache to force refresh
+                    if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
+                        del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+
+                    # Update current model in session state
+                    st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
+
+                    # Update URL based on provider
+                    if selected_provider == "lm-studio":
+                        if args.remote:
+                            new_url = REMOTE_LMSTUDIO_URL
+                        else:
+                            new_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
+                        if new_url.endswith("/v1"):
+                            new_url = new_url[:-3]  # Remove /v1 for consistency
+                    elif selected_provider == "openai":
+                        new_url = "https://api.openai.com/v1"
+                    else:  # ollama
+                        new_url = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
+
+                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_url
+
+                    st.success(f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}")
+                    st.rerun()
+
         st.header("Model Selection")
-        
+
         # Show current provider prominently
         provider = os.getenv("PROVIDER", "ollama")
         provider_display = provider.upper() if provider == "ollama" else "LM Studio" if provider == "lm-studio" else provider.title()
