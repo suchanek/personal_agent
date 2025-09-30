@@ -472,6 +472,32 @@ class DockerUserSync:
             logger.error("Unexpected error starting Docker service in %s: %s", server_dir, e)
             return False
 
+    def stop_all_services(self) -> bool:
+        """Stop all configured Docker services.
+
+        Returns:
+            True if all running services were stopped successfully, False otherwise.
+        """
+        print(f"\n{Colors.PURPLE}🛑 Stopping all Docker services...{Colors.NC}")
+        print("=" * 60)
+
+        all_stopped = True
+        for server_name, config in self.docker_configs.items():
+            if self.is_container_running(config["container_name"]):
+                print(f"{Colors.CYAN}   Stopping {server_name}...{Colors.NC}")
+                if not self.stop_docker_service(config):
+                    logger.error(f"Failed to stop {server_name}")
+                    all_stopped = False
+            else:
+                print(f"{Colors.GREEN}   ✅ {server_name} is already stopped.{Colors.NC}")
+        
+        if all_stopped:
+            print(f"\n{Colors.GREEN}🎉 All Docker services stopped successfully!{Colors.NC}")
+        else:
+            print(f"\n{Colors.RED}❌ Some services could not be stopped. Check logs.{Colors.NC}")
+
+        return all_stopped
+
     def check_user_id_consistency(self) -> Dict[str, Dict]:
         """Check USER_ID consistency across all Docker configurations.
 

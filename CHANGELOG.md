@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.8.7dev] - 2025-09-30
+
+### Changed
+- **Robust User Switching**: The `switch-user.py` script now explicitly shuts down all LightRAG Docker services *before* switching the user context and then restarts them. This prevents potential race conditions and ensures a clean, reliable transition between users. See [ADR-093](./refs/adr/093-robust-docker-shutdown-for-user-switching.md) for details.
+
 ## [v0.8.7dev] - 2025-09-25
 
 ### Added
