@@ -113,14 +113,44 @@ def _render_memory_explorer():
         )
     
     with col2:
-        # Default date range: 5 days ago to today
-        default_start_date = datetime.now().date() - timedelta(days=5)
-        default_end_date = datetime.now().date()
-        
+        # Get all memories to determine the full date range
+        try:
+            all_memories = memory_helper.get_all_memories()
+            memory_dates = []
+
+            for memory in all_memories:
+                last_updated = getattr(memory, 'last_updated', None)
+                if last_updated:
+                    try:
+                        # Convert memory date to date object
+                        if isinstance(last_updated, str):
+                            # Try to parse the date string (assuming YYYY-MM-DD format)
+                            memory_date = datetime.strptime(last_updated.split()[0], '%Y-%m-%d').date()
+                        elif hasattr(last_updated, 'date'):
+                            memory_date = last_updated.date()
+                        else:
+                            memory_date = last_updated
+                        memory_dates.append(memory_date)
+                    except (ValueError, AttributeError):
+                        pass
+
+            if memory_dates:
+                default_start_date = min(memory_dates)
+                default_end_date = max(memory_dates)
+            else:
+                # Fallback to last 5 days if no memories have dates
+                default_start_date = datetime.now().date() - timedelta(days=5)
+                default_end_date = datetime.now().date()
+
+        except Exception:
+            # Fallback to last 5 days if there's an error
+            default_start_date = datetime.now().date() - timedelta(days=5)
+            default_end_date = datetime.now().date()
+
         date_range = st.date_input(
             "Date Range",
             value=[default_start_date, default_end_date],
-            help="Filter memories by date range (defaults to last 5 days)"
+            help="Filter memories by date range (automatically set to encompass all memory dates)"
         )
     
     with col3:

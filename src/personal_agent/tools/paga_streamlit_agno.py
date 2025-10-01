@@ -1820,12 +1820,103 @@ def render_memory_tab():
     st.subheader("📚 Browse All Memories")
     st.markdown("*View, edit, and manage all stored memories*")
 
+    # Date range filter like dashboard
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        memory_type = st.selectbox(
+            "Memory Type",
+            ["All", "Conversation", "Document", "Tool", "System"],
+            help="Filter memories by type"
+        )
+
+    with col2:
+        # Get all memories to determine the full date range
+        try:
+            all_memories = memory_helper.get_all_memories()
+            memory_dates = []
+
+            for memory in all_memories:
+                last_updated = getattr(memory, 'last_updated', None)
+                if last_updated:
+                    try:
+                        # Convert memory date to date object
+                        if isinstance(last_updated, str):
+                            # Try to parse the date string (assuming YYYY-MM-DD format)
+                            memory_date = datetime.strptime(last_updated.split()[0], '%Y-%m-%d').date()
+                        elif hasattr(last_updated, 'date'):
+                            memory_date = last_updated.date()
+                        else:
+                            memory_date = last_updated
+                        memory_dates.append(memory_date)
+                    except (ValueError, AttributeError):
+                        pass
+
+            if memory_dates:
+                default_start_date = min(memory_dates)
+                default_end_date = max(memory_dates)
+            else:
+                # Fallback to last 5 days if no memories have dates
+                default_start_date = datetime.now().date() - timedelta(days=5)
+                default_end_date = datetime.now().date()
+
+        except Exception:
+            # Fallback to last 5 days if there's an error
+            default_start_date = datetime.now().date() - timedelta(days=5)
+            default_end_date = datetime.now().date()
+
+        date_range = st.date_input(
+            "Date Range",
+            value=[default_start_date, default_end_date],
+            help="Filter memories by date range (automatically set to encompass all memory dates)"
+        )
+
+    with col3:
+        limit = st.number_input(
+            "Limit",
+            min_value=10,
+            max_value=1000,
+            value=100,
+            step=10,
+            help="Maximum number of memories to display"
+        )
+
     # Auto-load memories like the dashboard does (no button required)
     try:
-        memories = memory_helper.get_all_memories()
-        if memories:
-            st.info(f"Found {len(memories)} total memories")
-            for memory in memories:
+        raw_memories = memory_helper.get_all_memories()
+
+        # Apply date range filter if specified
+        filtered_memories = raw_memories
+        if len(date_range) == 2:
+            start_date, end_date = date_range
+            filtered_memories = []
+            for memory in raw_memories:
+                memory_date = getattr(memory, 'last_updated', None)
+                if memory_date:
+                    try:
+                        # Convert memory date to date object for comparison
+                        if isinstance(memory_date, str):
+                            # Try to parse the date string (assuming YYYY-MM-DD format)
+                            memory_date = datetime.strptime(memory_date.split()[0], '%Y-%m-%d').date()
+                        elif hasattr(memory_date, 'date'):
+                            memory_date = memory_date.date()
+
+                        # Check if memory date is within range
+                        if start_date <= memory_date <= end_date:
+                            filtered_memories.append(memory)
+                    except (ValueError, AttributeError):
+                        # If date parsing fails, include the memory
+                        filtered_memories.append(memory)
+                else:
+                    # If no date, include the memory
+                    filtered_memories.append(memory)
+
+        # Apply limit
+        filtered_memories = filtered_memories[:limit]
+
+        if filtered_memories:
+            st.info(f"Displaying {len(filtered_memories)} of {len(raw_memories)} total memories")
+            for memory in filtered_memories:
                 with st.expander(f"Memory: {memory.memory[:50]}..."):
                     st.write(f"**Content:** {memory.memory}")
                     st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
