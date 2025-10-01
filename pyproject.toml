@@ -216,9 +216,9 @@ cmd = "python analysis/test_comprehensive_research.py"
 # === Streamlit Dashboard ===
 [tool.poe.tasks.dashboard]
 help = "Start Streamlit dashboard"
-cmd = "streamlit run src/personal_agent/streamlit/dashboard.py"
+cmd = "streamlit run src/personal_agent/streamlit/dashboard.py --server.port 8502"
 args = [
-  { name = "port", options = ["--server.port"], default = "8501", help = "Streamlit port" }
+  { name = "port", options = ["--server.port"], default = "8502", help = "Streamlit port" }
 ]
 
 # === Utility Tasks ===
