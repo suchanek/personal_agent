@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.8.7dev] - 2025-10-01
+
+### Added
+- **Dynamic Memory Timestamps**: Both the main agent UI and the management dashboard now display memories with dynamic, human-readable timestamps (e.g., '3 days ago,' 'at age 25'), providing a more intuitive and chronological view of memories. See [ADR-094](./refs/adr/094-unified-memory-display-and-dashboard.md) for details.
+
+### Fixed
+- **User Switching**: Resolved an issue in the user management system to ensure stable and reliable switching between user contexts.
+
 ## [v0.8.7dev] - 2025-09-30
 
 ### Changed

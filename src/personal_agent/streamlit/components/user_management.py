@@ -16,6 +16,10 @@ import streamlit as st
 
 # Import project modules
 from personal_agent.core.docker.user_sync import DockerUserSync
+from personal_agent.core.docker_integration import (
+    ensure_docker_user_consistency,
+    stop_lightrag_services,
+)
 from personal_agent.streamlit.utils.user_utils import (
     create_new_user,
     delete_user,
@@ -517,7 +521,187 @@ def _render_profile_management():
 def _render_switch_user():
     """Interface for switching between users."""
     st.subheader("Switch User")
-    st.info("Switch to a different user account.")
+
+    try:
+        # Get all users
+        users = get_all_users()
+        user_ids = [user["user_id"] for user in users]
+
+        if user_ids:
+            # Get current user
+            current_user_id = os.getenv("USER_ID", "Unknown")
+
+            # Display current user status
+            st.info(f"**Current User:** {current_user_id}")
+
+            # Filter out current user from selection
+            available_users = [uid for uid in user_ids if uid != current_user_id]
+
+            if available_users:
+                # User selection dropdown
+                st.write("**Select User to Switch To:**")
+                selected_user = st.selectbox(
+                    "Available Users",
+                    [""] + available_users,
+                    help="Choose the user you want to switch to",
+                    key="switch_user_selectbox"
+                )
+
+                if selected_user:
+                    # Show selected user details
+                    user_details = get_user_details(selected_user)
+                    if user_details:
+                        st.success(f"**Selected:** {user_details.get('user_name', selected_user)} ({selected_user})")
+
+                        # Display user information
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("**User Details:**")
+                            st.write(f"• User ID: {user_details.get('user_id', 'N/A')}")
+                            st.write(f"• Name: {user_details.get('user_name', 'N/A')}")
+                            st.write(f"• Type: {user_details.get('user_type', 'N/A')}")
+
+                        with col2:
+                            st.write("**Profile Status:**")
+                            cognitive_state = user_details.get("cognitive_state", 50)
+                            st.write(f"• Cognitive State: {cognitive_state}/100")
+                            st.progress(cognitive_state / 100)
+
+                            profile_summary = user_details.get("profile_summary", {})
+                            if profile_summary and not profile_summary.get("error"):
+                                completion = profile_summary.get("completion_percentage", 0)
+                                st.write(f"• Profile Complete: {completion:.1f}%")
+                                st.progress(completion / 100)
+
+                        # Warning about switching
+                        st.warning("⚠️ **Important:** Switching users will:")
+                        st.write("• Change the active user context")
+                        st.write("• Restart Docker services with new user data")
+                        st.write("• Update all user-dependent configurations")
+                        st.write("• May take a few moments to complete")
+
+                        # Switch button
+                        if st.button(
+                            f"🔄 Switch to {user_details.get('user_name', selected_user)}",
+                            type="primary",
+                            use_container_width=True
+                        ):
+                                # Perform the switch
+                                with st.spinner(f"Switching to user '{selected_user}'... This may take a moment."):
+                                    try:
+                                        # Shut down services before switching user to ensure a clean restart
+                                        success, message = stop_lightrag_services()
+                                        if success:
+                                            st.info("LightRAG services stopped successfully.")
+                                        else:
+                                            # This is a warning because services might already be stopped
+                                            st.warning(f"Could not stop all LightRAG services: {message}")
+
+                                        # Perform user switch without restarting services
+                                        result = switch_user(selected_user, restart_containers=False)
+
+                                        if result["success"]:
+                                            # Restart services using the robust docker_integration module
+                                            st.info("Ensuring Docker services are synchronized...")
+                                            success, message = ensure_docker_user_consistency(
+                                                user_id=selected_user, auto_fix=True, force_restart=True
+                                            )
+                                            if success:
+                                                st.success("✅ Docker services synchronized successfully.")
+                                            else:
+                                                st.error(f"❌ Docker synchronization failed: {message}")
+                                                st.warning("User switch completed but service restart failed. You may need to restart services manually.")
+
+                                            st.success("✅ **User switched successfully!**")
+
+                                            # Display success details
+                                            st.info("**Switch completed successfully:**")
+                                            if result.get("actions_performed"):
+                                                for action in result["actions_performed"]:
+                                                    st.write(f"• {action}")
+
+                                            # Show new user status
+                                            st.info(f"**Now active as:** {selected_user}")
+
+                                            # Clear cached user manager to refresh user list
+                                            from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                            get_user_manager.clear()
+
+                                            # Success message with refresh suggestion
+                                            st.success("🎉 **Switch Complete!** You may need to refresh the page to see all changes take effect.")
+
+                                        else:
+                                            error_msg = result.get("error", "Unknown error")
+                                            st.error(f"❌ **Switch failed:** {error_msg}")
+
+                                            # Show any partial results or warnings
+                                            if result.get("warnings"):
+                                                st.warning("Warnings during switch:")
+                                                for warning in result["warnings"]:
+                                                    st.write(f"• {warning}")
+
+                                    except Exception as e:
+                                        st.error(f"❌ **Error during user switch:** {str(e)}")
+                                        st.info("If this error persists, try using the command-line switch-user.py script instead.")
+
+                        # Alternative: Quick switch without confirmation (for power users)
+                        with st.expander("⚡ Quick Switch (Advanced)"):
+                            st.warning("This bypasses the confirmation dialog. Use with caution!")
+                            if st.button(
+                                f"⚡ Quick Switch to {user_details.get('user_name', selected_user)}",
+                                type="secondary"
+                            ):
+                                with st.spinner(f"Quick switching to user '{selected_user}'..."):
+                                    try:
+                                        # Shut down services before switching user
+                                        success, message = stop_lightrag_services()
+                                        if success:
+                                            st.info("LightRAG services stopped successfully.")
+                                        else:
+                                            st.warning(f"Could not stop all LightRAG services: {message}")
+
+                                        # Perform user switch without restarting services
+                                        result = switch_user(selected_user, restart_containers=False)
+
+                                        if result["success"]:
+                                            # Restart services using the robust docker_integration module
+                                            st.info("Ensuring Docker services are synchronized...")
+                                            success, message = ensure_docker_user_consistency(
+                                                user_id=selected_user, auto_fix=True, force_restart=True
+                                            )
+                                            if success:
+                                                st.success("✅ Docker services synchronized successfully.")
+                                            else:
+                                                st.error(f"❌ Docker synchronization failed: {message}")
+                                                st.warning("User switch completed but service restart failed. You may need to restart services manually.")
+
+                                            st.success("✅ **Quick switch completed!**")
+                                            st.info(f"**Now active as:** {selected_user}")
+
+                                            # Clear cached user manager
+                                            from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                            get_user_manager.clear()
+
+                                            st.success("🔄 Refreshing user data...")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ **Quick switch failed:** {result.get('error', 'Unknown error')}")
+
+                                    except Exception as e:
+                                        st.error(f"❌ **Error during quick switch:** {str(e)}")
+
+                    else:
+                        st.error(f"Could not retrieve details for user '{selected_user}'")
+                else:
+                    st.info("👆 Select a user from the dropdown above to switch to them.")
+            else:
+                st.info("ℹ️ No other users available to switch to. Create additional users first.")
+        else:
+            st.info("ℹ️ No users found. Create users first before switching.")
+
+    except Exception as e:
+        st.error(f"❌ Error loading switch user interface: {str(e)}")
+        st.info("Try refreshing the page or check the system logs for more details.")
 
 
 def _render_delete_user():

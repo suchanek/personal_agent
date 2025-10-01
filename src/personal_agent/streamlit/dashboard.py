@@ -139,6 +139,33 @@ def main():
         st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
         st.rerun()
 
+    # Display current user prominently near the top
+    st.sidebar.header("👤 Current User")
+    try:
+        from personal_agent.streamlit.utils.agent_utils import get_agent_instance, check_agent_status
+
+        agent = get_agent_instance()
+        if agent:
+            status = check_agent_status(agent)
+            user_id = status.get("user_id", "Unknown")
+            st.sidebar.info(f"**{user_id}**")
+        else:
+            # Fallback to direct user_id_mgr import if no agent
+            try:
+                from personal_agent.config.user_id_mgr import get_userid
+                st.sidebar.info(f"**{get_userid()}**")
+            except ImportError:
+                # Final fallback to environment variable
+                import os
+                user_id = os.getenv("USER_ID", "Unknown")
+                st.sidebar.info(f"**{user_id}**")
+    except Exception as e:
+        # Final fallback to environment variable
+        import os
+        user_id = os.getenv("USER_ID", "Unknown")
+        st.sidebar.info(f"**{user_id}**")
+        st.sidebar.caption(f"⚠️ User detection error: {str(e)}")
+
     # Sidebar navigation
     st.sidebar.title("🧠 PersonalAgent Dashboard")
 
@@ -155,32 +182,6 @@ def main():
         st.sidebar.caption(f"Personal Agent v{__version__}")
     except ImportError:
         st.sidebar.caption("Personal Agent")
-
-    # Display current user using the agent status system
-    try:
-        from personal_agent.streamlit.utils.agent_utils import get_agent_instance, check_agent_status
-        
-        agent = get_agent_instance()
-        if agent:
-            status = check_agent_status(agent)
-            user_id = status.get("user_id", "Unknown")
-            st.sidebar.caption(f"Current User: {user_id}")
-        else:
-            # Fallback to direct user_id_mgr import if no agent
-            try:
-                from personal_agent.config.user_id_mgr import get_userid
-                st.sidebar.caption(f"Current User: {get_userid()}")
-            except ImportError:
-                # Final fallback to environment variable
-                import os
-                user_id = os.getenv("USER_ID", "Unknown")
-                st.sidebar.caption(f"Current User: {user_id}")
-    except Exception as e:
-        # Final fallback to environment variable
-        import os
-        user_id = os.getenv("USER_ID", "Unknown")
-        st.sidebar.caption(f"Current User: {user_id}")
-        st.sidebar.caption(f"⚠️ User detection error: {str(e)}")
 
     # Power off button at the bottom of the sidebar
     st.sidebar.markdown("---")
