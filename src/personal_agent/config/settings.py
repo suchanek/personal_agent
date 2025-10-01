@@ -17,7 +17,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
 
-
 INSTRUCTION_LEVEL = "STANDARD"
 
 # see below for the ollama server urls
@@ -116,9 +115,9 @@ REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://100.100.248.61:1143
 REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234")
 
 # LMStudio URL configuration - defaults to localhost LMStudio, can be overridden in .env
-LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "")
+LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")
 # LMStudio base URL for dedicated lm-studio provider - defaults to user's remote endpoint
-LMSTUDIO_BASE_URL = get_env_var("LMSTUDIO_BASE_URL", "http://100.73.95.100:1234")
+LMSTUDIO_BASE_URL = get_env_var("LMSTUDIO_BASE_URL", "http://localhost:1234")
 # FIX: Corrected OpenAI API URL - was using chat.openai.com instead of api.openai.com
 OPENAI_URL = "https://api.openai.com/v1"
 
