@@ -1,156 +1,25 @@
 """
-Personal Agent Streamlit Web UI (Persag) - Unified Interface
-============================================================
+Streamlit Tabs
+==============
 
-This module provides the main web-based user interface for the Personal Agent system,
-built using Streamlit. It serves as a unified, comprehensive dashboard for interacting
-with both a single AI personal assistant and a multi-agent team, featuring memory,
-knowledge management, and advanced conversational capabilities.
+This module contains all tab rendering functions for the Personal Agent
+Streamlit application.
 
-The application allows users to dynamically switch between a single-agent mode for
-direct interaction and a team-based mode that leverages multiple specialized agents
-to accomplish complex tasks.
-
-Key Features
------------
-🤖 **Dual-Mode Conversational AI Interface**
-    - Real-time chat with a single agent (AgnoPersonalAgent) or a multi-agent team (PersonalAgentTeam).
-    - Dynamic mode switching between single-agent and team-based interaction at runtime.
-    - Streaming responses with real-time tool call visualization.
-    - Support for multiple LLM models via Ollama.
-    - Advanced debugging and performance metrics.
-
-🧠 **Memory Management System**
-    - Store, search, and manage personal facts and memories.
-    - Semantic similarity search with configurable thresholds.
-    - Topic-based categorization and organization.
-    - Synchronization between local SQLite and graph-based storage.
-    - Comprehensive memory statistics and analytics.
-
-📚 **Knowledge Base Management**
-    - Multi-format file upload support (PDF, DOCX, TXT, MD, HTML, etc.).
-    - Direct text content ingestion with format selection.
-    - Web content extraction from URLs.
-    - Dual search capabilities: SQLite/LanceDB and RAG-based.
-    - Advanced RAG query modes (naive, hybrid, local, global, mix, bypass).
-
-⚙️ **System Configuration**
-    - Dynamic agent/team mode selection.
-    - Dynamic model selection and switching.
-    - Ollama server configuration (local/remote).
-    - RAG server location management.
-    - Theme switching (light/dark mode).
-    - Debug mode with detailed performance analytics.
-
-🔧 **Advanced Features**
-    - Real-time tool call monitoring and visualization.
-    - Performance metrics tracking (response times, token usage).
-    - Memory-knowledge synchronization status monitoring.
-    - Comprehensive error handling and logging.
-    - Session state management for a persistent user experience.
-
-Architecture
------------
-The application is built around three main components:
-
-1. **AgnoPersonalAgent & PersonalAgentTeam**: Core conversational AI systems, supporting both single-agent and multi-agent team configurations.
-2. **Streamlit Interface**: A multi-tab web UI with a unified chat interface and dedicated tabs for memory and knowledge management.
-3. **Helper Classes**: StreamlitMemoryHelper and StreamlitKnowledgeHelper for abstracting data operations from the UI.
-
-Technical Stack
---------------
-- **Frontend**: Streamlit with custom CSS theming
-- **AI Systems**: AgnoPersonalAgent and PersonalAgentTeam with tool-calling capabilities
-- **Memory Storage**: SQLite with semantic search via embeddings
-- **Knowledge Storage**: SQLite/LanceDB + RAG server integration
-- **LLM Integration**: Ollama with support for multiple models
-- **Visualization**: Altair charts for performance metrics
-
-Usage
------
-Run the application with:
-    ```bash
-    streamlit run tools/paga_streamlit_agno.py [--remote] [--recreate] [--single]
-    ```
-
-Command Line Arguments:
-    --remote: Use remote Ollama URL instead of local.
-    --recreate: Recreate the knowledge base and clear all memories.
-    --single: Launch in single-agent mode (default is team mode).
-
-Environment Variables:
-    - AGNO_STORAGE_DIR: Directory for agent storage.
-    - AGNO_KNOWLEDGE_DIR: Directory for knowledge files.
-    - LLM_MODEL: Default language model to use.
-    - OLLAMA_URL: Local Ollama server URL.
-    - REMOTE_OLLAMA_URL: Remote Ollama server URL.
-    - USER_ID: Current user identifier.
-
-Session Management
------------------
-The application maintains a persistent session state across interactions, managing:
-- Chat message history.
-- Agent/Team configuration, mode, and initialization.
-- Performance metrics and debug information.
-- User preferences (theme, model selection).
-- Memory and knowledge helper instances.
-
-Author: Personal Agent Development Team
-Version: v0.2.1
-Last Revision: 2025-08-17
+It provides the main UI tabs: Chat, Memory Manager, and Knowledge Base.
 """
-
-# pylint: disable=c0413, c0301, c0415, w0718,
 
 import asyncio
 import logging
 import os
-import sys
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 
-import altair as alt
 import pandas as pd
-import requests
 import streamlit as st
 
-# Set up logging
-logger = logging.getLogger(__name__)
-
-# sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from personal_agent import __version__
 from personal_agent.config import (
     AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    LIGHTRAG_MEMORY_URL,
-    LIGHTRAG_URL,
-    LLM_MODEL,
-    OLLAMA_URL,
-    PROVIDER,
-    REMOTE_LMSTUDIO_URL,
-    REMOTE_OLLAMA_URL,
     USER_DATA_DIR,
-    get_current_user_id,
-    get_provider_default_model,
-)
-from personal_agent.core.agno_agent import AgnoPersonalAgent
-from personal_agent.team.reasoning_team import create_team as create_personal_agent_team
-from personal_agent.tools.global_state import update_global_state_from_streamlit
-from personal_agent.tools.rest_api import start_rest_api
-from personal_agent.tools.streamlit_config import (
-    args,
-    DEBUG_FLAG,
-    EFFECTIVE_OLLAMA_URL,
-    RECREATE_FLAG,
-    SINGLE_FLAG,
-    get_available_models,
-)
-from personal_agent.tools.streamlit_agent_manager import (
-    initialize_agent,
-    initialize_team,
 )
 from personal_agent.tools.streamlit_session import (
     SESSION_KEY_AGENT,
@@ -167,41 +36,464 @@ from personal_agent.tools.streamlit_session import (
     SESSION_KEY_RAG_SERVER_LOCATION,
     SESSION_KEY_SHOW_DEBUG,
     SESSION_KEY_TEAM,
-    initialize_session_state,
-)
-from personal_agent.tools.streamlit_helpers import (
-    StreamlitKnowledgeHelper,
-    StreamlitMemoryHelper,
-)
-from personal_agent.tools.streamlit_tabs import (
-    render_chat_tab,
-    render_memory_tab,
-    render_knowledge_tab,
-    render_sidebar,
 )
 from personal_agent.tools.streamlit_ui_components import (
-    apply_custom_theme,
     display_tool_calls,
     extract_tool_calls_and_metrics,
-    format_tool_call_for_debug,
 )
 
-# Apply dashboard-style layout but keep original page title/icon
-st.set_page_config(
-    page_title=f"Personal Agent Friendly Assistant {__version__}",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-USER_ID = get_current_user_id()
+logger = logging.getLogger(__name__)
 
 
+def render_chat_tab():
+    """Render the chat tab interface."""
+    # Dynamic title based on mode
+    if st.session_state[SESSION_KEY_AGENT_MODE] == "team":
+        st.markdown("### Chat with your AI Team")
+    else:
+        st.markdown("### Have a conversation with your AI friend")
 
+    for message in st.session_state[SESSION_KEY_MESSAGES]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
+    if prompt := st.chat_input("What would you like to talk about?"):
+        st.session_state[SESSION_KEY_MESSAGES].append(
+            {"role": "user", "content": prompt}
+        )
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            # Create containers for tool calls and response
+            tool_calls_container = st.empty()
+            resp_container = st.empty()
+
+            # Dynamic spinner message based on mode
+            spinner_message = (
+                "🤖 Team is thinking..."
+                if st.session_state[SESSION_KEY_AGENT_MODE] == "team"
+                else "🤔 Thinking..."
+            )
+
+            with st.spinner(spinner_message):
+                start_time = time.time()
+                start_timestamp = datetime.now()
+                response = ""
+                tool_calls_made = 0
+                tool_call_details = []
+                all_tools_used = []
+
+                try:
+                    if st.session_state[SESSION_KEY_AGENT_MODE] == "team":
+                        # Team mode handling
+                        team = st.session_state[SESSION_KEY_TEAM]
+
+                        if team:
+                            # DIAGNOSTIC: Log team information
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Team has %d members",
+                                len(getattr(team, "members", [])),
+                            )
+                            if hasattr(team, "members"):
+                                for i, member in enumerate(team.members):
+                                    member_name = getattr(member, "name", "Unknown")
+                                    member_model = getattr(
+                                        getattr(member, "model", None), "id", "Unknown"
+                                    )
+                                    logger.info(
+                                        "🔍 DIAGNOSTIC: Member %d: %s (model: %s)",
+                                        i,
+                                        member_name,
+                                        member_model,
+                                    )
+
+                            # Use the standard agno Team arun method (async)
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Running team query: %s", prompt[:50]
+                            )
+                            response_obj = asyncio.run(
+                                team.arun(prompt, user_id=USER_DATA_DIR)
+                            )
+
+                            # DIAGNOSTIC: Log response structure
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Response type: %s",
+                                type(response_obj).__name__,
+                            )
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Response has content: %s",
+                                hasattr(response_obj, "content"),
+                            )
+                            logger.info(
+                                "🔍 DIAGNOSTIC: Response has messages: %s",
+                                hasattr(response_obj, "messages"),
+                            )
+                            if (
+                                hasattr(response_obj, "messages")
+                                and response_obj.messages
+                            ):
+                                logger.info(
+                                    "🔍 DIAGNOSTIC: Number of messages: %d",
+                                    len(response_obj.messages),
+                                )
+                                for i, msg in enumerate(response_obj.messages):
+                                    logger.info(
+                                        "🔍 DIAGNOSTIC: Message %d: role=%s, content_length=%d",
+                                        i,
+                                        getattr(msg, "role", "unknown"),
+                                        len(getattr(msg, "content", "")),
+                                    )
+
+                            response = (
+                                response_obj.content
+                                if hasattr(response_obj, "content")
+                                else str(response_obj)
+                            )
+
+                            # Use the unified extraction method for team mode
+                            (
+                                tool_calls_made,
+                                tool_call_details,
+                                metrics_data,
+                            ) = extract_tool_calls_and_metrics(response_obj)
+
+                            # 🚨 SIMPLIFIED RESPONSE PARSING - NO FILTERING
+                            print(
+                                f"🔍 SIMPLE_DEBUG: Starting response parsing for query: '{prompt[:50]}...'"
+                            )
+
+                            # Step 1: Try main response content first
+                            if (
+                                hasattr(response_obj, "content")
+                                and response_obj.content
+                            ):
+                                response = str(response_obj.content)
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: Using main response content: '{response[:100]}...' ({len(response)} chars)"
+                                )
+                            else:
+                                response = ""
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: No main response content found"
+                                )
+
+                            # Step 2: If no main content or it's empty, check member responses
+                            if (
+                                not response.strip()
+                                and hasattr(response_obj, "member_responses")
+                                and response_obj.member_responses
+                            ):
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: Main response empty, checking {len(response_obj.member_responses)} member responses"
+                                )
+
+                                # Get ALL assistant messages from ALL members - no filtering
+                                all_assistant_messages = []
+                                for i, member_resp in enumerate(
+                                    response_obj.member_responses
+                                ):
+                                    if (
+                                        hasattr(member_resp, "messages")
+                                        and member_resp.messages
+                                    ):
+                                        for j, msg in enumerate(member_resp.messages):
+                                            if (
+                                                hasattr(msg, "role")
+                                                and msg.role == "assistant"
+                                                and hasattr(msg, "content")
+                                                and msg.content
+                                            ):
+                                                all_assistant_messages.append(
+                                                    {
+                                                        "member": i,
+                                                        "message": j,
+                                                        "content": str(msg.content),
+                                                        "length": len(str(msg.content)),
+                                                    }
+                                                )
+                                                print(
+                                                    f"🔍 SIMPLE_DEBUG: Found assistant message from member {i}: '{str(msg.content)[:100]}...' ({len(str(msg.content))} chars)"
+                                                )
+
+                                # Use the LAST assistant message (most recent)
+                                if all_assistant_messages:
+                                    last_message = all_assistant_messages[-1]
+                                    response = last_message["content"]
+                                    print(
+                                        f"🔍 SIMPLE_DEBUG: Using LAST assistant message from member {last_message['member']}: '{response[:100]}...' ({len(response)} chars)"
+                                    )
+                                else:
+                                    print(
+                                        f"🔍 SIMPLE_DEBUG: No assistant messages found in member responses"
+                                    )
+
+                            # Step 3: Handle </think> tags if present - PRESERVE them for now (don't strip)
+                            if "</think>" in response:
+                                print(
+                                    f"🔍 SIMPLE_DEBUG: Found <think> tags in response, preserving them as requested"
+                                )
+                                # Keep the full response including <think> tags
+                                # Original stripping logic commented out:
+                                # parts = response.split('</think>')
+                                # if len(parts) > 1:
+                                #     after_think = parts[-1].strip()
+                                #     if after_think:
+                                #         response = after_think
+
+                            print(
+                                f"🔍 SIMPLE_DEBUG: ✅ FINAL RESPONSE: '{response[:200]}...' ({len(response)} chars)"
+                            )
+
+                            # Display tool calls if any
+                            if tool_call_details:
+                                display_tool_calls(
+                                    tool_calls_container, tool_call_details
+                                )
+                        else:
+                            response = "Team not initialized properly"
+                    else:
+                        # Single agent mode handling
+                        agent = st.session_state[SESSION_KEY_AGENT]
+
+                        # Handle AgnoPersonalAgent with new RunResponse pattern
+                        from personal_agent.core.agno_agent import AgnoPersonalAgent
+                        if isinstance(agent, AgnoPersonalAgent):
+
+                            async def run_agent_with_streaming():
+                                nonlocal response, tool_calls_made, tool_call_details, all_tools_used
+
+                                try:
+                                    # Use agent.arun() instead of agent.run() for async tool compatibility
+                                    # The arun() method returns a RunResponse object directly, not a string
+                                    run_response = await agent.arun(
+                                        prompt, stream=False, add_thought_callback=None
+                                    )
+
+                                    # Extract content from the RunResponse object
+                                    if (
+                                        hasattr(run_response, "content")
+                                        and run_response.content
+                                    ):
+                                        response_content = run_response.content
+                                    elif (
+                                        hasattr(run_response, "messages")
+                                        and run_response.messages
+                                    ):
+                                        # Extract content from the last assistant message
+                                        response_content = ""
+                                        for message in run_response.messages:
+                                            if (
+                                                hasattr(message, "role")
+                                                and message.role == "assistant"
+                                            ):
+                                                if (
+                                                    hasattr(message, "content")
+                                                    and message.content
+                                                ):
+                                                    response_content += message.content
+                                    else:
+                                        response_content = str(run_response)
+
+                                    # Use the unified extraction method for single agent mode
+                                    (
+                                        tool_calls_made,
+                                        tool_call_details,
+                                        metrics_data,
+                                    ) = extract_tool_calls_and_metrics(run_response)
+
+                                    # Display tool calls if any
+                                    if tool_call_details:
+                                        display_tool_calls(
+                                            tool_calls_container, tool_call_details
+                                        )
+                                        logger.info(
+                                            f"Displayed {len(tool_call_details)} tool calls using unified method"
+                                        )
+                                    else:
+                                        logger.info(
+                                            "No tool calls found in RunResponse using unified method"
+                                        )
+
+                                    return response_content
+
+                                except Exception as e:
+                                    raise Exception(
+                                        f"Error in agent execution: {e}"
+                                    ) from e
+
+                            response_content = asyncio.run(run_agent_with_streaming())
+                            response = response_content if response_content else ""
+                        else:
+                            # Non-AgnoPersonalAgent fallback
+                            agent_response = agent.run(prompt)
+                            response = (
+                                agent_response.content
+                                if hasattr(agent_response, "content")
+                                else str(agent_response)
+                            )
+
+                    # Display the final response
+                    resp_container.markdown(response)
+
+                    end_time = time.time()
+                    response_time = end_time - start_time
+
+                    # Calculate token estimates
+                    input_tokens = len(prompt.split()) * 1.3
+                    output_tokens = len(response.split()) * 1.3 if response else 0
+                    total_tokens = input_tokens + output_tokens
+
+                    response_metadata = {}
+                    response_type = "AgnoResponse"
+
+                    # Update performance stats with real-time tool call count
+                    stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
+                    stats["total_requests"] += 1
+                    stats["total_response_time"] += response_time
+                    stats["average_response_time"] = (
+                        stats["total_response_time"] / stats["total_requests"]
+                    )
+                    stats["total_tokens"] += total_tokens
+                    stats["average_tokens"] = (
+                        stats["total_tokens"] / stats["total_requests"]
+                    )
+                    stats["fastest_response"] = min(
+                        stats["fastest_response"], response_time
+                    )
+                    stats["slowest_response"] = max(
+                        stats["slowest_response"], response_time
+                    )
+                    stats["tool_calls_count"] += tool_calls_made
+
+                    # Store debug metrics with standardized format
+                    debug_entry = {
+                        "timestamp": start_timestamp.strftime("%H:%M:%S"),
+                        "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
+                        "response_time": round(response_time, 3),
+                        "input_tokens": round(input_tokens),
+                        "output_tokens": round(output_tokens),
+                        "total_tokens": round(total_tokens),
+                        "tool_calls": tool_calls_made,
+                        "tool_call_details": tool_call_details,
+                        "response_type": (
+                            "PersonalAgentTeam"
+                            if st.session_state[SESSION_KEY_AGENT_MODE] == "team"
+                            else (
+                                "AgnoPersonalAgent"
+                                if st.session_state[SESSION_KEY_AGENT_MODE] == "single"
+                                else "Unknown"
+                            )
+                        ),
+                        "success": True,
+                    }
+                    st.session_state[SESSION_KEY_DEBUG_METRICS].append(debug_entry)
+                    if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 10:
+                        st.session_state[SESSION_KEY_DEBUG_METRICS].pop(0)
+
+                    # Display structured response metadata if available
+                    if response_metadata and response_type == "StructuredResponse":
+                        confidence = response_metadata.get("confidence")
+                        sources = response_metadata.get("sources", [])
+                        metadata_response_type = response_metadata.get(
+                            "response_type", "structured"
+                        )
+
+                        # Create a compact metadata display
+                        metadata_parts = []
+                        if confidence is not None:
+                            confidence_color = (
+                                "🟢"
+                                if confidence > 0.8
+                                else "🟡" if confidence > 0.6 else "🔴"
+                            )
+                            metadata_parts.append(
+                                f"{confidence_color} **Confidence:** {confidence:.2f}"
+                            )
+
+                        if sources:
+                            metadata_parts.append(
+                                f"📚 **Sources:** {', '.join(sources[:3])}"
+                            )  # Show first 3 sources
+
+                        metadata_parts.append(f"🔧 **Type:** {metadata_response_type}")
+
+                        if metadata_parts:
+                            with st.expander("📊 Response Metadata", expanded=False):
+                                st.markdown(" | ".join(metadata_parts))
+                                if len(sources) > 3:
+                                    st.markdown(
+                                        f"**All Sources:** {', '.join(sources)}"
+                                    )
+
+                    # Display debug info if enabled (moved to sidebar)
+                    if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
+                        with st.expander("🔍 **Basic Debug Info**", expanded=False):
+                            st.write(f"**Response Type:** {response_type}")
+                            st.write(f"**Tool Calls Made:** {tool_calls_made}")
+                            st.write(f"**Response Time:** {response_time:.3f}s")
+                            st.write(f"**Total Tokens:** {total_tokens:.0f}")
+
+                            if response_metadata:
+                                st.write("**Structured Response Metadata:**")
+                                st.json(response_metadata)
+
+                    # Store message with metadata for future reference
+                    message_data = {
+                        "role": "assistant",
+                        "content": response,
+                        "metadata": (
+                            response_metadata
+                            if response_type == "StructuredResponse"
+                            else None
+                        ),
+                        "response_type": response_type,
+                        "tool_calls": tool_call_details,  # Store the standardized list
+                        "response_time": response_time,
+                    }
+                    st.session_state[SESSION_KEY_MESSAGES].append(message_data)
+                    st.rerun()
+
+                except Exception as e:
+                    end_time = time.time()
+                    response_time = end_time - start_time
+                    error_msg = f"Sorry, I encountered an error: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state[SESSION_KEY_MESSAGES].append(
+                        {"role": "assistant", "content": error_msg}
+                    )
+
+                    # Log failed request
+                    debug_entry = {
+                        "timestamp": start_timestamp.strftime("%H:%M:%S"),
+                        "prompt": prompt[:100] + "..." if len(prompt) > 100 else prompt,
+                        "response_time": round(response_time, 3),
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                        "tool_calls": 0,
+                        "tool_call_details": [],
+                        "response_type": "Error",
+                        "success": False,
+                        "error": str(e),
+                    }
+                    st.session_state[SESSION_KEY_DEBUG_METRICS].append(debug_entry)
+                    if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 10:
+                        st.session_state[SESSION_KEY_DEBUG_METRICS].pop(0)
+
+                    if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
+                        with st.expander("❌ **Error Debug Info**", expanded=True):
+                            import traceback
+
+                            st.write(f"**Error Time:** {response_time:.3f}s")
+                            st.write(f"**Error Type:** {type(e).__name__}")
+                            st.write(f"**Error Message:** {str(e)}")
+                            st.code(traceback.format_exc())
+                    st.rerun()
 
 
 def render_memory_tab():
+    """Render the memory management tab interface."""
     st.markdown("### Comprehensive Memory Management")
     memory_helper = st.session_state[SESSION_KEY_MEMORY_HELPER]
 
@@ -636,7 +928,6 @@ def render_memory_tab():
             )
 
 
-
 def render_knowledge_status(knowledge_helper):
     """Renders the status of the knowledge bases in an expander."""
     with st.expander("ℹ️ Knowledge Base Status"):
@@ -749,6 +1040,7 @@ def render_knowledge_status(knowledge_helper):
                         f"Switching to {rag_location} and triggering rescan..."
                     ):
                         try:
+                            import requests
                             rescan_response = requests.post(
                                 f"{new_rag_url}/documents/scan", timeout=10
                             )
@@ -777,6 +1069,7 @@ def render_knowledge_status(knowledge_helper):
             # Check RAG server status with improved reliability and error handling
             try:
                 # Increase timeout and add better error handling
+                import requests
                 health_response = requests.get(
                     f"{rag_url}/health", timeout=10
                 )  # Increased from 3 to 10
@@ -883,7 +1176,704 @@ def render_knowledge_status(knowledge_helper):
                 )
 
 
+def render_sidebar():
+    """Render the sidebar with configuration and control options."""
+    with st.sidebar:
+        # Theme selector at the very top
+        st.header("🎨 Theme")
+        dark_mode = st.toggle(
+            "Dark Mode", value=st.session_state.get(SESSION_KEY_DARK_THEME, False)
+        )
+
+        if dark_mode != st.session_state.get(SESSION_KEY_DARK_THEME, False):
+            st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
+            st.rerun()
+
+        st.header("Provider Selection")
+
+        # Provider selector
+        available_providers = ["ollama", "lm-studio", "openai"]
+        current_provider = os.getenv("PROVIDER", "ollama")
+
+        selected_provider = st.selectbox(
+            "Select AI Provider:",
+            available_providers,
+            index=available_providers.index(current_provider) if current_provider in available_providers else 0,
+            help="Choose your AI model provider. Each provider has different default models."
+        )
+
+        # Show provider-specific information
+        if selected_provider == "ollama":
+            st.caption("🐳 **Ollama**: Local models, full control, no API costs")
+            from personal_agent.config import get_provider_default_model
+            default_model = get_provider_default_model("ollama")
+        elif selected_provider == "lm-studio":
+            st.caption("🎭 **LM Studio**: Local models with user-friendly interface")
+            from personal_agent.config import get_provider_default_model
+            default_model = get_provider_default_model("lm-studio")
+        elif selected_provider == "openai":
+            st.caption("🔗 **OpenAI**: Cloud models, requires API key")
+            from personal_agent.config import get_provider_default_model
+            default_model = get_provider_default_model("openai")
+
+        st.caption(f"📋 **Default Model:** {default_model}")
+
+        # Apply provider change
+        if selected_provider != current_provider:
+            if st.button(f"🔄 Switch to {selected_provider.title()}", type="primary"):
+                with st.spinner(f"Switching to {selected_provider.title()} provider..."):
+                    # Update environment variable
+                    os.environ["PROVIDER"] = selected_provider
+
+                    # Update default model to provider default
+                    from personal_agent.config import get_provider_default_model
+                    new_default_model = get_provider_default_model(selected_provider)
+                    os.environ["LLM_MODEL"] = new_default_model
+
+                    # Force refresh of config module
+                    try:
+                        import importlib
+                        from personal_agent import config
+                        importlib.reload(config.settings)
+                        logger.info(f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not refresh config module: {e}")
+
+                    # Clear available models cache to force refresh
+                    if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
+                        del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+
+                    # Update current model in session state
+                    st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
+
+                    # Update URL based on provider
+                    from personal_agent.config import REMOTE_LMSTUDIO_URL, REMOTE_OLLAMA_URL
+                    if selected_provider == "lm-studio":
+                        if st.session_state.get("args", {}).get("remote", False):
+                            new_url = REMOTE_LMSTUDIO_URL
+                        else:
+                            new_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
+                        if new_url.endswith("/v1"):
+                            new_url = new_url[:-3]  # Remove /v1 for consistency
+                    elif selected_provider == "openai":
+                        new_url = "https://api.openai.com/v1"
+                    else:  # ollama
+                        new_url = REMOTE_OLLAMA_URL if st.session_state.get("args", {}).get("remote", False) else st.session_state.get("OLLAMA_URL", "http://localhost:11434")
+
+                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_url
+
+                    st.success(f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}")
+                    st.rerun()
+
+        st.header("Model Selection")
+
+        # Show current provider prominently
+        provider = os.getenv("PROVIDER", "ollama")
+        provider_display = provider.upper() if provider == "ollama" else "LM Studio" if provider == "lm-studio" else provider.title()
+        st.write(f"**Current Provider:** {provider_display}")
+
+        new_ollama_url = st.text_input(
+            "**Provider URL:**", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+        )
+        if st.button("🔄 Fetch Available Models"):
+            with st.spinner("Fetching models..."):
+                from personal_agent.tools.streamlit_config import get_available_models
+                available_models = get_available_models(new_ollama_url)
+                if available_models:
+                    st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
+                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_ollama_url
+                    st.success(f"Found {len(available_models)} models!")
+                else:
+                    st.error("No models found or connection failed")
+
+        if (
+            SESSION_KEY_AVAILABLE_MODELS in st.session_state
+            and st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+        ):
+            current_model_index = 0
+            if (
+                st.session_state[SESSION_KEY_CURRENT_MODEL]
+                in st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+            ):
+                current_model_index = st.session_state[
+                    SESSION_KEY_AVAILABLE_MODELS
+                ].index(st.session_state[SESSION_KEY_CURRENT_MODEL])
+            selected_model = st.selectbox(
+                "Select Model:",
+                st.session_state[SESSION_KEY_AVAILABLE_MODELS],
+                index=current_model_index,
+            )
+            if st.button("🚀 Apply Model Selection"):
+                if (
+                    selected_model != st.session_state[SESSION_KEY_CURRENT_MODEL]
+                    or new_ollama_url
+                    != st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+                ):
+                    current_mode = st.session_state.get(
+                        SESSION_KEY_AGENT_MODE, "single"
+                    )
+                    spinner_text = (
+                        "Reinitializing team..."
+                        if current_mode == "team"
+                        else "Reinitializing agent..."
+                    )
+
+                    with st.spinner(spinner_text):
+                        old_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
+                        old_url = st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+
+                        logger.info(
+                            "🔄 MODEL UPDATE: Changing from %s to %s",
+                            old_model,
+                            selected_model,
+                        )
+                        logger.info(
+                            "🔄 URL UPDATE: Changing from %s to %s",
+                            old_url,
+                            new_ollama_url,
+                        )
+
+                        st.session_state[SESSION_KEY_CURRENT_MODEL] = selected_model
+                        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = (
+                            new_ollama_url
+                        )
+
+                        if current_mode == "team":
+                            logger.info(
+                                "🤖 TEAM REINIT: Reinitializing team with new model %s",
+                                selected_model,
+                            )
+                            # Reinitialize team
+                            from personal_agent.tools.streamlit_agent_manager import initialize_team
+                            st.session_state[SESSION_KEY_TEAM] = initialize_team(
+                                selected_model,
+                                new_ollama_url,
+                                st.session_state.get(SESSION_KEY_TEAM),
+                            )
+
+                            # Update helper classes with new team - use knowledge agent directly
+                            team = st.session_state[SESSION_KEY_TEAM]
+                            if hasattr(team, "members") and team.members:
+                                knowledge_agent = team.members[
+                                    0
+                                ]  # First member is the knowledge agent
+                                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                    StreamlitMemoryHelper(knowledge_agent)
+                                )
+                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                    StreamlitKnowledgeHelper(knowledge_agent)
+                                )
+                            else:
+                                # Fallback: create with team object
+                                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                    StreamlitMemoryHelper(team)
+                                )
+                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                    StreamlitKnowledgeHelper(team)
+                                )
+
+                            success_msg = f"Team updated to use model: {selected_model}"
+                            logger.info("✅ TEAM UPDATE COMPLETE: %s", success_msg)
+                        else:
+                            logger.info(
+                                "🧠 AGENT REINIT: Reinitializing agent with new model %s",
+                                selected_model,
+                            )
+                            # Reinitialize single agent
+                            from personal_agent.tools.streamlit_agent_manager import initialize_agent
+                            st.session_state[SESSION_KEY_AGENT] = initialize_agent(
+                                selected_model,
+                                new_ollama_url,
+                                st.session_state.get(SESSION_KEY_AGENT),
+                            )
+
+                            # Update helper classes with new agent
+                            from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                            st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                StreamlitMemoryHelper(
+                                    st.session_state[SESSION_KEY_AGENT]
+                                )
+                            )
+                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                StreamlitKnowledgeHelper(
+                                    st.session_state[SESSION_KEY_AGENT]
+                                )
+                            )
+
+                            success_msg = (
+                                f"Agent updated to use model: {selected_model}"
+                            )
+                            logger.info("✅ AGENT UPDATE COMPLETE: %s", success_msg)
+
+                        st.session_state[SESSION_KEY_MESSAGES] = []
+                        st.success(success_msg)
+                        st.rerun()
+                else:
+                    st.info("Model and URL are already current")
+        else:
+            st.info("Click 'Fetch Available Models' to see available models")
+
+        # Dynamic header based on mode
+        current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
+        if current_mode == "team":
+            st.header("Team Information")
+        else:
+            st.header("Agent Information")
+
+        st.write(f"**Current Model:** {st.session_state[SESSION_KEY_CURRENT_MODEL]}")
+        # st.write(
+        #    f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
+        # )
+
+        # Show mode-specific information
+        if current_mode == "team":
+            # Team-specific information
+            team = st.session_state.get(SESSION_KEY_TEAM)
+            if team:
+                st.write(f"**Mode:** 🤖 Team of Agents")
+
+                # Make team information collapsible
+                with st.expander("🤖 Team Details", expanded=False):
+                    # Show team composition
+                    members = getattr(team, "members", [])
+                    st.write(f"**Team Members:** {len(members)}")
+
+                    if members:
+                        st.write("**Specialized Agents:**")
+                        for member in members:
+                            member_name = getattr(member, "name", "Unknown")
+                            member_role = getattr(member, "role", "Unknown")
+                            member_tools = len(getattr(member, "tools", []))
+                            st.write(
+                                f"• **{member_name}**: {member_role} ({member_tools} tools)"
+                            )
+
+                    # Show team capabilities
+                    st.write("**Team Capabilities:**")
+                    st.write("• 🧠 Memory Management")
+                    st.write("• 📚 Knowledge Base Access")
+                    st.write("• 🌐 Web Research")
+                    st.write("• ✍️ Writing & Content Creation")
+                    st.write("• 🎨 Image Creation")
+                    st.write("• 🔬 PubMed Research")
+                    st.write("• 💰 Finance & Calculations")
+                    st.write("• 📁 File Operations")
+            else:
+                st.write(f"**Mode:** 🤖 Team of Agents")
+                st.warning("⚠️ Team not initialized")
+        else:
+            # Single agent information
+            agent = st.session_state.get(SESSION_KEY_AGENT)
+            if agent:
+                st.write(f"**Mode:** 🧠 Single Agent")
+                st.write(f"**Agent Type:** {type(agent).__name__}")
+
+                # Show agent capabilities
+                st.write("**Agent Capabilities:**")
+                st.write("• 🧠 Memory Management")
+                st.write("• 📚 Knowledge Base Access")
+                st.write("• 🔧 Tool Integration")
+                if hasattr(agent, "enable_mcp") and agent.enable_mcp:
+                    st.write("• 🔌 MCP Server Integration")
+            else:
+                st.write(f"**Mode:** 🧠 Single Agent")
+                st.warning("⚠️ Agent not initialized")
+
+        # Show comprehensive model configuration for current model
+        current_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
+        current_ollama_url = st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+
+        with st.expander("⚙️ Model Configuration", expanded=False):
+            try:
+                # Get comprehensive model configuration
+                from personal_agent.config.model_contexts import get_model_config_dict
+                model_config = get_model_config_dict(current_model, current_ollama_url)
+
+                st.write("**Model Parameters:**")
+                params = model_config.get("parameters", {})
+                st.write(f"• Temperature: {params.get('temperature', 'N/A')}")
+                st.write(f"• Top P: {params.get('top_p', 'N/A')}")
+                st.write(f"• Top K: {params.get('top_k', 'N/A')}")
+                st.write(
+                    f"• Repetition Penalty: {params.get('repetition_penalty', 'N/A')}"
+                )
+
+                st.write("**Context Configuration:**")
+                context_size = model_config.get("context_size", "N/A")
+                if isinstance(context_size, int):
+                    st.write(f"• Context Size: {context_size:,} tokens")
+                else:
+                    st.write(f"• Context Size: {context_size}")
+
+                st.caption(
+                    "Configuration sourced from model_contexts.py and environment variables"
+                )
+
+            except Exception as e:
+                st.error(f"Error loading model configuration: {e}")
+                # Fallback to basic model info
+                st.write(f"**Model:** {current_model}")
+                st.write(f"**Ollama URL:** {current_ollama_url}")
+
+        # Show debug info about URL configuration
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
+            with st.expander("🔍 URL Debug Info", expanded=False):
+                st.write(f"**--remote flag:** {st.session_state.get('args', {}).get('remote', 'N/A')}")
+                from personal_agent.config import OLLAMA_URL, REMOTE_OLLAMA_URL
+                st.write(f"**OLLAMA_URL (local):** {OLLAMA_URL}")
+                st.write(f"**REMOTE_OLLAMA_URL:** {REMOTE_OLLAMA_URL}")
+                from personal_agent.tools.streamlit_config import EFFECTIVE_OLLAMA_URL
+                st.write(f"**EFFECTIVE_OLLAMA_URL (startup):** {EFFECTIVE_OLLAMA_URL}")
+                st.write(
+                    f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
+                )
+
+                # Show agent/team specific debug info
+                provider = os.getenv("PROVIDER", "ollama")
+                st.write(f"**Current Provider:** {provider}")
+
+                if current_mode == "team":
+                    team = st.session_state.get(SESSION_KEY_TEAM)
+                    if team and hasattr(team, "ollama_base_url"):
+                        st.write(f"**Team's Ollama URL:** {team.ollama_base_url}")
+                    else:
+                        st.write("**Team URL:** Not accessible")
+                else:
+                    agent = st.session_state.get(SESSION_KEY_AGENT)
+                    if agent:
+                        # Show provider-specific URLs
+                        if provider == "lm-studio":
+                            if hasattr(agent, "model_manager") and hasattr(
+                                agent.model_manager, "lmstudio_base_url"
+                            ):
+                                st.write(
+                                    f"**Agent's LM Studio URL:** {agent.model_manager.lmstudio_base_url}"
+                                )
+                            else:
+                                lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "Not set")
+                                st.write(f"**LM Studio URL (env):** {lmstudio_url}")
+                        else:
+                            if hasattr(agent, "ollama_base_url"):
+                                st.write(
+                                    f"**Agent's Ollama URL:** {agent.ollama_base_url}"
+                                )
+                            elif hasattr(agent, "model_manager") and hasattr(
+                                agent.model_manager, "ollama_base_url"
+                            ):
+                                st.write(
+                                    f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}"
+                                )
+                            else:
+                                st.write("**Agent URL:** Not accessible")
+
+                        # Show model manager provider info
+                        if hasattr(agent, "model_manager"):
+                            st.write(
+                                f"**Model Manager Provider:** {getattr(agent.model_manager, 'model_provider', 'Unknown')}"
+                            )
+                    else:
+                        st.write("**Agent:** Not accessible")
+
+        st.header("Controls")
+        if st.button("Clear Chat History"):
+            st.session_state[SESSION_KEY_MESSAGES] = []
+            st.rerun()
+
+        st.header("Debug Info")
+        debug_label = "Enable Debug Mode"
+        if st.session_state.get("DEBUG_FLAG", False):
+            debug_label += " (CLI enabled)"
+        st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox(
+            debug_label,
+            value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, st.session_state.get("DEBUG_FLAG", False)),
+            help="Debug mode can be enabled via --debug flag or this checkbox",
+        )
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
+            st.subheader("📊 Performance Statistics")
+            stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
+            if stats["total_requests"] > 0:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total Requests", stats["total_requests"])
+                    st.metric(
+                        "Avg Response Time", f"{stats['average_response_time']:.3f}s"
+                    )
+                    st.metric(
+                        "Fastest Response",
+                        (
+                            f"{stats['fastest_response']:.3f}s"
+                            if stats["fastest_response"] != float("inf")
+                            else "N/A"
+                        ),
+                    )
+                with col2:
+                    st.metric("Total Tool Calls", stats["tool_calls_count"])
+                    st.metric("Avg Tokens/Request", f"{stats['average_tokens']:.0f}")
+                    st.metric("Slowest Response", f"{stats['slowest_response']:.3f}s")
+            else:
+                st.info("No requests made yet.")
+
+            if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 1:
+                st.subheader("📈 Response Time Trend")
+                df = pd.DataFrame(st.session_state[SESSION_KEY_DEBUG_METRICS])
+                df = df[df["success"]]
+                if not df.empty and len(df) > 1:
+                    chart_data = (
+                        df[["timestamp", "response_time"]].copy().set_index("timestamp")
+                    )
+
+                    # Apply theme-aware styling for the chart
+                    is_dark_theme = st.session_state.get(SESSION_KEY_DARK_THEME, False)
+
+                    # Create base chart
+                    chart = (
+                        alt.Chart(chart_data.reset_index())
+                        .mark_line(point=True, color="#1f77b4" if not is_dark_theme else "#ff7f0e")
+                        .encode(
+                            x=alt.X("timestamp:O", title="Time"),
+                            y=alt.Y("response_time:Q", title="Response Time (s)"),
+                            tooltip=["timestamp:O", "response_time:Q"],
+                        )
+                        .properties(title="Response Time Trend")
+                    )
+
+                    # Apply theme-specific configuration
+                    if is_dark_theme:
+                        # Configure for dark theme
+                        chart = chart.configure_view(
+                            strokeWidth=0,
+                            fill='#0e1117'  # Dark background color matching Streamlit dark theme
+                        ).configure_axis(
+                            labelColor='white',
+                            titleColor='white',
+                            gridColor='#444444',
+                            domainColor='white'
+                        ).configure_title(
+                            color='white'
+                        ).configure_legend(
+                            labelColor='white',
+                            titleColor='white'
+                        ).configure(
+                            background='#0e1117'  # Set overall chart background
+                        )
+                    else:
+                        # Configure for light theme (default)
+                        chart = chart.configure_view(
+                            strokeWidth=0,
+                            fill='white'  # Light background color
+                        ).configure_axis(
+                            labelColor='black',
+                            titleColor='black',
+                            gridColor='#e0e0e0',
+                            domainColor='black'
+                        ).configure_title(
+                            color='black'
+                        ).configure_legend(
+                            labelColor='black',
+                            titleColor='black'
+                        ).configure(
+                            background='white'  # Set overall chart background
+                        )
+
+                    st.altair_chart(chart, use_container_width=True)
+
+            st.subheader("🔧 Recent Tool Calls")
+            if st.session_state[SESSION_KEY_DEBUG_METRICS]:
+                # Filter entries that have tool calls
+                tool_call_entries = [
+                    entry
+                    for entry in st.session_state[SESSION_KEY_DEBUG_METRICS]
+                    if entry.get("tool_calls", 0) > 0
+                ]
+
+                if tool_call_entries:
+                    for entry in reversed(
+                        tool_call_entries[-5:]
+                    ):  # Show last 5 tool call entries
+                        tool_call_details = entry.get("tool_call_details", [])
+                        with st.expander(
+                            f"🔧 {entry['timestamp']} - {entry['tool_calls']} tool(s) - {entry['response_time']}s"
+                        ):
+                            st.write(f"**Prompt:** {entry['prompt']}")
+                            st.write(f"**Response Time:** {entry['response_time']}s")
+                            st.write(f"**Tool Calls Made:** {entry['tool_calls']}")
+
+                            if tool_call_details:
+                                st.write("**Tool Call Details:**")
+                                for i, tool_call in enumerate(tool_call_details, 1):
+                                    # Use standardized format - check for 'name' field first
+                                    tool_name = tool_call.get(
+                                        "name",
+                                        tool_call.get("function_name", "Unknown"),
+                                    )
+                                    tool_status = tool_call.get("status", "unknown")
+
+                                    # Status indicator
+                                    status_icon = (
+                                        "✅"
+                                        if tool_status == "success"
+                                        else "❓" if tool_status == "unknown" else "❌"
+                                    )
+
+                                    st.write(f"**Tool {i}:** {status_icon} {tool_name}")
+
+                                    # Show arguments
+                                    tool_args = tool_call.get(
+                                        "arguments", tool_call.get("function_args", {})
+                                    )
+                                    if tool_args:
+                                        st.write("**Arguments:**")
+                                        st.json(tool_args)
+
+                                    # Show result if available
+                                    tool_result = tool_call.get(
+                                        "result", tool_call.get("content")
+                                    )
+                                    if tool_result:
+                                        st.write("**Result:**")
+                                        if (
+                                            isinstance(tool_result, str)
+                                            and len(tool_result) > 200
+                                        ):
+                                            st.write(f"{tool_result[:200]}...")
+                                        else:
+                                            st.write(str(tool_result))
+
+                                    # Show reasoning if available (legacy field)
+                                    if tool_call.get("reasoning"):
+                                        st.write(
+                                            f"**Reasoning:** {tool_call['reasoning']}"
+                                        )
+
+                                    if i < len(
+                                        tool_call_details
+                                    ):  # Add separator between tools
+                                        st.markdown("---")
+                else:
+                    st.info("No tool calls made yet.")
+            else:
+                st.info("No debug metrics available yet.")
+
+            # REST API (debug-only) moved to sidebar to avoid cluttering pages
+            if False and st.session_state.get(SESSION_KEY_SHOW_DEBUG):
+                st.subheader("📡 REST API")
+                if st.session_state.get("rest_api_server"):
+                    st.success("🌐 REST API server running on http://localhost:8001")
+                    with st.expander("📡 REST API Endpoints", expanded=False):
+                        st.markdown("""
+            **Memory Endpoints:**
+            - `POST /api/v1/memory/store` - Store text as memory
+            - `POST /api/v1/memory/store-url` - Store content from URL as memory
+            - `GET /api/v1/memory/search?q=query` - Search memories
+            - `GET /api/v1/memory/list` - List all memories
+            - `GET /api/v1/memory/stats` - Get memory statistics
+
+            **Knowledge Endpoints:**
+            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
+            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
+            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
+            - `GET /api/v1/knowledge/status` - Get knowledge base status
+
+            **System Endpoints:**
+            - `GET /api/v1/health` - Health check
+            - `GET /api/v1/status` - System status
+
+            **Example Usage:**
+            ```bash
+            # Store memory
+            curl -X POST http://localhost:8001/api/v1/memory/store \\
+              -H "Content-Type: application/json" \\
+              -d '{"content": "I work at Google", "topics": ["work"]}'
+
+            # Store knowledge from URL
+            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
+              -H "Content-Type: application/json" \\
+              -d '{"url": "https://example.com/article", "title": "Important Article"}'
+            ```
+                        """)
+                else:
+                    st.warning("⚠️ REST API server failed to start")
+
+        # Show recent request details above system controls to keep power button last
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
+            st.subheader("🔍 Recent Request Details")
+            if st.session_state[SESSION_KEY_DEBUG_METRICS]:
+                for entry in reversed(st.session_state[SESSION_KEY_DEBUG_METRICS][-5:]):
+                    with st.expander(
+                        f"{'✅' if entry['success'] else '❌'} {entry['timestamp']} - {entry['response_time']}s"
+                    ):
+                        st.write(f"**Prompt:** {entry['prompt']}")
+                        st.write(f"**Response Time:** {entry['response_time']}s")
+                        st.write(f"**Input Tokens:** {entry['input_tokens']}")
+                        st.write(f"**Output Tokens:** {entry['output_tokens']}")
+                        st.write(f"**Total Tokens:** {entry['total_tokens']}")
+                        st.write(f"**Tool Calls:** {entry['tool_calls']}")
+                        st.write(f"**Response Type:** {entry['response_type']}")
+                        if not entry["success"]:
+                            st.write(
+                                f"**Error:** {entry.get('error', 'Unknown error')}"
+                            )
+            else:
+                st.info("No debug metrics available yet.")
+
+        # REST API (debug-only) placed below Recent Request Details
+        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
+            st.subheader("📡 REST API")
+            if st.session_state.get("rest_api_server"):
+                st.success("🌐 REST API server running on http://localhost:8001")
+                with st.expander("📡 REST API Endpoints", expanded=False):
+                    st.markdown("""
+            **Memory Endpoints:**
+            - `POST /api/v1/memory/store` - Store text as memory
+            - `POST /api/v1/memory/store-url` - Store content from URL as memory
+            - `GET /api/v1/memory/search?q=query` - Search memories
+            - `GET /api/v1/memory/list` - List all memories
+            - `GET /api/v1/memory/stats` - Get memory statistics
+
+            **Knowledge Endpoints:**
+            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
+            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
+            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
+            - `GET /api/v1/knowledge/status` - Get knowledge base status
+
+            **System Endpoints:**
+            - `GET /api/v1/health` - Health check
+            - `GET /api/v1/status` - System status
+
+            **Example Usage:**
+            ```bash
+            # Store memory
+            curl -X POST http://localhost:8001/api/v1/memory/store \\
+              -H "Content-Type: application/json" \\
+              -d '{"content": "I work at Google", "topics": ["work"]}'
+
+            # Store knowledge from URL
+            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
+              -H "Content-Type: application/json" \\
+              -d '{"url": "https://example.com/article", "title": "Important Article"}'
+            ```
+                    """)
+            else:
+                st.warning("⚠️ REST API server failed to start")
+
+        # Power off button at the bottom of the sidebar
+        st.markdown("---")
+        st.header("🚨 System Control")
+        if st.button(
+            "🔴 Power Off System",
+            key="sidebar_power_off_btn",
+            type="primary",
+            use_container_width=True,
+        ):
+            # Show confirmation dialog
+            st.session_state["show_power_off_confirmation"] = True
+            st.rerun()
+
+
 def render_knowledge_tab():
+    """Render the knowledge base management tab interface."""
     st.markdown("### Knowledge Base Search & Management")
     knowledge_helper = st.session_state[SESSION_KEY_KNOWLEDGE_HELPER]
     render_knowledge_status(knowledge_helper)
@@ -1290,968 +2280,3 @@ def render_knowledge_tab():
             st.warning(f"Query returned empty response. Raw result: '{search_results}'")
         else:
             st.info("No matching knowledge found.")
-
-
-def render_sidebar():
-    with st.sidebar:
-        # Theme selector at the very top
-        st.header("🎨 Theme")
-        dark_mode = st.toggle(
-            "Dark Mode", value=st.session_state.get(SESSION_KEY_DARK_THEME, False)
-        )
-
-        if dark_mode != st.session_state.get(SESSION_KEY_DARK_THEME, False):
-            st.session_state[SESSION_KEY_DARK_THEME] = dark_mode
-            st.rerun()
-
-        st.header("Provider Selection")
-
-        # Provider selector
-        available_providers = ["ollama", "lm-studio", "openai"]
-        current_provider = os.getenv("PROVIDER", "ollama")
-
-        selected_provider = st.selectbox(
-            "Select AI Provider:",
-            available_providers,
-            index=available_providers.index(current_provider) if current_provider in available_providers else 0,
-            help="Choose your AI model provider. Each provider has different default models."
-        )
-
-        # Show provider-specific information
-        if selected_provider == "ollama":
-            st.caption("🐳 **Ollama**: Local models, full control, no API costs")
-            default_model = get_provider_default_model("ollama")
-        elif selected_provider == "lm-studio":
-            st.caption("🎭 **LM Studio**: Local models with user-friendly interface")
-            default_model = get_provider_default_model("lm-studio")
-        elif selected_provider == "openai":
-            st.caption("🔗 **OpenAI**: Cloud models, requires API key")
-            default_model = get_provider_default_model("openai")
-
-        st.caption(f"📋 **Default Model:** {default_model}")
-
-        # Apply provider change
-        if selected_provider != current_provider:
-            if st.button(f"🔄 Switch to {selected_provider.title()}", type="primary"):
-                with st.spinner(f"Switching to {selected_provider.title()} provider..."):
-                    # Update environment variable
-                    os.environ["PROVIDER"] = selected_provider
-
-                    # Update default model to provider default
-                    new_default_model = get_provider_default_model(selected_provider)
-                    os.environ["LLM_MODEL"] = new_default_model
-
-                    # Force refresh of config module
-                    try:
-                        import importlib
-                        from personal_agent import config
-                        importlib.reload(config.settings)
-                        logger.info(f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not refresh config module: {e}")
-
-                    # Clear available models cache to force refresh
-                    if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
-                        del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
-
-                    # Update current model in session state
-                    st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
-
-                    # Update URL based on provider
-                    if selected_provider == "lm-studio":
-                        if args.remote:
-                            new_url = REMOTE_LMSTUDIO_URL
-                        else:
-                            new_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
-                        if new_url.endswith("/v1"):
-                            new_url = new_url[:-3]  # Remove /v1 for consistency
-                    elif selected_provider == "openai":
-                        new_url = "https://api.openai.com/v1"
-                    else:  # ollama
-                        new_url = REMOTE_OLLAMA_URL if args.remote else OLLAMA_URL
-
-                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_url
-
-                    # Reinitialize agent/team with new provider settings
-                    current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
-                    spinner_text = (
-                        "Reinitializing team with new provider..."
-                        if current_mode == "team"
-                        else "Reinitializing agent with new provider..."
-                    )
-
-                    with st.spinner(spinner_text):
-                        logger.info(
-                            "🔄 PROVIDER UPDATE: Reinitializing with provider %s and model %s",
-                            selected_provider,
-                            new_default_model,
-                        )
-
-                        if current_mode == "team":
-                            logger.info(
-                                "🤖 TEAM REINIT: Reinitializing team with new provider %s",
-                                selected_provider,
-                            )
-                            # Reinitialize team
-                            st.session_state[SESSION_KEY_TEAM] = initialize_team(
-                                new_default_model,
-                                new_url,
-                                st.session_state.get(SESSION_KEY_TEAM),
-                            )
-
-                            # Update helper classes with new team - use knowledge agent directly
-                            team = st.session_state[SESSION_KEY_TEAM]
-                            if hasattr(team, "members") and team.members:
-                                knowledge_agent = team.members[
-                                    0
-                                ]  # First member is the knowledge agent
-                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                    StreamlitMemoryHelper(knowledge_agent)
-                                )
-                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                    StreamlitKnowledgeHelper(knowledge_agent)
-                                )
-                            else:
-                                # Fallback: create with team object
-                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                    StreamlitMemoryHelper(team)
-                                )
-                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                    StreamlitKnowledgeHelper(team)
-                                )
-
-                            success_msg = f"Team updated to use {selected_provider.title()} provider with model: {new_default_model}"
-                            logger.info("✅ TEAM PROVIDER UPDATE COMPLETE: %s", success_msg)
-                        else:
-                            logger.info(
-                                "🧠 AGENT REINIT: Reinitializing agent with new provider %s",
-                                selected_provider,
-                            )
-                            # Reinitialize single agent
-                            st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-                                new_default_model,
-                                new_url,
-                                st.session_state.get(SESSION_KEY_AGENT),
-                            )
-
-                            # Update helper classes with new agent
-                            st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                StreamlitMemoryHelper(
-                                    st.session_state[SESSION_KEY_AGENT]
-                                )
-                            )
-                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                StreamlitKnowledgeHelper(
-                                    st.session_state[SESSION_KEY_AGENT]
-                                )
-                            )
-
-                            success_msg = (
-                                f"Agent updated to use {selected_provider.title()} provider with model: {new_default_model}"
-                            )
-                            logger.info("✅ AGENT PROVIDER UPDATE COMPLETE: %s", success_msg)
-
-                        st.session_state[SESSION_KEY_MESSAGES] = []
-                        st.success(success_msg)
-                        st.rerun()
-
-        st.header("Model Selection")
-
-        # Show current provider prominently
-        provider = os.getenv("PROVIDER", "ollama")
-        provider_display = provider.upper() if provider == "ollama" else "LM Studio" if provider == "lm-studio" else provider.title()
-        st.write(f"**Current Provider:** {provider_display}")
-        
-        new_ollama_url = st.text_input(
-            "**Provider URL:**", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
-        )
-        if st.button("🔄 Fetch Available Models"):
-            with st.spinner("Fetching models..."):
-                available_models = get_available_models(new_ollama_url)
-                if available_models:
-                    st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
-                    st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_ollama_url
-                    st.success(f"Found {len(available_models)} models!")
-                else:
-                    st.error("No models found or connection failed")
-
-        if (
-            SESSION_KEY_AVAILABLE_MODELS in st.session_state
-            and st.session_state[SESSION_KEY_AVAILABLE_MODELS]
-        ):
-            current_model_index = 0
-            if (
-                st.session_state[SESSION_KEY_CURRENT_MODEL]
-                in st.session_state[SESSION_KEY_AVAILABLE_MODELS]
-            ):
-                current_model_index = st.session_state[
-                    SESSION_KEY_AVAILABLE_MODELS
-                ].index(st.session_state[SESSION_KEY_CURRENT_MODEL])
-            selected_model = st.selectbox(
-                "Select Model:",
-                st.session_state[SESSION_KEY_AVAILABLE_MODELS],
-                index=current_model_index,
-            )
-            if st.button("🚀 Apply Model Selection"):
-                if (
-                    selected_model != st.session_state[SESSION_KEY_CURRENT_MODEL]
-                    or new_ollama_url
-                    != st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
-                ):
-                    current_mode = st.session_state.get(
-                        SESSION_KEY_AGENT_MODE, "single"
-                    )
-                    spinner_text = (
-                        "Reinitializing team..."
-                        if current_mode == "team"
-                        else "Reinitializing agent..."
-                    )
-
-                    with st.spinner(spinner_text):
-                        old_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
-                        old_url = st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
-
-                        logger.info(
-                            "🔄 MODEL UPDATE: Changing from %s to %s",
-                            old_model,
-                            selected_model,
-                        )
-                        logger.info(
-                            "🔄 URL UPDATE: Changing from %s to %s",
-                            old_url,
-                            new_ollama_url,
-                        )
-
-                        st.session_state[SESSION_KEY_CURRENT_MODEL] = selected_model
-                        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = (
-                            new_ollama_url
-                        )
-
-                        if current_mode == "team":
-                            logger.info(
-                                "🤖 TEAM REINIT: Reinitializing team with new model %s",
-                                selected_model,
-                            )
-                            # Reinitialize team
-                            st.session_state[SESSION_KEY_TEAM] = initialize_team(
-                                selected_model,
-                                new_ollama_url,
-                                st.session_state.get(SESSION_KEY_TEAM),
-                            )
-
-                            # Update helper classes with new team - use knowledge agent directly
-                            team = st.session_state[SESSION_KEY_TEAM]
-                            if hasattr(team, "members") and team.members:
-                                knowledge_agent = team.members[
-                                    0
-                                ]  # First member is the knowledge agent
-                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                    StreamlitMemoryHelper(knowledge_agent)
-                                )
-                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                    StreamlitKnowledgeHelper(knowledge_agent)
-                                )
-                            else:
-                                # Fallback: create with team object
-                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                    StreamlitMemoryHelper(team)
-                                )
-                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                    StreamlitKnowledgeHelper(team)
-                                )
-
-                            success_msg = f"Team updated to use model: {selected_model}"
-                            logger.info("✅ TEAM UPDATE COMPLETE: %s", success_msg)
-                        else:
-                            logger.info(
-                                "🧠 AGENT REINIT: Reinitializing agent with new model %s",
-                                selected_model,
-                            )
-                            # Reinitialize single agent
-                            st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-                                selected_model,
-                                new_ollama_url,
-                                st.session_state.get(SESSION_KEY_AGENT),
-                            )
-
-                            # Update helper classes with new agent
-                            st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                StreamlitMemoryHelper(
-                                    st.session_state[SESSION_KEY_AGENT]
-                                )
-                            )
-                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                StreamlitKnowledgeHelper(
-                                    st.session_state[SESSION_KEY_AGENT]
-                                )
-                            )
-
-                            success_msg = (
-                                f"Agent updated to use model: {selected_model}"
-                            )
-                            logger.info("✅ AGENT UPDATE COMPLETE: %s", success_msg)
-
-                        st.session_state[SESSION_KEY_MESSAGES] = []
-                        st.success(success_msg)
-                        st.rerun()
-                else:
-                    st.info("Model and URL are already current")
-        else:
-            st.info("Click 'Fetch Available Models' to see available models")
-
-        # Dynamic header based on mode
-        current_mode = st.session_state.get(SESSION_KEY_AGENT_MODE, "single")
-        if current_mode == "team":
-            st.header("Team Information")
-        else:
-            st.header("Agent Information")
-
-        st.write(f"**Current Model:** {st.session_state[SESSION_KEY_CURRENT_MODEL]}")
-        # st.write(
-        #    f"**Current Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
-        # )
-
-        # Show mode-specific information
-        if current_mode == "team":
-            # Team-specific information
-            team = st.session_state.get(SESSION_KEY_TEAM)
-            if team:
-                st.write(f"**Mode:** 🤖 Team of Agents")
-
-                # Make team information collapsible
-                with st.expander("🤖 Team Details", expanded=False):
-                    # Show team composition
-                    members = getattr(team, "members", [])
-                    st.write(f"**Team Members:** {len(members)}")
-
-                    if members:
-                        st.write("**Specialized Agents:**")
-                        for member in members:
-                            member_name = getattr(member, "name", "Unknown")
-                            member_role = getattr(member, "role", "Unknown")
-                            member_tools = len(getattr(member, "tools", []))
-                            st.write(
-                                f"• **{member_name}**: {member_role} ({member_tools} tools)"
-                            )
-
-                    # Show team capabilities
-                    st.write("**Team Capabilities:**")
-                    st.write("• 🧠 Memory Management")
-                    st.write("• 📚 Knowledge Base Access")
-                    st.write("• 🌐 Web Research")
-                    st.write("• ✍️ Writing & Content Creation")
-                    st.write("• 🎨 Image Creation")
-                    st.write("• 🔬 PubMed Research")
-                    st.write("• 💰 Finance & Calculations")
-                    st.write("• 📁 File Operations")
-            else:
-                st.write(f"**Mode:** 🤖 Team of Agents")
-                st.warning("⚠️ Team not initialized")
-        else:
-            # Single agent information
-            agent = st.session_state.get(SESSION_KEY_AGENT)
-            if agent:
-                st.write(f"**Mode:** 🧠 Single Agent")
-                st.write(f"**Agent Type:** {type(agent).__name__}")
-
-                # Show agent capabilities
-                st.write("**Agent Capabilities:**")
-                st.write("• 🧠 Memory Management")
-                st.write("• 📚 Knowledge Base Access")
-                st.write("• 🔧 Tool Integration")
-                if hasattr(agent, "enable_mcp") and agent.enable_mcp:
-                    st.write("• 🔌 MCP Server Integration")
-            else:
-                st.write(f"**Mode:** 🧠 Single Agent")
-                st.warning("⚠️ Agent not initialized")
-
-        # Show comprehensive model configuration for current model
-        current_model = st.session_state[SESSION_KEY_CURRENT_MODEL]
-        current_ollama_url = st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
-
-        with st.expander("⚙️ Model Configuration", expanded=False):
-            try:
-                # Get comprehensive model configuration
-                model_config = get_model_config_dict(current_model, current_ollama_url)
-
-                st.write("**Model Parameters:**")
-                params = model_config.get("parameters", {})
-                st.write(f"• Temperature: {params.get('temperature', 'N/A')}")
-                st.write(f"• Top P: {params.get('top_p', 'N/A')}")
-                st.write(f"• Top K: {params.get('top_k', 'N/A')}")
-                st.write(
-                    f"• Repetition Penalty: {params.get('repetition_penalty', 'N/A')}"
-                )
-
-                st.write("**Context Configuration:**")
-                context_size = model_config.get("context_size", "N/A")
-                if isinstance(context_size, int):
-                    st.write(f"• Context Size: {context_size:,} tokens")
-                else:
-                    st.write(f"• Context Size: {context_size}")
-
-                st.caption(
-                    "Configuration sourced from model_contexts.py and environment variables"
-                )
-
-            except Exception as e:
-                st.error(f"Error loading model configuration: {e}")
-                # Fallback to basic model info
-                st.write(f"**Model:** {current_model}")
-                st.write(f"**Ollama URL:** {current_ollama_url}")
-
-        # Show debug info about URL configuration
-        if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
-            with st.expander("🔍 URL Debug Info", expanded=False):
-                st.write(f"**--remote flag:** {args.remote}")
-                st.write(f"**OLLAMA_URL (local):** {OLLAMA_URL}")
-                st.write(f"**REMOTE_OLLAMA_URL:** {REMOTE_OLLAMA_URL}")
-                st.write(f"**EFFECTIVE_OLLAMA_URL (startup):** {EFFECTIVE_OLLAMA_URL}")
-                st.write(
-                    f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
-                )
-
-                # Show agent/team specific debug info
-                provider = os.getenv("PROVIDER", "ollama")
-                st.write(f"**Current Provider:** {provider}")
-
-                if current_mode == "team":
-                    team = st.session_state.get(SESSION_KEY_TEAM)
-                    if team and hasattr(team, "ollama_base_url"):
-                        st.write(f"**Team's Ollama URL:** {team.ollama_base_url}")
-                    else:
-                        st.write("**Team URL:** Not accessible")
-                else:
-                    agent = st.session_state.get(SESSION_KEY_AGENT)
-                    if agent:
-                        # Show provider-specific URLs
-                        if provider == "lm-studio":
-                            if hasattr(agent, "model_manager") and hasattr(
-                                agent.model_manager, "lmstudio_base_url"
-                            ):
-                                st.write(
-                                    f"**Agent's LM Studio URL:** {agent.model_manager.lmstudio_base_url}"
-                                )
-                            else:
-                                lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "Not set")
-                                st.write(f"**LM Studio URL (env):** {lmstudio_url}")
-                        else:
-                            if hasattr(agent, "ollama_base_url"):
-                                st.write(
-                                    f"**Agent's Ollama URL:** {agent.ollama_base_url}"
-                                )
-                            elif hasattr(agent, "model_manager") and hasattr(
-                                agent.model_manager, "ollama_base_url"
-                            ):
-                                st.write(
-                                    f"**Agent's Model Manager URL:** {agent.model_manager.ollama_base_url}"
-                                )
-                            else:
-                                st.write("**Agent URL:** Not accessible")
-
-                        # Show model manager provider info
-                        if hasattr(agent, "model_manager"):
-                            st.write(
-                                f"**Model Manager Provider:** {getattr(agent.model_manager, 'model_provider', 'Unknown')}"
-                            )
-                    else:
-                        st.write("**Agent:** Not accessible")
-
-        st.header("Controls")
-        if st.button("Clear Chat History"):
-            st.session_state[SESSION_KEY_MESSAGES] = []
-            st.rerun()
-
-        st.header("Debug Info")
-        debug_label = "Enable Debug Mode"
-        if DEBUG_FLAG:
-            debug_label += " (CLI enabled)"
-        st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox(
-            debug_label,
-            value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, DEBUG_FLAG),
-            help="Debug mode can be enabled via --debug flag or this checkbox",
-        )
-        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
-            st.subheader("📊 Performance Statistics")
-            stats = st.session_state[SESSION_KEY_PERFORMANCE_STATS]
-            if stats["total_requests"] > 0:
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Total Requests", stats["total_requests"])
-                    st.metric(
-                        "Avg Response Time", f"{stats['average_response_time']:.3f}s"
-                    )
-                    st.metric(
-                        "Fastest Response",
-                        (
-                            f"{stats['fastest_response']:.3f}s"
-                            if stats["fastest_response"] != float("inf")
-                            else "N/A"
-                        ),
-                    )
-                with col2:
-                    st.metric("Total Tool Calls", stats["tool_calls_count"])
-                    st.metric("Avg Tokens/Request", f"{stats['average_tokens']:.0f}")
-                    st.metric("Slowest Response", f"{stats['slowest_response']:.3f}s")
-            else:
-                st.info("No requests made yet.")
-
-            if len(st.session_state[SESSION_KEY_DEBUG_METRICS]) > 1:
-                st.subheader("📈 Response Time Trend")
-                df = pd.DataFrame(st.session_state[SESSION_KEY_DEBUG_METRICS])
-                df = df[df["success"]]
-                if not df.empty and len(df) > 1:
-                    chart_data = (
-                        df[["timestamp", "response_time"]].copy().set_index("timestamp")
-                    )
-                    
-                    # Apply theme-aware styling for the chart
-                    is_dark_theme = st.session_state.get(SESSION_KEY_DARK_THEME, False)
-                    
-                    # Create base chart
-                    chart = (
-                        alt.Chart(chart_data.reset_index())
-                        .mark_line(point=True, color="#1f77b4" if not is_dark_theme else "#ff7f0e")
-                        .encode(
-                            x=alt.X("timestamp:O", title="Time"),
-                            y=alt.Y("response_time:Q", title="Response Time (s)"),
-                            tooltip=["timestamp:O", "response_time:Q"],
-                        )
-                        .properties(title="Response Time Trend")
-                    )
-                    
-                    # Apply theme-specific configuration
-                    if is_dark_theme:
-                        # Configure for dark theme
-                        chart = chart.configure_view(
-                            strokeWidth=0,
-                            fill='#0e1117'  # Dark background color matching Streamlit dark theme
-                        ).configure_axis(
-                            labelColor='white',
-                            titleColor='white',
-                            gridColor='#444444',
-                            domainColor='white'
-                        ).configure_title(
-                            color='white'
-                        ).configure_legend(
-                            labelColor='white',
-                            titleColor='white'
-                        ).configure(
-                            background='#0e1117'  # Set overall chart background
-                        )
-                    else:
-                        # Configure for light theme (default)
-                        chart = chart.configure_view(
-                            strokeWidth=0,
-                            fill='white'  # Light background color
-                        ).configure_axis(
-                            labelColor='black',
-                            titleColor='black',
-                            gridColor='#e0e0e0',
-                            domainColor='black'
-                        ).configure_title(
-                            color='black'
-                        ).configure_legend(
-                            labelColor='black',
-                            titleColor='black'
-                        ).configure(
-                            background='white'  # Set overall chart background
-                        )
-                    
-                    st.altair_chart(chart, use_container_width=True)
-
-            st.subheader("🔧 Recent Tool Calls")
-            if st.session_state[SESSION_KEY_DEBUG_METRICS]:
-                # Filter entries that have tool calls
-                tool_call_entries = [
-                    entry
-                    for entry in st.session_state[SESSION_KEY_DEBUG_METRICS]
-                    if entry.get("tool_calls", 0) > 0
-                ]
-
-                if tool_call_entries:
-                    for entry in reversed(
-                        tool_call_entries[-5:]
-                    ):  # Show last 5 tool call entries
-                        tool_call_details = entry.get("tool_call_details", [])
-                        with st.expander(
-                            f"🔧 {entry['timestamp']} - {entry['tool_calls']} tool(s) - {entry['response_time']}s"
-                        ):
-                            st.write(f"**Prompt:** {entry['prompt']}")
-                            st.write(f"**Response Time:** {entry['response_time']}s")
-                            st.write(f"**Tool Calls Made:** {entry['tool_calls']}")
-
-                            if tool_call_details:
-                                st.write("**Tool Call Details:**")
-                                for i, tool_call in enumerate(tool_call_details, 1):
-                                    # Use standardized format - check for 'name' field first
-                                    tool_name = tool_call.get(
-                                        "name",
-                                        tool_call.get("function_name", "Unknown"),
-                                    )
-                                    tool_status = tool_call.get("status", "unknown")
-
-                                    # Status indicator
-                                    status_icon = (
-                                        "✅"
-                                        if tool_status == "success"
-                                        else "❓" if tool_status == "unknown" else "❌"
-                                    )
-
-                                    st.write(f"**Tool {i}:** {status_icon} {tool_name}")
-
-                                    # Show arguments
-                                    tool_args = tool_call.get(
-                                        "arguments", tool_call.get("function_args", {})
-                                    )
-                                    if tool_args:
-                                        st.write("**Arguments:**")
-                                        st.json(tool_args)
-
-                                    # Show result if available
-                                    tool_result = tool_call.get(
-                                        "result", tool_call.get("content")
-                                    )
-                                    if tool_result:
-                                        st.write("**Result:**")
-                                        if (
-                                            isinstance(tool_result, str)
-                                            and len(tool_result) > 200
-                                        ):
-                                            st.write(f"{tool_result[:200]}...")
-                                        else:
-                                            st.write(str(tool_result))
-
-                                    # Show reasoning if available (legacy field)
-                                    if tool_call.get("reasoning"):
-                                        st.write(
-                                            f"**Reasoning:** {tool_call['reasoning']}"
-                                        )
-
-                                    if i < len(
-                                        tool_call_details
-                                    ):  # Add separator between tools
-                                        st.markdown("---")
-                else:
-                    st.info("No tool calls made yet.")
-            else:
-                st.info("No debug metrics available yet.")
-
-            # REST API (debug-only) moved to sidebar to avoid cluttering pages
-            if False and st.session_state.get(SESSION_KEY_SHOW_DEBUG):
-                st.subheader("📡 REST API")
-                if st.session_state.get("rest_api_server"):
-                    st.success("🌐 REST API server running on http://localhost:8001")
-                    with st.expander("📡 REST API Endpoints", expanded=False):
-                        st.markdown("""
-            **Memory Endpoints:**
-            - `POST /api/v1/memory/store` - Store text as memory
-            - `POST /api/v1/memory/store-url` - Store content from URL as memory
-            - `GET /api/v1/memory/search?q=query` - Search memories
-            - `GET /api/v1/memory/list` - List all memories
-            - `GET /api/v1/memory/stats` - Get memory statistics
-
-            **Knowledge Endpoints:**
-            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
-            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
-            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
-            - `GET /api/v1/knowledge/status` - Get knowledge base status
-
-            **System Endpoints:**
-            - `GET /api/v1/health` - Health check
-            - `GET /api/v1/status` - System status
-
-            **Example Usage:**
-            ```bash
-            # Store memory
-            curl -X POST http://localhost:8001/api/v1/memory/store \\
-              -H "Content-Type: application/json" \\
-              -d '{"content": "I work at Google", "topics": ["work"]}'
-
-            # Store knowledge from URL
-            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
-              -H "Content-Type: application/json" \\
-              -d '{"url": "https://example.com/article", "title": "Important Article"}'
-            ```
-                        """)
-                else:
-                    st.warning("⚠️ REST API server failed to start")
-
-        # Show recent request details above system controls to keep power button last
-        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
-            st.subheader("🔍 Recent Request Details")
-            if st.session_state[SESSION_KEY_DEBUG_METRICS]:
-                for entry in reversed(st.session_state[SESSION_KEY_DEBUG_METRICS][-5:]):
-                    with st.expander(
-                        f"{'✅' if entry['success'] else '❌'} {entry['timestamp']} - {entry['response_time']}s"
-                    ):
-                        st.write(f"**Prompt:** {entry['prompt']}")
-                        st.write(f"**Response Time:** {entry['response_time']}s")
-                        st.write(f"**Input Tokens:** {entry['input_tokens']}")
-                        st.write(f"**Output Tokens:** {entry['output_tokens']}")
-                        st.write(f"**Total Tokens:** {entry['total_tokens']}")
-                        st.write(f"**Tool Calls:** {entry['tool_calls']}")
-                        st.write(f"**Response Type:** {entry['response_type']}")
-                        if not entry["success"]:
-                            st.write(
-                                f"**Error:** {entry.get('error', 'Unknown error')}"
-                            )
-            else:
-                st.info("No debug metrics available yet.")
-
-        # REST API (debug-only) placed below Recent Request Details
-        if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
-            st.subheader("📡 REST API")
-            if st.session_state.get("rest_api_server"):
-                st.success("🌐 REST API server running on http://localhost:8001")
-                with st.expander("📡 REST API Endpoints", expanded=False):
-                    st.markdown("""
-            **Memory Endpoints:**
-            - `POST /api/v1/memory/store` - Store text as memory
-            - `POST /api/v1/memory/store-url` - Store content from URL as memory
-            - `GET /api/v1/memory/search?q=query` - Search memories
-            - `GET /api/v1/memory/list` - List all memories
-            - `GET /api/v1/memory/stats` - Get memory statistics
-
-            **Knowledge Endpoints:**
-            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
-            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
-            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
-            - `GET /api/v1/knowledge/status` - Get knowledge base status
-
-            **System Endpoints:**
-            - `GET /api/v1/health` - Health check
-            - `GET /api/v1/status` - System status
-
-            **Example Usage:**
-            ```bash
-            # Store memory
-            curl -X POST http://localhost:8001/api/v1/memory/store \\
-              -H "Content-Type: application/json" \\
-              -d '{"content": "I work at Google", "topics": ["work"]}'
-
-            # Store knowledge from URL
-            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
-              -H "Content-Type: application/json" \\
-              -d '{"url": "https://example.com/article", "title": "Important Article"}'
-            ```
-                    """)
-            else:
-                st.warning("⚠️ REST API server failed to start")
-
-        # Power off button at the bottom of the sidebar
-        st.markdown("---")
-        st.header("🚨 System Control")
-        if st.button(
-            "🔴 Power Off System",
-            key="sidebar_power_off_btn",
-            type="primary",
-            use_container_width=True,
-        ):
-            # Show confirmation dialog
-            st.session_state["show_power_off_confirmation"] = True
-            st.rerun()
-
-
-
-def main():
-    """Main function to run the Streamlit app."""
-    initialize_session_state(args, EFFECTIVE_OLLAMA_URL, RECREATE_FLAG, DEBUG_FLAG, SINGLE_FLAG, USER_ID)
-    apply_custom_theme()
-
-    # Update global state with current session state for REST API access
-    update_global_state_from_streamlit(st.session_state)
-    
-    # Initialize REST API server AFTER session state is fully initialized
-    if "rest_api_server" not in st.session_state:
-        try:
-            # Start the REST API server with access to Streamlit session state
-            api_server = start_rest_api(st.session_state, port=8001, host="0.0.0.0")
-            st.session_state["rest_api_server"] = api_server
-            logger.info("REST API server initialized and started on port 8001")
-        except Exception as e:
-            logger.error(f"Failed to start REST API server: {e}")
-            # Don't fail the entire app if REST API fails to start
-            st.session_state["rest_api_server"] = None
-    else:
-        # Update the REST API server with current session state (in case it changed)
-        api_server = st.session_state.get("rest_api_server")
-        if api_server:
-            api_server.set_streamlit_session(st.session_state)
-        # Also update global state on every run
-        update_global_state_from_streamlit(st.session_state)
-
-    # Add power button to actual top banner using custom HTML/CSS
-    st.markdown(
-        """
-    <style>
-    .power-button-container {
-        position: fixed;
-        top: 10px;
-        right: 20px;
-        z-index: 999999;
-        background: rgba(255, 255, 255, 0.9);
-        border-radius: 50%;
-        padding: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .power-button {
-        background: #ff4b4b;
-        border: none;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        font-size: 20px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    .power-button:hover {
-        background: #ff3333;
-        transform: scale(1.05);
-    }
-    </style>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    # Streamlit UI
-    st.title("🤖 Personal AI Friend with Memory")
-    st.markdown(
-        "*A friendly AI agent that remembers your conversations and learns about you*"
-    )
-    
-    # Show REST API status
-    if False and st.session_state.get("rest_api_server"):
-        st.success("🌐 REST API server running on http://localhost:8001")
-        with st.expander("📡 REST API Endpoints", expanded=False):
-            st.markdown("""
-            **Memory Endpoints:**
-            - `POST /api/v1/memory/store` - Store text as memory
-            - `POST /api/v1/memory/store-url` - Store content from URL as memory
-            - `GET /api/v1/memory/search?q=query` - Search memories
-            - `GET /api/v1/memory/list` - List all memories
-            - `GET /api/v1/memory/stats` - Get memory statistics
-            
-            **Knowledge Endpoints:**
-            - `POST /api/v1/knowledge/store-text` - Store text in knowledge base
-            - `POST /api/v1/knowledge/store-url` - Store content from URL in knowledge base
-            - `GET /api/v1/knowledge/search?q=query` - Search knowledge base
-            - `GET /api/v1/knowledge/status` - Get knowledge base status
-            
-            **System Endpoints:**
-            - `GET /api/v1/health` - Health check
-            - `GET /api/v1/status` - System status
-            
-            **Example Usage:**
-            ```bash
-            # Store memory
-            curl -X POST http://localhost:8001/api/v1/memory/store \\
-              -H "Content-Type: application/json" \\
-              -d '{"content": "I work at Google", "topics": ["work"]}'
-            
-            # Store knowledge from URL
-            curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
-              -H "Content-Type: application/json" \\
-              -d '{"url": "https://example.com/article", "title": "Important Article"}'
-            ```
-            """)
-    elif False:
-        pass
-
-    # Power off button moved to bottom of sidebar (in render_sidebar function)
-
-    # Power off confirmation modal - full width
-    if st.session_state.get("show_power_off_confirmation", False):
-        # Create a prominent confirmation dialog
-        st.markdown("---")
-        st.error("⚠️ **SYSTEM SHUTDOWN CONFIRMATION**")
-        st.warning("This will permanently shut down the Personal Agent application.")
-
-        # Create wider columns for better button layout
-        col_spacer1, col_cancel, col_spacer2, col_confirm, col_spacer3 = st.columns(
-            [1, 2, 1, 2, 1]
-        )
-
-        with col_cancel:
-            if st.button(
-                "❌ Cancel Shutdown",
-                key="wide_cancel_power_off",
-                use_container_width=True,
-            ):
-                st.session_state["show_power_off_confirmation"] = False
-                st.rerun()
-
-        with col_confirm:
-            if st.button(
-                "🔴 CONFIRM SHUTDOWN",
-                key="wide_confirm_power_off",
-                type="primary",
-                use_container_width=True,
-            ):
-                # Clear confirmation state
-                st.session_state["show_power_off_confirmation"] = False
-
-                # Show success notification
-                st.toast("🎉 Shutting down system...", icon="🔴")
-                time.sleep(2.0)  # 2 second delay
-
-                # Graceful system shutdown - no browser closing attempts
-                import os
-                import threading
-
-                def graceful_shutdown():
-                    """Perform graceful shutdown of the system."""
-                    try:
-                        # Give time for the UI to show the shutdown message
-                        time.sleep(3)
-
-                        # Log shutdown
-                        logger.info("🔴 SHUTDOWN: Initiating graceful shutdown...")
-
-                        # Force exit the Python process
-                        os._exit(0)
-
-                    except Exception as e:
-                        logger.error(f"🔴 SHUTDOWN ERROR: {e}")
-                        # Force exit as fallback
-                        os._exit(1)
-
-                # Start shutdown in a separate thread
-                shutdown_thread = threading.Thread(target=graceful_shutdown)
-                shutdown_thread.daemon = True
-                shutdown_thread.start()
-
-                # Stop Streamlit execution
-                st.stop()
-
-        st.markdown("---")
-
-        # Don't show any other content when shutdown confirmation is active
-        return
-
-    # Sidebar navigation (replaces top-level tabs)
-    st.sidebar.title(f"🧠 {USER_ID}'s Personal Agent")
-    selected_tab = st.sidebar.radio(
-        "Navigation",
-        ["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"],
-        index=0,
-    )
-
-    # Route content based on sidebar selection
-    if selected_tab == "💬 Chat":
-        render_chat_tab()
-    elif selected_tab == "🧠 Memory Manager":
-        render_memory_tab()
-    elif selected_tab == "📚 Knowledge Base":
-        render_knowledge_tab()
-
-    # Append the original sidebar controls (theme/model/debug/etc.)
-    render_sidebar()
-
-
-if __name__ == "__main__":
-    main()
