@@ -28,7 +28,6 @@ from .memory import (
     reset_weaviate_if_corrupted,
     setup_weaviate,
 )
-from .multi_agent_system import MultiAgentSystem, create_multi_agent_system
 from .nlp_extractor import extract_entities, extract_relationships
 from .semantic_memory_manager import (
     SemanticDuplicateDetector,
@@ -74,9 +73,6 @@ __all__ = [
     "AgentKnowledgeManager",
     "AgentMemoryManager", 
     "AgentModelManager",
-    # Multi-agent system
-    "MultiAgentSystem",
-    "create_multi_agent_system",
     # Smolagents
     "create_smolagents_executor",
     "create_smolagents_model",

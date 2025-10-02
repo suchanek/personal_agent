@@ -61,7 +61,9 @@ class GlobalStateManager:
                 "team_available": self._state.get("team") is not None,
                 "memory_helper_available": self._state.get("memory_helper") is not None,
                 "knowledge_helper_available": self._state.get("knowledge_helper") is not None,
-                "agent_mode": self._state.get("agent_mode", "single")
+                "agent_mode": self._state.get("agent_mode", "single"),
+                "user": self._state.get("userid", "unknown"),
+                "model": self._state.get("llm_model", "unknown")
             }
 
 
@@ -77,12 +79,26 @@ def get_global_state() -> GlobalStateManager:
 def update_global_state_from_streamlit(session_state) -> None:
     """Update global state with current Streamlit session state."""
     global_state = get_global_state()
-    
+
     # Update all relevant state
     global_state.set("agent_mode", session_state.get("agent_mode", "single"))
     global_state.set("agent", session_state.get("agent"))
     global_state.set("team", session_state.get("team"))
     global_state.set("memory_helper", session_state.get("memory_helper"))
     global_state.set("knowledge_helper", session_state.get("knowledge_helper"))
-    
-    logger.info("Global state updated from Streamlit session")
+
+    # Get user ID from environment if not in session state
+    import os
+    from personal_agent.config import get_current_user_id
+    userid = session_state.get("user_id", get_current_user_id())
+    global_state.set("userid", userid)
+
+    # Get model from session state (key is "current_model")
+    llm_model = session_state.get("current_model", "unknown")
+    global_state.set("llm_model", llm_model)
+
+    # Debug logging
+    logger.info(f"Global state updated from Streamlit session - userid: {userid}, llm_model: {llm_model}")
+    logger.info(f"Session state keys: {list(session_state.keys())}")
+    logger.info(f"Session state current_model: {session_state.get('current_model')}")
+    logger.info(f"Session state agent_mode: {session_state.get('agent_mode')}")
