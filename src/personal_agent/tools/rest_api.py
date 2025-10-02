@@ -125,31 +125,25 @@ class PersonalAgentRestAPI:
             try:
                 # Use global state to check system health
                 global_state = get_global_state()
+                if global_state is None:
+                    logger.error("global_state is None")
+                    raise Exception("Global state not available")
+                    
                 global_status = global_state.get_status()
+                if global_status is None:
+                    logger.error("global_status is None")
+                    raise Exception("Global status not available")
 
                 # Check all required conditions
                 streamlit_connected = self.streamlit_session is not None
-                agent_available = global_status["agent_available"]
-                team_available = global_status["team_available"]
-                memory_available = global_status["memory_helper_available"]
-                knowledge_available = global_status["knowledge_helper_available"]
+                agent_available = global_status.get("agent_available", False)
+                team_available = global_status.get("team_available", False)
+                memory_available = global_status.get("memory_helper_available", False)
+                knowledge_available = global_status.get("knowledge_helper_available", False)
 
-                # Get user and model directly from session state or environment
-                if self.streamlit_session:
-                    model = self.streamlit_session.get(
-                        "current_model",
-                        "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
-                    )
-                    user = self.streamlit_session.get("user_id")
-                    if not user:
-                        from personal_agent.config import get_current_user_id
-
-                        user = get_current_user_id()
-                else:
-                    from personal_agent.config import get_current_user_id
-
-                    user = get_current_user_id()
-                    model = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+                # Get user and model directly from global state
+                user = global_status.get("user", "unknown")
+                model = global_status.get("model", "unknown")
 
                 # System is healthy if all conditions are met, with exception that either team or agent must be available
                 is_healthy = (
@@ -202,21 +196,44 @@ class PersonalAgentRestAPI:
                 global_status = global_state.get_status()
 
                 # Get user and model directly from session state or environment
-                if self.streamlit_session:
-                    model = self.streamlit_session.get(
-                        "current_model",
-                        "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
-                    )
-                    user = self.streamlit_session.get("user_id")
-                    if not user:
-                        from personal_agent.config import get_current_user_id
-
-                        user = get_current_user_id()
-                else:
-                    from personal_agent.config import get_current_user_id
-
-                    user = get_current_user_id()
-                    model = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+                try:
+                    if self.streamlit_session:
+                        model = self.streamlit_session.get(
+                            "current_model",
+                            "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+                        )
+                        user = self.streamlit_session.get("user_id")
+                        if not user:
+                            try:
+                                from ..config.user_id_mgr import get_current_user_id
+                                user = get_current_user_id()
+                            except ImportError:
+                                # Try absolute import as fallback
+                                import sys
+                                from pathlib import Path
+                                src_path = Path(__file__).parent.parent.parent / "src"
+                                if str(src_path) not in sys.path:
+                                    sys.path.insert(0, str(src_path))
+                                from personal_agent.config.user_id_mgr import get_current_user_id
+                                user = get_current_user_id()
+                    else:
+                        try:
+                            from ..config.user_id_mgr import get_current_user_id
+                            user = get_current_user_id()
+                        except ImportError:
+                            # Try absolute import as fallback
+                            import sys
+                            from pathlib import Path
+                            src_path = Path(__file__).parent.parent.parent / "src"
+                            if str(src_path) not in sys.path:
+                                sys.path.insert(0, str(src_path))
+                            from personal_agent.config.user_id_mgr import get_current_user_id
+                            user = get_current_user_id()
+                        model = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+                except Exception as user_model_error:
+                    logger.error(f"Error getting user/model info: {user_model_error}")
+                    user = "error_getting_user"
+                    model = "error_getting_model"
 
                 status = {
                     "status": "Running",
