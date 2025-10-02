@@ -14,6 +14,7 @@ import os
 import time
 from datetime import datetime, timedelta
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
