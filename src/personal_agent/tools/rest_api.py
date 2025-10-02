@@ -134,6 +134,23 @@ class PersonalAgentRestAPI:
                 memory_available = global_status["memory_helper_available"]
                 knowledge_available = global_status["knowledge_helper_available"]
 
+                # Get user and model directly from session state or environment
+                if self.streamlit_session:
+                    model = self.streamlit_session.get(
+                        "current_model",
+                        "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+                    )
+                    user = self.streamlit_session.get("user_id")
+                    if not user:
+                        from personal_agent.config import get_current_user_id
+
+                        user = get_current_user_id()
+                else:
+                    from personal_agent.config import get_current_user_id
+
+                    user = get_current_user_id()
+                    model = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+
                 # System is healthy if all conditions are met, with exception that either team or agent must be available
                 is_healthy = (
                     streamlit_connected
@@ -150,6 +167,8 @@ class PersonalAgentRestAPI:
                         "timestamp": datetime.now().isoformat(),
                         "service": "personal-agent-api",
                         "version": "1.0.0",
+                        "model": model,
+                        "user": user,
                         "checks": {
                             "streamlit_connected": streamlit_connected,
                             "agent_available": agent_available,
@@ -182,6 +201,23 @@ class PersonalAgentRestAPI:
                 global_state = get_global_state()
                 global_status = global_state.get_status()
 
+                # Get user and model directly from session state or environment
+                if self.streamlit_session:
+                    model = self.streamlit_session.get(
+                        "current_model",
+                        "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+                    )
+                    user = self.streamlit_session.get("user_id")
+                    if not user:
+                        from personal_agent.config import get_current_user_id
+
+                        user = get_current_user_id()
+                else:
+                    from personal_agent.config import get_current_user_id
+
+                    user = get_current_user_id()
+                    model = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+
                 status = {
                     "status": "Running",
                     "timestamp": datetime.now().isoformat(),
@@ -198,6 +234,8 @@ class PersonalAgentRestAPI:
                     "knowledge_available": (
                         "Yes" if global_status["knowledge_helper_available"] else "No"
                     ),
+                    "user": user,
+                    "model": model,
                 }
 
                 return jsonify(status)

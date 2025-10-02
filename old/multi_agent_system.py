@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 from smolagents import CodeAgent, LiteLLMModel, ToolCallingAgent
 
 from ..config import LLM_MODEL, OLLAMA_URL, USE_WEAVIATE
-from ..tools.multiple_tools import (
+from ....old.multiple_tools import (
     get_joke,
     get_news_headlines,
     get_random_fact,
