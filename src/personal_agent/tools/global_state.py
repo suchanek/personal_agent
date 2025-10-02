@@ -89,7 +89,17 @@ def update_global_state_from_streamlit(session_state) -> None:
 
     # Get user ID from environment if not in session state
     import os
-    from personal_agent.config import get_current_user_id
+    try:
+        from personal_agent.config.user_id_mgr import get_current_user_id
+    except ImportError:
+        # Try relative import as fallback
+        try:
+            from ..config.user_id_mgr import get_current_user_id
+        except ImportError:
+            # Final fallback
+            def get_current_user_id():
+                return os.environ.get("USER_ID", "unknown")
+    
     userid = session_state.get("user_id", get_current_user_id())
     global_state.set("userid", userid)
 
