@@ -31,6 +31,10 @@ from personal_agent.streamlit.components.user_management import user_management_
 # Import utilities
 from personal_agent.streamlit.utils.system_utils import check_dependencies, load_css
 
+# Import REST API components
+from personal_agent.tools.global_state import update_global_state_from_streamlit
+from personal_agent.tools.rest_api import start_rest_api
+
 # Constants for session state keys
 SESSION_KEY_DARK_THEME = "dark_theme"
 SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION = "show_power_off_confirmation"
@@ -116,15 +120,36 @@ def initialize_session_state():
 
 def main():
     """Main dashboard application."""
-    
+
     # Initialize session state
     initialize_session_state()
-    
+
     # Apply theme
     apply_custom_theme()
 
     # Load custom CSS with theme awareness
     load_css(st.session_state.get(SESSION_KEY_DARK_THEME, False))
+
+    # Update global state with current session state for REST API access
+    update_global_state_from_streamlit(st.session_state)
+
+    # Initialize REST API server AFTER session state is fully initialized
+    if "rest_api_server" not in st.session_state:
+        try:
+            # Start the REST API server with access to Streamlit session state
+            api_server = start_rest_api(st.session_state, port=8002, host="0.0.0.0")
+            st.session_state["rest_api_server"] = api_server
+            # Note: No logging import needed as this is handled in rest_api.py
+        except Exception as e:
+            # Don't fail the entire app if REST API fails to start
+            st.session_state["rest_api_server"] = None
+    else:
+        # Update the REST API server with current session state (in case it changed)
+        api_server = st.session_state.get("rest_api_server")
+        if api_server:
+            api_server.set_streamlit_session(st.session_state)
+        # Also update global state on every run
+        update_global_state_from_streamlit(st.session_state)
 
     # Check dependencies
     check_dependencies()

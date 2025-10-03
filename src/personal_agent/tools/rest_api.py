@@ -5,7 +5,7 @@ This module provides REST API endpoints that run alongside the Streamlit web int
 allowing external systems to interact with memory and knowledge storage capabilities
 via standard HTTP requests.
 
-The API runs on a separate port (default 8001) while sharing the same agent instances
+The API runs on a separate port (default 8002) while sharing the same agent instances
 and session state with the Streamlit UI for consistency.
 
 Endpoints:
@@ -22,6 +22,10 @@ Endpoints:
     - POST /api/v1/knowledge/store-url - Extract and store URL content in knowledge base
     - GET /api/v1/knowledge/search - Search knowledge base
     - GET /api/v1/knowledge/status - Get knowledge base status
+
+    Users:
+    - GET /api/v1/users - List all users
+    - POST /api/v1/users/switch - Switch to a different user
 
     System:
     - GET /api/v1/health - Health check
@@ -81,7 +85,7 @@ except ImportError:
 class PersonalAgentRestAPI:
     """REST API server for Personal Agent memory and knowledge operations."""
 
-    def __init__(self, port: int = 8001, host: str = "0.0.0.0"):
+    def __init__(self, port: int = 8002, host: str = "0.0.0.0"):
         self.port = port
         self.host = host
         self.app = Flask(__name__)
@@ -734,6 +738,62 @@ class PersonalAgentRestAPI:
                 logger.error(f"Error getting knowledge status via API: {e}")
                 return jsonify({"success": "False", "error": str(e)}), 500
 
+        # User endpoints
+        @self.app.route("/api/v1/users", methods=["GET"])
+        def list_users():
+            try:
+                # Import user utilities
+                from ..streamlit.utils.user_utils import get_all_users
+
+                # Get all users
+                users = get_all_users()
+
+                logger.info(f"Users list retrieved via API: {len(users)} users")
+                return jsonify({
+                    "success": "True",
+                    "users": users,
+                    "total_count": len(users)
+                })
+
+            except Exception as e:
+                logger.error(f"Error listing users via API: {e}")
+                return jsonify({"success": "False", "error": str(e)}), 500
+
+        @self.app.route("/api/v1/users/switch", methods=["POST"])
+        def switch_user():
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No JSON data provided"}), 400
+
+                user_id = data.get("user_id", "").strip()
+                if not user_id:
+                    return jsonify({"error": "user_id is required"}), 400
+
+                restart_containers = data.get("restart_containers", True)
+
+                # Import user utilities
+                from ..streamlit.utils.user_utils import switch_user
+
+                # Switch to the specified user
+                result = switch_user(user_id, restart_containers=restart_containers)
+
+                if result.get("success", False):
+                    logger.info(f"Successfully switched to user via API: {user_id}")
+                    return jsonify({
+                        "success": "True",
+                        "message": result.get("message", "User switched successfully"),
+                        "user_id": user_id,
+                        "restart_containers": restart_containers
+                    })
+                else:
+                    logger.warning(f"Failed to switch user via API: {result.get('error', 'Unknown error')}")
+                    return jsonify({"success": "False", "error": result.get("error", "Failed to switch user")}), 400
+
+            except Exception as e:
+                logger.error(f"Error switching user via API: {e}")
+                return jsonify({"success": "False", "error": str(e)}), 500
+
     def _get_memory_helper(self):
         """Get memory helper from global state."""
         global_state = get_global_state()
@@ -843,23 +903,9 @@ class PersonalAgentRestAPI:
         logger.info("REST API server stopped")
 
 
-# Global instance
-_rest_api_instance = None
-
-
-def get_rest_api_instance(
-    port: int = 8001, host: str = "0.0.0.0"
-) -> PersonalAgentRestAPI:
-    """Get or create the global REST API instance."""
-    global _rest_api_instance
-    if _rest_api_instance is None:
-        _rest_api_instance = PersonalAgentRestAPI(port=port, host=host)
-    return _rest_api_instance
-
-
-def start_rest_api(streamlit_session, port: int = 8001, host: str = "0.0.0.0"):
+def start_rest_api(streamlit_session, port: int = 8002, host: str = "0.0.0.0"):
     """Start the REST API server with Streamlit session reference."""
-    api = get_rest_api_instance(port=port, host=host)
+    api = PersonalAgentRestAPI(port=port, host=host)
     api.set_streamlit_session(streamlit_session)
     api.start()
     return api
@@ -892,7 +938,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Personal Agent REST API Server")
     parser.add_argument(
-        "--port", type=int, default=8001, help="Port to run the server on"
+        "--port", type=int, default=8002, help="Port to run the server on"
     )
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind the server to")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
