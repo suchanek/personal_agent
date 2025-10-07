@@ -34,7 +34,7 @@ except ImportError:
     st = None
 
 
-# @st.cache_resource(ttl=300)  # Cache for 5 minutes, then refresh
+@st.cache_resource(ttl=300)  # Cache for 5 minutes, then refresh
 def get_agent_instance() -> Optional[AgnoPersonalAgent]:
     """
     Get or create a cached AgnoPersonalAgent instance for Streamlit using the same pattern as paga_streamlit_agno.py.

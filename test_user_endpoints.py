@@ -18,7 +18,8 @@ src_path = project_root / "src"
 if src_path not in sys.path:
     sys.path.insert(0, str(src_path))
 
-def test_list_users(base_url="http://localhost:8002"):
+
+def test_list_users(base_url="http://100.100.248.61:8002"):
     """Test GET /api/v1/users endpoint."""
     print("🧑 Testing GET /api/v1/users")
 
@@ -31,11 +32,13 @@ def test_list_users(base_url="http://localhost:8002"):
             print(f"   ✅ Success: {data.get('success')}")
             print(f"   Total users: {data.get('total_count', 0)}")
 
-            users = data.get('users', [])
+            users = data.get("users", [])
             if users:
                 print("   Users found:")
                 for user in users[:3]:  # Show first 3 users
-                    print(f"     - {user.get('user_id', 'unknown')}: {user.get('user_name', 'unknown')}")
+                    print(
+                        f"     - {user.get('user_id', 'unknown')}: {user.get('user_name', 'unknown')}"
+                    )
                 if len(users) > 3:
                     print(f"     ... and {len(users) - 3} more")
             else:
@@ -55,7 +58,8 @@ def test_list_users(base_url="http://localhost:8002"):
         print(f"   ❌ Connection failed: {str(e)}")
         return False
 
-def test_switch_user(base_url="http://localhost:8002"):
+
+def test_switch_user(base_url="http://100.100.248.61:8002"):
     """Test POST /api/v1/users/switch endpoint."""
     print("\n🔄 Testing POST /api/v1/users/switch")
 
@@ -66,34 +70,32 @@ def test_switch_user(base_url="http://localhost:8002"):
             print("   ❌ Cannot get user list to test switch")
             return False
 
-        users = response.json().get('users', [])
+        users = response.json().get("users", [])
         if not users:
             print("   ❌ No users available to test switch")
             return False
 
         # Pick the first user
-        test_user = users[0]
-        user_id = test_user.get('user_id')
+        test_user = users[1]
+        user_id = test_user.get("user_id")
 
         print(f"   Attempting to switch to user: {user_id}")
 
         # Test switch user
         switch_data = {
             "user_id": user_id,
-            "restart_containers": False  # Don't restart containers for testing
+            "restart_containers": False,  # Don't restart containers for testing
         }
 
         response = requests.post(
-            f"{base_url}/api/v1/users/switch",
-            json=switch_data,
-            timeout=30
+            f"{base_url}/api/v1/users/switch", json=switch_data, timeout=30
         )
 
         print(f"   Status Code: {response.status_code}")
 
         if response.status_code == 200:
             data = response.json()
-            if data.get('success') == 'True':
+            if data.get("success") == "True":
                 print(f"   ✅ Successfully switched to user: {data.get('user_id')}")
                 print(f"   Message: {data.get('message')}")
                 return True
@@ -113,12 +115,13 @@ def test_switch_user(base_url="http://localhost:8002"):
         print(f"   ❌ Connection failed: {str(e)}")
         return False
 
+
 def main():
     """Main test function."""
     print("Personal Agent User Endpoints Test")
     print("=" * 40)
 
-    base_url = "http://localhost:8002"
+    base_url = "http://100.100.248.61:8002"
 
     # Test 1: List users
     list_ok = test_list_users(base_url)
@@ -147,6 +150,7 @@ def main():
         print("3. Verify user management system is initialized")
 
     print("=" * 40)
+
 
 if __name__ == "__main__":
     main()

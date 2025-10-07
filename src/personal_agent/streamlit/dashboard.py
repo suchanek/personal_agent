@@ -10,9 +10,14 @@ Author: Personal Agent Development Team
 
 import os
 import sys
+import time
+import logging
 from pathlib import Path
 
 import streamlit as st
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Add project root to path for imports
 from personal_agent.utils import add_src_to_path
@@ -27,12 +32,14 @@ from personal_agent.streamlit.components.docker_services import docker_services_
 # Import components
 from personal_agent.streamlit.components.system_status import system_status_tab
 from personal_agent.streamlit.components.user_management import user_management_tab
+from personal_agent.streamlit.components.api_endpoints import api_endpoints_tab
 
 # Import utilities
 from personal_agent.streamlit.utils.system_utils import check_dependencies, load_css
+from personal_agent.streamlit.utils.agent_utils import get_agent_instance
 
 # Import REST API components
-from personal_agent.tools.global_state import update_global_state_from_streamlit
+from personal_agent.tools.global_state import update_global_state_from_streamlit, get_global_state
 from personal_agent.tools.rest_api import start_rest_api
 
 # Constants for session state keys
@@ -130,6 +137,29 @@ def main():
     # Load custom CSS with theme awareness
     load_css(st.session_state.get(SESSION_KEY_DARK_THEME, False))
 
+    # Initialize agent and update global state ONCE
+    if "agent_initialized" not in st.session_state:
+        try:
+            # Get cached agent instance (will be created only once due to @st.cache_resource)
+            agent = get_agent_instance()
+            if agent:
+                # Update global state with the agent
+                global_state = get_global_state()
+                global_state.set("agent", agent)
+                global_state.set("agent_mode", "single")  # Assuming single agent mode for dashboard
+
+                # Create and store memory/knowledge helpers
+                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                memory_helper = StreamlitMemoryHelper(agent)
+                knowledge_helper = StreamlitKnowledgeHelper(agent)
+                global_state.set("memory_helper", memory_helper)
+                global_state.set("knowledge_helper", knowledge_helper)
+
+                st.session_state["agent_initialized"] = True
+        except Exception as e:
+            st.error(f"Failed to initialize agent: {str(e)}")
+            st.session_state["agent_initialized"] = False
+
     # Update global state with current session state for REST API access
     update_global_state_from_streamlit(st.session_state)
 
@@ -167,23 +197,34 @@ def main():
     # Display current user prominently near the top
     st.sidebar.header("👤 Current User")
     try:
-        from personal_agent.streamlit.utils.agent_utils import get_agent_instance, check_agent_status
+        from personal_agent.streamlit.utils.agent_utils import check_agent_status
+        from personal_agent.streamlit.utils.user_utils import get_user_details
 
         agent = get_agent_instance()
         if agent:
             status = check_agent_status(agent)
             user_id = status.get("user_id", "Unknown")
-            st.sidebar.info(f"**{user_id}**")
         else:
             # Fallback to direct user_id_mgr import if no agent
             try:
                 from personal_agent.config.user_id_mgr import get_userid
-                st.sidebar.info(f"**{get_userid()}**")
+                user_id = get_userid()
             except ImportError:
                 # Final fallback to environment variable
                 import os
                 user_id = os.getenv("USER_ID", "Unknown")
+
+        # Get user details to show the display name
+        if user_id != "Unknown":
+            user_details = get_user_details(user_id)
+            if user_details and user_details.get("user_name"):
+                display_name = user_details["user_name"]
+                st.sidebar.info(f"**{display_name}** ({user_id})")
+            else:
                 st.sidebar.info(f"**{user_id}**")
+        else:
+            st.sidebar.info(f"**{user_id}**")
+
     except Exception as e:
         # Final fallback to environment variable
         import os
@@ -197,7 +238,7 @@ def main():
     # Navigation
     selected_tab = st.sidebar.radio(
         "Navigation",
-        ["System Status", "User Management", "Memory Management", "Docker Services"],
+        ["System Status", "User Management", "Memory Management", "Docker Services", "API Endpoints"],
     )
 
     # Display version information
@@ -208,9 +249,11 @@ def main():
     except ImportError:
         st.sidebar.caption("Personal Agent")
 
-    # Power off button at the bottom of the sidebar
+    # System control buttons at the bottom of the sidebar
     st.sidebar.markdown("---")
     st.sidebar.header("🚨 System Control")
+
+    # Power off button
     if st.sidebar.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
         # Show confirmation dialog
         st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = True
@@ -288,6 +331,8 @@ def main():
         memory_management_tab()
     elif selected_tab == "Docker Services":
         docker_services_tab()
+    elif selected_tab == "API Endpoints":
+        api_endpoints_tab()
 
 
 if __name__ == "__main__":

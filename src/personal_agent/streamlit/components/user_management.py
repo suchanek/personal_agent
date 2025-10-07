@@ -15,11 +15,6 @@ import pandas as pd
 import streamlit as st
 
 # Import project modules
-from personal_agent.core.docker.user_sync import DockerUserSync
-from personal_agent.core.docker_integration import (
-    ensure_docker_user_consistency,
-    stop_lightrag_services,
-)
 from personal_agent.streamlit.utils.user_utils import (
     create_new_user,
     delete_user,
@@ -27,7 +22,6 @@ from personal_agent.streamlit.utils.user_utils import (
     get_all_users_with_profiles,
     get_user_details,
     get_user_profile_summary,
-    switch_user,
     update_cognitive_state,
     update_contact_info,
     update_user_profile,
@@ -586,107 +580,103 @@ def _render_switch_user():
                             type="primary",
                             use_container_width=True
                         ):
-                                # Perform the switch
+                                # Perform the switch via REST API
                                 with st.spinner(f"Switching to user '{selected_user}'... This may take a moment."):
                                     try:
-                                        # Shut down services before switching user to ensure a clean restart
-                                        success, message = stop_lightrag_services()
-                                        if success:
-                                            st.info("LightRAG services stopped successfully.")
-                                        else:
-                                            # This is a warning because services might already be stopped
-                                            st.warning(f"Could not stop all LightRAG services: {message}")
+                                        import requests
 
-                                        # Perform user switch without restarting services
-                                        result = switch_user(selected_user, restart_containers=False)
+                                        # Call the REST API switch endpoint from paga_streamlit_agno
+                                        # Port 8001 is used by paga_streamlit_agno (dashboard uses 8002)
+                                        api_url = "http://localhost:8001/api/v1/users/switch"
 
-                                        if result["success"]:
-                                            # Restart services using the robust docker_integration module
-                                            st.info("Ensuring Docker services are synchronized...")
-                                            success, message = ensure_docker_user_consistency(
-                                                user_id=selected_user, auto_fix=True, force_restart=True
-                                            )
-                                            if success:
-                                                st.success("✅ Docker services synchronized successfully.")
+                                        response = requests.post(
+                                            api_url,
+                                            json={
+                                                "user_id": selected_user,
+                                                "restart_containers": True
+                                            },
+                                            timeout=30
+                                        )
+
+                                        if response.status_code == 200:
+                                            result = response.json()
+                                            if result.get("success") == "True":
+                                                st.success("✅ **User switched successfully!**")
+                                                st.info(f"**Now active as:** {selected_user}")
+
+                                                # Display success details
+                                                if result.get("actions_performed"):
+                                                    st.info("**Actions performed:**")
+                                                    for action in result["actions_performed"]:
+                                                        st.write(f"• {action}")
+
+                                                # Clear cached user manager to refresh user list
+                                                from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                                get_user_manager.clear()
+
+                                                # Success message with refresh suggestion
+                                                st.success("🎉 **Switch Complete!** You may need to refresh the page to see all changes take effect.")
                                             else:
-                                                st.error(f"❌ Docker synchronization failed: {message}")
-                                                st.warning("User switch completed but service restart failed. You may need to restart services manually.")
-
-                                            st.success("✅ **User switched successfully!**")
-
-                                            # Display success details
-                                            st.info("**Switch completed successfully:**")
-                                            if result.get("actions_performed"):
-                                                for action in result["actions_performed"]:
-                                                    st.write(f"• {action}")
-
-                                            # Show new user status
-                                            st.info(f"**Now active as:** {selected_user}")
-
-                                            # Clear cached user manager to refresh user list
-                                            from personal_agent.streamlit.utils.user_utils import get_user_manager
-                                            get_user_manager.clear()
-
-                                            # Success message with refresh suggestion
-                                            st.success("🎉 **Switch Complete!** You may need to refresh the page to see all changes take effect.")
-
+                                                error_msg = result.get("error", "Unknown error")
+                                                st.error(f"❌ **Switch failed:** {error_msg}")
                                         else:
-                                            error_msg = result.get("error", "Unknown error")
-                                            st.error(f"❌ **Switch failed:** {error_msg}")
+                                            st.error(f"❌ Switch request failed with status code: {response.status_code}")
+                                            try:
+                                                error_detail = response.json().get("error", "No details available")
+                                                st.error(f"Error details: {error_detail}")
+                                            except:
+                                                pass
 
-                                            # Show any partial results or warnings
-                                            if result.get("warnings"):
-                                                st.warning("Warnings during switch:")
-                                                for warning in result["warnings"]:
-                                                    st.write(f"• {warning}")
-
+                                    except requests.exceptions.RequestException as e:
+                                        st.error(f"❌ **Error connecting to REST API:** {str(e)}")
+                                        st.info("Make sure the Personal Agent service (paga_streamlit_agno) is running on port 8001.")
                                     except Exception as e:
                                         st.error(f"❌ **Error during user switch:** {str(e)}")
                                         st.info("If this error persists, try using the command-line switch-user.py script instead.")
 
                         # Alternative: Quick switch without confirmation (for power users)
                         with st.expander("⚡ Quick Switch (Advanced)"):
-                            st.warning("This bypasses the confirmation dialog. Use with caution!")
+                            st.warning("This bypasses additional confirmation and refreshes automatically. Use with caution!")
                             if st.button(
                                 f"⚡ Quick Switch to {user_details.get('user_name', selected_user)}",
                                 type="secondary"
                             ):
                                 with st.spinner(f"Quick switching to user '{selected_user}'..."):
                                     try:
-                                        # Shut down services before switching user
-                                        success, message = stop_lightrag_services()
-                                        if success:
-                                            st.info("LightRAG services stopped successfully.")
-                                        else:
-                                            st.warning(f"Could not stop all LightRAG services: {message}")
+                                        import requests
 
-                                        # Perform user switch without restarting services
-                                        result = switch_user(selected_user, restart_containers=False)
+                                        # Call the REST API switch endpoint
+                                        api_url = "http://localhost:8001/api/v1/users/switch"
 
-                                        if result["success"]:
-                                            # Restart services using the robust docker_integration module
-                                            st.info("Ensuring Docker services are synchronized...")
-                                            success, message = ensure_docker_user_consistency(
-                                                user_id=selected_user, auto_fix=True, force_restart=True
-                                            )
-                                            if success:
-                                                st.success("✅ Docker services synchronized successfully.")
+                                        response = requests.post(
+                                            api_url,
+                                            json={
+                                                "user_id": selected_user,
+                                                "restart_containers": True
+                                            },
+                                            timeout=30
+                                        )
+
+                                        if response.status_code == 200:
+                                            result = response.json()
+                                            if result.get("success") == "True":
+                                                st.success("✅ **Quick switch completed!**")
+                                                st.info(f"**Now active as:** {selected_user}")
+
+                                                # Clear cached user manager
+                                                from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                                get_user_manager.clear()
+
+                                                st.success("🔄 Refreshing user data...")
+                                                st.rerun()
                                             else:
-                                                st.error(f"❌ Docker synchronization failed: {message}")
-                                                st.warning("User switch completed but service restart failed. You may need to restart services manually.")
-
-                                            st.success("✅ **Quick switch completed!**")
-                                            st.info(f"**Now active as:** {selected_user}")
-
-                                            # Clear cached user manager
-                                            from personal_agent.streamlit.utils.user_utils import get_user_manager
-                                            get_user_manager.clear()
-
-                                            st.success("🔄 Refreshing user data...")
-                                            st.rerun()
+                                                st.error(f"❌ **Quick switch failed:** {result.get('error', 'Unknown error')}")
                                         else:
-                                            st.error(f"❌ **Quick switch failed:** {result.get('error', 'Unknown error')}")
+                                            st.error(f"❌ Quick switch request failed with status code: {response.status_code}")
 
+                                    except requests.exceptions.RequestException as e:
+                                        st.error(f"❌ **Error connecting to REST API:** {str(e)}")
+                                        st.info("Make sure the Personal Agent service (paga_streamlit_agno) is running on port 8001.")
                                     except Exception as e:
                                         st.error(f"❌ **Error during quick switch:** {str(e)}")
 

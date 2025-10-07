@@ -154,8 +154,271 @@ st.set_page_config(
 USER_ID = get_current_user_id()
 
 
+def add_paga_restart_endpoint(api_server):
+    """Add a custom restart endpoint for paga_streamlit_agno that re-initializes agent/team.
+
+    This endpoint emulates the functionality of switch-user.py for system restart:
+    1. Stops LightRAG services before restart
+    2. Clears global state
+    3. Re-initializes agent/team with recreate=True
+    4. Ensures Docker service consistency
+    5. Updates global state with new configuration
+    """
+    from flask import jsonify, request
+    from datetime import datetime
+    import tempfile
+
+    @api_server.app.route("/api/v1/paga/restart", methods=["POST"])
+    def restart_paga_system():
+        """Restart the paga system by re-initializing agent/team (emulates switch-user.py)."""
+        try:
+            logger.info("PAGA system restart requested via REST API")
+
+            # Parse request data for optional parameters
+            data = request.get_json() if request.is_json else {}
+            restart_lightrag = data.get("restart_lightrag", True)  # Default to True
+
+            # Create restart marker file to trigger page refresh
+            marker_file = os.path.join(tempfile.gettempdir(), "personal_agent_restart_marker")
+            with open(marker_file, "w") as f:
+                f.write(str(time.time()))
+
+            # Import required modules
+            from personal_agent.tools.global_state import get_global_state
+            from personal_agent.config.user_id_mgr import get_userid
+            from personal_agent.core.docker_integration import (
+                stop_lightrag_services,
+                ensure_docker_user_consistency,
+            )
+
+            # Get current user
+            current_user = get_userid()
+            logger.info(f"Current user: {current_user}")
+
+            # Step 1: Stop LightRAG services BEFORE restart (matches switch-user.py line 163)
+            if restart_lightrag:
+                logger.info("Stopping LightRAG services before restart...")
+                try:
+                    success, message = stop_lightrag_services()
+                    if success:
+                        logger.info("LightRAG services stopped successfully.")
+                    else:
+                        logger.warning(f"Could not stop all LightRAG services: {message}")
+                except Exception as e:
+                    logger.warning(f"Error stopping LightRAG services: {e}")
+
+            # Step 2: Get current configuration from global state (matches switch-user.py line 228-231)
+            global_state = get_global_state()
+            current_mode = global_state.get("agent_mode", st.session_state.get("agent_mode", "team"))
+            current_model = global_state.get("llm_model", st.session_state.get("current_model", os.getenv("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0")))
+            current_ollama_url = global_state.get("ollama_url", st.session_state.get("ollama_url", EFFECTIVE_OLLAMA_URL))
+
+            logger.info(f"Restart configuration: mode={current_mode}, model={current_model}")
+
+            # Step 3: Clear global state for clean restart (matches switch-user.py line 234)
+            logger.info("Clearing global state for clean restart...")
+            global_state.clear()
+
+            # Step 4: Reinitialize agent/team with recreate=True (matches switch-user.py line 240-287)
+            success = False
+            message = ""
+            restart_errors = []
+
+            try:
+                # Import required modules
+                from personal_agent.tools.streamlit_agent_manager import initialize_team, initialize_agent, create_team_wrapper
+                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+
+                if current_mode == "team":
+                    logger.info("Reinitializing team with recreate=True...")
+                    # Clear existing team from session state
+                    if "team" in st.session_state:
+                        del st.session_state["team"]
+                    if "team_wrapper" in st.session_state:
+                        del st.session_state["team_wrapper"]
+
+                    # Re-initialize team with recreate=True (matches switch-user.py line 242)
+                    team = initialize_team(current_model, current_ollama_url, recreate=True)
+
+                    if team:
+                        # Update session state
+                        st.session_state["team"] = team
+                        team_wrapper = create_team_wrapper(team)
+                        st.session_state["team_wrapper"] = team_wrapper
+
+                        # Update global state (matches switch-user.py line 244-247)
+                        global_state.set("agent_mode", "team")
+                        global_state.set("team", team)
+                        global_state.set("llm_model", current_model)
+                        global_state.set("ollama_url", current_ollama_url)
+
+                        # Create helpers and update global state (matches switch-user.py line 249-254)
+                        if hasattr(team, "members") and team.members:
+                            knowledge_agent = team.members[0]
+                            memory_helper = StreamlitMemoryHelper(knowledge_agent)
+                            knowledge_helper = StreamlitKnowledgeHelper(knowledge_agent)
+                        else:
+                            memory_helper = StreamlitMemoryHelper(team_wrapper)
+                            knowledge_helper = StreamlitKnowledgeHelper(team_wrapper)
+
+                        st.session_state["memory_helper"] = memory_helper
+                        st.session_state["knowledge_helper"] = knowledge_helper
+                        global_state.set("memory_helper", memory_helper)
+                        global_state.set("knowledge_helper", knowledge_helper)
+
+                        success = True
+                        message = "Team reinitialized successfully in team mode"
+                        logger.info(message)
+                    else:
+                        message = "Failed to reinitialize team"
+                        logger.error(message)
+                        restart_errors.append(message)
+
+                else:  # single agent mode
+                    logger.info("Reinitializing agent with recreate=True...")
+                    # Clear existing agent from session state
+                    if "agent" in st.session_state:
+                        del st.session_state["agent"]
+
+                    # Re-initialize agent with recreate=True (matches switch-user.py line 267)
+                    agent = initialize_agent(current_model, current_ollama_url, recreate=True)
+
+                    if agent:
+                        # Update session state
+                        st.session_state["agent"] = agent
+
+                        # Update global state (matches switch-user.py line 269-272)
+                        global_state.set("agent_mode", "single")
+                        global_state.set("agent", agent)
+                        global_state.set("llm_model", current_model)
+                        global_state.set("ollama_url", current_ollama_url)
+
+                        # Create helpers and update global state (matches switch-user.py line 274-277)
+                        memory_helper = StreamlitMemoryHelper(agent)
+                        knowledge_helper = StreamlitKnowledgeHelper(agent)
+                        st.session_state["memory_helper"] = memory_helper
+                        st.session_state["knowledge_helper"] = knowledge_helper
+                        global_state.set("memory_helper", memory_helper)
+                        global_state.set("knowledge_helper", knowledge_helper)
+
+                        success = True
+                        message = "Agent reinitialized successfully in single agent mode"
+                        logger.info(message)
+                    else:
+                        message = "Failed to reinitialize agent"
+                        logger.error(message)
+                        restart_errors.append(message)
+
+            except Exception as e:
+                message = f"Error during reinitialization: {str(e)}"
+                logger.error(message)
+                restart_errors.append(message)
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+
+            # Step 5: Ensure Docker service consistency (matches switch-user.py line 207-216)
+            docker_result = None
+            if restart_lightrag and success:
+                logger.info("Ensuring Docker services are synchronized...")
+                try:
+                    docker_success, docker_message = ensure_docker_user_consistency(
+                        user_id=current_user, auto_fix=True, force_restart=True
+                    )
+                    docker_result = {
+                        "success": docker_success,
+                        "message": docker_message
+                    }
+                    if docker_success:
+                        logger.info("Docker services synchronized successfully.")
+                    else:
+                        logger.error(f"Docker synchronization failed: {docker_message}")
+                        restart_errors.append(f"Docker sync failed: {docker_message}")
+                except Exception as e:
+                    error_msg = f"Error ensuring Docker consistency: {str(e)}"
+                    logger.error(error_msg)
+                    docker_result = {
+                        "success": False,
+                        "message": error_msg
+                    }
+                    restart_errors.append(error_msg)
+
+            # Build response (matches switch-user.py structure)
+            if success:
+                response_data = {
+                    "success": "True",
+                    "message": message,
+                    "mode": current_mode,
+                    "model": current_model,
+                    "timestamp": datetime.now().isoformat(),
+                    "user_id": current_user
+                }
+
+                # Include Docker restart results
+                if docker_result:
+                    response_data["docker_sync"] = docker_result
+
+                # Include any warnings/errors
+                if restart_errors:
+                    response_data["warnings"] = restart_errors
+
+                return jsonify(response_data)
+            else:
+                response_data = {
+                    "success": "False",
+                    "error": message,
+                    "errors": restart_errors,
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                # Include Docker results even on failure
+                if docker_result:
+                    response_data["docker_sync"] = docker_result
+
+                return jsonify(response_data), 500
+
+        except Exception as e:
+            logger.error(f"Error during PAGA system restart via API: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return jsonify({
+                "success": "False",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }), 500
+
+    logger.info("Added custom /api/v1/paga/restart endpoint")
+
+
+def check_restart_marker_and_refresh():
+    """Check for restart marker file and trigger page refresh if found."""
+    import tempfile
+    import os
+    import time
+
+    marker_file = os.path.join(tempfile.gettempdir(), "personal_agent_restart_marker")
+    if os.path.exists(marker_file):
+        try:
+            with open(marker_file, "r") as f:
+                timestamp_str = f.read().strip()
+                marker_timestamp = float(timestamp_str)
+
+            # Check if marker is recent (within last 30 seconds)
+            current_time = time.time()
+            if current_time - marker_timestamp < 30:
+                # Remove the marker file
+                os.remove(marker_file)
+                # Trigger page refresh
+                st.rerun()
+        except (ValueError, OSError):
+            # If there's an issue reading/deleting the file, just continue
+            pass
+
+
 def main():
     """Main function to run the Streamlit app."""
+    # Check for restart marker and refresh if needed
+    check_restart_marker_and_refresh()
+
     initialize_session_state(args, EFFECTIVE_OLLAMA_URL, RECREATE_FLAG, DEBUG_FLAG, SINGLE_FLAG, USER_ID)
     apply_custom_theme()
 
@@ -168,6 +431,10 @@ def main():
             # Start the REST API server with access to Streamlit session state
             api_server = start_rest_api(st.session_state, port=8001, host="0.0.0.0")
             st.session_state["rest_api_server"] = api_server
+            
+            # Add custom restart endpoint for paga_streamlit_agno
+            add_paga_restart_endpoint(api_server)
+            
             logger.info("REST API server initialized and started on port 8001")
         except Exception as e:
             logger.error(f"Failed to start REST API server: {e}")
