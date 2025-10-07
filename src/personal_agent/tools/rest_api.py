@@ -150,9 +150,9 @@ class PersonalAgentRestAPI:
                 memory_available = global_status.get("memory_helper_available", False)
                 knowledge_available = global_status.get("knowledge_helper_available", False)
 
-                # Get user and model directly from global state
-                user = global_status.get("user", "unknown")
-                model = global_status.get("model", "unknown")
+                # Get user and model directly from global state (using correct keys)
+                user = global_status.get("user", "unknown")  # get_status returns "user" key
+                model = global_status.get("model", "unknown")  # get_status returns "model" key
 
                 # System is healthy if all conditions are met, with exception that either team or agent must be available
                 is_healthy = (

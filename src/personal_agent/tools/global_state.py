@@ -53,7 +53,7 @@ class GlobalStateManager:
             self._state.clear()
             logger.info("Global state cleared")
     
-    def get_status(self) -> Dict[str, bool]:
+    def get_status(self) -> Dict[str, Any]:
         """Get the status of all systems."""
         with self._lock:
             return {
