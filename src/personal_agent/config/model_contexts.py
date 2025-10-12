@@ -97,7 +97,7 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.05,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen3:14b": ModelParameters(
         temperature=0.6,
@@ -111,21 +111,21 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.8,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0": ModelParameters(
         temperature=0.7,
         top_p=0.8,
         top_k=20,
         repetition_penalty=1.05,
-        context_size=32768,
+        context_size=12232,
     ),
     "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:q8_0": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.05,
-        context_size=32768,
+        context_size=12232,
     ),
     # Lowercase variant for case-insensitive matching
     "hf.co/unsloth/qwen3-4b-instruct-2507-gguf:q8_0": ModelParameters(
@@ -133,20 +133,20 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.05,
-        context_size=32768,
+        context_size=12232,
     ),
     "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:Q4_K_M": ModelParameters(
         temperature=0.7,
         top_p=0.8,
         top_k=20,
-        context_size=32768,
+        context_size=12232,
         repetition_penalty=1.05,
     ),
     # LM Studio Qwen models - using LM Studio defaults with increased context
@@ -184,66 +184,66 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5:1.5b": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5:3b": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5:7b": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5:14b": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5:32b": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5:72b": ModelParameters(
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "qwen2.5-coder:3b": ModelParameters(
         temperature=0.2,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),  # Lower temp for coding
     "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf": ModelParameters(
         temperature=0.2,
         top_p=0.95,
         top_k=20,
         repetition_penalty=1.0,
-        context_size=32768,
+        context_size=12232,
     ),
     "myaniu/qwen2.5-1m:latest": ModelParameters(
-        temperature=0.5, top_p=0.95, context_size=32768
+        temperature=0.5, top_p=0.95, context_size=12232
     ),  # 1M context
     # Llama models - balanced parameters for instruction following
     "llama3.1:8b": ModelParameters(
@@ -251,128 +251,128 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.1:8b-instruct-q8_0": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.1:70b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.1:405b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.2": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.2:1b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.2:3b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.2:11b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.2:90b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.3:latest": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3.3:70b": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     "llama3:8b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     "llama3:70b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     "llama3-groq-tool-use": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     "hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF": ModelParameters(
         temperature=0.7,
         top_p=0.9,
         top_k=40,
         repetition_penalty=1.1,
-        context_size=32768,
+        context_size=12232,
     ),
     # Mistral models - slightly more creative parameters
     "mistral:7b": ModelParameters(
-        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=12232
     ),
     "mistral:instruct": ModelParameters(
-        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=12232
     ),
     "mistral-nemo": ModelParameters(
-        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=12232
     ),
     "mixtral:8x7b": ModelParameters(
-        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=32768
+        temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=12232
     ),
     "mixtral:8x22b": ModelParameters(
         temperature=0.8, top_p=0.9, top_k=50, repetition_penalty=1.1, context_size=65536
     ),
     # Gemma models - extracted and balanced parameters
     "gemma3:1b": ModelParameters(
-        temperature=1.0, top_p=0.95, top_k=64, context_size=32768
+        temperature=1.0, top_p=0.95, top_k=64, context_size=12232
     ),
     "orieg/gemma3-tools:4b": ModelParameters(
-        temperature=1.0, top_p=0.9, top_k=64, context_size=32768
+        temperature=1.0, top_p=0.9, top_k=64, context_size=12232
     ),
     "gemma:2b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     "gemma:7b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     "gemma2:9b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     "gemma2:27b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     # CodeLlama models - focused parameters for code generation
     "codellama:7b": ModelParameters(
@@ -420,16 +420,16 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
     ),
     # SmolLM models
     "smollm2:1.7B": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     # Other specialized models
-    "gpt-oss:20b": ModelParameters(temperature=1.0, context_size=32768),
+    "gpt-oss:20b": ModelParameters(temperature=1.0, context_size=12232),
     "nomic-embed-text": ModelParameters(
         temperature=0.1, top_p=0.9, top_k=10, repetition_penalty=1.0, context_size=8192
     ),  # Embedding model - low temp
     # Neural Chat models
     "neural-chat:7b": ModelParameters(
-        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=32768
+        temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
     ),
     # Orca models - conservative parameters for smaller models
     "orca-mini:3b": ModelParameters(
@@ -460,55 +460,55 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
 # Model context size database - curated list of known models and their context windows
 MODEL_CONTEXT_SIZES: Dict[str, int] = {
     # Qwen models
-    "qwen3:1.7b": 40960,  # Updated from 32768 via ollama show verification
+    "qwen3:1.7b": 40960,  # Updated from 12232 via ollama show verification
     "qwen3:7b": 40960,  # Updated to match other qwen3 models
-    "qwen3:8b": 40960,  # Updated from 32768 via ollama show verification
-    "qwen3:14b": 40960,  # Updated from 32768 via ollama show verification
+    "qwen3:8b": 40960,  # Updated from 12232 via ollama show verification
+    "qwen3:14b": 40960,  # Updated from 12232 via ollama show verification
     "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M": 262144,
-    "qwen2.5:0.5b": 32768,
-    "qwen2.5:1.5b": 32768,
-    "qwen2.5:3b": 32768,
-    "qwen2.5:7b": 32768,
-    "qwen2.5:14b": 32768,
-    "qwen2.5:32b": 32768,
-    "qwen2.5:72b": 32768,
+    "qwen2.5:0.5b": 12232,
+    "qwen2.5:1.5b": 12232,
+    "qwen2.5:3b": 12232,
+    "qwen2.5:7b": 12232,
+    "qwen2.5:14b": 12232,
+    "qwen2.5:32b": 12232,
+    "qwen2.5:72b": 12232,
     "hf.co/unsloth/qwen3-30b-a3b-thinking-2507-gguf:q4_k_m": 262144,
     # Llama 3.1 models (128K context) - Updated via ollama show verification
-    "llama3.1:8b": 32768,  # Updated from 32768
-    "llama3.1:8b-instruct-q8_0": 32768,  # Updated from 32768
-    "llama3.1:70b": 32768,  # Updated from 32768 (estimated based on verified models)
-    "llama3.1:405b": 32768,  # Updated from 32768 (estimated based on verified models)
+    "llama3.1:8b": 12232,  # Updated from 12232
+    "llama3.1:8b-instruct-q8_0": 12232,  # Updated from 12232
+    "llama3.1:70b": 12232,  # Updated from 12232 (estimated based on verified models)
+    "llama3.1:405b": 12232,  # Updated from 12232 (estimated based on verified models)
     # Llama 3.2 models (128K context) - Updated via ollama show verification
-    "llama3.2:1b": 32768,  # Updated from 32768 (estimated based on verified models)
-    "llama3.2:3b": 32768,  # Updated from 32768
-    "llama3.2:11b": 32768,  # Updated from 32768 (estimated based on verified models)
-    "llama3.2:90b": 32768,  # Updated from 32768 (estimated based on verified models)
+    "llama3.2:1b": 12232,  # Updated from 12232 (estimated based on verified models)
+    "llama3.2:3b": 12232,  # Updated from 12232
+    "llama3.2:11b": 12232,  # Updated from 12232 (estimated based on verified models)
+    "llama3.2:90b": 12232,  # Updated from 12232 (estimated based on verified models)
     # Llama 3.3 models (131K context)
-    "llama3.3:latest": 32768,
-    "llama3.3:70b": 32768,
+    "llama3.3:latest": 12232,
+    "llama3.3:70b": 12232,
     # Llama 3 models (8K context)
-    "llama3:8b": 32768,
-    "llama3:70b": 32768,
+    "llama3:8b": 12232,
+    "llama3:70b": 12232,
     # Mistral models
-    "mistral:7b": 32768,
-    "mistral:instruct": 32768,
-    "mixtral:8x7b": 32768,
+    "mistral:7b": 12232,
+    "mistral:instruct": 12232,
+    "mixtral:8x7b": 12232,
     "mixtral:8x22b": 65536,
     # CodeLlama models
     "codellama:7b": 16384,
     "codellama:13b": 16384,
     "codellama:34b": 16384,
     # Gemma models
-    "gemma:2b": 32768,
-    "gemma:7b": 32768,
-    "gemma2:9b": 32768,
-    "gemma2:27b": 32768,
+    "gemma:2b": 12232,
+    "gemma:7b": 12232,
+    "gemma2:9b": 12232,
+    "gemma2:27b": 12232,
     # Phi models
     "phi3:3.8b": 128000,
     "phi3:14b": 128000,
     "phi3.5:3.8b": 128000,
     # Neural Chat models
-    "neural-chat:7b": 32768,
+    "neural-chat:7b": 12232,
     # Orca models
     "orca-mini:3b": 2048,
     "orca-mini:7b": 2048,
