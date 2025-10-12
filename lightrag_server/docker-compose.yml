@@ -8,14 +8,13 @@ services:
       tags:
         - ghcr.io/suchanek/lightrag_pagent:latest
     env_file:
-      - .env
+      - env.server
     ports:
       - 9621:9621
     volumes:
       - "${AGNO_STORAGE_DIR}/rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/inputs:/app/data/inputs"
-      - ./config.ini:/app/config.ini
-      - ./.env:/app/.env
+      - ./env.server:/app/.env
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
