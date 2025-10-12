@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "personal-agent"
-version = "v0.8.7dev"
+version = "v0.8.72"
 description = "Personal AI agent with MCP and Memory, powered by Agno, LightRAG and Ollama"
 authors = ["Eric Suchanek <suchanek@mac.com>"]
 readme = "README.md"
@@ -68,6 +68,7 @@ pip = "^25.2"
 qwen-agent = {extras = ["code-interpreter"], version = "^0.0.29"}
 ddgs = "^9.5.5"
 pdoc = "^15.0.4"
+huggingface-hub = "^0.35.3"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"
