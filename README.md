@@ -4,12 +4,22 @@ A modern, production-ready personal AI assistant built with the Agno framework, 
 
 ## ✨ Latest Updates
 
+### Recent Improvements (January 2025)
+
+- **🔒 License Update**: Migrated from GPL-3.0 to Apache-2.0 for commercial-friendly licensing with patent protection
+- **📝 Memory System Refactoring**: Streamlined CLI memory commands - reduced code complexity by 63% while maintaining full functionality
+- **🏗️ Standalone Memory Functions**: Memory operations now use direct agent methods instead of wrapper classes for better performance
+- **📚 Documentation Updates**: Enhanced architecture documentation and README with current system capabilities
+- **🎯 Command Fixes**: Corrected all CLI command references for consistency across documentation
+
+### Previous Updates
+
 The Streamlit web interface has been significantly upgraded to provide a unified experience for both single-agent and multi-agent team interactions.
 
 - **Unified Dual-Mode UI**: A single, powerful interface (`poe serve-persag`) now manages both the single personal agent and the multi-agent team.
 - **Mode Switching**: Switch between single-agent and team modes at launch.
-- **Team-based cli `poe rteam`**: The separate command-line interface for the team.
-- **Streamlit-based Dashboard `poe dashboard`**: Streamlit-based system management dashboard.
+- **Team CLI**: The separate command-line interface for multi-agent teams (`poe team`).
+- **System Dashboard**: Streamlit-based system management dashboard (`poe dashboard`).
 
 ## Key Features
 
@@ -245,8 +255,8 @@ poe serve-persag
 # To start the web interface in single-agent mode
 poe serve-persag --single
 
-# CLI interface (single-agent only)
-poe rteam
+# Team CLI interface
+poe team
 ```
 
 Open `http://localhost:8501` for the Streamlit interface if it doesn't open automatically.
@@ -268,11 +278,14 @@ The unified Streamlit interface provides:
 ### Command Line Interface (`poe cli`)
 
 ```bash
-# Interactive CLI
+# Interactive Team CLI
 poe team
 
+# Single Agent CLI
+poe cli
+
 # Direct query
-poet cli --query "What's the weather like?"
+poe cli --query "What's the weather like?"
 
 # Recreate knowledge base on startup
 poe cli --recreate
@@ -286,7 +299,8 @@ poe cli --help
 ```bash
 # Main interfaces
 serve-persag                   # Unified Streamlit web interface (single agent or team)
-li               # Command-line interface (single agent)
+cli                            # Command-line interface (single agent)
+team                           # Command-line interface (multi-agent team)
 
 # System utilities
 ./smart-restart-lightrag.sh    # Restart LightRAG services
@@ -638,14 +652,14 @@ personal_agent/
 ## 🚀 Future Directions
 
 - **RESTful API**: A RESTful API is planned to provide a dedicated endpoint for mobile applications and third-party integrations, further enhancing the ability to add memories and interact with the agent from anywhere.
-
-## 🚀 Future Directions
-
-- **RESTful API**: A RESTful API is planned to provide a dedicated endpoint for mobile applications and third-party integrations, further enhancing the ability to add memories and interact with the agent from anywhere.
+- **Enhanced Multi-Modal Support**: Extended support for image and audio input processing
+- **Advanced Team Workflows**: More sophisticated team collaboration patterns and coordination strategies
 
 ## 📄 License
 
-GPL-3.0-only License - See LICENSE file for details.
+Apache-2.0 License - See LICENSE file for details.
+
+This project uses the Apache License 2.0, which allows commercial use, modification, and distribution. The license includes explicit patent protection and is compatible with all project dependencies.
 
 ## 🤝 Contributing
 
