@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.8.72] - 2025-10-12
+
+### Changed
+- **Simplified CLI Memory Architecture**: The CLI for memory operations (`src/personal_agent/cli/memory_commands.py`) has been refactored into a thin presentation layer. It now directly delegates all calls to the agent's public memory interface, removing complex tool-finding and fallback logic. This improves separation of concerns and aligns with the unified agent interface. See [ADR-095](./refs/adr/095-simplified-cli-memory-architecture.md) for details.
+
 ## [v0.8.7dev] - 2025-10-01
 
 ### Added
