@@ -159,18 +159,18 @@ logger.setLevel(LOG_LEVEL)
 
 # Provider-specific default models
 PROVIDER_DEFAULT_MODELS = {
-    "ollama": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+    "ollama": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q6_k",
     "lm-studio": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
     "openai": "gpt-4o-mini",
 }
 
 # LLM Model configuration
-LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:1.7b")
+LLM_MODEL = get_env_var("LLM_MODEL", "qwen3:4b")
 
 # Qwen Model Settings - Instruct Model Parameters
-QWEN_INSTRUCT_TEMPERATURE = get_env_var("QWEN_INSTRUCT_TEMPERATURE", "0.7")
+QWEN_INSTRUCT_TEMPERATURE = get_env_var("QWEN_INSTRUCT_TEMPERATURE", "0.6")
 QWEN_INSTRUCT_MIN_P = get_env_var("QWEN_INSTRUCT_MIN_P", "0.00")
-QWEN_INSTRUCT_TOP_P = get_env_var("QWEN_INSTRUCT_TOP_P", "0.80")
+QWEN_INSTRUCT_TOP_P = get_env_var("QWEN_INSTRUCT_TOP_P", "0.90")
 QWEN_INSTRUCT_TOP_K = get_env_var("QWEN_INSTRUCT_TOP_K", "20")
 
 # Qwen Model Settings - Thinking Model Parameters
