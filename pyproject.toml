@@ -7,7 +7,7 @@ readme = "README.md"
 homepage = "https://github.com/suchanek/personal_agent"
 repository = "https://github.com/suchanek/personal_agent"
 keywords = ["personal-agent", "mcp", "memory", "ollama", "langchain"]
-license = "GPL-3.0-only"
+license = "Apache-2.0"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
