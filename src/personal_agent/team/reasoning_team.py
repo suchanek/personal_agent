@@ -518,44 +518,17 @@ Conclusion about {topic}."""
             return error_msg
 
 
-def create_writer_agent(
-    model_provider: str = None,
-    model_name: str = None,
-    debug: bool = False,
-    use_remote: bool = False,
-) -> Agent:
+def create_writer_agent(debug: bool = False) -> Agent:
     """Create a specialized writing agent.
 
-    :param model_provider: LLM provider ('ollama', 'lm-studio', or 'openai')
-    :param model_name: Model name to use
     :param debug: Enable debug mode
-    :param use_remote: Use remote Ollama
     :return: Configured writing agent
     """
-
-    # Create writing tools instance
     writing_tools = WritingTools()
-
-    # Use provided model_name or fall back to config model
-    if model_name:
-        effective_model = model_name
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_model = get_config().model
-
-    # Use provided provider or fall back to config provider
-    if model_provider:
-        effective_provider = model_provider
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_provider = get_config().provider
-
     agent = Agent(
         name="Writer Agent",
         role="Create written content in the requested tone and style",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=AgentModelManager.create_model_from_config(),
         debug_mode=debug,
         tools=[writing_tools],  # Use the instance, not the class
         instructions=[
@@ -570,46 +543,20 @@ def create_writer_agent(
         show_tool_calls=False,  # CRITICAL: Always show tool calls to ensure execution
         add_name_to_instructions=True,
     )
-
     logger.debug("Created Writer Agent with custom writing tools")
     return agent
 
 
-def create_image_agent(
-    model_provider: str = None,
-    model_name: str = None,
-    debug: bool = False,
-    use_remote: bool = False,
-) -> Agent:
+def create_image_agent(debug: bool = False) -> Agent:
     """Create a specialized image creation agent using DALL-E with enhanced error handling.
 
-    :param model_provider: LLM provider ('ollama', 'lm-studio', or 'openai')
-    :param model_name: Model name to use
     :param debug: Enable debug mode
-    :param use_remote: Use remote Ollama
     :return: Configured image creation agent
     """
-
-    # Use provided model_name or fall back to config model
-    if model_name:
-        effective_model = model_name
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_model = get_config().model
-
-    # Use provided provider or fall back to config provider
-    if model_provider:
-        effective_provider = model_provider
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_provider = get_config().provider
-
     agent = Agent(
         name="Image Agent",
         role="Create images using DALL-E based on text descriptions with comprehensive error handling",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=AgentModelManager.create_model_from_config(),
         debug_mode=debug,  # Always enable debug mode for better error tracking
         tools=[
             DalleTools(model="dall-e-3", size="1792x1024", quality="hd", style="vivid"),
@@ -631,39 +578,19 @@ def create_image_agent(
     return agent
 
 
-def create_agents(
-    use_remote: bool = False, debug: bool = False, model_name: str = None, model_provider: str = None
-):
+def create_agents(debug: bool = False):
     """Create all agents with the correct remote/local configuration.
 
     Args:
-        use_remote: Whether to use remote endpoints
         debug: Enable debug mode
-        model_name: Model name to use
-        model_provider: LLM provider ('ollama', 'lm-studio', 'openai')
     """
-
-    # Use provided model_name or fall back to config model
-    if model_name:
-        effective_model = model_name
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_model = get_config().model
-
-    # Use provided provider or fall back to config provider
-    if model_provider:
-        effective_provider = model_provider
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_provider = get_config().provider
+    model = AgentModelManager.create_model_from_config()
 
     # Web search agent using Ollama
     web_agent = Agent(
         name="Web Agent",
         role="Search the web for information",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=model,
         tools=[DuckDuckGoTools()],
         instructions=[
             "Search the web for information based on the input. Always include sources"
@@ -676,9 +603,7 @@ def create_agents(
     system_agent = Agent(
         name="SystemAgent",
         role="Execute system commands and shell operations",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=model,
         tools=[PersonalAgentSystemTools(shell_command=True)],
         instructions=[
             "You are a system agent that can execute shell commands safely.",
@@ -692,9 +617,7 @@ def create_agents(
     finance_agent = Agent(
         name="Finance Agent",
         role="Get financial data",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=model,
         tools=[
             YFinanceTools(
                 stock_price=True,
@@ -712,9 +635,7 @@ def create_agents(
     medical_agent = Agent(
         name="Medical Agent",
         role="Search pubmed for medical information",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=model,
         description="You are an AI agent that search PubMed for medical information.",
         tools=[PubmedTools()],
         instructions=[
@@ -727,17 +648,15 @@ def create_agents(
     )
 
     # Writer agent using Ollama
-    writer_agent = create_writer_agent(model_provider=effective_provider, model_name=effective_model, use_remote=use_remote)
+    writer_agent = create_writer_agent(debug=debug)
 
     # Image agent using DALL-E
-    image_agent = create_image_agent(model_provider=effective_provider, model_name=effective_model, use_remote=use_remote)
+    image_agent = create_image_agent(debug=debug)
 
     # Calculator agent using Ollama
     calculator_agent = Agent(
         name="Calculator Agent",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=model,
         role="Calculate mathematical expressions",
         tools=[
             CalculatorTools(
@@ -757,11 +676,7 @@ def create_agents(
 
     python_agent = Agent(
         name="Python Agent",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider,
-            model_name=effective_model,
-            use_remote=use_remote,
-        ),
+        model=model,
         role="Create and Execute Python code",
         tools=[
             PythonTools(
@@ -780,9 +695,7 @@ def create_agents(
 
     file_agent = Agent(
         name="File System Agent",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
+        model=model,
         role="Read and write files in the system",
         tools=[
             FileTools(
@@ -857,9 +770,7 @@ async def create_memory_agent(
     debug: bool = False,
     use_remote: bool = False,
     recreate: bool = False,
-    model_name: str = None,
     single: bool = False,  # Simplified: just use single flag directly
-    model_provider: str = None,  # NEW: Accept provider parameter
 ) -> Agent:
     """Create a memory agent that uses the shared memory system.
 
@@ -868,33 +779,25 @@ async def create_memory_agent(
         debug: Enable debug mode
         use_remote: Whether to use remote server endpoints
         recreate: Whether to recreate knowledge bases
-        model_name: Model name to use
         single: Whether to enable all tools (single-agent mode)
-        model_provider: LLM provider ('ollama', 'lm-studio', 'openai')
     """
     # Get user_id dynamically if not provided
     if user_id is None:
-        user_id = get_userid()
+        from ..config.runtime_config import get_config
 
-    # Use provided provider or fall back to global PROVIDER
-    effective_provider = model_provider if model_provider else PROVIDER
+        config = get_config()
+        user_id = config.user_id
 
-    # Simple logic: single flag directly controls alltools
     logger.info(
         f"🔧 Memory agent mode: {'single-agent (all tools)' if single else 'team mode (memory tools only)'}"
     )
-    logger.info(f"🔧 Memory agent provider: {effective_provider}")
 
-    # Use provided model_name or fall back to config default
-    effective_model = model_name if model_name else LLM_MODEL
-
-    # Create AgnoPersonalAgent with proper parameters
-    # CRITICAL: Pass use_remote flag to ensure proper URL selection
+    # Create AgnoPersonalAgent with the new simplified constructor.
+    # The agent will pull its provider, model, etc., from the central config.
+    # We only need to pass overrides or operational flags.
     from ..core.agent_instruction_manager import InstructionLevel
 
     memory_agent = AgnoPersonalAgent(
-        model_provider=effective_provider,  # Use the effective provider (passed or global)
-        model_name=effective_model,  # Use the effective model
         enable_memory=True,
         enable_mcp=False,
         debug=debug,
@@ -902,7 +805,7 @@ async def create_memory_agent(
         recreate=recreate,
         alltools=single,  # Use single flag directly to control alltools
         instruction_level=InstructionLevel.CONCISE,
-        use_remote=use_remote,  # CRITICAL: Pass use_remote flag for proper URL selection
+        use_remote=use_remote,  # Still useful as an override
     )
 
     # After initialization, we need to set the shared memory and add the tools
@@ -926,29 +829,10 @@ async def create_memory_writer_agent(
     recreate: bool = False,
 ) -> Agent:
     """Create a memory agent that uses the shared memory system and can write content."""
-    # Get user_id dynamically if not provided
     if user_id is None:
         user_id = get_userid()
 
-    # Get provider from config instead of global
-    from personal_agent.config.runtime_config import get_config
-    config = get_config()
-
-    # Determine the correct URL based on use_remote flag
-    if config.provider == "ollama":
-        ollama_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
-    else:
-        ollama_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-
-    # DEBUG: Log the URL selection for memory agent
-    logger.debug(
-        f"🔍 create_memory_writer_agent: provider={config.provider}, use_remote={use_remote}, selected_url={ollama_url}"
-    )
-
-    # Create AgnoPersonalAgent with proper parameters (it creates its own model internally)
     memory_writer_agent = AgnoPersonalAgent(
-        model_provider=config.provider,  # Use the provider from config
-        model_name=config.model,  # Use the model from config
         enable_memory=True,
         enable_mcp=False,
         debug=debug,
@@ -956,45 +840,35 @@ async def create_memory_writer_agent(
         recreate=recreate,
         alltools=False,
         initialize_agent=True,
-        use_remote=use_remote,  # Pass use_remote flag instead of ollama_base_url
+        use_remote=use_remote,
     )
 
-    # After initialization, we need to set the shared memory and add the tools
-    # Wait for initialization to complete
-    # await memory_writer_agent._ensure_initialized()
-
-    # Update instructions to include memory-specific guidance
-
+    await memory_writer_agent._ensure_initialized()
     memory_writer_agent.instructions = _memory_specific_instructions
     logger.debug("✅ Memory/Writer agent created")
     return memory_writer_agent
 
 
 # Create the team
-async def create_team(
-    use_remote: bool = False, model_name: str = None, single: bool = False, model_provider: str = None
-):
+async def create_team(use_remote: bool = False, single: bool = False):
     """Create the team with shared memory context and your existing managers.
 
     Args:
         use_remote: Whether to use remote Ollama server
-        model_name: Specific model name to use (overrides LLM_MODEL from config)
         single: Whether to run in single-agent mode with all tools enabled
-        model_provider: LLM provider ('ollama', 'lm-studio', 'openai')
     """
+    from ..config.runtime_config import get_config
 
-    # CRITICAL: Ensure Docker and user synchronization BEFORE creating any agents
     try:
-        from ..config.user_id_mgr import get_userid
         from ..core.docker_integration import ensure_docker_user_consistency
     except ImportError:
-        from personal_agent.config.user_id_mgr import get_userid
         from personal_agent.core.docker_integration import (
             ensure_docker_user_consistency,
         )
 
-    # Get the current user ID dynamically
-    current_user_id = get_userid()
+    config = get_config()
+    current_user_id = config.user_id
+
     print("🐳 Ensuring Docker and user synchronization...")
     docker_ready, docker_message = ensure_docker_user_consistency(
         user_id=current_user_id, auto_fix=True, force_restart=False
@@ -1006,37 +880,15 @@ async def create_team(
         print(f"⚠️ Docker synchronization failed: {docker_message}")
         print("Proceeding with team creation, but Docker services may be inconsistent")
 
-    # Use provided model_name or fall back to config model
-    if model_name:
-        effective_model = model_name
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_model = get_config().model
-
-    # Use provided provider or fall back to config provider
-    if model_provider:
-        effective_provider = model_provider
-    else:
-        from personal_agent.config.runtime_config import get_config
-        effective_provider = get_config().provider
-
     logger.info(
-        f"🔄 Creating team with provider: {effective_provider}, model: {effective_model} (use_remote={use_remote})"
+        f"🔄 Creating team with provider: {config.provider}, model: {config.model} (use_remote={use_remote})"
     )
 
-    # Create memory agent directly using the create_memory_agent function
-    # Use effective_model instead of MEMORY_AGENT_MODEL to respect provider switching
     memory_agent = await create_memory_agent(
-        user_id=current_user_id,
-        debug=True,
-        use_remote=use_remote,
-        model_name=effective_model,  # Use effective_model instead of global
-        single=single,  # Pass the single flag directly
-        model_provider=effective_provider,  # Pass the provider
+        user_id=current_user_id, debug=True, use_remote=use_remote, single=single
     )
 
-    # Create all other agents with the correct remote/local configuration
-    agents = create_agents(use_remote=use_remote, model_name=effective_model, model_provider=effective_provider)
+    agents = create_agents(debug=True)
     (
         web_agent,
         system_agent,
@@ -1049,14 +901,11 @@ async def create_team(
         file_agent,
     ) = agents
 
-    # Create the team without shared memory - only the memory agent handles memory
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
-        model=AgentModelManager.create_model_for_provider(
-            provider=effective_provider, model_name=effective_model, use_remote=use_remote
-        ),
-        memory=None,  # No team-level memory - only memory agent handles memory
+        model=AgentModelManager.create_model_from_config(),
+        memory=None,
         tools=[
             ReasoningTools(add_instructions=True, add_few_shot=True),
         ],

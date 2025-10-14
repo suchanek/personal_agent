@@ -431,7 +431,7 @@ def main():
     logger.info(f"   Mode: {config.agent_mode}")
     logger.info(f"   Base URL: {config.get_effective_base_url()}")
 
-    initialize_session_state(args, EFFECTIVE_OLLAMA_URL, RECREATE_FLAG, DEBUG_FLAG, SINGLE_FLAG, USER_ID)
+    initialize_session_state(RECREATE_FLAG, SINGLE_FLAG)
     apply_custom_theme()
 
     # Update global state with current session state for REST API access

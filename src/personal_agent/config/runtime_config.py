@@ -73,6 +73,12 @@ class ConfigSnapshot:
     debug_mode: bool
     use_remote: bool
     use_mcp: bool
+    enable_memory: bool
+    seed: Optional[int]
+    home_dir: str
+    user_storage_dir: str
+    user_knowledge_dir: str
+    user_data_dir: str
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -127,7 +133,9 @@ class PersonalAgentConfig:
             self._remote_ollama_url = os.getenv(
                 "REMOTE_OLLAMA_URL", "http://100.100.248.61:11434"
             )
-            self._lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
+            self._lmstudio_url = os.getenv(
+                "LMSTUDIO_BASE_URL", "http://localhost:1234"
+            )
             self._remote_lmstudio_url = os.getenv(
                 "REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234"
             )
@@ -145,7 +153,27 @@ class PersonalAgentConfig:
                 "yes",
             )
             self._use_remote = False
-            self._use_mcp = os.getenv("USE_MCP", "true").lower() in ("true", "1", "yes")
+            self._use_mcp = os.getenv("USE_MCP", "true").lower() in (
+                "true",
+                "1",
+                "yes",
+            )
+            self._enable_memory = os.getenv("ENABLE_MEMORY", "true").lower() in (
+                "true",
+                "1",
+                "yes",
+            )
+            seed_env = os.getenv("LLM_SEED")
+            self._seed = int(seed_env) if seed_env and seed_env.isdigit() else None
+
+            # Home directory for shell tools
+            self._home_dir = os.path.expanduser("~")
+
+            # Path configurations
+            self._persag_root = os.getenv(
+                "PERSAG_ROOT", "/Users/Shared/personal_agent_data"
+            )
+            self._storage_backend = os.getenv("STORAGE_BACKEND", "agno")
 
             # Extra configuration storage
             self._extra: Dict[str, Any] = {}
@@ -245,7 +273,9 @@ class PersonalAgentConfig:
             # Persist to ~/.persag/env.userid if requested
             if persist:
                 try:
-                    from personal_agent.core.persag_manager import get_persag_manager
+                    from personal_agent.core.persag_manager import (
+                        get_persag_manager,
+                    )
 
                     persag_manager = get_persag_manager()
                     success = persag_manager.set_userid(user_id)
@@ -258,14 +288,23 @@ class PersonalAgentConfig:
                 except Exception as e:
                     logger.warning(f"Error persisting user ID: {e}")
 
-                # Refresh user-dependent configuration settings
+                # CRITICAL: Refresh user-dependent settings AND update environment variables
+                # This ensures Docker configurations receive the correct paths.
                 try:
-                    from personal_agent.config import refresh_user_dependent_settings
+                    from personal_agent.config import (
+                        refresh_user_dependent_settings,
+                    )
 
-                    refresh_user_dependent_settings()
-                    logger.info("Refreshed user-dependent configuration settings")
+                    updated_settings = refresh_user_dependent_settings()
+                    for key, value in updated_settings.items():
+                        os.environ[key] = str(value)
+                    logger.info(
+                        "Refreshed and propagated user-dependent environment variables for Docker."
+                    )
                 except Exception as e:
-                    logger.warning(f"Error refreshing user-dependent settings: {e}")
+                    logger.warning(
+                        f"Error refreshing user-dependent environment variables: {e}"
+                    )
 
             self._notify_callbacks("user_id", old_value, user_id)
 
@@ -380,7 +419,49 @@ class PersonalAgentConfig:
             elif self._provider == "openai":
                 return self._openai_url
             else:  # ollama
-                return self._remote_ollama_url if self._use_remote else self._ollama_url
+                return (
+                    self._remote_ollama_url
+                    if self._use_remote
+                    else self._ollama_url
+                )
+
+    def get_effective_ollama_url(self) -> str:
+        """Get the effective Ollama URL based on remote setting.
+
+        This method is provider-agnostic and returns the appropriate URL
+        for the current provider configuration. For backward compatibility,
+        it's named for Ollama but works with all providers.
+
+        Returns:
+            str: The appropriate base URL for the current provider
+        """
+        return self.get_effective_base_url()
+
+    # ========== User-Specific Paths ==========
+
+    @property
+    def user_storage_dir(self) -> str:
+        """Get the user-specific storage directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}"
+            )
+
+    @property
+    def user_knowledge_dir(self) -> str:
+        """Get the user-specific knowledge directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/knowledge"
+            )
+
+    @property
+    def user_data_dir(self) -> str:
+        """Get the user-specific data directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/data"
+            )
 
     # ========== Application Settings ==========
 
@@ -396,7 +477,9 @@ class PersonalAgentConfig:
         :param mode: Agent mode ('single' or 'team')
         """
         if mode not in ("single", "team"):
-            raise ValueError(f"Invalid agent mode: {mode}. Must be 'single' or 'team'")
+            raise ValueError(
+                f"Invalid agent mode: {mode}. Must be 'single' or 'team'"
+            )
 
         with self._config_lock:
             old_value = self._agent_mode
@@ -436,7 +519,9 @@ class PersonalAgentConfig:
         with self._config_lock:
             old_value = self._use_remote
             self._use_remote = use_remote
-            logger.info(f"Remote endpoint usage changed: {old_value} -> {use_remote}")
+            logger.info(
+                f"Remote endpoint usage changed: {old_value} -> {use_remote}"
+            )
             self._notify_callbacks("use_remote", old_value, use_remote)
 
     @property
@@ -456,6 +541,36 @@ class PersonalAgentConfig:
             os.environ["USE_MCP"] = "true" if use_mcp else "false"
             logger.info(f"MCP usage changed: {old_value} -> {use_mcp}")
             self._notify_callbacks("use_mcp", old_value, use_mcp)
+
+    @property
+    def seed(self) -> Optional[int]:
+        """Get the model seed."""
+        with self._config_lock:
+            return self._seed
+
+    @property
+    def enable_memory(self) -> bool:
+        """Get memory enable status."""
+        with self._config_lock:
+            return self._enable_memory
+
+    def set_enable_memory(self, enable_memory: bool):
+        """Set memory enable status.
+
+        :param enable_memory: Enable/disable memory
+        """
+        with self._config_lock:
+            old_value = self._enable_memory
+            self._enable_memory = enable_memory
+            os.environ["ENABLE_MEMORY"] = "true" if enable_memory else "false"
+            logger.info(f"Memory enable changed: {old_value} -> {enable_memory}")
+            self._notify_callbacks("enable_memory", old_value, enable_memory)
+
+    @property
+    def home_dir(self) -> str:
+        """Get the home directory."""
+        with self._config_lock:
+            return self._home_dir
 
     # ========== Extra Configuration ==========
 
@@ -508,6 +623,12 @@ class PersonalAgentConfig:
                 debug_mode=self._debug_mode,
                 use_remote=self._use_remote,
                 use_mcp=self._use_mcp,
+                enable_memory=self._enable_memory,
+                seed=self._seed,
+                home_dir=self._home_dir,
+                user_storage_dir=self.user_storage_dir,
+                user_knowledge_dir=self.user_knowledge_dir,
+                user_data_dir=self.user_data_dir,
                 extra=self._extra.copy(),
             )
 
@@ -533,6 +654,12 @@ class PersonalAgentConfig:
             "debug_mode": snapshot.debug_mode,
             "use_remote": snapshot.use_remote,
             "use_mcp": snapshot.use_mcp,
+            "enable_memory": snapshot.enable_memory,
+            "seed": snapshot.seed,
+            "home_dir": snapshot.home_dir,
+            "user_storage_dir": snapshot.user_storage_dir,
+            "user_knowledge_dir": snapshot.user_knowledge_dir,
+            "user_data_dir": snapshot.user_data_dir,
             "extra": snapshot.extra,
         }
 

@@ -71,22 +71,11 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import get_mcp_servers
+from ..config.runtime_config import get_config
 from ..config.settings import (
-    AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    DATA_DIR,
-    HOME_DIR,
-    LIGHTRAG_MEMORY_URL,
-    LIGHTRAG_URL,
-    LLM_MODEL,
     LOG_LEVEL,
-    OLLAMA_URL,
-    PERSAG_ROOT,
     SHOW_SPLASH_SCREEN,
-    STORAGE_BACKEND,
-    USE_MCP,
 )
-from ..config.user_id_mgr import get_userid
 from ..tools.knowledge_tools import KnowledgeTools
 
 # PersagMemoryTools is no longer used - memory functions are now standalone
@@ -118,22 +107,6 @@ from .user_manager import UserManager
 logger = setup_logging(__name__, level=LOG_LEVEL)
 
 
-@dataclass
-class AgnoPersonalAgentConfig:
-    """Configuration data for AgnoPersonalAgent."""
-
-    model_provider: str = "ollama"
-    model_name: str = LLM_MODEL
-    enable_memory: bool = True
-    storage_dir: str = AGNO_STORAGE_DIR
-    knowledge_dir: str = AGNO_KNOWLEDGE_DIR
-    debug: bool = False
-    ollama_base_url: str = OLLAMA_URL
-    user_id: str = None
-    recreate: bool = False
-    seed: Optional[int] = None
-
-
 class AgnoPersonalAgent(Agent):
     """
     Refactored Agno-based Personal AI Agent that inherits directly from Agent.
@@ -144,80 +117,65 @@ class AgnoPersonalAgent(Agent):
 
     def __init__(
         self,
-        model_provider: str = "ollama",
-        model_name: str = LLM_MODEL,
         model: Optional[Any] = None,  # Accept pre-created model
-        enable_memory: bool = True,
-        enable_mcp: bool = True,  # Simplified: disable MCP by default
-        storage_dir: str = AGNO_STORAGE_DIR,
-        knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
-        debug: bool = False,
-        user_id: str = None,
-        recreate: bool = False,
-        instruction_level: InstructionLevel = InstructionLevel.CONCISE,
+        enable_memory: Optional[bool] = None,
+        enable_mcp: Optional[bool] = None,
+        debug: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        recreate: Optional[bool] = None,
+        instruction_level: Optional[InstructionLevel] = None,
         seed: Optional[int] = None,
-        alltools: Optional[bool] = True,
+        alltools: Optional[bool] = None,
         initialize_agent: Optional[bool] = False,
         stream: Optional[bool] = False,
-        use_remote: bool = False,  # Add use_remote parameter
+        use_remote: Optional[bool] = None,
         **kwargs,  # Accept additional kwargs for backward compatibility
     ) -> None:
         """Initialize the Agno Personal Agent.
 
+        This constructor is designed to be lightweight. It pulls configuration
+        from the centralized `PersonalAgentConfig` singleton but allows for
+        overrides via parameters, which is useful for testing.
+
         Args:
-            model_provider: LLM provider ('ollama' or 'openai')
-            model_name: Model name to use
-            model: Optional pre-created model instance (if provided, model_provider and model_name are ignored)
-            enable_memory: Whether to enable memory and knowledge features
-            enable_mcp: Whether to enable MCP tool integration (simplified)
-            storage_dir: Directory for Agno storage files
-            knowledge_dir: Directory containing knowledge files to load
-            debug: Enable debug logging and tool call visibility
-            user_id: User identifier for memory operations
-            recreate: Whether to recreate knowledge bases
-            instruction_level: The sophistication level for agent instructions (kept for compatibility)
-            seed: Optional seed for model reproducibility
-            alltools: Whether to enable all built-in tools (Google Search, Calculator, YFinance, Python, Shell, etc.)
-            initialize_agent: Whether to force immediate initialization instead of lazy initialization
-            use_remote: Whether to use remote endpoints for model creation
-            **kwargs: Additional keyword arguments for backward compatibility with base Agent class
+            model: Optional pre-created model instance.
+            enable_memory: Override central config for enabling memory.
+            enable_mcp: Override central config for enabling MCP.
+            debug: Override central config for debug mode.
+            user_id: Override central config for the user ID.
+            recreate: Override central config for recreating knowledge bases.
+            instruction_level: Override central config for instruction sophistication.
+            seed: Override central config for model reproducibility.
+            alltools: Override central config for enabling all tools.
+            initialize_agent: Force immediate initialization.
+            stream: Set the default streaming behavior.
+            use_remote: Override central config for using remote endpoints.
+            **kwargs: Additional keyword arguments for the base Agent class.
         """
-        # Store configuration
-        self.config = AgnoPersonalAgentConfig(
-            model_provider=model_provider,
-            model_name=model_name,
-            enable_memory=enable_memory,
-            storage_dir=storage_dir,
-            knowledge_dir=knowledge_dir,
-            debug=debug,
-            user_id=user_id,
-            recreate=recreate,
-            seed=seed,
+        # Get the centralized configuration singleton
+        config = get_config()
+
+        # Set properties, using constructor arguments as overrides, otherwise use central config
+        self.user_id = user_id if user_id is not None else config.user_id
+        self.model_provider = config.provider
+        self.model_name = config.model
+        self.enable_memory = (
+            enable_memory if enable_memory is not None else config.enable_memory
         )
+        self.use_remote = use_remote if use_remote is not None else config.use_remote
+        self.debug = debug if debug is not None else config.debug_mode
+        self.recreate = recreate if recreate is not None else False
+        self.seed = seed if seed is not None else config.seed
+        self.alltools = alltools if alltools is not None else True
+        self.instruction_level = (
+            instruction_level
+            if instruction_level is not None
+            else InstructionLevel.CONCISE
+        )
+        self.enable_mcp = enable_mcp if enable_mcp is not None else config.use_mcp
 
-        # Legacy compatibility fields
-        self.model_provider = model_provider
-        self.model_name = model_name
-        self.enable_memory = enable_memory
-        self.enable_mcp = (
-            enable_mcp and USE_MCP
-        )  # Keep for compatibility but simplified
-
-        self.debug = debug
-        self.recreate = recreate
-        self.instruction_level = instruction_level
-        self.seed = seed
-        self.alltools = alltools
-        self.use_remote = use_remote  # Store use_remote flag
-
-        # Set user_id with fallback
-        if user_id is None:
-            user_id = get_userid()
-
-        self.user_id = user_id
         user_manager = UserManager()
-
-        self.user_details = user_manager.get_user_details(user_id)
+        self.user_details = user_manager.get_user_details(self.user_id)
         self.delta_year = self.user_details.get("delta_year", 0)
         self.cognitive_state = self.user_details.get("cognitive_state", 100)
 
@@ -226,8 +184,9 @@ class AgnoPersonalAgent(Agent):
         self._initialization_lock = asyncio.Lock()
         self._force_init = initialize_agent
 
-        # Set up storage paths
-        self._setup_storage_paths(storage_dir, knowledge_dir, user_id)
+        # Set up storage paths from central config
+        self.storage_dir = config.user_storage_dir
+        self.knowledge_dir = config.user_knowledge_dir
 
         # Initialize component managers (will be set in _do_initialization())
         self.model_manager: Optional[AgentModelManager] = None
@@ -255,20 +214,14 @@ class AgnoPersonalAgent(Agent):
         self._collected_tool_calls = []
         self.mcp_servers = get_mcp_servers() if self.enable_mcp else {}
 
-        # Create the model immediately to avoid agno defaulting to OpenAI
-        # Use centralized model creation with use_remote flag
-        temp_model_manager = AgentModelManager(
-            model_provider=model_provider,
-            model_name=model_name,
-            seed=seed,
-        )
-
         # Create the initial model to pass to super().__init__()
-        # Use the provided model if available, otherwise create one
+        # This ensures the base Agent class is initialized with a valid model
+        # that respects the central configuration.
         if model is not None:
             initial_model = model
         else:
-            initial_model = temp_model_manager.create_model(use_remote=use_remote)
+            # Use the new config-aware model creation (class method, no instantiation needed)
+            initial_model = AgentModelManager.create_model_from_config()
 
         # Initialize base Agent with proper model to prevent OpenAI default
         super().__init__(
@@ -277,14 +230,14 @@ class AgnoPersonalAgent(Agent):
             tools=[],  # Will be updated in _do_initialization()
             instructions=[],  # Will be updated in _do_initialization()
             markdown=True,
-            show_tool_calls=debug,
+            show_tool_calls=self.debug,
             agent_id="personal-agent",  # Use hyphen to match team expectations
-            user_id=user_id,
+            user_id=self.user_id,
             enable_agentic_memory=False,  # Disable to avoid conflicts
             enable_user_memories=False,  # Use our custom tools instead
             add_history_to_messages=True,
             num_history_responses=3,
-            debug_mode=debug,
+            debug_mode=self.debug,
             stream_intermediate_steps=True,
             stream=stream,
             **kwargs,
@@ -292,7 +245,7 @@ class AgnoPersonalAgent(Agent):
 
         logger.info(
             "Created AgnoPersonalAgent with model=%s, memory=%s, user_id=%s (lazy initialization=%s)",
-            f"{model_provider}:{model_name}",
+            f"{self.model_provider}:{self.model_name}",
             self.enable_memory,
             self.user_id,
             not self._force_init,
@@ -321,33 +274,6 @@ class AgnoPersonalAgent(Agent):
                 except RuntimeError as e:
                     logger.error("Failed to force initialize agent: %s", e)
                     raise e
-
-    def _setup_storage_paths(
-        self, storage_dir: str, knowledge_dir: str, user_id: str
-    ) -> None:
-        """Set up storage paths based on user ID.
-
-        Args:
-            storage_dir: Default storage directory
-            knowledge_dir: Default knowledge directory
-            user_id: User identifier
-        """
-        # If user_id differs from default, create user-specific paths
-        if user_id != get_userid():
-            # Replace the default user ID in the paths with the custom user ID
-            self.storage_dir = os.path.expandvars(
-                f"{PERSAG_ROOT}/{STORAGE_BACKEND}/{user_id}"
-            )
-            self.knowledge_dir = os.path.expandvars(
-                f"{PERSAG_ROOT}/{STORAGE_BACKEND}/{user_id}/knowledge"
-            )
-        else:
-            self.storage_dir = storage_dir
-            self.knowledge_dir = knowledge_dir
-
-        # Update config with resolved paths
-        self.config.storage_dir = self.storage_dir
-        self.config.knowledge_dir = self.knowledge_dir
 
     async def _ensure_initialized(self) -> None:
         """Ensure the agent is initialized, performing lazy initialization if needed."""
@@ -383,7 +309,6 @@ class AgnoPersonalAgent(Agent):
         # Update recreate flag if different from constructor
         if recreate != self.recreate:
             self.recreate = recreate
-            self.config.recreate = recreate
 
         try:
             await self._ensure_initialized()
@@ -405,6 +330,7 @@ class AgnoPersonalAgent(Agent):
             "🚀 AgnoPersonalAgent._do_initialization() called with recreate=%s",
             recreate,
         )
+        config = get_config()
 
         try:
             # 1. Create Agno storage (CRITICAL: Must be done first)
@@ -438,15 +364,13 @@ class AgnoPersonalAgent(Agent):
                 return False
 
             # 5. Initialize managers (CRITICAL: Must be done after agno_memory creation)
+            # Get config to pass required parameters to AgentModelManager
             self.model_manager = AgentModelManager(
-                model_provider=self.model_provider,
-                model_name=self.model_name,
-                ollama_base_url="",  # Let AgentModelManager handle URL selection
-                openai_base_url="",  # Let AgentModelManager handle URL selection
-                lmstudio_base_url="",  # Let AgentModelManager handle URL selection
+                model_provider=config.provider,
+                model_name=config.model,
+                ollama_base_url=config.get_effective_ollama_url(),
                 seed=self.seed,
             )
-
             self.instruction_manager = AgentInstructionManager(
                 self.instruction_level,
                 self.user_id,
@@ -459,8 +383,8 @@ class AgnoPersonalAgent(Agent):
                 self.user_id,
                 self.storage_dir,
                 self.agno_memory,
-                LIGHTRAG_URL,
-                LIGHTRAG_MEMORY_URL,
+                config.lightrag_url,  # Use central config
+                config.lightrag_memory_url,  # Use central config
                 self.enable_memory,
             )
 
@@ -468,7 +392,10 @@ class AgnoPersonalAgent(Agent):
             self.memory_manager.initialize(self.agno_memory)
 
             self.knowledge_manager = AgentKnowledgeManager(
-                self.user_id, self.storage_dir, LIGHTRAG_URL, LIGHTRAG_MEMORY_URL
+                self.user_id,
+                self.storage_dir,
+                config.lightrag_url,  # Use central config
+                config.lightrag_memory_url,  # Use central config
             )
 
             self.tool_manager = AgentToolManager(self.user_id, self.storage_dir)
@@ -481,9 +408,9 @@ class AgnoPersonalAgent(Agent):
                 # PersagMemoryTools is no longer used - memory functions are now standalone
                 self.memory_tools = None
 
-            # 7. Create the model
-            model = self.model_manager.create_model(use_remote=self.use_remote)
-            logger.debug("Created model: %s", self.model_name)
+            # 7. Create the model from the central config
+            model = self.model_manager.create_model_from_config()
+            logger.debug("Created model: %s", config.model)
             # we are using a subset for now
             tools = [
                 self.store_user_memory,
@@ -513,7 +440,7 @@ class AgnoPersonalAgent(Agent):
                         read_files=True,
                         uv_pip_install=True,
                     ),
-                    ShellTools(base_dir=Path(HOME_DIR)),
+                    ShellTools(base_dir=Path(config.home_dir)),
                     PersonalAgentFilesystemTools(),
                     PubmedTools(),
                 ]
@@ -541,7 +468,7 @@ class AgnoPersonalAgent(Agent):
 
             # 9. Create instructions using the AgentInstructionManager
             # For LM Studio, use minimal instructions to avoid context issues
-            if self.model_provider == "lm-studio":
+            if config.provider == "lm-studio":
                 # Use minimal instructions for LM Studio to avoid context window issues
                 instructions = [
                     "You are a helpful AI assistant.",
@@ -574,8 +501,8 @@ class AgnoPersonalAgent(Agent):
             if self.enable_memory:
                 self.knowledge_coordinator = create_knowledge_coordinator(
                     agno_knowledge=self.agno_knowledge,
-                    lightrag_url=LIGHTRAG_URL,
-                    debug=self.debug,
+                    lightrag_url=config.lightrag_url,  # Use central config
+                    debug=config.debug_mode,  # Use central config
                 )
                 logger.debug(
                     "Created Knowledge Coordinator for unified knowledge queries"
@@ -945,17 +872,22 @@ class AgnoPersonalAgent(Agent):
         return await get_graph_entity_count(self)
 
     async def query_lightrag_knowledge_direct(
-        self, query: str, params: dict = None, url: str = LIGHTRAG_URL
+        self, query: str, params: dict = None, url: str = None
     ) -> str:
         """Directly query the LightRAG knowledge base and return the raw response.
 
         Args:
             query: The query string to search in the knowledge base
             params: A dictionary of query parameters (mode, response_type, top_k, etc.)
+            url: The base URL of the LightRAG server. Defaults to the one in the config.
 
         Returns:
             String with query results exactly as LightRAG returns them
         """
+        config = get_config()
+        if url is None:
+            url = config.lightrag_url
+
         if not query or not query.strip():
             return "❌ Error: Query cannot be empty"
 
@@ -1039,6 +971,8 @@ class AgnoPersonalAgent(Agent):
         Returns:
             Dictionary containing detailed agent configuration and tool information
         """
+        config = get_config()
+
         # Get basic tool info
         built_in_tools = []
         mcp_tools = []
@@ -1094,28 +1028,26 @@ class AgnoPersonalAgent(Agent):
                         }
                     )
 
-        # For lazy initialization, knowledge is enabled if memory is enabled
-        # (since knowledge is part of the memory system)
-        knowledge_enabled = self.enable_memory and (
+        knowledge_enabled = config.enable_memory and (
             self.agno_knowledge is not None or not self._initialized
         )
 
         return {
             "framework": "agno",
-            "model_provider": self.model_provider,
-            "model_name": self.model_name,
-            "memory_enabled": self.enable_memory,
+            "model_provider": config.provider,
+            "model_name": config.model,
+            "memory_enabled": config.enable_memory,
             "knowledge_enabled": knowledge_enabled,
             "lightrag_knowledge_enabled": self.lightrag_knowledge_enabled,
-            "mcp_enabled": self.enable_mcp,
-            "debug_mode": self.debug,
-            "user_id": self.user_id,
+            "mcp_enabled": config.use_mcp,
+            "debug_mode": config.debug_mode,
+            "user_id": config.user_id,
             "initialized": self._initialized,
-            "storage_dir": self.storage_dir,
-            "knowledge_dir": self.knowledge_dir,
-            "ollama_base_url": OLLAMA_URL,
-            "lightrag_url": LIGHTRAG_URL,
-            "lightrag_memory_url": LIGHTRAG_MEMORY_URL,
+            "storage_dir": config.user_storage_dir,
+            "knowledge_dir": config.user_knowledge_dir,
+            "ollama_base_url": config.get_effective_ollama_url(),
+            "lightrag_url": config.lightrag_url,
+            "lightrag_memory_url": config.lightrag_memory_url,
             "tool_counts": {
                 "total": len(built_in_tools) + len(mcp_tools),
                 "built_in": len(built_in_tools),
@@ -1137,6 +1069,7 @@ class AgnoPersonalAgent(Agent):
             console = Console()
 
         info = self.get_agent_info()
+        config = get_config()
 
         # Main agent info table
         main_table = Table(
@@ -1154,7 +1087,7 @@ class AgnoPersonalAgent(Agent):
         main_table.add_row("Knowledge Enabled", str(info["knowledge_enabled"]))
         main_table.add_row("Debug Mode", str(info["debug_mode"]))
         main_table.add_row("User ID", info["user_id"])
-        main_table.add_row("User Data Directory", DATA_DIR)
+        main_table.add_row("User Data Directory", config.user_data_dir)
         main_table.add_row("Storage Directory", info["storage_dir"])
         main_table.add_row("Knowledge Directory", info["knowledge_dir"])
         main_table.add_row("Total Tools", str(info["tool_counts"]["total"]))
@@ -1292,21 +1225,7 @@ class AgnoPersonalAgent(Agent):
 
     @classmethod
     async def create_with_init(
-        cls,
-        model_provider: str = "ollama",
-        model_name: str = LLM_MODEL,
-        enable_memory: bool = True,
-        enable_mcp: bool = True,
-        storage_dir: str = AGNO_STORAGE_DIR,
-        knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
-        debug: bool = False,
-        user_id: str = None,
-        recreate: bool = False,
-        instruction_level: InstructionLevel = InstructionLevel.CONCISE,
-        seed: Optional[int] = None,
-        alltools: Optional[bool] = False,
-        use_remote: bool = False,  # Use use_remote instead of URL parameters
-        **kwargs,
+        cls, **kwargs
     ) -> "AgnoPersonalAgent":
         """Create and fully initialize an AgnoPersonalAgent.
 
@@ -1315,42 +1234,13 @@ class AgnoPersonalAgent(Agent):
         to use immediately.
 
         Args:
-            model_provider: LLM provider ('ollama' or 'openai')
-            model_name: Model name to use
-            enable_memory: Whether to enable memory and knowledge features
-            enable_mcp: Whether to enable MCP tool integration
-            storage_dir: Directory for Agno storage files
-            knowledge_dir: Directory containing knowledge files to load
-            debug: Enable debug mode
-            user_id: User identifier for memory operations
-            recreate: Whether to recreate knowledge bases
-            instruction_level: The sophistication level for agent instructions
-            seed: Optional seed for model reproducibility
-            alltools: Whether to enable all built-in tools
-            use_remote: Whether to use remote endpoints for model creation
-            **kwargs: Additional keyword arguments
+            **kwargs: Configuration overrides for the agent constructor.
 
         Returns:
             Fully initialized AgnoPersonalAgent instance
         """
-        # Create the agent instance
-        agent = cls(
-            model_provider=model_provider,
-            model_name=model_name,
-            enable_memory=enable_memory,
-            enable_mcp=enable_mcp,
-            storage_dir=storage_dir,
-            knowledge_dir=knowledge_dir,
-            debug=debug,
-            user_id=user_id,
-            recreate=recreate,
-            instruction_level=instruction_level,
-            seed=seed,
-            alltools=alltools,
-            use_remote=use_remote,  # Pass use_remote flag instead of URL parameters
-            initialize_agent=False,  # Don't try to force init in constructor
-            **kwargs,
-        )
+        # Create the agent instance, passing any overrides
+        agent = cls(initialize_agent=False, **kwargs)
 
         # Now initialize it
         await agent._ensure_initialized()
@@ -1367,8 +1257,8 @@ class AgnoPersonalAgent(Agent):
 def create_simple_personal_agent(
     storage_dir: str = None,
     knowledge_dir: str = None,
-    model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
+    model_provider: str = None,
+    model_name: str = None,
 ):
     """Create a simple personal agent following the working pattern from knowledge_agent_example.py
 
@@ -1376,25 +1266,33 @@ def create_simple_personal_agent(
     pattern that avoids async initialization complexity.
 
     Args:
-        storage_dir: Directory for storage files (defaults to PERSAG_ROOT/agno)
-        knowledge_dir: Directory containing knowledge files (defaults to PERSAG_ROOT/knowledge)
-        model_provider: LLM provider ('ollama' or 'openai')
-        model_name: Model name to use
+        storage_dir: Override for the storage directory.
+        knowledge_dir: Override for the knowledge directory.
+        model_provider: Override for the model provider.
+        model_name: Override for the model name.
 
     Returns:
         Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
     """
     from agno.knowledge.combined import CombinedKnowledgeBase
 
+    config = get_config()
+
+    # Use overrides or fall back to central config
+    final_storage_dir = storage_dir or config.user_storage_dir
+    final_knowledge_dir = knowledge_dir or config.user_knowledge_dir
+    final_provider = model_provider or config.provider
+    final_model_name = model_name or config.model
+
     # Create knowledge base (synchronous creation)
-    knowledge_base = create_combined_knowledge_base(storage_dir, knowledge_dir)
+    knowledge_base = create_combined_knowledge_base(
+        final_storage_dir, final_knowledge_dir
+    )
 
     # Always use AgentModelManager to ensure consistent model creation
     model_manager = AgentModelManager(
-        model_provider=model_provider,
-        model_name=model_name,
-        ollama_base_url=OLLAMA_URL,
-        seed=None,
+        model_provider=final_provider,
+        model_name=final_model_name,
     )
     model = model_manager.create_model()
 
@@ -1444,42 +1342,14 @@ async def load_agent_knowledge(knowledge_base, recreate: bool = False) -> None:
         logger.debug("No knowledge base to load")
 
 
-async def create_agno_agent(
-    model_provider: str = "ollama",
-    model_name: str = LLM_MODEL,
-    enable_memory: bool = True,
-    enable_mcp: bool = False,  # Simplified: disable MCP by default
-    storage_dir: str = AGNO_STORAGE_DIR,
-    knowledge_dir: str = AGNO_KNOWLEDGE_DIR,
-    debug: bool = False,
-    ollama_base_url: str = OLLAMA_URL,
-    openai_base_url: str = None,
-    lmstudio_base_url: str = None,
-    user_id: str = None,
-    recreate: bool = False,
-    instruction_level: InstructionLevel = InstructionLevel.CONCISE,
-    alltools: Optional[bool] = True,  # Add alltools parameter
-    seed: Optional[int] = None,
-) -> AgnoPersonalAgent:
+async def create_agno_agent(**kwargs) -> AgnoPersonalAgent:
     """Create and fully initialize an agno-based personal agent.
 
     This function creates an AgnoPersonalAgent and performs complete initialization,
     ensuring the agent is ready to use immediately upon return.
 
     Args:
-        model_provider: LLM provider ('ollama' or 'openai')
-        model_name: Model name to use
-        enable_memory: Whether to enable memory and knowledge features
-        enable_mcp: Whether to enable MCP tool integration (simplified)
-        storage_dir: Directory for Agno storage files
-        knowledge_dir: Directory containing knowledge files to load
-        debug: Enable debug mode
-        ollama_base_url: Base URL for Ollama API
-        user_id: User identifier for memory operations
-        recreate: Whether to recreate knowledge bases
-        instruction_level: The sophistication level for agent instructions
-        alltools: Whether to enable all built-in tools
-        seed: Optional seed for model reproducibility
+        **kwargs: Configuration overrides for the agent constructor.
 
     Returns:
         Fully initialized AgnoPersonalAgent instance
@@ -1488,24 +1358,5 @@ async def create_agno_agent(
         "create_agno_agent() called - creating and initializing agent with proper init"
     )
 
-    # Set user_id with fallback
-    if user_id is None:
-        user_id = get_userid()
-
     # Use the create_with_init class method to ensure proper initialization
-    # Note: URL parameters are no longer passed - AgentModelManager handles URL selection
-    return await AgnoPersonalAgent.create_with_init(
-        model_provider=model_provider,
-        model_name=model_name,
-        enable_memory=enable_memory,
-        enable_mcp=enable_mcp,
-        storage_dir=storage_dir,
-        knowledge_dir=knowledge_dir,
-        debug=debug,
-        user_id=user_id,
-        recreate=recreate,
-        instruction_level=instruction_level,
-        seed=seed,
-        alltools=alltools,
-        use_remote=False,  # Use local endpoints by default
-    )
+    return await AgnoPersonalAgent.create_with_init(**kwargs)
