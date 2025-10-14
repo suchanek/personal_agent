@@ -241,7 +241,8 @@ def add_paga_restart_endpoint(api_server):
                         del st.session_state["team_wrapper"]
 
                     # Re-initialize team with recreate=True (matches switch-user.py line 242)
-                    team = initialize_team(current_model, current_ollama_url, recreate=True)
+                    # Note: initialize_team() now uses get_config() for all settings
+                    team = initialize_team(recreate=True)
 
                     if team:
                         # Update session state
@@ -284,7 +285,8 @@ def add_paga_restart_endpoint(api_server):
                         del st.session_state["agent"]
 
                     # Re-initialize agent with recreate=True (matches switch-user.py line 267)
-                    agent = initialize_agent(current_model, current_ollama_url, recreate=True)
+                    # Note: initialize_agent() now uses get_config() for all settings
+                    agent = initialize_agent(recreate=True)
 
                     if agent:
                         # Update session state
