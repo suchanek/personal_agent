@@ -20,104 +20,26 @@ from personal_agent.team.reasoning_team import create_team as create_personal_ag
 logger = logging.getLogger(__name__)
 
 
-async def initialize_agent_async(
-    model_name, ollama_url, existing_agent=None, recreate=False, provider=None
-):
-    """Initialize AgnoPersonalAgent with proper async handling."""
-    # Use provided provider or detect from model name, fallback to environment variable
-    if provider is None:
-        from personal_agent.tools.streamlit_config import (
-            detect_provider_from_model_name,
-        )
+async def initialize_agent_async(recreate: bool = False):
+    """Initialize AgnoPersonalAgent using the central configuration.
 
-        provider = detect_provider_from_model_name(model_name)
+    Args:
+        recreate (bool): Flag to recreate knowledge bases.
 
-        # Update environment variable if provider was auto-detected
-        if provider != os.getenv("PROVIDER", "ollama"):
-            logger.info(
-                "Auto-detected provider '%s' for model '%s'", provider, model_name
-            )
-            os.environ["PROVIDER"] = provider
-
-    # Determine use_remote flag based on the URL passed in
-    from personal_agent.tools.streamlit_config import args
-
-    use_remote = args.remote  # Use the --remote flag directly
-
-    # Always create a new agent when URL or model changes to ensure proper configuration
-    # This is more reliable than trying to update existing agent configuration
-
-    # For LM Studio, use optimized settings to avoid context window issues
-    if provider == "lm-studio":
-        # Use lightweight configuration for LM Studio to avoid context issues
-        return await AgnoPersonalAgent.create_with_init(
-            model_provider=provider,
-            model_name=model_name,
-            user_id=USER_DATA_DIR,  # This should be the actual user ID, but keeping for compatibility
-            debug=True,
-            enable_memory=True,  # Enable memory
-            enable_mcp=False,  # Disable MCP to reduce context usage
-            alltools=False,  # Use SINGLE_FLAG to control all tools - will be passed from caller
-            storage_dir=AGNO_STORAGE_DIR,
-            knowledge_dir=AGNO_KNOWLEDGE_DIR,
-            recreate=recreate,
-            use_remote=use_remote,  # Pass use_remote flag
-        )
-    else:
-        # Full configuration for other providers
-        return await AgnoPersonalAgent.create_with_init(
-            model_provider=provider,
-            model_name=model_name,
-            user_id=USER_DATA_DIR,  # This should be the actual user ID, but keeping for compatibility
-            debug=True,
-            enable_memory=True,
-            enable_mcp=False,
-            storage_dir=AGNO_STORAGE_DIR,
-            knowledge_dir=AGNO_KNOWLEDGE_DIR,
-            recreate=recreate,
-            alltools=False,  # Use SINGLE_FLAG to control all tools - will be passed from caller
-            use_remote=use_remote,  # Pass use_remote flag
-        )
+    Returns:
+        An initialized AgnoPersonalAgent instance.
+    """
+    # The agent's provider, model, user_id, etc., are now read directly from
+    # the get_config() singleton within the agent's constructor.
+    return await AgnoPersonalAgent.create_with_init(recreate=recreate)
 
 
-def initialize_agent(
-    model_name, ollama_url, existing_agent=None, recreate=False, provider=None
-):
+def initialize_agent(recreate: bool = False):
     """Sync wrapper for agent initialization."""
-    # Detect provider if not provided
-    if provider is None:
-        from personal_agent.tools.streamlit_config import (
-            detect_provider_from_model_name,
-        )
-
-        provider = detect_provider_from_model_name(model_name)
-
-    # Update the environment variables to ensure all components use the new model and provider
-    old_model = os.environ.get("LLM_MODEL")
-    old_provider = os.environ.get("PROVIDER", "ollama")
-    os.environ["LLM_MODEL"] = model_name
-    os.environ["PROVIDER"] = provider
-    logger.info("🔄 Updated LLM_MODEL from '%s' to '%s'", old_model, model_name)
-    logger.info("🔄 Updated PROVIDER from '%s' to '%s'", old_provider, provider)
-
-    # Force refresh of config module to pick up new environment variable
-    try:
-        import importlib
-
-        from personal_agent import config
-
-        importlib.reload(config.settings)
-        logger.info("🔄 Refreshed config.settings module to pick up new LLM_MODEL")
-    except Exception as e:
-        logger.warning(f"⚠️ Could not refresh config module: {e}")
-
-    # Note: ollama_url parameter is kept for compatibility but not used
-    # The use_remote flag from args is used instead
-    return asyncio.run(
-        initialize_agent_async(
-            model_name, ollama_url, existing_agent, recreate, provider
-        )
-    )
+    # The UI or CLI is responsible for setting the config state before this is called.
+    # For example: `get_config().set_model("new-model-name")`
+    logger.info("Initializing agent based on central configuration...")
+    return asyncio.run(initialize_agent_async(recreate=recreate))
 
 
 def _run_async_team_init(coro):
@@ -147,142 +69,42 @@ def _run_async_team_init(coro):
         return asyncio.run(coro)
 
 
-def initialize_team(
-    model_name, ollama_url, existing_team=None, recreate=False, provider=None
-):
-    """Initialize the team using the reasoning_team create_team function."""
+def initialize_team(recreate: bool = False):
+    """Initialize the team using the central configuration."""
     try:
-        # Detect provider if not provided
-        if provider is None:
-            from personal_agent.tools.streamlit_config import (
-                detect_provider_from_model_name,
-            )
-
-            provider = detect_provider_from_model_name(model_name)
-
-        # Update the environment variables to ensure all components use the new model and provider
-        old_model = os.environ.get("LLM_MODEL")
-        old_provider = os.environ.get("PROVIDER", "ollama")
-        os.environ["LLM_MODEL"] = model_name
-        os.environ["PROVIDER"] = provider
-        logger.info("🔄 Updated LLM_MODEL from '%s' to '%s'", old_model, model_name)
-        logger.info("🔄 Updated PROVIDER from '%s' to '%s'", old_provider, provider)
-
-        # Force refresh of config module to pick up new environment variable
-        try:
-            import importlib
-
-            from personal_agent import config
-
-            importlib.reload(config.settings)
-            logger.info("🔄 Refreshed config.settings module to pick up new LLM_MODEL")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not refresh config module: {e}")
-
-        logger.info("Initializing team with model %s at %s", model_name, ollama_url)
-
-        # IMPORTANT: Use the provided ollama_url instead of just the --remote flag
-        # This allows dynamic provider switching in the UI
         from personal_agent.tools.streamlit_config import args
 
-        # If a specific URL is provided (from UI), use it to determine remote vs local
-        # Otherwise fall back to the --remote flag
-        if ollama_url and ollama_url != "":
-            # Determine if this is a remote URL by checking if it's not localhost
-            use_remote = "localhost" not in ollama_url and "127.0.0.1" not in ollama_url
-        else:
-            use_remote = args.remote
+        logger.info("Initializing team based on central configuration...")
 
-        # Create team using the factory function from reasoning_team with model_name, URL, and provider
-        # CRITICAL: Pass the provider parameter to create_team so all agents use the correct provider
-        # Pass the specific ollama_url from session state for dynamic provider switching
-        if ollama_url and ollama_url != "":
-            logger.info("Using specific URL from session state: %s", ollama_url)
-            # For now, we'll have to work around the create_team API limitation
-            # by temporarily setting environment variables
-            original_url = None
-            if provider == "lm-studio":
-                original_url = os.environ.get("LMSTUDIO_BASE_URL")
-                os.environ["LMSTUDIO_BASE_URL"] = ollama_url.rstrip("/v1")
-            elif provider == "ollama":
-                original_url = os.environ.get("OLLAMA_URL")
-                os.environ["OLLAMA_URL"] = ollama_url
+        # The create_personal_agent_team function now reads directly from the
+        # get_config() singleton, so we no longer need to pass model, provider, etc.
+        team = _run_async_team_init(
+            create_personal_agent_team(use_remote=args.remote, single=args.single)
+        )
 
-            try:
-                team = _run_async_team_init(
-                    create_personal_agent_team(
-                        use_remote=use_remote, model_name=model_name, model_provider=provider
-                    )
-                )
-            finally:
-                # Restore original environment variable
-                if original_url is not None:
-                    if provider == "lm-studio":
-                        os.environ["LMSTUDIO_BASE_URL"] = original_url
-                    elif provider == "ollama":
-                        os.environ["OLLAMA_URL"] = original_url
-        else:
-            team = _run_async_team_init(
-                create_personal_agent_team(use_remote=use_remote, model_name=model_name, model_provider=provider)
-            )
-
-        # Validate team creation
-        if not team:
-            logger.error("Team creation returned None")
-            import streamlit as st
-
-            st.error("❌ Team creation failed - returned None")
-            return None
-
-        if not hasattr(team, "members"):
-            logger.error("Team has no members attribute")
-            import streamlit as st
-
-            st.error("❌ Team creation failed - no members attribute")
-            return None
-
-        if not team.members:
-            logger.error("Team has empty members list")
-            import streamlit as st
-
-            st.error("❌ Team creation failed - empty members list")
+        if not team or not hasattr(team, "members") or not team.members:
+            logger.error("Team creation failed or resulted in an empty team.")
+            st.error("❌ Team creation failed.")
             return None
 
         logger.info(f"Team created successfully with {len(team.members)} members")
 
-        # The refactored team now has a knowledge agent as the first member
-        # which contains the memory system, so we don't need to create it separately
-        # But we'll add a fallback for backward compatibility
-        if hasattr(team, "members") and team.members:
-            knowledge_agent = team.members[0]
-            logger.info(f"Knowledge agent type: {type(knowledge_agent).__name__}")
-
-            if hasattr(knowledge_agent, "agno_memory"):
-                # Expose the knowledge agent's memory for Streamlit compatibility
-                team.agno_memory = knowledge_agent.agno_memory
-                logger.info("Exposed knowledge agent's memory to team")
-            else:
-                # Fallback: create memory system for compatibility
-                logger.warning("Knowledge agent has no agno_memory, creating fallback")
-                from personal_agent.core.agno_storage import create_agno_memory
-
-                team.agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
+        # The knowledge agent (first member) should have the memory system.
+        knowledge_agent = team.members[0]
+        if hasattr(knowledge_agent, "agno_memory"):
+            team.agno_memory = knowledge_agent.agno_memory
+            logger.info("Exposed knowledge agent's memory to team object.")
         else:
-            # Fallback: create memory system for compatibility
-            logger.warning("No team members found, creating fallback memory")
-            from personal_agent.core.agno_storage import create_agno_memory
-
-            team.agno_memory = create_agno_memory(AGNO_STORAGE_DIR, debug_mode=True)
+            logger.error("Knowledge agent lacks 'agno_memory', memory features will fail.")
 
         logger.info("Team initialization completed successfully")
         return team
+
     except Exception as e:
         logger.error(f"Exception during team initialization: {str(e)}")
         import traceback
-
         logger.error(f"Traceback: {traceback.format_exc()}")
         import streamlit as st
-
         st.error(f"❌ Failed to initialize team: {str(e)}")
         return None
 
