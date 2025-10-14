@@ -18,10 +18,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from personal_agent.config import (
-    AGNO_KNOWLEDGE_DIR,
-    USER_DATA_DIR,
-)
+from personal_agent.config import AGNO_KNOWLEDGE_DIR, USER_DATA_DIR
 from personal_agent.tools.streamlit_session import (
     SESSION_KEY_AGENT,
     SESSION_KEY_AGENT_MODE,
@@ -259,6 +256,7 @@ def render_chat_tab():
 
                         # Handle AgnoPersonalAgent with new RunResponse pattern
                         from personal_agent.core.agno_agent import AgnoPersonalAgent
+
                         if isinstance(agent, AgnoPersonalAgent):
 
                             async def run_agent_with_streaming():
@@ -685,7 +683,7 @@ def render_memory_tab():
         memory_type = st.selectbox(
             "Memory Type",
             ["All", "Conversation", "Document", "Tool", "System"],
-            help="Filter memories by type"
+            help="Filter memories by type",
         )
 
     with col2:
@@ -695,14 +693,16 @@ def render_memory_tab():
             memory_dates = []
 
             for memory in all_memories:
-                last_updated = getattr(memory, 'last_updated', None)
+                last_updated = getattr(memory, "last_updated", None)
                 if last_updated:
                     try:
                         # Convert memory date to date object
                         if isinstance(last_updated, str):
                             # Try to parse the date string (assuming YYYY-MM-DD format)
-                            memory_date = datetime.strptime(last_updated.split()[0], '%Y-%m-%d').date()
-                        elif hasattr(last_updated, 'date'):
+                            memory_date = datetime.strptime(
+                                last_updated.split()[0], "%Y-%m-%d"
+                            ).date()
+                        elif hasattr(last_updated, "date"):
                             memory_date = last_updated.date()
                         else:
                             memory_date = last_updated
@@ -726,7 +726,7 @@ def render_memory_tab():
         date_range = st.date_input(
             "Date Range",
             value=[default_start_date, default_end_date],
-            help="Filter memories by date range (automatically set to encompass all memory dates)"
+            help="Filter memories by date range (automatically set to encompass all memory dates)",
         )
 
     with col3:
@@ -736,7 +736,7 @@ def render_memory_tab():
             max_value=1000,
             value=100,
             step=10,
-            help="Maximum number of memories to display"
+            help="Maximum number of memories to display",
         )
 
     # Auto-load memories like the dashboard does (no button required)
@@ -749,14 +749,16 @@ def render_memory_tab():
             start_date, end_date = date_range
             filtered_memories = []
             for memory in raw_memories:
-                memory_date = getattr(memory, 'last_updated', None)
+                memory_date = getattr(memory, "last_updated", None)
                 if memory_date:
                     try:
                         # Convert memory date to date object for comparison
                         if isinstance(memory_date, str):
                             # Try to parse the date string (assuming YYYY-MM-DD format)
-                            memory_date = datetime.strptime(memory_date.split()[0], '%Y-%m-%d').date()
-                        elif hasattr(memory_date, 'date'):
+                            memory_date = datetime.strptime(
+                                memory_date.split()[0], "%Y-%m-%d"
+                            ).date()
+                        elif hasattr(memory_date, "date"):
                             memory_date = memory_date.date()
 
                         # Check if memory date is within range
@@ -773,7 +775,9 @@ def render_memory_tab():
         filtered_memories = filtered_memories[:limit]
 
         if filtered_memories:
-            st.info(f"Displaying {len(filtered_memories)} of {len(raw_memories)} total memories")
+            st.info(
+                f"Displaying {len(filtered_memories)} of {len(raw_memories)} total memories"
+            )
             for memory in filtered_memories:
                 with st.expander(f"Memory: {memory.memory[:50]}..."):
                     st.write(f"**Content:** {memory.memory}")
@@ -1042,6 +1046,7 @@ def render_knowledge_status(knowledge_helper):
                     ):
                         try:
                             import requests
+
                             rescan_response = requests.post(
                                 f"{new_rag_url}/documents/scan", timeout=10
                             )
@@ -1071,6 +1076,7 @@ def render_knowledge_status(knowledge_helper):
             try:
                 # Increase timeout and add better error handling
                 import requests
+
                 health_response = requests.get(
                     f"{rag_url}/health", timeout=10
                 )  # Increased from 3 to 10
@@ -1199,79 +1205,86 @@ def render_sidebar():
         selected_provider = st.selectbox(
             "Select AI Provider:",
             available_providers,
-            index=available_providers.index(current_provider) if current_provider in available_providers else 0,
-            help="Choose your AI model provider. Each provider has different default models."
+            index=(
+                available_providers.index(current_provider)
+                if current_provider in available_providers
+                else 0
+            ),
+            help="Choose your AI model provider. Each provider has different default models.",
         )
 
-        # Show provider-specific information
-        if selected_provider == "ollama":
-            st.caption("🐳 **Ollama**: Local models, full control, no API costs")
-            from personal_agent.config import get_provider_default_model
-            default_model = get_provider_default_model("ollama")
-        elif selected_provider == "lm-studio":
-            st.caption("🎭 **LM Studio**: Local models with user-friendly interface")
-            from personal_agent.config import get_provider_default_model
-            default_model = get_provider_default_model("lm-studio")
-        elif selected_provider == "openai":
-            st.caption("🔗 **OpenAI**: Cloud models, requires API key")
-            from personal_agent.config import get_provider_default_model
-            default_model = get_provider_default_model("openai")
+        # Show provider-specific information based on CURRENT provider (not selected)
+        from personal_agent.config import get_provider_default_model
+        current_default_model = get_provider_default_model(current_provider)
+        
+        if current_provider == "ollama":
+            st.caption("🐳 **Current**: Ollama - Local models, full control, no API costs")
+        elif current_provider == "lm-studio":
+            st.caption("🎭 **Current**: LM Studio - Local models with user-friendly interface")
+        elif current_provider == "openai":
+            st.caption("🔗 **Current**: OpenAI - Cloud models, requires API key")
 
-        st.caption(f"📋 **Default Model:** {default_model}")
+        st.caption(f"📋 **Current Default Model:** {current_default_model}")
+        
+        # Show preview of selected provider if different from current
+        if selected_provider != current_provider:
+            selected_default_model = get_provider_default_model(selected_provider)
+            if selected_provider == "ollama":
+                st.caption("� **Preview**: Ollama - Local models, full control, no API costs")
+            elif selected_provider == "lm-studio":
+                st.caption("🔮 **Preview**: LM Studio - Local models with user-friendly interface")
+            elif selected_provider == "openai":
+                st.caption("🔮 **Preview**: OpenAI - Cloud models, requires API key")
+            st.caption(f"📋 **New Default Model:** {selected_default_model}")
 
         # Apply provider change
         if selected_provider != current_provider:
             if st.button(f"🔄 Switch to {selected_provider.title()}", type="primary"):
-                with st.spinner(f"Switching to {selected_provider.title()} provider..."):
-                    # Update environment variable
-                    os.environ["PROVIDER"] = selected_provider
+                with st.spinner(
+                    f"Switching to {selected_provider.title()} provider..."
+                ):
+                    # Use PersonalAgentConfig for provider switching
+                    from personal_agent.config.runtime_config import get_config
+                    config = get_config()
 
-                    # Update default model to provider default
-                    from personal_agent.config import get_provider_default_model
-                    new_default_model = get_provider_default_model(selected_provider)
-                    os.environ["LLM_MODEL"] = new_default_model
+                    # Switch provider (automatically sets default model)
+                    config.set_provider(selected_provider, auto_set_model=True)
+                    new_default_model = config.model
+                    new_url = config.get_effective_base_url()
 
-                    # Force refresh of config module
-                    try:
-                        import importlib
-                        from personal_agent import config
-                        importlib.reload(config.settings)
-                        logger.info(f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not refresh config module: {e}")
+                    logger.info(
+                        f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}, URL: {new_url}"
+                    )
 
                     # Clear available models cache to force refresh
                     if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
                         del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
 
-                    # Update current model in session state
+                    # Update session state to match config
                     st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
-
-                    # Update URL based on provider
-                    from personal_agent.config import REMOTE_LMSTUDIO_URL, REMOTE_OLLAMA_URL
-                    if selected_provider == "lm-studio":
-                        if st.session_state.get("args", {}).get("remote", False):
-                            new_url = REMOTE_LMSTUDIO_URL
-                        else:
-                            new_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
-                        if new_url.endswith("/v1"):
-                            new_url = new_url[:-3]  # Remove /v1 for consistency
-                    elif selected_provider == "openai":
-                        new_url = "https://api.openai.com/v1"
-                    else:  # ollama
-                        new_url = REMOTE_OLLAMA_URL if st.session_state.get("args", {}).get("remote", False) else st.session_state.get("OLLAMA_URL", "http://localhost:11434")
-
                     st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_url
+                    logger.info(f"🔄 Updated session state: model={new_default_model}, url={new_url}")
 
-                    st.success(f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}")
+                    st.success(
+                        f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}"
+                    )
+                    st.info("💡 **Tip**: Click 'Fetch Available Models' to see models available in the new provider, then select and apply a model to reinitialize the agent/team.")
                     st.rerun()
 
         st.header("Model Selection")
 
-        # Show current provider prominently
-        provider = os.getenv("PROVIDER", "ollama")
-        provider_display = provider.upper() if provider == "ollama" else "LM Studio" if provider == "lm-studio" else provider.title()
+        # Show current provider and model prominently from config
+        from personal_agent.config.runtime_config import get_config
+        config = get_config()
+        provider = config.provider
+        provider_display = (
+            provider.upper()
+            if provider == "ollama"
+            else "LM Studio" if provider == "lm-studio" else provider.title()
+        )
+        current_model = st.session_state.get(SESSION_KEY_CURRENT_MODEL, "Unknown")
         st.write(f"**Current Provider:** {provider_display}")
+        st.write(f"**Current Model:** {current_model}")
 
         new_ollama_url = st.text_input(
             "**Provider URL:**", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
@@ -1279,7 +1292,11 @@ def render_sidebar():
         if st.button("🔄 Fetch Available Models"):
             with st.spinner("Fetching models..."):
                 from personal_agent.tools.streamlit_config import get_available_models
-                available_models = get_available_models(new_ollama_url)
+
+                current_provider = os.getenv("PROVIDER", "ollama")
+                available_models = get_available_models(
+                    new_ollama_url, provider=current_provider
+                )
                 if available_models:
                     st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
                     st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_ollama_url
@@ -1305,11 +1322,44 @@ def render_sidebar():
                 index=current_model_index,
             )
             if st.button("🚀 Apply Model Selection"):
-                if (
+                # Detect provider change based on model name
+                from personal_agent.tools.streamlit_config import (
+                    detect_provider_from_model_name,
+                    get_appropriate_base_url,
+                    args,
+                )
+
+                detected_provider = detect_provider_from_model_name(selected_model)
+                current_provider = os.getenv("PROVIDER", "ollama")
+
+                provider_changed = detected_provider != current_provider
+                model_changed = (
                     selected_model != st.session_state[SESSION_KEY_CURRENT_MODEL]
-                    or new_ollama_url
-                    != st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
-                ):
+                )
+                url_changed = (
+                    new_ollama_url != st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
+                )
+
+                if model_changed or url_changed or provider_changed:
+                    # CRITICAL: If provider is changing, update URL FIRST before any initialization
+                    if provider_changed:
+                        st.warning(f"🔄 Auto-detected provider change from {current_provider} to {detected_provider}")
+                        st.info("💡 **Note**: You selected a model that requires a different provider. The system will switch providers and use the selected model name.")
+                        
+                        # CRITICAL: Get the correct URL for the new provider BEFORE initialization
+                        target_url = get_appropriate_base_url(detected_provider, use_remote=args.remote)
+                        new_ollama_url = target_url  # Update URL to match provider
+                        logger.info(f"🔄 Provider change: Updated URL from {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]} to {new_ollama_url}")
+                    
+                    # CRITICAL: Even if provider didn't change, ensure URL matches current provider
+                    # This handles the case where user manually changed the URL input
+                    if not provider_changed and url_changed:
+                        # Verify the URL is appropriate for the current provider
+                        expected_url = get_appropriate_base_url(detected_provider, use_remote=args.remote)
+                        if new_ollama_url != expected_url:
+                            logger.warning(f"⚠️ URL mismatch: User entered {new_ollama_url}, but provider {detected_provider} expects {expected_url}")
+                            # Use the user-provided URL but log the discrepancy
+                    
                     current_mode = st.session_state.get(
                         SESSION_KEY_AGENT_MODE, "single"
                     )
@@ -1334,6 +1384,47 @@ def render_sidebar():
                             new_ollama_url,
                         )
 
+                        # Handle provider switching if needed
+                        if provider_changed:
+                            logger.info(
+                                "🔄 PROVIDER CHANGE DETECTED: Switching from %s to %s for model %s",
+                                current_provider,
+                                detected_provider,
+                                selected_model,
+                            )
+
+                            # Update provider and get appropriate URL
+                            from personal_agent.tools.streamlit_config import (
+                                args,
+                                update_provider_and_reinitialize,
+                            )
+
+                            success, message, suggested_url = (
+                                update_provider_and_reinitialize(
+                                    detected_provider,
+                                    selected_model,
+                                    use_remote=args.remote,
+                                )
+                            )
+
+                            if success:
+                                st.info(f"🔄 {message}")
+                                # Use the suggested URL if different from user input
+                                if suggested_url and suggested_url != new_ollama_url:
+                                    logger.info(
+                                        "📡 Using provider-appropriate URL: %s",
+                                        suggested_url,
+                                    )
+                                    new_ollama_url = suggested_url
+                                
+                                # Clear available models cache to force re-fetch from new provider
+                                if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
+                                    del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+                                    logger.info("🔄 Cleared model cache - user should re-fetch models for new provider")
+                            else:
+                                st.error(f"❌ Provider switch failed: {message}")
+                                return  # Exit early on provider switch failure
+
                         st.session_state[SESSION_KEY_CURRENT_MODEL] = selected_model
                         st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = (
                             new_ollama_url
@@ -1344,12 +1435,17 @@ def render_sidebar():
                                 "🤖 TEAM REINIT: Reinitializing team with new model %s",
                                 selected_model,
                             )
-                            # Reinitialize team
-                            from personal_agent.tools.streamlit_agent_manager import initialize_team
+                            # Reinitialize team with detected provider
+                            from personal_agent.tools.streamlit_agent_manager import (
+                                initialize_team,
+                            )
+
                             st.session_state[SESSION_KEY_TEAM] = initialize_team(
                                 selected_model,
                                 new_ollama_url,
                                 st.session_state.get(SESSION_KEY_TEAM),
+                                recreate=False,
+                                provider=detected_provider,
                             )
 
                             # Update helper classes with new team - use knowledge agent directly
@@ -1358,7 +1454,11 @@ def render_sidebar():
                                 knowledge_agent = team.members[
                                     0
                                 ]  # First member is the knowledge agent
-                                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                                from personal_agent.tools.streamlit_helpers import (
+                                    StreamlitKnowledgeHelper,
+                                    StreamlitMemoryHelper,
+                                )
+
                                 st.session_state[SESSION_KEY_MEMORY_HELPER] = (
                                     StreamlitMemoryHelper(knowledge_agent)
                                 )
@@ -1367,7 +1467,11 @@ def render_sidebar():
                                 )
                             else:
                                 # Fallback: create with team object
-                                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                                from personal_agent.tools.streamlit_helpers import (
+                                    StreamlitKnowledgeHelper,
+                                    StreamlitMemoryHelper,
+                                )
+
                                 st.session_state[SESSION_KEY_MEMORY_HELPER] = (
                                     StreamlitMemoryHelper(team)
                                 )
@@ -1382,16 +1486,25 @@ def render_sidebar():
                                 "🧠 AGENT REINIT: Reinitializing agent with new model %s",
                                 selected_model,
                             )
-                            # Reinitialize single agent
-                            from personal_agent.tools.streamlit_agent_manager import initialize_agent
+                            # Reinitialize single agent with detected provider
+                            from personal_agent.tools.streamlit_agent_manager import (
+                                initialize_agent,
+                            )
+
                             st.session_state[SESSION_KEY_AGENT] = initialize_agent(
                                 selected_model,
                                 new_ollama_url,
                                 st.session_state.get(SESSION_KEY_AGENT),
+                                recreate=False,
+                                provider=detected_provider,
                             )
 
                             # Update helper classes with new agent
-                            from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                            from personal_agent.tools.streamlit_helpers import (
+                                StreamlitKnowledgeHelper,
+                                StreamlitMemoryHelper,
+                            )
+
                             st.session_state[SESSION_KEY_MEMORY_HELPER] = (
                                 StreamlitMemoryHelper(
                                     st.session_state[SESSION_KEY_AGENT]
@@ -1409,7 +1522,28 @@ def render_sidebar():
                             logger.info("✅ AGENT UPDATE COMPLETE: %s", success_msg)
 
                         st.session_state[SESSION_KEY_MESSAGES] = []
-                        st.success(success_msg)
+
+                        # Enhanced success message with provider info
+                        final_provider = os.getenv("PROVIDER", "ollama")
+                        provider_display = (
+                            final_provider.upper()
+                            if final_provider == "ollama"
+                            else (
+                                "LM Studio"
+                                if final_provider == "lm-studio"
+                                else final_provider.title()
+                            )
+                        )
+                        enhanced_msg = (
+                            f"✅ {success_msg} using {provider_display} provider"
+                        )
+                        if provider_changed:
+                            enhanced_msg += f" (auto-switched from {current_provider})"
+                            st.success(enhanced_msg)
+                            st.info("💡 **Tip**: After switching providers, click 'Fetch Available Models' to see models available in the new provider")
+                        else:
+                            st.success(enhanced_msg)
+                        
                         st.rerun()
                 else:
                     st.info("Model and URL are already current")
@@ -1490,6 +1624,7 @@ def render_sidebar():
             try:
                 # Get comprehensive model configuration
                 from personal_agent.config.model_contexts import get_model_config_dict
+
                 model_config = get_model_config_dict(current_model, current_ollama_url)
 
                 st.write("**Model Parameters:**")
@@ -1521,19 +1656,29 @@ def render_sidebar():
         # Show debug info about URL configuration
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
             with st.expander("🔍 URL Debug Info", expanded=False):
-                st.write(f"**--remote flag:** {st.session_state.get('args', {}).get('remote', 'N/A')}")
+                st.write(
+                    f"**--remote flag:** {st.session_state.get('args', {}).get('remote', 'N/A')}"
+                )
                 from personal_agent.config import OLLAMA_URL, REMOTE_OLLAMA_URL
+
                 st.write(f"**OLLAMA_URL (local):** {OLLAMA_URL}")
                 st.write(f"**REMOTE_OLLAMA_URL:** {REMOTE_OLLAMA_URL}")
-                from personal_agent.tools.streamlit_config import EFFECTIVE_OLLAMA_URL
-                st.write(f"**EFFECTIVE_OLLAMA_URL (startup):** {EFFECTIVE_OLLAMA_URL}")
+                
+                # Show current provider and calculate effective URL dynamically
+                provider = os.getenv("PROVIDER", "ollama")
+                st.write(f"**Current Provider:** {provider}")
+                
+                # Calculate the effective URL based on current provider and remote flag
+                from personal_agent.tools.streamlit_config import get_appropriate_base_url
+                use_remote = st.session_state.get('args', {}).get('remote', False)
+                effective_url = get_appropriate_base_url(provider, use_remote)
+                st.write(f"**EFFECTIVE_URL (current provider):** {effective_url}")
+                
                 st.write(
                     f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
                 )
 
                 # Show agent/team specific debug info
-                provider = os.getenv("PROVIDER", "ollama")
-                st.write(f"**Current Provider:** {provider}")
 
                 if current_mode == "team":
                     team = st.session_state.get(SESSION_KEY_TEAM)
@@ -1588,7 +1733,9 @@ def render_sidebar():
             debug_label += " (CLI enabled)"
         st.session_state[SESSION_KEY_SHOW_DEBUG] = st.checkbox(
             debug_label,
-            value=st.session_state.get(SESSION_KEY_SHOW_DEBUG, st.session_state.get("DEBUG_FLAG", False)),
+            value=st.session_state.get(
+                SESSION_KEY_SHOW_DEBUG, st.session_state.get("DEBUG_FLAG", False)
+            ),
             help="Debug mode can be enabled via --debug flag or this checkbox",
         )
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG):
@@ -1631,7 +1778,10 @@ def render_sidebar():
                     # Create base chart
                     chart = (
                         alt.Chart(chart_data.reset_index())
-                        .mark_line(point=True, color="#1f77b4" if not is_dark_theme else "#ff7f0e")
+                        .mark_line(
+                            point=True,
+                            color="#1f77b4" if not is_dark_theme else "#ff7f0e",
+                        )
                         .encode(
                             x=alt.X("timestamp:O", title="Time"),
                             y=alt.Y("response_time:Q", title="Response Time (s)"),
@@ -1643,39 +1793,40 @@ def render_sidebar():
                     # Apply theme-specific configuration
                     if is_dark_theme:
                         # Configure for dark theme
-                        chart = chart.configure_view(
-                            strokeWidth=0,
-                            fill='#0e1117'  # Dark background color matching Streamlit dark theme
-                        ).configure_axis(
-                            labelColor='white',
-                            titleColor='white',
-                            gridColor='#444444',
-                            domainColor='white'
-                        ).configure_title(
-                            color='white'
-                        ).configure_legend(
-                            labelColor='white',
-                            titleColor='white'
-                        ).configure(
-                            background='#0e1117'  # Set overall chart background
+                        chart = (
+                            chart.configure_view(
+                                strokeWidth=0,
+                                fill="#0e1117",  # Dark background color matching Streamlit dark theme
+                            )
+                            .configure_axis(
+                                labelColor="white",
+                                titleColor="white",
+                                gridColor="#444444",
+                                domainColor="white",
+                            )
+                            .configure_title(color="white")
+                            .configure_legend(labelColor="white", titleColor="white")
+                            .configure(
+                                background="#0e1117"  # Set overall chart background
+                            )
                         )
                     else:
                         # Configure for light theme (default)
-                        chart = chart.configure_view(
-                            strokeWidth=0,
-                            fill='white'  # Light background color
-                        ).configure_axis(
-                            labelColor='black',
-                            titleColor='black',
-                            gridColor='#e0e0e0',
-                            domainColor='black'
-                        ).configure_title(
-                            color='black'
-                        ).configure_legend(
-                            labelColor='black',
-                            titleColor='black'
-                        ).configure(
-                            background='white'  # Set overall chart background
+                        chart = (
+                            chart.configure_view(
+                                strokeWidth=0, fill="white"  # Light background color
+                            )
+                            .configure_axis(
+                                labelColor="black",
+                                titleColor="black",
+                                gridColor="#e0e0e0",
+                                domainColor="black",
+                            )
+                            .configure_title(color="black")
+                            .configure_legend(labelColor="black", titleColor="black")
+                            .configure(
+                                background="white"  # Set overall chart background
+                            )
                         )
 
                     st.altair_chart(chart, use_container_width=True)
@@ -1763,7 +1914,8 @@ def render_sidebar():
                 if st.session_state.get("rest_api_server"):
                     st.success("🌐 REST API server running on http://localhost:8001")
                     with st.expander("📡 REST API Endpoints", expanded=False):
-                        st.markdown("""
+                        st.markdown(
+                            """
             **Memory Endpoints:**
             - `POST /api/v1/memory/store` - Store text as memory
             - `POST /api/v1/memory/store-url` - Store content from URL as memory
@@ -1793,7 +1945,8 @@ def render_sidebar():
               -H "Content-Type: application/json" \\
               -d '{"url": "https://example.com/article", "title": "Important Article"}'
             ```
-                        """)
+                        """
+                        )
                 else:
                     st.warning("⚠️ REST API server failed to start")
 
@@ -1825,7 +1978,8 @@ def render_sidebar():
             if st.session_state.get("rest_api_server"):
                 st.success("🌐 REST API server running on http://localhost:8001")
                 with st.expander("📡 REST API Endpoints", expanded=False):
-                    st.markdown("""
+                    st.markdown(
+                        """
             **Memory Endpoints:**
             - `POST /api/v1/memory/store` - Store text as memory
             - `POST /api/v1/memory/store-url` - Store content from URL as memory
@@ -1855,7 +2009,8 @@ def render_sidebar():
               -H "Content-Type: application/json" \\
               -d '{"url": "https://example.com/article", "title": "Important Article"}'
             ```
-                    """)
+                    """
+                    )
             else:
                 st.warning("⚠️ REST API server failed to start")
 
