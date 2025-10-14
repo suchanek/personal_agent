@@ -1436,16 +1436,13 @@ def render_sidebar():
                                 selected_model,
                             )
                             # Reinitialize team with detected provider
+                            # Note: initialize_team() now uses get_config() for all settings
                             from personal_agent.tools.streamlit_agent_manager import (
                                 initialize_team,
                             )
 
                             st.session_state[SESSION_KEY_TEAM] = initialize_team(
-                                selected_model,
-                                new_ollama_url,
-                                st.session_state.get(SESSION_KEY_TEAM),
-                                recreate=False,
-                                provider=detected_provider,
+                                recreate=False
                             )
 
                             # Update helper classes with new team - use knowledge agent directly
@@ -1487,16 +1484,13 @@ def render_sidebar():
                                 selected_model,
                             )
                             # Reinitialize single agent with detected provider
+                            # Note: initialize_agent() now uses get_config() for all settings
                             from personal_agent.tools.streamlit_agent_manager import (
                                 initialize_agent,
                             )
 
                             st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-                                selected_model,
-                                new_ollama_url,
-                                st.session_state.get(SESSION_KEY_AGENT),
-                                recreate=False,
-                                provider=detected_provider,
+                                recreate=False
                             )
 
                             # Update helper classes with new agent

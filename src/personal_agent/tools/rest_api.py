@@ -803,9 +803,8 @@ class PersonalAgentRestAPI:
                                 try:
                                     from .streamlit_agent_manager import initialize_team
 
-                                    team = initialize_team(
-                                        current_model, current_ollama_url, recreate=True
-                                    )
+                                    # Note: initialize_team() now uses get_config() for all settings
+                                    team = initialize_team(recreate=True)
                                     if team:
                                         global_state.set("agent_mode", "team")
                                         global_state.set("team", team)
@@ -855,9 +854,8 @@ class PersonalAgentRestAPI:
                                         initialize_agent,
                                     )
 
-                                    agent = initialize_agent(
-                                        current_model, current_ollama_url, recreate=True
-                                    )
+                                    # Note: initialize_agent() now uses get_config() for all settings
+                                    agent = initialize_agent(recreate=True)
                                     if agent:
                                         global_state.set("agent_mode", "single")
                                         global_state.set("agent", agent)
@@ -1059,9 +1057,8 @@ class PersonalAgentRestAPI:
                         from .streamlit_agent_manager import initialize_team
 
                         # Initialize team
-                        team = initialize_team(
-                            current_model, current_ollama_url, recreate=True
-                        )
+                        # Note: initialize_team() now uses get_config() for all settings
+                        team = initialize_team(recreate=True)
 
                         if team:
                             # Update global state with team
@@ -1107,9 +1104,8 @@ class PersonalAgentRestAPI:
                         from .streamlit_agent_manager import initialize_agent
 
                         # Initialize agent
-                        agent = initialize_agent(
-                            current_model, current_ollama_url, recreate=True
-                        )
+                        # Note: initialize_agent() now uses get_config() for all settings
+                        agent = initialize_agent(recreate=True)
 
                         if agent:
                             # Update global state with agent
