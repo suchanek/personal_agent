@@ -137,7 +137,7 @@ class PersonalAgentRestAPI:
                 if global_state is None:
                     logger.error("global_state is None")
                     raise Exception("Global state not available")
-                    
+
                 global_status = global_state.get_status()
                 if global_status is None:
                     logger.error("global_status is None")
@@ -148,11 +148,17 @@ class PersonalAgentRestAPI:
                 agent_available = global_status.get("agent_available", False)
                 team_available = global_status.get("team_available", False)
                 memory_available = global_status.get("memory_helper_available", False)
-                knowledge_available = global_status.get("knowledge_helper_available", False)
+                knowledge_available = global_status.get(
+                    "knowledge_helper_available", False
+                )
 
                 # Get user and model directly from global state (using correct keys)
-                user = global_status.get("user", "unknown")  # get_status returns "user" key
-                model = global_status.get("llm_model", "unknown")  # get_status returns "llm_model" key
+                user = global_status.get(
+                    "user", "unknown"
+                )  # get_status returns "user" key
+                model = global_status.get(
+                    "model", "unknown"
+                )  # get_status returns "model" key (mapped from llm_model)
 
                 # System is healthy if all conditions are met, with exception that either team or agent must be available
                 is_healthy = (
@@ -206,7 +212,9 @@ class PersonalAgentRestAPI:
 
                 # Get user and model directly from global state
                 user = global_status.get("user", "unknown")
-                model = global_status.get("llm_model", "unknown")
+                model = global_status.get(
+                    "model", "unknown"
+                )  # get_status returns "model" key
 
                 status = {
                     "status": "Running",
@@ -718,11 +726,9 @@ class PersonalAgentRestAPI:
                 users = get_all_users()
 
                 logger.info(f"Users list retrieved via API: {len(users)} users")
-                return jsonify({
-                    "success": "True",
-                    "users": users,
-                    "total_count": len(users)
-                })
+                return jsonify(
+                    {"success": "True", "users": users, "total_count": len(users)}
+                )
 
             except Exception as e:
                 logger.error(f"Error listing users via API: {e}")
@@ -740,7 +746,9 @@ class PersonalAgentRestAPI:
                     return jsonify({"error": "user_id is required"}), 400
 
                 restart_containers = data.get("restart_containers", True)
-                restart_system = data.get("restart_system", True)  # New parameter to control system restart
+                restart_system = data.get(
+                    "restart_system", True
+                )  # New parameter to control system restart
 
                 # Import user utilities
                 from ..streamlit.utils.user_utils import switch_user
@@ -754,19 +762,35 @@ class PersonalAgentRestAPI:
                     # After successful user switch, perform system restart if requested
                     system_restart_result = None
                     if restart_system:
-                        logger.info(f"Performing system restart after user switch to {user_id}")
+                        logger.info(
+                            f"Performing system restart after user switch to {user_id}"
+                        )
                         try:
                             # Create restart marker file to trigger page refresh in Streamlit apps
                             import tempfile
-                            marker_file = os.path.join(tempfile.gettempdir(), "personal_agent_restart_marker")
+
+                            marker_file = os.path.join(
+                                tempfile.gettempdir(), "personal_agent_restart_marker"
+                            )
                             with open(marker_file, "w") as f:
                                 f.write(str(time.time()))
 
                             # Call the system restart logic directly
                             global_state = get_global_state()
-                            current_agent_mode = global_state.get("agent_mode", "single")
-                            current_model = global_state.get("llm_model", os.getenv("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"))
-                            current_ollama_url = global_state.get("ollama_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+                            current_agent_mode = global_state.get(
+                                "agent_mode", "single"
+                            )
+                            current_model = global_state.get(
+                                "llm_model",
+                                os.getenv(
+                                    "LLM_MODEL",
+                                    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+                                ),
+                            )
+                            current_ollama_url = global_state.get(
+                                "ollama_url",
+                                os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                            )
 
                             # Clear global state
                             global_state.clear()
@@ -778,54 +802,96 @@ class PersonalAgentRestAPI:
                             if current_agent_mode == "team":
                                 try:
                                     from .streamlit_agent_manager import initialize_team
-                                    team = initialize_team(current_model, current_ollama_url, recreate=True)
+
+                                    team = initialize_team(
+                                        current_model, current_ollama_url, recreate=True
+                                    )
                                     if team:
                                         global_state.set("agent_mode", "team")
                                         global_state.set("team", team)
                                         global_state.set("llm_model", current_model)
-                                        global_state.set("ollama_url", current_ollama_url)
+                                        global_state.set(
+                                            "ollama_url", current_ollama_url
+                                        )
 
-                                        from .streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                                        from .streamlit_helpers import (
+                                            StreamlitKnowledgeHelper,
+                                            StreamlitMemoryHelper,
+                                        )
+
                                         if hasattr(team, "members") and team.members:
                                             knowledge_agent = team.members[0]
-                                            memory_helper = StreamlitMemoryHelper(knowledge_agent)
-                                            knowledge_helper_obj = StreamlitKnowledgeHelper(knowledge_agent)
-                                            global_state.set("memory_helper", memory_helper)
-                                            global_state.set("knowledge_helper", knowledge_helper_obj)
+                                            memory_helper = StreamlitMemoryHelper(
+                                                knowledge_agent
+                                            )
+                                            knowledge_helper_obj = (
+                                                StreamlitKnowledgeHelper(
+                                                    knowledge_agent
+                                                )
+                                            )
+                                            global_state.set(
+                                                "memory_helper", memory_helper
+                                            )
+                                            global_state.set(
+                                                "knowledge_helper", knowledge_helper_obj
+                                            )
 
                                         restart_success = True
-                                        restart_message = "System restarted successfully in team mode"
+                                        restart_message = (
+                                            "System restarted successfully in team mode"
+                                        )
                                         logger.info(restart_message)
                                     else:
-                                        restart_message = "Failed to initialize team during restart"
+                                        restart_message = (
+                                            "Failed to initialize team during restart"
+                                        )
                                         logger.error(restart_message)
                                 except Exception as e:
                                     restart_message = f"Error restarting team: {str(e)}"
                                     logger.error(restart_message)
                             else:
                                 try:
-                                    from .streamlit_agent_manager import initialize_agent
-                                    agent = initialize_agent(current_model, current_ollama_url, recreate=True)
+                                    from .streamlit_agent_manager import (
+                                        initialize_agent,
+                                    )
+
+                                    agent = initialize_agent(
+                                        current_model, current_ollama_url, recreate=True
+                                    )
                                     if agent:
                                         global_state.set("agent_mode", "single")
                                         global_state.set("agent", agent)
                                         global_state.set("llm_model", current_model)
-                                        global_state.set("ollama_url", current_ollama_url)
+                                        global_state.set(
+                                            "ollama_url", current_ollama_url
+                                        )
 
-                                        from .streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                                        from .streamlit_helpers import (
+                                            StreamlitKnowledgeHelper,
+                                            StreamlitMemoryHelper,
+                                        )
+
                                         memory_helper = StreamlitMemoryHelper(agent)
-                                        knowledge_helper_obj = StreamlitKnowledgeHelper(agent)
+                                        knowledge_helper_obj = StreamlitKnowledgeHelper(
+                                            agent
+                                        )
                                         global_state.set("memory_helper", memory_helper)
-                                        global_state.set("knowledge_helper", knowledge_helper_obj)
+                                        global_state.set(
+                                            "knowledge_helper", knowledge_helper_obj
+                                        )
 
                                         restart_success = True
                                         restart_message = "System restarted successfully in single agent mode"
                                         logger.info(restart_message)
                                     else:
-                                        restart_message = "Failed to initialize agent during restart"
+                                        restart_message = (
+                                            "Failed to initialize agent during restart"
+                                        )
                                         logger.error(restart_message)
                                 except Exception as e:
-                                    restart_message = f"Error restarting agent: {str(e)}"
+                                    restart_message = (
+                                        f"Error restarting agent: {str(e)}"
+                                    )
                                     logger.error(restart_message)
 
                             system_restart_result = {
@@ -833,15 +899,17 @@ class PersonalAgentRestAPI:
                                 "restart_success": restart_success,
                                 "restart_message": restart_message,
                                 "agent_mode": current_agent_mode,
-                                "model": current_model
+                                "model": current_model,
                             }
 
                         except Exception as restart_error:
-                            logger.error(f"Error during system restart after user switch: {restart_error}")
+                            logger.error(
+                                f"Error during system restart after user switch: {restart_error}"
+                            )
                             system_restart_result = {
                                 "restart_performed": True,
                                 "restart_success": False,
-                                "restart_message": str(restart_error)
+                                "restart_message": str(restart_error),
                             }
 
                     response_data = {
@@ -849,7 +917,7 @@ class PersonalAgentRestAPI:
                         "message": result.get("message", "User switched successfully"),
                         "user_id": user_id,
                         "restart_containers": restart_containers,
-                        "restart_system": restart_system
+                        "restart_system": restart_system,
                     }
 
                     if system_restart_result:
@@ -857,8 +925,18 @@ class PersonalAgentRestAPI:
 
                     return jsonify(response_data)
                 else:
-                    logger.warning(f"Failed to switch user via API: {result.get('error', 'Unknown error')}")
-                    return jsonify({"success": "False", "error": result.get("error", "Failed to switch user")}), 400
+                    logger.warning(
+                        f"Failed to switch user via API: {result.get('error', 'Unknown error')}"
+                    )
+                    return (
+                        jsonify(
+                            {
+                                "success": "False",
+                                "error": result.get("error", "Failed to switch user"),
+                            }
+                        ),
+                        400,
+                    )
 
             except Exception as e:
                 logger.error(f"Error switching user via API: {e}")
@@ -869,38 +947,38 @@ class PersonalAgentRestAPI:
         def discovery():
             """Discovery endpoint to find API server information."""
             try:
-                return jsonify({
-                    "service": "personal-agent-api",
-                    "version": "1.0.0",
-                    "port": self.port,
-                    "host": self.host,
-                    "base_url": f"http://{self.host}:{self.port}",
-                    "endpoints": {
-                        "health": "/api/v1/health",
-                        "status": "/api/v1/status",
-                        "discovery": "/api/v1/discovery",
-                        "memory": {
-                            "store": "/api/v1/memory/store",
-                            "store_url": "/api/v1/memory/store-url",
-                            "search": "/api/v1/memory/search",
-                            "list": "/api/v1/memory/list",
-                            "stats": "/api/v1/memory/stats"
+                return jsonify(
+                    {
+                        "service": "personal-agent-api",
+                        "version": "1.0.0",
+                        "port": self.port,
+                        "host": self.host,
+                        "base_url": f"http://{self.host}:{self.port}",
+                        "endpoints": {
+                            "health": "/api/v1/health",
+                            "status": "/api/v1/status",
+                            "discovery": "/api/v1/discovery",
+                            "memory": {
+                                "store": "/api/v1/memory/store",
+                                "store_url": "/api/v1/memory/store-url",
+                                "search": "/api/v1/memory/search",
+                                "list": "/api/v1/memory/list",
+                                "stats": "/api/v1/memory/stats",
+                            },
+                            "knowledge": {
+                                "store_text": "/api/v1/knowledge/store-text",
+                                "store_url": "/api/v1/knowledge/store-url",
+                                "search": "/api/v1/knowledge/search",
+                                "status": "/api/v1/knowledge/status",
+                            },
+                            "users": {
+                                "list": "/api/v1/users",
+                                "switch": "/api/v1/users/switch",
+                            },
+                            "system": {"restart": "/api/v1/system/restart"},
                         },
-                        "knowledge": {
-                            "store_text": "/api/v1/knowledge/store-text",
-                            "store_url": "/api/v1/knowledge/store-url",
-                            "search": "/api/v1/knowledge/search",
-                            "status": "/api/v1/knowledge/status"
-                        },
-                        "users": {
-                            "list": "/api/v1/users",
-                            "switch": "/api/v1/users/switch"
-                        },
-                        "system": {
-                            "restart": "/api/v1/system/restart"
-                        }
                     }
-                })
+                )
             except Exception as e:
                 logger.error(f"Error in discovery endpoint: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -917,7 +995,10 @@ class PersonalAgentRestAPI:
 
                 # Create restart marker file to trigger page refresh in Streamlit apps
                 import tempfile
-                marker_file = os.path.join(tempfile.gettempdir(), "personal_agent_restart_marker")
+
+                marker_file = os.path.join(
+                    tempfile.gettempdir(), "personal_agent_restart_marker"
+                )
                 with open(marker_file, "w") as f:
                     f.write(str(time.time()))
 
@@ -926,31 +1007,41 @@ class PersonalAgentRestAPI:
                 current_agent_mode = global_state.get("agent_mode", "single")
 
                 # Get model and URL from global state or environment
-                current_model = global_state.get("llm_model", os.getenv("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"))
-                current_ollama_url = global_state.get("ollama_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+                current_model = global_state.get(
+                    "llm_model",
+                    os.getenv(
+                        "LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+                    ),
+                )
+                current_ollama_url = global_state.get(
+                    "ollama_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+                )
 
                 # Restart LightRAG services if requested
                 lightrag_result = None
                 if restart_lightrag:
                     try:
                         logger.info("Restarting LightRAG services...")
-                        from ..core.lightrag_manager import LightRAGManager
                         from ..config.user_id_mgr import get_userid
-                        
+                        from ..core.lightrag_manager import LightRAGManager
+
                         lightrag_manager = LightRAGManager()
                         current_user = get_userid()
-                        lightrag_result = lightrag_manager.restart_lightrag_services(current_user)
-                        
+                        lightrag_result = lightrag_manager.restart_lightrag_services(
+                            current_user
+                        )
+
                         if lightrag_result.get("success"):
-                            logger.info(f"LightRAG services restarted successfully: {lightrag_result.get('services_restarted', [])}")
+                            logger.info(
+                                f"LightRAG services restarted successfully: {lightrag_result.get('services_restarted', [])}"
+                            )
                         else:
-                            logger.warning(f"LightRAG restart had issues: {lightrag_result.get('errors', [])}")
+                            logger.warning(
+                                f"LightRAG restart had issues: {lightrag_result.get('errors', [])}"
+                            )
                     except Exception as e:
                         logger.error(f"Error restarting LightRAG services: {e}")
-                        lightrag_result = {
-                            "success": False,
-                            "errors": [str(e)]
-                        }
+                        lightrag_result = {"success": False, "errors": [str(e)]}
 
                 # Clear global state
                 logger.info("Clearing global state for restart")
@@ -968,7 +1059,9 @@ class PersonalAgentRestAPI:
                         from .streamlit_agent_manager import initialize_team
 
                         # Initialize team
-                        team = initialize_team(current_model, current_ollama_url, recreate=True)
+                        team = initialize_team(
+                            current_model, current_ollama_url, recreate=True
+                        )
 
                         if team:
                             # Update global state with team
@@ -978,12 +1071,19 @@ class PersonalAgentRestAPI:
                             global_state.set("ollama_url", current_ollama_url)
 
                             # Create memory and knowledge helpers
-                            from .streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                            from .streamlit_helpers import (
+                                StreamlitKnowledgeHelper,
+                                StreamlitMemoryHelper,
+                            )
 
                             if hasattr(team, "members") and team.members:
-                                knowledge_agent = team.members[0]  # First member is knowledge agent
+                                knowledge_agent = team.members[
+                                    0
+                                ]  # First member is knowledge agent
                                 memory_helper = StreamlitMemoryHelper(knowledge_agent)
-                                knowledge_helper = StreamlitKnowledgeHelper(knowledge_agent)
+                                knowledge_helper = StreamlitKnowledgeHelper(
+                                    knowledge_agent
+                                )
 
                                 global_state.set("memory_helper", memory_helper)
                                 global_state.set("knowledge_helper", knowledge_helper)
@@ -1007,7 +1107,9 @@ class PersonalAgentRestAPI:
                         from .streamlit_agent_manager import initialize_agent
 
                         # Initialize agent
-                        agent = initialize_agent(current_model, current_ollama_url, recreate=True)
+                        agent = initialize_agent(
+                            current_model, current_ollama_url, recreate=True
+                        )
 
                         if agent:
                             # Update global state with agent
@@ -1017,7 +1119,10 @@ class PersonalAgentRestAPI:
                             global_state.set("ollama_url", current_ollama_url)
 
                             # Create memory and knowledge helpers
-                            from .streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                            from .streamlit_helpers import (
+                                StreamlitKnowledgeHelper,
+                                StreamlitMemoryHelper,
+                            )
 
                             memory_helper = StreamlitMemoryHelper(agent)
                             knowledge_helper = StreamlitKnowledgeHelper(agent)
@@ -1026,7 +1131,9 @@ class PersonalAgentRestAPI:
                             global_state.set("knowledge_helper", knowledge_helper)
 
                             success = True
-                            message = "System restarted successfully in single agent mode"
+                            message = (
+                                "System restarted successfully in single agent mode"
+                            )
                             logger.info(message)
                         else:
                             message = "Failed to initialize agent during restart"
@@ -1042,44 +1149,53 @@ class PersonalAgentRestAPI:
                         "message": message,
                         "agent_mode": current_agent_mode,
                         "model": current_model,
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
-                    
+
                     # Include LightRAG restart results if performed
                     if lightrag_result:
                         response_data["lightrag_restart"] = {
                             "performed": True,
                             "success": lightrag_result.get("success", False),
-                            "services_restarted": lightrag_result.get("services_restarted", []),
-                            "errors": lightrag_result.get("errors", [])
+                            "services_restarted": lightrag_result.get(
+                                "services_restarted", []
+                            ),
+                            "errors": lightrag_result.get("errors", []),
                         }
-                    
+
                     return jsonify(response_data)
                 else:
                     response_data = {
                         "success": "False",
                         "error": message,
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
-                    
+
                     # Include LightRAG restart results even on failure
                     if lightrag_result:
                         response_data["lightrag_restart"] = {
                             "performed": True,
                             "success": lightrag_result.get("success", False),
-                            "services_restarted": lightrag_result.get("services_restarted", []),
-                            "errors": lightrag_result.get("errors", [])
+                            "services_restarted": lightrag_result.get(
+                                "services_restarted", []
+                            ),
+                            "errors": lightrag_result.get("errors", []),
                         }
-                    
+
                     return jsonify(response_data), 500
 
             except Exception as e:
                 logger.error(f"Error during system restart via API: {e}")
-                return jsonify({
-                    "success": "False",
-                    "error": str(e),
-                    "timestamp": datetime.now().isoformat()
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "success": "False",
+                            "error": str(e),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    ),
+                    500,
+                )
 
     def _get_memory_helper(self):
         """Get memory helper from global state."""
@@ -1216,11 +1332,15 @@ def start_rest_api(streamlit_session, port: int = 8002, host: str = "0.0.0.0"):
         actual_port = port
         logger.info(f"Starting REST API server on {host}:{actual_port}")
     else:
-        logger.warning(f"Port {port} is already in use on {host}, searching for available port...")
+        logger.warning(
+            f"Port {port} is already in use on {host}, searching for available port..."
+        )
         available_port = find_available_port(port + 1, host)
         if available_port:
             actual_port = available_port
-            logger.info(f"Found available port {actual_port}, starting REST API server on {host}:{actual_port}")
+            logger.info(
+                f"Found available port {actual_port}, starting REST API server on {host}:{actual_port}"
+            )
         else:
             logger.error(f"Could not find an available port starting from {port}")
             raise RuntimeError(f"No available ports found starting from {port}")
@@ -1233,6 +1353,7 @@ def start_rest_api(streamlit_session, port: int = 8002, host: str = "0.0.0.0"):
     # Store the actual port in global state for discovery
     try:
         from .global_state import get_global_state
+
         global_state = get_global_state()
         global_state.set("rest_api_port", actual_port)
         global_state.set("rest_api_host", host)
