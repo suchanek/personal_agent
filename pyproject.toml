@@ -119,7 +119,8 @@ streamlit run src/personal_agent/tools/paga_streamlit_agno.py \
   ${remote:+--remote} \
   ${debug:+--debug} \
   ${recreate:+--recreate} \
-  ${single:+--single}
+  ${single:+--single} \
+  ${provider:+--provider $provider}
 """
 args = [
   { name = "port", options = ["--port"], help = "Port to serve on (default: 8501)" },
@@ -127,7 +128,8 @@ args = [
   { name = "remote", options = ["--remote"], type = "boolean", help = "Use remote Ollama URL instead of local" },
   { name = "debug", options = ["--debug"], type = "boolean", help = "Enable debug mode" },
   { name = "recreate", options = ["--recreate"], type = "boolean", help = "Recreate the knowledge base and clear all memories" },
-  { name = "single", options = ["--single"], type = "boolean", help = "Launch in single-agent mode (default is team mode)" }
+  { name = "single", options = ["--single"], type = "boolean", help = "Launch in single-agent mode (default is team mode)" },
+  { name = "provider", options = ["--provider"], help = "Set the LLM provider (ollama, lm-studio, or openai)" }
 ]
 
 [tool.poe.tasks.serve-persag-team]

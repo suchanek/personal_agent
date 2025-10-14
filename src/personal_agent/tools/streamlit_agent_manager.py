@@ -13,11 +13,7 @@ import asyncio
 import logging
 import os
 
-from personal_agent.config import (
-    AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    USER_DATA_DIR,
-)
+from personal_agent.config import AGNO_KNOWLEDGE_DIR, AGNO_STORAGE_DIR, USER_DATA_DIR
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 from personal_agent.team.reasoning_team import create_team as create_personal_agent_team
 
@@ -25,14 +21,27 @@ logger = logging.getLogger(__name__)
 
 
 async def initialize_agent_async(
-    model_name, ollama_url, existing_agent=None, recreate=False
+    model_name, ollama_url, existing_agent=None, recreate=False, provider=None
 ):
     """Initialize AgnoPersonalAgent with proper async handling."""
-    # Read provider from environment variable, default to ollama if not set
-    provider = os.getenv("PROVIDER", "ollama")
+    # Use provided provider or detect from model name, fallback to environment variable
+    if provider is None:
+        from personal_agent.tools.streamlit_config import (
+            detect_provider_from_model_name,
+        )
+
+        provider = detect_provider_from_model_name(model_name)
+
+        # Update environment variable if provider was auto-detected
+        if provider != os.getenv("PROVIDER", "ollama"):
+            logger.info(
+                "Auto-detected provider '%s' for model '%s'", provider, model_name
+            )
+            os.environ["PROVIDER"] = provider
 
     # Determine use_remote flag based on the URL passed in
     from personal_agent.tools.streamlit_config import args
+
     use_remote = args.remote  # Use the --remote flag directly
 
     # Always create a new agent when URL or model changes to ensure proper configuration
@@ -71,17 +80,32 @@ async def initialize_agent_async(
         )
 
 
-def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False):
+def initialize_agent(
+    model_name, ollama_url, existing_agent=None, recreate=False, provider=None
+):
     """Sync wrapper for agent initialization."""
-    # Update the environment variable to ensure all components use the new model
+    # Detect provider if not provided
+    if provider is None:
+        from personal_agent.tools.streamlit_config import (
+            detect_provider_from_model_name,
+        )
+
+        provider = detect_provider_from_model_name(model_name)
+
+    # Update the environment variables to ensure all components use the new model and provider
     old_model = os.environ.get("LLM_MODEL")
+    old_provider = os.environ.get("PROVIDER", "ollama")
     os.environ["LLM_MODEL"] = model_name
-    logger.info(f"🔄 Updated LLM_MODEL environment variable from '{old_model}' to '{model_name}'")
+    os.environ["PROVIDER"] = provider
+    logger.info("🔄 Updated LLM_MODEL from '%s' to '%s'", old_model, model_name)
+    logger.info("🔄 Updated PROVIDER from '%s' to '%s'", old_provider, provider)
 
     # Force refresh of config module to pick up new environment variable
     try:
         import importlib
+
         from personal_agent import config
+
         importlib.reload(config.settings)
         logger.info("🔄 Refreshed config.settings module to pick up new LLM_MODEL")
     except Exception as e:
@@ -90,7 +114,9 @@ def initialize_agent(model_name, ollama_url, existing_agent=None, recreate=False
     # Note: ollama_url parameter is kept for compatibility but not used
     # The use_remote flag from args is used instead
     return asyncio.run(
-        initialize_agent_async(model_name, ollama_url, existing_agent, recreate)
+        initialize_agent_async(
+            model_name, ollama_url, existing_agent, recreate, provider
+        )
     )
 
 
@@ -121,50 +147,104 @@ def _run_async_team_init(coro):
         return asyncio.run(coro)
 
 
-def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
+def initialize_team(
+    model_name, ollama_url, existing_team=None, recreate=False, provider=None
+):
     """Initialize the team using the reasoning_team create_team function."""
     try:
-        # Update the environment variable to ensure all components use the new model
+        # Detect provider if not provided
+        if provider is None:
+            from personal_agent.tools.streamlit_config import (
+                detect_provider_from_model_name,
+            )
+
+            provider = detect_provider_from_model_name(model_name)
+
+        # Update the environment variables to ensure all components use the new model and provider
         old_model = os.environ.get("LLM_MODEL")
+        old_provider = os.environ.get("PROVIDER", "ollama")
         os.environ["LLM_MODEL"] = model_name
-        logger.info(f"🔄 Updated LLM_MODEL environment variable from '{old_model}' to '{model_name}'")
+        os.environ["PROVIDER"] = provider
+        logger.info("🔄 Updated LLM_MODEL from '%s' to '%s'", old_model, model_name)
+        logger.info("🔄 Updated PROVIDER from '%s' to '%s'", old_provider, provider)
 
         # Force refresh of config module to pick up new environment variable
         try:
             import importlib
+
             from personal_agent import config
+
             importlib.reload(config.settings)
             logger.info("🔄 Refreshed config.settings module to pick up new LLM_MODEL")
         except Exception as e:
             logger.warning(f"⚠️ Could not refresh config module: {e}")
 
-        logger.info(f"Initializing team with model {model_name} at {ollama_url}")
+        logger.info("Initializing team with model %s at %s", model_name, ollama_url)
 
-        # SIMPLIFIED: Just pass the --remote flag directly!
+        # IMPORTANT: Use the provided ollama_url instead of just the --remote flag
+        # This allows dynamic provider switching in the UI
         from personal_agent.tools.streamlit_config import args
-        use_remote = args.remote
 
-        # Create team using the factory function from reasoning_team with model_name parameter
-        team = _run_async_team_init(
-            create_personal_agent_team(use_remote=use_remote, model_name=model_name)
-        )
+        # If a specific URL is provided (from UI), use it to determine remote vs local
+        # Otherwise fall back to the --remote flag
+        if ollama_url and ollama_url != "":
+            # Determine if this is a remote URL by checking if it's not localhost
+            use_remote = "localhost" not in ollama_url and "127.0.0.1" not in ollama_url
+        else:
+            use_remote = args.remote
+
+        # Create team using the factory function from reasoning_team with model_name, URL, and provider
+        # CRITICAL: Pass the provider parameter to create_team so all agents use the correct provider
+        # Pass the specific ollama_url from session state for dynamic provider switching
+        if ollama_url and ollama_url != "":
+            logger.info("Using specific URL from session state: %s", ollama_url)
+            # For now, we'll have to work around the create_team API limitation
+            # by temporarily setting environment variables
+            original_url = None
+            if provider == "lm-studio":
+                original_url = os.environ.get("LMSTUDIO_BASE_URL")
+                os.environ["LMSTUDIO_BASE_URL"] = ollama_url.rstrip("/v1")
+            elif provider == "ollama":
+                original_url = os.environ.get("OLLAMA_URL")
+                os.environ["OLLAMA_URL"] = ollama_url
+
+            try:
+                team = _run_async_team_init(
+                    create_personal_agent_team(
+                        use_remote=use_remote, model_name=model_name, model_provider=provider
+                    )
+                )
+            finally:
+                # Restore original environment variable
+                if original_url is not None:
+                    if provider == "lm-studio":
+                        os.environ["LMSTUDIO_BASE_URL"] = original_url
+                    elif provider == "ollama":
+                        os.environ["OLLAMA_URL"] = original_url
+        else:
+            team = _run_async_team_init(
+                create_personal_agent_team(use_remote=use_remote, model_name=model_name, model_provider=provider)
+            )
 
         # Validate team creation
         if not team:
             logger.error("Team creation returned None")
             import streamlit as st
+
             st.error("❌ Team creation failed - returned None")
             return None
 
         if not hasattr(team, "members"):
             logger.error("Team has no members attribute")
             import streamlit as st
+
             st.error("❌ Team creation failed - no members attribute")
             return None
 
         if not team.members:
             logger.error("Team has empty members list")
             import streamlit as st
+
             st.error("❌ Team creation failed - empty members list")
             return None
 
@@ -202,6 +282,7 @@ def initialize_team(model_name, ollama_url, existing_team=None, recreate=False):
 
         logger.error(f"Traceback: {traceback.format_exc()}")
         import streamlit as st
+
         st.error(f"❌ Failed to initialize team: {str(e)}")
         return None
 
@@ -212,6 +293,7 @@ def create_team_wrapper(team):
     class TeamWrapper:
         def __init__(self, team):
             from personal_agent.config import get_current_user_id
+
             self.team = team
             self.user_id = get_current_user_id()
             # Force initialization of the knowledge agent first

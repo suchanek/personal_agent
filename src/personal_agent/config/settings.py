@@ -160,8 +160,8 @@ logger.setLevel(LOG_LEVEL)
 # Provider-specific default models
 PROVIDER_DEFAULT_MODELS = {
     "ollama": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K",
-    "lm-studio": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
-    "openai": "gpt-4o-mini",
+    "lm-studio": "qwen3-4b-instruct-2507-mlx",
+    "openai": "gpt-4.1-mini",
 }
 
 # LLM Model configuration

@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.8.73] - 2025-10-13
+
+### Changed
+- **Centralized Configuration Management**: Majorly refactored the configuration system, replacing scattered environment variables with a centralized, thread-safe `PersonalAgentConfig` singleton. This eliminates race conditions, provides a single source of truth, and enables reliable, dynamic switching of model providers at runtime. See [ADR-096](./refs/adr/096-centralized-configuration-management.md) for details.
+
 ## [v0.8.72] - 2025-10-12
 
 ### Changed

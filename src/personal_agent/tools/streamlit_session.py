@@ -11,6 +11,7 @@ application file clean and maintainable.
 
 import os
 import streamlit as st
+from personal_agent.config.runtime_config import get_config
 
 # Constants for session state keys
 SESSION_KEY_MESSAGES = "messages"
@@ -33,44 +34,23 @@ SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION = "show_power_off_confirmation"
 
 
 def initialize_session_state(args, EFFECTIVE_OLLAMA_URL, RECREATE_FLAG, DEBUG_FLAG, SINGLE_FLAG, USER_ID):
-    """Initialize all session state variables."""
+    """Initialize all session state variables using PersonalAgentConfig."""
+    # Get the global configuration
+    config = get_config()
+
     # Import here to avoid circular imports
-    from personal_agent.config import (
-        LLM_MODEL,
-        REMOTE_LMSTUDIO_URL,
-    )
     from personal_agent.tools.streamlit_helpers import (
         StreamlitKnowledgeHelper,
         StreamlitMemoryHelper,
     )
-    # These will be imported later when the modules are created
-    # from personal_agent.tools.streamlit_agent_manager import (
-    #     initialize_agent,
-    #     initialize_team,
-    # )
 
     if SESSION_KEY_CURRENT_OLLAMA_URL not in st.session_state:
-        # SIMPLIFIED: Just use the appropriate URL based on provider and --remote flag
-        provider = os.getenv("PROVIDER", "ollama")
-        if provider == "lm-studio":
-            if args.remote:
-                url = REMOTE_LMSTUDIO_URL
-                # Remove /v1 suffix if present since we add it in the model manager
-                if url.endswith("/v1"):
-                    url = url[:-3]
-            else:
-                url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
-            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = url
-        else:
-            # For Ollama and other providers, use EFFECTIVE_OLLAMA_URL which already respects --remote
-            st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = EFFECTIVE_OLLAMA_URL
+        # Use config to get the effective base URL
+        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = config.get_effective_base_url()
 
     if SESSION_KEY_CURRENT_MODEL not in st.session_state:
-        # Use provider-specific default model instead of hardcoded fallback
-        provider = os.getenv("PROVIDER", "ollama")
-        from personal_agent.config import get_provider_default_model
-        default_model = get_provider_default_model(provider)
-        st.session_state[SESSION_KEY_CURRENT_MODEL] = default_model
+        # Use the model from config
+        st.session_state[SESSION_KEY_CURRENT_MODEL] = config.model
 
     if SESSION_KEY_DARK_THEME not in st.session_state:
         st.session_state[SESSION_KEY_DARK_THEME] = False

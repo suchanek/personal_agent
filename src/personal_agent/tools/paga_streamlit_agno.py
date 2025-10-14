@@ -70,13 +70,14 @@ Usage
 -----
 Run the application with:
     ```bash
-    streamlit run tools/paga_streamlit_agno.py [--remote] [--recreate] [--single]
+    streamlit run tools/paga_streamlit_agno.py [--remote] [--recreate] [--single] [--provider PROVIDER]
     ```
 
 Command Line Arguments:
     --remote: Use remote Ollama URL instead of local.
     --recreate: Recreate the knowledge base and clear all memories.
     --single: Launch in single-agent mode (default is team mode).
+    --provider: Set the LLM provider (ollama, lm-studio, or openai). Overrides PROVIDER environment variable.
 
 Environment Variables:
     - AGNO_STORAGE_DIR: Directory for agent storage.
@@ -120,10 +121,12 @@ from personal_agent import __version__
 from personal_agent.config import (
     get_current_user_id,
 )
+from personal_agent.config.runtime_config import get_config
 from personal_agent.tools.global_state import update_global_state_from_streamlit
 from personal_agent.tools.rest_api import start_rest_api
 from personal_agent.tools.streamlit_config import (
     args,
+    config as streamlit_config,
     DEBUG_FLAG,
     EFFECTIVE_OLLAMA_URL,
     RECREATE_FLAG,
@@ -418,6 +421,15 @@ def main():
     """Main function to run the Streamlit app."""
     # Check for restart marker and refresh if needed
     check_restart_marker_and_refresh()
+
+    # Get and log current configuration
+    config = get_config()
+    logger.info(f"🔧 Starting with configuration: {config}")
+    logger.info(f"   Provider: {config.provider}")
+    logger.info(f"   Model: {config.model}")
+    logger.info(f"   User: {config.user_id}")
+    logger.info(f"   Mode: {config.agent_mode}")
+    logger.info(f"   Base URL: {config.get_effective_base_url()}")
 
     initialize_session_state(args, EFFECTIVE_OLLAMA_URL, RECREATE_FLAG, DEBUG_FLAG, SINGLE_FLAG, USER_ID)
     apply_custom_theme()
