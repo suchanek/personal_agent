@@ -71,6 +71,8 @@ def _run_async_team_init(coro):
 
 def initialize_team(recreate: bool = False):
     """Initialize the team using the central configuration."""
+    import streamlit as st
+
     try:
         from personal_agent.tools.streamlit_config import args
 
@@ -79,7 +81,9 @@ def initialize_team(recreate: bool = False):
         # The create_personal_agent_team function now reads directly from the
         # get_config() singleton, so we no longer need to pass model, provider, etc.
         team = _run_async_team_init(
-            create_personal_agent_team(use_remote=args.remote, single=args.single)
+            create_personal_agent_team(
+                use_remote=args.remote, single=args.single, recreate=recreate
+            )
         )
 
         if not team or not hasattr(team, "members") or not team.members:
@@ -87,7 +91,7 @@ def initialize_team(recreate: bool = False):
             st.error("❌ Team creation failed.")
             return None
 
-        logger.info(f"Team created successfully with {len(team.members)} members")
+        logger.info("Team created successfully with %d members", len(team.members))
 
         # The knowledge agent (first member) should have the memory system.
         knowledge_agent = team.members[0]
@@ -95,16 +99,20 @@ def initialize_team(recreate: bool = False):
             team.agno_memory = knowledge_agent.agno_memory
             logger.info("Exposed knowledge agent's memory to team object.")
         else:
-            logger.error("Knowledge agent lacks 'agno_memory', memory features will fail.")
+            logger.error(
+                "Knowledge agent lacks 'agno_memory', memory features will fail."
+            )
 
         logger.info("Team initialization completed successfully")
         return team
 
     except Exception as e:
-        logger.error(f"Exception during team initialization: {str(e)}")
+        logger.error("Exception during team initialization: %s", str(e))
         import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        logger.error("Traceback: %s", traceback.format_exc())
         import streamlit as st
+
         st.error(f"❌ Failed to initialize team: {str(e)}")
         return None
 
@@ -128,27 +136,27 @@ def create_team_wrapper(team):
             self.memory_manager = self._create_memory_manager_wrapper()
 
             # Add debugging info
-            logger.info(f"TeamWrapper initialized:")
-            logger.info(f"  - Team available: {self.team is not None}")
-            logger.info(f"  - Team members: {len(getattr(self.team, 'members', []))}")
-            logger.info(f"  - Memory available: {self.agno_memory is not None}")
-            logger.info(f"  - Memory tools available: {self.memory_tools is not None}")
+            logger.info("TeamWrapper initialized:")
+            logger.info("  - Team available: %s", self.team is not None)
+            logger.info("  - Team members: %d", len(getattr(self.team, "members", [])))
+            logger.info("  - Memory available: %s", self.agno_memory is not None)
+            logger.info("  - Memory tools available: %s", self.memory_tools is not None)
             logger.info(
-                f"  - Memory manager wrapper: {self.memory_manager is not None}"
+                "  - Memory manager wrapper: %s", self.memory_manager is not None
             )
 
         def _force_knowledge_agent_init(self):
             """Force initialization of the knowledge agent (first team member)."""
             if hasattr(self.team, "members") and self.team.members:
                 knowledge_agent = self.team.members[0]
-                logger.info(f"Knowledge agent type: {type(knowledge_agent).__name__}")
+                logger.info("Knowledge agent type: %s", type(knowledge_agent).__name__)
                 # Force initialization if not already done
                 if hasattr(knowledge_agent, "_ensure_initialized"):
                     try:
                         self._run_async_safely(knowledge_agent._ensure_initialized())
                         logger.info("Knowledge agent initialized successfully")
                     except Exception as e:
-                        logger.error(f"Failed to initialize knowledge agent: {e}")
+                        logger.error("Failed to initialize knowledge agent: %s", e)
                 else:
                     logger.warning("Knowledge agent has no _ensure_initialized method")
             else:
@@ -160,7 +168,8 @@ def create_team_wrapper(team):
                 # The first member should be the knowledge agent (PersonalAgnoAgent)
                 knowledge_agent = self.team.members[0]
                 logger.info(
-                    f"Getting memory from knowledge agent: {type(knowledge_agent).__name__}"
+                    "Getting memory from knowledge agent: %s",
+                    type(knowledge_agent).__name__,
                 )
 
                 if hasattr(knowledge_agent, "agno_memory"):
@@ -186,7 +195,8 @@ def create_team_wrapper(team):
                 # The first member should be the knowledge agent (PersonalAgnoAgent)
                 knowledge_agent = self.team.members[0]
                 logger.info(
-                    f"Getting memory tools from knowledge agent: {type(knowledge_agent).__name__}"
+                    "Getting memory tools from knowledge agent: %s",
+                    type(knowledge_agent).__name__,
                 )
 
                 if hasattr(knowledge_agent, "memory_tools"):

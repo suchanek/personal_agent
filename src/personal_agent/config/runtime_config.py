@@ -38,6 +38,7 @@ import logging
 import os
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,19 @@ class ConfigSnapshot:
     user_storage_dir: str
     user_knowledge_dir: str
     user_data_dir: str
+    agno_storage_dir: str
+    agno_knowledge_dir: str
+    lightrag_storage_dir: str
+    lightrag_inputs_dir: str
+    lightrag_memory_storage_dir: str
+    lightrag_memory_inputs_dir: str
+    persag_root: str
+    storage_backend: str
+    persag_home: str
+    lightrag_port: str
+    lightrag_memory_port: str
+    root_dir: str
+    repo_dir: str
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -133,9 +147,7 @@ class PersonalAgentConfig:
             self._remote_ollama_url = os.getenv(
                 "REMOTE_OLLAMA_URL", "http://100.100.248.61:11434"
             )
-            self._lmstudio_url = os.getenv(
-                "LMSTUDIO_BASE_URL", "http://localhost:1234"
-            )
+            self._lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
             self._remote_lmstudio_url = os.getenv(
                 "REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234"
             )
@@ -174,12 +186,24 @@ class PersonalAgentConfig:
                 "PERSAG_ROOT", "/Users/Shared/personal_agent_data"
             )
             self._storage_backend = os.getenv("STORAGE_BACKEND", "agno")
+            self._persag_home = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
+
+            # LightRAG server port configurations
+            self._lightrag_port = os.getenv("LIGHTRAG_PORT", "9621")
+            self._lightrag_memory_port = os.getenv("LIGHTRAG_MEMORY_PORT", "9622")
+
+            # Directory configurations
+            self._root_dir = os.getenv("ROOT_DIR", "/")
+            self._repo_dir = os.getenv("REPO_DIR", "./repos")
 
             # Extra configuration storage
             self._extra: Dict[str, Any] = {}
 
         logger.info(
-            f"PersonalAgentConfig initialized: user={self._user_id}, provider={self._provider}, model={self._model}"
+            "PersonalAgentConfig initialized: user=%s, provider=%s, model=%s",
+            self._user_id,
+            self._provider,
+            self._model,
         )
 
     @classmethod
@@ -224,8 +248,8 @@ class PersonalAgentConfig:
         for callback in self._callbacks:
             try:
                 callback(key, old_value, new_value)
-            except Exception as e:
-                logger.error(f"Error in config callback: {e}")
+            except Exception:
+                logger.exception("Error in config callback")
 
     def register_callback(self, callback: Callable[[str, Any, Any], None]):
         """Register a callback to be notified of configuration changes.
@@ -268,32 +292,28 @@ class PersonalAgentConfig:
             old_value = self._user_id
             self._user_id = user_id
             os.environ["USER_ID"] = user_id
-            logger.info(f"User ID changed: {old_value} -> {user_id}")
+            logger.info("User ID changed: %s -> %s", old_value, user_id)
 
             # Persist to ~/.persag/env.userid if requested
             if persist:
                 try:
-                    from personal_agent.core.persag_manager import (
-                        get_persag_manager,
-                    )
+                    from personal_agent.core.persag_manager import get_persag_manager
 
                     persag_manager = get_persag_manager()
                     success = persag_manager.set_userid(user_id)
                     if success:
-                        logger.info(f"Persisted user ID to ~/.persag/env.userid")
+                        logger.info("Persisted user ID to ~/.persag/env.userid")
                     else:
                         logger.warning(
                             "Could not persist user ID to ~/.persag/env.userid"
                         )
-                except Exception as e:
-                    logger.warning(f"Error persisting user ID: {e}")
+                except Exception:
+                    logger.exception("Error persisting user ID")
 
                 # CRITICAL: Refresh user-dependent settings AND update environment variables
                 # This ensures Docker configurations receive the correct paths.
                 try:
-                    from personal_agent.config import (
-                        refresh_user_dependent_settings,
-                    )
+                    from personal_agent.config import refresh_user_dependent_settings
 
                     updated_settings = refresh_user_dependent_settings()
                     for key, value in updated_settings.items():
@@ -301,9 +321,9 @@ class PersonalAgentConfig:
                     logger.info(
                         "Refreshed and propagated user-dependent environment variables for Docker."
                     )
-                except Exception as e:
-                    logger.warning(
-                        f"Error refreshing user-dependent environment variables: {e}"
+                except Exception:
+                    logger.exception(
+                        "Error refreshing user-dependent environment variables"
                     )
 
             self._notify_callbacks("user_id", old_value, user_id)
@@ -331,7 +351,7 @@ class PersonalAgentConfig:
             old_value = self._provider
             self._provider = provider
             os.environ["PROVIDER"] = provider
-            logger.info(f"Provider changed: {old_value} -> {provider}")
+            logger.info("Provider changed: %s -> %s", old_value, provider)
             self._notify_callbacks("provider", old_value, provider)
 
             # Auto-set model to provider default if requested
@@ -354,7 +374,7 @@ class PersonalAgentConfig:
             old_value = self._model
             self._model = model
             os.environ["LLM_MODEL"] = model
-            logger.info(f"Model changed: {old_value} -> {model}")
+            logger.info("Model changed: %s -> %s", old_value, model)
             self._notify_callbacks("model", old_value, model)
 
     # ========== Service URLs ==========
@@ -419,11 +439,7 @@ class PersonalAgentConfig:
             elif self._provider == "openai":
                 return self._openai_url
             else:  # ollama
-                return (
-                    self._remote_ollama_url
-                    if self._use_remote
-                    else self._ollama_url
-                )
+                return self._remote_ollama_url if self._use_remote else self._ollama_url
 
     def get_effective_ollama_url(self) -> str:
         """Get the effective Ollama URL based on remote setting.
@@ -438,6 +454,18 @@ class PersonalAgentConfig:
         return self.get_effective_base_url()
 
     # ========== User-Specific Paths ==========
+
+    @property
+    def persag_root(self) -> str:
+        """Get the PERSAG_ROOT directory."""
+        with self._config_lock:
+            return self._persag_root
+
+    @property
+    def storage_backend(self) -> str:
+        """Get the storage backend (typically 'agno')."""
+        with self._config_lock:
+            return self._storage_backend
 
     @property
     def user_storage_dir(self) -> str:
@@ -463,6 +491,84 @@ class PersonalAgentConfig:
                 f"{self._persag_root}/{self._storage_backend}/{self._user_id}/data"
             )
 
+    @property
+    def agno_storage_dir(self) -> str:
+        """Get the AGNO storage directory (same as user_storage_dir)."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}"
+            )
+
+    @property
+    def agno_knowledge_dir(self) -> str:
+        """Get the AGNO knowledge directory (same as user_knowledge_dir)."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/knowledge"
+            )
+
+    @property
+    def lightrag_storage_dir(self) -> str:
+        """Get the LightRAG storage directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/rag_storage"
+            )
+
+    @property
+    def lightrag_inputs_dir(self) -> str:
+        """Get the LightRAG inputs directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/inputs"
+            )
+
+    @property
+    def lightrag_memory_storage_dir(self) -> str:
+        """Get the LightRAG memory storage directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/memory_rag_storage"
+            )
+
+    @property
+    def lightrag_memory_inputs_dir(self) -> str:
+        """Get the LightRAG memory inputs directory."""
+        with self._config_lock:
+            return os.path.expandvars(
+                f"{self._persag_root}/{self._storage_backend}/{self._user_id}/memory_inputs"
+            )
+
+    @property
+    def persag_home(self) -> str:
+        """Get the PERSAG_HOME directory (typically ~/.persag)."""
+        with self._config_lock:
+            return self._persag_home
+
+    @property
+    def lightrag_port(self) -> str:
+        """Get the LightRAG server port."""
+        with self._config_lock:
+            return self._lightrag_port
+
+    @property
+    def lightrag_memory_port(self) -> str:
+        """Get the LightRAG memory server port."""
+        with self._config_lock:
+            return self._lightrag_memory_port
+
+    @property
+    def root_dir(self) -> str:
+        """Get the root directory."""
+        with self._config_lock:
+            return self._root_dir
+
+    @property
+    def repo_dir(self) -> str:
+        """Get the repository directory."""
+        with self._config_lock:
+            return self._repo_dir
+
     # ========== Application Settings ==========
 
     @property
@@ -477,14 +583,12 @@ class PersonalAgentConfig:
         :param mode: Agent mode ('single' or 'team')
         """
         if mode not in ("single", "team"):
-            raise ValueError(
-                f"Invalid agent mode: {mode}. Must be 'single' or 'team'"
-            )
+            raise ValueError(f"Invalid agent mode: {mode}. Must be 'single' or 'team'")
 
         with self._config_lock:
             old_value = self._agent_mode
             self._agent_mode = mode
-            logger.info(f"Agent mode changed: {old_value} -> {mode}")
+            logger.info("Agent mode changed: %s -> %s", old_value, mode)
             self._notify_callbacks("agent_mode", old_value, mode)
 
     @property
@@ -502,7 +606,7 @@ class PersonalAgentConfig:
             old_value = self._debug_mode
             self._debug_mode = debug
             os.environ["DEBUG"] = "true" if debug else "false"
-            logger.info(f"Debug mode changed: {old_value} -> {debug}")
+            logger.info("Debug mode changed: %s -> %s", old_value, debug)
             self._notify_callbacks("debug_mode", old_value, debug)
 
     @property
@@ -520,7 +624,7 @@ class PersonalAgentConfig:
             old_value = self._use_remote
             self._use_remote = use_remote
             logger.info(
-                f"Remote endpoint usage changed: {old_value} -> {use_remote}"
+                "Remote endpoint usage changed: %s -> %s", old_value, use_remote
             )
             self._notify_callbacks("use_remote", old_value, use_remote)
 
@@ -539,7 +643,7 @@ class PersonalAgentConfig:
             old_value = self._use_mcp
             self._use_mcp = use_mcp
             os.environ["USE_MCP"] = "true" if use_mcp else "false"
-            logger.info(f"MCP usage changed: {old_value} -> {use_mcp}")
+            logger.info("MCP usage changed: %s -> %s", old_value, use_mcp)
             self._notify_callbacks("use_mcp", old_value, use_mcp)
 
     @property
@@ -563,7 +667,7 @@ class PersonalAgentConfig:
             old_value = self._enable_memory
             self._enable_memory = enable_memory
             os.environ["ENABLE_MEMORY"] = "true" if enable_memory else "false"
-            logger.info(f"Memory enable changed: {old_value} -> {enable_memory}")
+            logger.info("Memory enable changed: %s -> %s", old_value, enable_memory)
             self._notify_callbacks("enable_memory", old_value, enable_memory)
 
     @property
@@ -593,7 +697,7 @@ class PersonalAgentConfig:
         with self._config_lock:
             old_value = self._extra.get(key)
             self._extra[key] = value
-            logger.debug(f"Extra config changed: {key}: {old_value} -> {value}")
+            logger.debug("Extra config changed: %s: %s -> %s", key, old_value, value)
             self._notify_callbacks(key, old_value, value)
 
     # ========== Configuration Snapshots ==========
@@ -629,6 +733,19 @@ class PersonalAgentConfig:
                 user_storage_dir=self.user_storage_dir,
                 user_knowledge_dir=self.user_knowledge_dir,
                 user_data_dir=self.user_data_dir,
+                agno_storage_dir=self.agno_storage_dir,
+                agno_knowledge_dir=self.agno_knowledge_dir,
+                lightrag_storage_dir=self.lightrag_storage_dir,
+                lightrag_inputs_dir=self.lightrag_inputs_dir,
+                lightrag_memory_storage_dir=self.lightrag_memory_storage_dir,
+                lightrag_memory_inputs_dir=self.lightrag_memory_inputs_dir,
+                persag_root=self._persag_root,
+                storage_backend=self._storage_backend,
+                persag_home=self._persag_home,
+                lightrag_port=self._lightrag_port,
+                lightrag_memory_port=self._lightrag_memory_port,
+                root_dir=self._root_dir,
+                repo_dir=self._repo_dir,
                 extra=self._extra.copy(),
             )
 
@@ -660,6 +777,19 @@ class PersonalAgentConfig:
             "user_storage_dir": snapshot.user_storage_dir,
             "user_knowledge_dir": snapshot.user_knowledge_dir,
             "user_data_dir": snapshot.user_data_dir,
+            "agno_storage_dir": snapshot.agno_storage_dir,
+            "agno_knowledge_dir": snapshot.agno_knowledge_dir,
+            "lightrag_storage_dir": snapshot.lightrag_storage_dir,
+            "lightrag_inputs_dir": snapshot.lightrag_inputs_dir,
+            "lightrag_memory_storage_dir": snapshot.lightrag_memory_storage_dir,
+            "lightrag_memory_inputs_dir": snapshot.lightrag_memory_inputs_dir,
+            "persag_root": snapshot.persag_root,
+            "storage_backend": snapshot.storage_backend,
+            "persag_home": snapshot.persag_home,
+            "lightrag_port": snapshot.lightrag_port,
+            "lightrag_memory_port": snapshot.lightrag_memory_port,
+            "root_dir": snapshot.root_dir,
+            "repo_dir": snapshot.repo_dir,
             "extra": snapshot.extra,
         }
 
