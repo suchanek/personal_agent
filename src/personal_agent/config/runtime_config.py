@@ -77,6 +77,7 @@ class ConfigSnapshot:
     enable_memory: bool
     seed: Optional[int]
     home_dir: str
+    instruction_level: str
     user_storage_dir: str
     user_knowledge_dir: str
     user_data_dir: str
@@ -177,6 +178,7 @@ class PersonalAgentConfig:
             )
             seed_env = os.getenv("LLM_SEED")
             self._seed = int(seed_env) if seed_env and seed_env.isdigit() else None
+            self._instruction_level = os.getenv("INSTRUCTION_LEVEL", "CONCISE")
 
             # Home directory for shell tools
             self._home_dir = os.path.expanduser("~")
@@ -676,6 +678,36 @@ class PersonalAgentConfig:
         with self._config_lock:
             return self._home_dir
 
+    @property
+    def instruction_level(self) -> str:
+        """Get the instruction level."""
+        with self._config_lock:
+            return self._instruction_level
+
+    def set_instruction_level(self, level: str):
+        """Set the instruction level.
+
+        :param level: Instruction level (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL)
+        """
+        valid_levels = ("MINIMAL", "CONCISE", "STANDARD", "EXPLICIT", "EXPERIMENTAL")
+        if level.upper() not in valid_levels:
+            raise ValueError(
+                f"Invalid instruction level: {level}. Must be one of {valid_levels}"
+            )
+
+        with self._config_lock:
+            old_value = self._instruction_level
+            self._instruction_level = level.upper()
+            os.environ["INSTRUCTION_LEVEL"] = self._instruction_level
+            logger.info(
+                "Instruction level changed: %s -> %s",
+                old_value,
+                self._instruction_level,
+            )
+            self._notify_callbacks(
+                "instruction_level", old_value, self._instruction_level
+            )
+
     # ========== Extra Configuration ==========
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -730,6 +762,7 @@ class PersonalAgentConfig:
                 enable_memory=self._enable_memory,
                 seed=self._seed,
                 home_dir=self._home_dir,
+                instruction_level=self._instruction_level,
                 user_storage_dir=self.user_storage_dir,
                 user_knowledge_dir=self.user_knowledge_dir,
                 user_data_dir=self.user_data_dir,
@@ -774,6 +807,7 @@ class PersonalAgentConfig:
             "enable_memory": snapshot.enable_memory,
             "seed": snapshot.seed,
             "home_dir": snapshot.home_dir,
+            "instruction_level": snapshot.instruction_level,
             "user_storage_dir": snapshot.user_storage_dir,
             "user_knowledge_dir": snapshot.user_knowledge_dir,
             "user_data_dir": snapshot.user_data_dir,
