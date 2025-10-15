@@ -12,7 +12,7 @@ Key Components:
     - **Memory Management**: Stores and retrieves personal user information and preferences
     - **CLI Interface**: Interactive command-line interface with enhanced memory commands
 
-Specialized Agents:
+Specialized Agents: (not all may be used at once)
     - **Memory Agent**: Manages personal information and factual knowledge storage/retrieval
     - **Web Agent**: Performs web searches using DuckDuckGo search
     - **SystemAgent**: Executes system commands and shell operations safely
@@ -88,8 +88,8 @@ Note:
     complete setup instructions.
 
 Author: Personal Agent Team
-Version: 0.2.4
-Last Revision: 2025-09-01 20:26:39
+Version: 0.8.72
+Last Revision: 2025-10-14 20:06:15
 Author: Eric G. Suchanek, PhD
 
 """
@@ -101,13 +101,10 @@ import asyncio
 import logging
 import os
 import sys
-from pathlib import Path
 from textwrap import dedent
 from typing import Optional
 
 from agno.agent import Agent
-from agno.models.ollama.tools import OllamaTools
-from agno.models.openai import OpenAIChat
 from agno.team.team import Team
 from agno.tools.calculator import CalculatorTools
 from agno.tools.dalle import DalleTools
@@ -147,8 +144,6 @@ try:
 
 except ImportError:
     # Fall back to absolute imports (when run directly)
-    import os
-    import sys
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -402,8 +397,6 @@ _file_instructions = dedent(
 )
 
 
-
-
 class WritingTools(Toolkit):
     """Custom writing tools for the writer agent."""
 
@@ -436,7 +429,11 @@ class WritingTools(Toolkit):
         try:
             # CRITICAL DIAGNOSTIC: Log every call to this method
             logger.warning(
-                f"🚨 DIAGNOSTIC: write_original_content called - topic: '{topic}', style: '{style}', type: '{content_type}', length: {length}"
+                "🚨 DIAGNOSTIC: write_original_content called - topic: '%s', style: '%s', type: '%s', length: %d",
+                topic,
+                style,
+                content_type,
+                length,
             )
             # Generate content based on parameters - KEEP IT CONCISE
             if content_type.lower() == "limerick":
@@ -455,7 +452,7 @@ And makes every reader quite tropic!"""
                     if i == 0:
                         lines.append(f"In the world of {topic}, we find")
                     elif i == 1:
-                        lines.append(f"Beauty and wonder combined")
+                        lines.append("Beauty and wonder combined")
                     else:
                         lines.append(f"Line {i+1} about {topic} so fine")
                 content = "\n".join(lines)
@@ -508,13 +505,16 @@ Key points about {topic} presented in {style} style.
 Conclusion about {topic}."""
 
             logger.info(
-                f"🔍 DIAGNOSTIC: Generated {content_type} about {topic} ({len(content)} characters)"
+                "🔍 DIAGNOSTIC: Generated %s about %s (%d characters)",
+                content_type,
+                topic,
+                len(content),
             )
             return content
 
         except Exception as e:
             error_msg = f"Error generating content: {str(e)}"
-            logger.error(f"🔍 DIAGNOSTIC: {error_msg}")
+            logger.error("🔍 DIAGNOSTIC: %s", error_msg)
             return error_msg
 
 
@@ -715,9 +715,7 @@ def create_agents(debug: bool = False):
         system_agent,
         finance_agent,
         medical_agent,
-        writer_agent,
         image_agent,
-        calculator_agent,
         python_agent,
         file_agent,
     )
@@ -758,7 +756,7 @@ def create_personalized_instructions(agent, base_instructions: list) -> list:
             )
             personalized_instructions.append(personalized_instruction)
 
-        logger.info(f"✅ Personalized instructions created for user: {user_id}")
+        logger.info("✅ Personalized instructions created for user: %s", user_id)
         return personalized_instructions
     else:
         logger.warning("⚠️ No user_id available, keeping generic instructions")
@@ -789,7 +787,8 @@ async def create_memory_agent(
         user_id = config.user_id
 
     logger.info(
-        f"🔧 Memory agent mode: {'single-agent (all tools)' if single else 'team mode (memory tools only)'}"
+        "🔧 Memory agent mode: %s",
+        "single-agent (all tools)" if single else "team mode (memory tools only)",
     )
 
     # Create AgnoPersonalAgent with the new simplified constructor.
@@ -850,7 +849,9 @@ async def create_memory_writer_agent(
 
 
 # Create the team
-async def create_team(use_remote: bool = False, single: bool = False):
+async def create_team(
+    use_remote: bool = False, single: bool = False, recreate: bool = False
+):
     """Create the team with shared memory context and your existing managers.
 
     Args:
@@ -881,11 +882,18 @@ async def create_team(use_remote: bool = False, single: bool = False):
         print("Proceeding with team creation, but Docker services may be inconsistent")
 
     logger.info(
-        f"🔄 Creating team with provider: {config.provider}, model: {config.model} (use_remote={use_remote})"
+        "🔄 Creating team with provider: %s, model: %s (use_remote=%s)",
+        config.provider,
+        config.model,
+        use_remote,
     )
 
     memory_agent = await create_memory_agent(
-        user_id=current_user_id, debug=True, use_remote=use_remote, single=single
+        user_id=current_user_id,
+        debug=True,
+        use_remote=use_remote,
+        single=single,
+        recreate=recreate,
     )
 
     agents = create_agents(debug=True)
@@ -894,9 +902,7 @@ async def create_team(use_remote: bool = False, single: bool = False):
         system_agent,
         finance_agent,
         medical_agent,
-        writer_agent,
         image_agent,
-        calculator_agent,
         python_agent,
         file_agent,
     ) = agents
@@ -907,16 +913,14 @@ async def create_team(use_remote: bool = False, single: bool = False):
         model=AgentModelManager.create_model_from_config(),
         memory=None,
         tools=[
-            ReasoningTools(add_instructions=True, add_few_shot=True),
+            # ReasoningTools(add_instructions=True, add_few_shot=True),
         ],
         members=[
             memory_agent,  # Memory agent with your managers
             web_agent,
             system_agent,  # SystemAgent for shell commands
             finance_agent,
-            # writer_agent,
             image_agent,  # Image creation agent
-            calculator_agent,
             medical_agent,
             python_agent,
             file_agent,
@@ -971,7 +975,8 @@ async def create_team(use_remote: bool = False, single: bool = False):
     )
 
     logger.info(
-        f"✅ Team created with {len(agent_team.members)} members - memory handled by Personal AI Agent"
+        "✅ Team created with %d members - memory handled by Personal AI Agent",
+        len(agent_team.members),
     )
     return agent_team
 
@@ -986,7 +991,7 @@ async def cleanup_team(team):
             try:
                 await _cleanup_model(team.model, "Team")
             except Exception as e:
-                logger.debug(f"⚠️ Error cleaning up team model: {e}")
+                logger.debug("⚠️ Error cleaning up team model: %s", e)
 
         if hasattr(team, "memory") and hasattr(team.memory, "db"):
             try:
@@ -994,30 +999,30 @@ async def cleanup_team(team):
                     await team.memory.db.close()
                 logger.debug("✅ Team memory database closed")
             except Exception as e:
-                logger.debug(f"⚠️ Error closing team memory database: {e}")
+                logger.debug("⚠️ Error closing team memory database: %s", e)
 
         # 2. Close member-level resources
         if hasattr(team, "members") and team.members:
             for i, member in enumerate(team.members):
                 member_name = getattr(member, "name", f"Member-{i}")
-                logger.debug(f"🔧 Cleaning up {member_name}...")
+                logger.debug("🔧 Cleaning up %s...", member_name)
 
                 # Close member's model
                 if hasattr(member, "model") and member.model:
                     try:
                         await _cleanup_model(member.model, member_name)
                     except Exception as e:
-                        logger.debug(f"⚠️ Error cleaning up {member_name} model: {e}")
+                        logger.debug("⚠️ Error cleaning up %s model: %s", member_name, e)
 
                 # Close member's memory
                 if hasattr(member, "memory") and hasattr(member.memory, "db"):
                     try:
                         if hasattr(member.memory.db, "close"):
                             await member.memory.db.close()
-                        logger.debug(f"✅ {member_name} memory database closed")
+                        logger.debug("✅ %s memory database closed", member_name)
                     except Exception as e:
                         logging.error(
-                            f"⚠️ Error closing {member_name} memory database: {e}"
+                            "⚠️ Error closing %s memory database: %s", member_name, e
                         )
 
                 # Close member's tools
@@ -1029,7 +1034,10 @@ async def cleanup_team(team):
                                 await _cleanup_tool(tool, f"{member_name}-{tool_name}")
                             except Exception as e:
                                 logging.error(
-                                    f"⚠️ Error cleaning up {member_name}-{tool_name}: {e}"
+                                    "⚠️ Error cleaning up %s-%s: %s",
+                                    member_name,
+                                    tool_name,
+                                    e,
                                 )
 
         # 3. Force garbage collection to help with cleanup
@@ -1043,7 +1051,7 @@ async def cleanup_team(team):
         logger.debug("✅ Team cleanup completed")
 
     except Exception as e:
-        logging.error(f"❌ Error during team cleanup: {e}")
+        logging.error("❌ Error during team cleanup: %s", e)
 
 
 async def _cleanup_model(model, model_name: str):
@@ -1053,12 +1061,12 @@ async def _cleanup_model(model, model_name: str):
         if hasattr(model, "_session") and model._session:
             if not model._session.closed:
                 await model._session.close()
-            logger.debug(f"✅ {model_name} model HTTP session closed")
+            logger.debug("✅ %s model HTTP session closed", model_name)
 
         if hasattr(model, "session") and model.session:
             if not model.session.closed:
                 await model.session.close()
-            logger.debug(f"✅ {model_name} model session closed")
+            logger.debug("✅ %s model session closed", model_name)
 
         # Close any client connections
         if hasattr(model, "client"):
@@ -1067,16 +1075,16 @@ async def _cleanup_model(model, model_name: str):
             elif hasattr(model.client, "_session") and model.client._session:
                 if not model.client._session.closed:
                     await model.client._session.close()
-            logger.debug(f"✅ {model_name} model client closed")
+            logger.debug("✅ %s model client closed", model_name)
 
         # Handle OllamaTools specific cleanup
         if hasattr(model, "_client") and model._client:
             if hasattr(model._client, "close"):
                 await model._client.close()
-            logger.debug(f"✅ {model_name} Ollama client closed")
+            logger.debug("✅ %s Ollama client closed", model_name)
 
     except Exception as e:
-        logging.error(f"⚠️ Error cleaning up {model_name} model: {e}")
+        logging.error("⚠️ Error cleaning up %s model: %s", model_name, e)
 
 
 async def _cleanup_tool(tool, tool_name: str):
@@ -1086,29 +1094,29 @@ async def _cleanup_tool(tool, tool_name: str):
         if hasattr(tool, "_session") and tool._session:
             if not tool._session.closed:
                 await tool._session.close()
-            logger.debug(f"✅ {tool_name} tool HTTP session closed")
+            logger.debug("✅ %s tool HTTP session closed", tool_name)
 
         if hasattr(tool, "session") and tool.session:
             if not tool.session.closed:
                 await tool.session.close()
-            logger.debug(f"✅ {tool_name} tool session closed")
+            logger.debug("✅ %s tool session closed", tool_name)
 
         # Handle DuckDuckGo tools specifically
         if hasattr(tool, "ddgs"):
             if hasattr(tool.ddgs, "_session") and tool.ddgs._session:
                 if not tool.ddgs._session.closed:
                     await tool.ddgs._session.close()
-                logger.debug(f"✅ {tool_name} DuckDuckGo session closed")
+                logger.debug("✅ %s DuckDuckGo session closed", tool_name)
 
             if hasattr(tool.ddgs, "close"):
                 await tool.ddgs.close()
-                logger.debug(f"✅ {tool_name} DuckDuckGo client closed")
+                logger.debug("✅ %s DuckDuckGo client closed", tool_name)
 
         # Handle YFinance tools
         if hasattr(tool, "_session") and "yfinance" in str(type(tool)).lower():
             if tool._session and not tool._session.closed:
                 await tool._session.close()
-                logger.debug(f"✅ {tool_name} YFinance session closed")
+                logger.debug("✅ %s YFinance session closed", tool_name)
 
         # Close any other client connections
         if hasattr(tool, "client"):
@@ -1117,10 +1125,10 @@ async def _cleanup_tool(tool, tool_name: str):
             elif hasattr(tool.client, "_session") and tool.client._session:
                 if not tool.client._session.closed:
                     await tool.client._session.close()
-            logger.debug(f"✅ {tool_name} tool client closed")
+            logger.debug("✅ %s tool client closed", tool_name)
 
     except Exception as e:
-        logging.error(f"⚠️ Error cleaning up {tool_name} tool: {e}")
+        logging.error("⚠️ Error cleaning up %s tool: %s", tool_name, e)
 
 
 def display_welcome_panel(console: Console, command_parser: CommandParser):
@@ -1158,35 +1166,43 @@ async def main(
     console.print("Initializing team with memory and knowledge capabilities...")
     console.print("This may take a moment on first run...")
 
-    # DEBUG: Log the remote flag and URLs
+    # Get configuration
+    from personal_agent.config import settings
+    from personal_agent.config.runtime_config import get_config
+
+    config = get_config()
+
+    # DEBUG: Log the remote flag and URLs from config
     console.print(f"🔍 DEBUG: use_remote={use_remote}")
-    console.print(f"🔍 DEBUG: PROVIDER={PROVIDER}")
-    console.print(f"🔍 DEBUG: OLLAMA_URL={OLLAMA_URL}")
-    console.print(f"🔍 DEBUG: REMOTE_OLLAMA_URL={REMOTE_OLLAMA_URL}")
+    console.print(f"🔍 DEBUG: PROVIDER={config.provider}")
+    console.print(f"🔍 DEBUG: OLLAMA_URL={settings.OLLAMA_URL}")
+    console.print(f"🔍 DEBUG: REMOTE_OLLAMA_URL={settings.REMOTE_OLLAMA_URL}")
 
     try:
         # Create the team
-        team = await create_team(use_remote=use_remote, single=single)
+        team = await create_team(
+            use_remote=use_remote, single=single, recreate=recreate
+        )
 
         # Get the memory agent for CLI commands
         memory_agent = None
         if hasattr(team, "members") and team.members:
             logger.debug(
-                f"🔍 Searching for memory agent among {len(team.members)} team members"
+                "🔍 Searching for memory agent among %d team members", len(team.members)
             )
             for member in team.members:
                 member_name = getattr(member, "name", "Unknown")
-                logger.debug(f"🔍 Checking member: {member_name}")
+                logger.debug("🔍 Checking member: %s", member_name)
                 if hasattr(member, "name") and "Personal-Agent" in member.name:
                     memory_agent = member
-                    logger.info(f"✅ Found memory agent: {member.name}")
+                    logger.info("✅ Found memory agent: %s", member.name)
                     break
 
             if not memory_agent:
                 logger.warning("⚠️ Memory agent not found! Available members:")
                 for member in team.members:
                     member_name = getattr(member, "name", "Unknown")
-                    logger.warning(f"   - {member_name}")
+                    logger.warning("   - %s", member_name)
 
         console.print("\n✅ [bold green]Team initialized successfully![/bold green]")
         console.print("\n[bold cyan]Team Members:[/bold cyan]")
@@ -1244,21 +1260,30 @@ async def main(
         console.print("\n")
         display_welcome_panel(console, command_parser)
 
-        # Get provider from config
-        from personal_agent.config.runtime_config import get_config
-        config = get_config()
+        # Get provider from config (already imported above)
+        # config is already available from earlier in the function
 
-        # Fix: Show the correct URL based on use_remote flag and provider
-        if config.provider == "openai":
-            # For OpenAI provider, use proper OpenAI URL logic
-            if not LMSTUDIO_URL:  # If LMSTUDIO_URL is empty, use standard OpenAI API
-                actual_url = OPENAI_URL
-            else:
-                actual_url = REMOTE_LMSTUDIO_URL if use_remote else LMSTUDIO_URL
-        else:
-            actual_url = REMOTE_OLLAMA_URL if use_remote else OLLAMA_URL
+        # Determine the correct URL based on provider and use_remote flag
+        match config.provider:
+            case "ollama":
+                actual_url = (
+                    settings.REMOTE_OLLAMA_URL if use_remote else settings.OLLAMA_URL
+                )
+            case "openai":
+                actual_url = settings.OPENAI_URL
+            case "lm-studio":
+                actual_url = (
+                    settings.REMOTE_LMSTUDIO_URL
+                    if use_remote
+                    else settings.LMSTUDIO_URL
+                )
+            case _:
+                actual_url = "unknown"
+                logger.warning("Unknown provider: %s", config.provider)
 
-        console.print(f"🖥️  Using {config.provider} model {config.model} at: {actual_url}")
+        console.print(
+            f"🖥️  Using {config.provider} model {config.model} at: {actual_url}"
+        )
 
         # Enhanced interactive chat loop with command parsing
         while True:
@@ -1276,7 +1301,6 @@ async def main(
                     continue
 
                 elif user_input.lower() == "clear":
-                    import os
 
                     os.system("clear" if os.name == "posix" else "cls")
                     console.print("🤖 Personal Agent Team")
@@ -1344,7 +1368,7 @@ async def main(
                     try:
                         console.print("🧠 [bold green]Memory Agent:[/bold green]")
                         logger.debug(
-                            f"🔍 Executing command handler: {command_handler.__name__}"
+                            "🔍 Executing command handler: %s", command_handler.__name__
                         )
                         # The command handlers expect an AgnoPersonalAgent, so we pass the memory_agent
                         # which is an AgnoPersonalAgent instance
@@ -1355,7 +1379,7 @@ async def main(
                         continue
                     except Exception as e:
                         console.print(f"💥 Error executing command: {e}")
-                        logger.error(f"Command execution failed: {e}", exc_info=True)
+                        logger.error("Command execution failed: %s", e, exc_info=True)
                         continue
                 elif command_handler and not memory_agent:
                     console.print(
@@ -1397,7 +1421,6 @@ async def main(
         try:
             if "team" in locals():
                 await cleanup_team(team)
-                pass
         except Exception as e:
             console.print(f"Warning during cleanup: {e}")
 
@@ -1406,6 +1429,7 @@ def cli_main():
     """Entry point for the paga_team_cli command."""
     # Get configuration instance
     from personal_agent.config.runtime_config import get_config
+
     config = get_config()
 
     parser = argparse.ArgumentParser(
@@ -1450,7 +1474,7 @@ def cli_main():
 
     if args.remote:
         config.set_use_remote(True)
-        print(f"🔧 Remote endpoints enabled")
+        print("🔧 Remote endpoints enabled")
 
     print(f"Starting Personal Agent Reasoning Team with provider: {config.provider}...")
     asyncio.run(

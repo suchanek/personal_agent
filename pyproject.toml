@@ -289,6 +289,15 @@ sequence = ["mcp-setup", "demo-memory", "demo-team", "example-mcp"]
 help = "Generate project documentation using pdoc"
 shell = "cd src && pdoc -o ../docs personal_agent"
 
+[tool.pylint.messages_control]
+disable = [
+    "C0301",  # line-too-long
+    "W0621",  # redefined-outer-name
+    "C0103",  # invalid-name
+    "W0703",  # broad-except (catching Exception)
+    "W0718",  # broad-exception-caught
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -233,38 +233,46 @@ def get_effective_model_name(provider: str, specified_model: str = None) -> str:
     """
     if not specified_model or specified_model.strip() == "":
         logger.info(
-            f"No model specified for provider '{provider}', using default: {get_provider_default_model(provider)}"
+            "No model specified for provider '%s', using default: %s",
+            provider,
+            get_provider_default_model(provider),
         )
         return get_provider_default_model(provider)
 
     # Basic compatibility checks - if model seems incompatible with provider, use default
     specified_model_lower = specified_model.lower()
 
-    if provider == "openai":
-        # OpenAI models should not contain colons (Ollama-style) or end with -mlx (MLX-style)
-        if ":" in specified_model or specified_model.endswith("-mlx"):
-            logger.warning(
-                f"Model '{specified_model}' appears incompatible with OpenAI provider, using default"
-            )
-            return get_provider_default_model(provider)
-    elif provider == "lm-studio":
-        # LM Studio models typically end with -mlx or are specific LM Studio models
-        # Allow some flexibility but warn about obvious mismatches
-        if specified_model.startswith("gpt-") and not any(
-            term in specified_model_lower for term in ["mlx", "lm", "studio"]
-        ):
-            logger.warning(
-                f"Model '{specified_model}' appears to be an OpenAI model used with LM Studio provider, using default"
-            )
-            return get_provider_default_model(provider)
-    elif provider == "ollama":
-        # Ollama models typically contain colons or are specific Ollama model names
-        # Allow some flexibility but warn about obvious OpenAI models
-        if specified_model.startswith("gpt-") and ":" not in specified_model:
-            logger.warning(
-                f"Model '{specified_model}' appears to be an OpenAI model used with Ollama provider, using default"
-            )
-            return get_provider_default_model(provider)
+    match provider:
+        case "openai":
+            # OpenAI models should not contain colons (Ollama-style) or end with -mlx (MLX-style)
+            if ":" in specified_model or specified_model.endswith("-mlx"):
+                logger.warning(
+                    "Model '%s' appears incompatible with OpenAI provider, using default",
+                    specified_model,
+                )
+                return get_provider_default_model(provider)
+
+        case "lm-studio":
+            # LM Studio models typically end with -mlx or are specific LM Studio models
+            # Allow some flexibility but warn about obvious mismatches
+            if specified_model.startswith("gpt-") and not any(
+                term in specified_model_lower for term in ["mlx", "lm", "studio"]
+            ):
+                logger.warning(
+                    "Model '%s' appears to be an OpenAI model used with LM Studio provider, using default",
+                    specified_model,
+                )
+                return get_provider_default_model(provider)
+
+        case "ollama":
+            # Ollama models typically contain colons or are specific Ollama model names
+            # Allow some flexibility but warn about obvious OpenAI models
+            if specified_model.startswith("gpt-") and ":" not in specified_model:
+                logger.warning(
+                    "Model '%s' appears to be an OpenAI model used with Ollama provider, using default",
+                    specified_model,
+                )
+                return get_provider_default_model(provider)
 
     return specified_model
 

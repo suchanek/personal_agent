@@ -26,13 +26,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-
-
 async def show_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
     """Show all memories for the user."""
     try:
         if not agent.agno_memory:
             console.print("📝 No memory system available")
+            logger.warning(
+                "Attempted to show memories but memory system is not available"
+            )
             return
 
         # Get raw memory objects directly from memory manager
@@ -51,11 +52,14 @@ async def show_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
             if memory.topics:
                 console.print(f"     Topics: {', '.join(memory.topics)}")
 
-        logger.info(f"Retrieved {len(results)} memories")
+        logger.info("Retrieved %d memories", len(results))
 
-    except Exception as e:
-        console.print(f"❌ Error retrieving memories: {e}")
-        logger.exception(f"Exception while retrieving all memories: {e}")
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except Exception:
+        console.print("❌ Unexpected error retrieving memories. Please check the logs.")
+        logger.exception("Unexpected exception while retrieving all memories")
 
 
 async def show_all_memories_brief(agent: "AgnoPersonalAgent", console: "Console"):
@@ -64,9 +68,14 @@ async def show_all_memories_brief(agent: "AgnoPersonalAgent", console: "Console"
         result = await agent.list_all_memories()
         console.print(result)
         logger.debug("Retrieved brief memory list")
-    except Exception as e:
-        console.print(f"❌ Error retrieving brief memory list: {e}")
-        logger.exception(f"Exception while retrieving brief memory list: {e}")
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except Exception:
+        console.print(
+            "❌ Unexpected error retrieving memory list. Please check the logs."
+        )
+        logger.exception("Unexpected exception while retrieving brief memory list")
 
 
 async def show_memories_by_topic_cli(
@@ -76,6 +85,9 @@ async def show_memories_by_topic_cli(
     try:
         if not agent.agno_memory:
             console.print("📝 No memory system available")
+            logger.warning(
+                "Attempted to show memories by topic but memory system is not available"
+            )
             return
 
         # Get raw memory objects directly from memory manager
@@ -96,11 +108,23 @@ async def show_memories_by_topic_cli(
             if memory.topics:
                 console.print(f"     Topics: {', '.join(memory.topics)}")
 
-        logger.info(f"Retrieved {len(results)} memories for topic '{topic}'")
+        logger.info("Retrieved %d memories for topic '%s'", len(results), topic)
 
-    except Exception as e:
-        console.print(f"❌ Error retrieving memories by topic: {e}")
-        logger.exception(f"Exception while retrieving memories for topic '{topic}': {e}")
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error(
+            "Memory system attribute error for topic '%s': %s",
+            topic,
+            str(e),
+            exc_info=True,
+        )
+    except Exception:
+        console.print(
+            f"❌ Unexpected error retrieving memories for topic '{topic}'. Please check the logs."
+        )
+        logger.exception(
+            "Unexpected exception while retrieving memories for topic '%s'", topic
+        )
 
 
 async def show_memory_analysis(agent: "AgnoPersonalAgent", console: "Console"):
@@ -109,9 +133,14 @@ async def show_memory_analysis(agent: "AgnoPersonalAgent", console: "Console"):
         result = await agent.get_memory_stats()
         console.print(result)
         logger.info("Retrieved memory analysis")
-    except Exception as e:
-        console.print(f"❌ Error getting memory analysis: {e}")
-        logger.exception(f"Exception while retrieving memory analysis: {e}")
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except Exception:
+        console.print(
+            "❌ Unexpected error getting memory analysis. Please check the logs."
+        )
+        logger.exception("Unexpected exception while retrieving memory analysis")
 
 
 async def show_memory_stats(agent: "AgnoPersonalAgent", console: "Console"):
@@ -120,9 +149,14 @@ async def show_memory_stats(agent: "AgnoPersonalAgent", console: "Console"):
         result = await agent.get_memory_stats()
         console.print(result)
         logger.info("Retrieved memory stats")
-    except Exception as e:
-        console.print(f"❌ Error getting memory stats: {e}")
-        logger.exception(f"Exception while retrieving memory stats: {e}")
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except Exception:
+        console.print(
+            "❌ Unexpected error getting memory stats. Please check the logs."
+        )
+        logger.exception("Unexpected exception while retrieving memory stats")
 
 
 async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
@@ -139,9 +173,11 @@ async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
             confirmation = input("Type 'YES' to confirm deletion: ").strip()
             if confirmation != "YES":
                 console.print("❌ Memory deletion cancelled.")
+                logger.info("User cancelled memory deletion")
                 return
         except (EOFError, KeyboardInterrupt):
             console.print("\n❌ Memory deletion cancelled.")
+            logger.info("User interrupted memory deletion prompt")
             return
 
         console.print("🗑️  Proceeding with memory deletion...")
@@ -149,9 +185,12 @@ async def clear_all_memories(agent: "AgnoPersonalAgent", console: "Console"):
         console.print(result)
         logger.info("Cleared all memories")
 
-    except Exception as e:
-        console.print(f"❌ Error clearing memories: {e}")
-        logger.exception(f"Exception while clearing memories: {e}")
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except Exception:
+        console.print("❌ Unexpected error clearing memories. Please check the logs.")
+        logger.exception("Unexpected exception while clearing memories")
 
 
 async def store_immediate_memory(
@@ -159,12 +198,23 @@ async def store_immediate_memory(
 ):
     """Store content immediately as a memory."""
     try:
+        if not content or not content.strip():
+            console.print("❌ Cannot store empty memory")
+            logger.warning("Attempted to store empty memory")
+            return
+
         result = await agent.store_user_memory(content=content)
         console.print(f"✅ Stored memory: {result}")
-        logger.info(f"Stored memory: {content[:50]}...")
-    except Exception as e:
-        console.print(f"❌ Error storing memory: {e}")
-        logger.exception(f"Exception while storing memory: {e}")
+        logger.info("Stored memory: %s...", content[:50])
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except ValueError as e:
+        console.print(f"❌ Invalid memory content: {e}")
+        logger.error("Invalid memory content: %s", str(e))
+    except Exception:
+        console.print("❌ Unexpected error storing memory. Please check the logs.")
+        logger.exception("Unexpected exception while storing memory")
 
 
 async def delete_memory_by_id_cli(
@@ -172,12 +222,28 @@ async def delete_memory_by_id_cli(
 ):
     """Delete a single memory by its ID."""
     try:
+        if not memory_id or not memory_id.strip():
+            console.print("❌ Memory ID is required")
+            logger.warning("Attempted to delete memory without ID")
+            return
+
         result = await agent.delete_memory(memory_id)
         console.print(result)
-        logger.info(f"Deleted memory {memory_id}")
-    except Exception as e:
-        console.print(f"❌ Error deleting memory: {e}")
-        logger.exception(f"Exception while deleting memory {memory_id}: {e}")
+        logger.info("Deleted memory %s", memory_id)
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except ValueError as e:
+        console.print(f"❌ Invalid memory ID: {e}")
+        logger.error("Invalid memory ID '%s': %s", memory_id, str(e))
+    except KeyError:
+        console.print(f"❌ Memory with ID '{memory_id}' not found")
+        logger.warning("Memory ID '%s' not found", memory_id)
+    except Exception:
+        console.print(
+            f"❌ Unexpected error deleting memory '{memory_id}'. Please check the logs."
+        )
+        logger.exception("Unexpected exception while deleting memory %s", memory_id)
 
 
 async def delete_memories_by_topic_cli(
@@ -185,9 +251,24 @@ async def delete_memories_by_topic_cli(
 ):
     """Delete memories by topic."""
     try:
+        if not topic or not topic.strip():
+            console.print("❌ Topic is required")
+            logger.warning("Attempted to delete memories without topic")
+            return
+
         result = await agent.delete_memories_by_topic(topic)
         console.print(result)
-        logger.info(f"Deleted memories for topic '{topic}'")
-    except Exception as e:
-        console.print(f"❌ Error deleting memories by topic: {e}")
-        logger.exception(f"Exception while deleting memories for topic '{topic}': {e}")
+        logger.info("Deleted memories for topic '%s'", topic)
+    except AttributeError as e:
+        console.print("❌ Memory system not properly initialized")
+        logger.error("Memory system attribute error: %s", str(e), exc_info=True)
+    except ValueError as e:
+        console.print(f"❌ Invalid topic: {e}")
+        logger.error("Invalid topic '%s': %s", topic, str(e))
+    except Exception:
+        console.print(
+            f"❌ Unexpected error deleting memories for topic '{topic}'. Please check the logs."
+        )
+        logger.exception(
+            "Unexpected exception while deleting memories for topic '%s'", topic
+        )

@@ -6,8 +6,7 @@ extracted from the AgnoPersonalAgent class to improve modularity and maintainabi
 """
 
 # Configure logging
-import logging
-from typing import Any, Dict, Optional, Union
+from typing import Optional, Union
 
 from agno.models.lmstudio import LMStudio
 from agno.models.ollama import Ollama  # Use regular Ollama instead of OllamaTools
@@ -53,7 +52,9 @@ class AgentModelManager:
         self.seed = seed
 
         logger.info(
-            f"AgentModelManager initialized for provider '{model_provider}' with model '{self.model_name}'"
+            "AgentModelManager initialized for provider '%s' with model '%s'",
+            model_provider,
+            self.model_name,
         )
 
     def create_model(
@@ -72,22 +73,22 @@ class AgentModelManager:
         """
         if self.model_provider == "openai":
             # Standard OpenAI API - uses OPENAI_API_KEY from environment
-            logger.info(f"Using standard OpenAI API with model: {self.model_name}")
+            logger.info("Using standard OpenAI API with model: %s", self.model_name)
 
             # Use custom base URL if provided, otherwise use the default OpenAI endpoint
             # IMPORTANT: Don't pass base_url=None as it breaks API key detection
             if self.openai_base_url:
                 base_url = self.openai_base_url
-                logger.info(f"Using custom OpenAI base URL: {base_url}")
+                logger.info("Using custom OpenAI base URL: %s", base_url)
             else:
                 # Use the standard OpenAI API endpoint from settings
                 base_url = settings.OPENAI_URL
-                logger.info(f"Using default OpenAI API endpoint: {base_url}")
+                logger.info("Using default OpenAI API endpoint: %s", base_url)
 
             logger.info("API Key will be read from OPENAI_API_KEY environment variable")
 
             model = OpenAIChat(id=self.model_name, base_url=base_url)
-            logger.info(f"✅ Created OpenAI model: {self.model_name}")
+            logger.info("✅ Created OpenAI model: %s", self.model_name)
             return model
         elif self.model_provider == "lm-studio":
             # SIMPLIFIED: Use remote/local URLs based on use_remote flag
@@ -96,28 +97,29 @@ class AgentModelManager:
                 base_url = getattr(
                     settings, "REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234"
                 )
-                logger.info(f"🌐 Using REMOTE LM Studio URL: {base_url}")
+                logger.info("🌐 Using REMOTE LM Studio URL: %s", base_url)
             else:
                 # Use local LM Studio URL (passed parameter or fallback)
                 base_url = self.lmstudio_base_url or getattr(
                     settings, "LMSTUDIO_BASE_URL", "http://localhost:1234"
                 )
-                logger.info(f"🏠 Using LOCAL LM Studio URL: {base_url}")
+                logger.info("🏠 Using LOCAL LM Studio URL: %s", base_url)
 
             # Ensure the base URL has the correct /v1 endpoint for LMStudio
             if not base_url.endswith("/v1"):
                 base_url = base_url.rstrip("/") + "/v1"
 
             # CRITICAL DEBUG: Log all URL information
-            logger.warning(f"🚨 LM STUDIO DEBUG: use_remote = {use_remote}")
+            logger.warning("🚨 LM STUDIO DEBUG: use_remote = %s", use_remote)
             logger.warning(
-                f"🚨 LM STUDIO DEBUG: self.lmstudio_base_url = {self.lmstudio_base_url}"
+                "🚨 LM STUDIO DEBUG: self.lmstudio_base_url = %s",
+                self.lmstudio_base_url,
             )
-            logger.warning(f"🚨 LM STUDIO DEBUG: final base_url = {base_url}")
-            logger.warning(f"🚨 LM STUDIO DEBUG: model_name = {self.model_name}")
+            logger.warning("🚨 LM STUDIO DEBUG: final base_url = %s", base_url)
+            logger.warning("🚨 LM STUDIO DEBUG: model_name = %s", self.model_name)
 
-            logger.info(f"Using official Agno LMStudio provider at: {base_url}")
-            logger.info(f"Model: {self.model_name}")
+            logger.info("Using official Agno LMStudio provider at: %s", base_url)
+            logger.info("Model: %s", self.model_name)
             logger.info(
                 "Using agno.models.lmstudio.LMStudio class (simplified approach)"
             )
@@ -128,11 +130,12 @@ class AgentModelManager:
             # CRITICAL DEBUG: Verify the model's actual base_url after creation
             if hasattr(model, "base_url"):
                 logger.warning(
-                    f"🚨 LM STUDIO DEBUG: model.base_url after creation = {model.base_url}"
+                    "🚨 LM STUDIO DEBUG: model.base_url after creation = %s",
+                    model.base_url,
                 )
             # Remove client debug since it causes pylint errors
 
-            logger.info(f"✅ Created official Agno LMStudio model: {self.model_name}")
+            logger.info("✅ Created official Agno LMStudio model: %s", self.model_name)
             return model
         elif self.model_provider == "ollama":
             # SIMPLIFIED: Use remote/local URLs based on use_remote flag
@@ -141,13 +144,13 @@ class AgentModelManager:
                 host_url = getattr(
                     settings, "REMOTE_OLLAMA_URL", "http://100.100.248.61:11434"
                 )
-                logger.info(f"🌐 Using REMOTE Ollama URL: {host_url}")
+                logger.info("🌐 Using REMOTE Ollama URL: %s", host_url)
             else:
                 # Use local Ollama URL (passed parameter or fallback)
                 host_url = self.ollama_base_url or getattr(
                     settings, "OLLAMA_URL", "http://localhost:11434"
                 )
-                logger.info(f"🏠 Using LOCAL Ollama URL: {host_url}")
+                logger.info("🏠 Using LOCAL Ollama URL: %s", host_url)
 
             # Get unified model configuration (parameters + context size)
             model_config = get_model_parameters_dict(self.model_name)
@@ -228,7 +231,9 @@ class AgentModelManager:
             )
 
             if model_supports_reasoning:
-                logger.debug(f"Model {self.model_name} supports reasoning capabilities")
+                logger.debug(
+                    "Model %s supports reasoning capabilities", self.model_name
+                )
 
             model = Ollama(
                 id=self.model_name,
@@ -248,7 +253,7 @@ class AgentModelManager:
                     "model": "assistant",
                 }
                 logger.debug(
-                    f"🔧 Applied role mapping fix to Ollama model: {self.model_name}"
+                    "🔧 Applied role mapping fix to Ollama model: %s", self.model_name
                 )
 
             return model
@@ -318,7 +323,9 @@ class AgentModelManager:
         """
         config = get_config()
         logger.info(
-            f"Creating model from config: provider={config.provider}, model={config.model}"
+            "Creating model from config: provider=%s, model=%s",
+            config.provider,
+            config.model,
         )
 
         return cls.create_model_for_provider(
