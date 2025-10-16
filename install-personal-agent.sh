@@ -18,10 +18,10 @@ set -u  # Exit on undefined variable
 # Configuration
 AGENT_USER="persagent"
 AGENT_HOME="/Users/${AGENT_USER}"
-INSTALL_DIR="${AGENT_HOME}"
+INSTALL_DIR="${AGENT_HOME}/repos/personal_agent"  # Clone repo into ~/repos/personal_agent
 DATA_DIR="${AGENT_HOME}/.persag"
-LOG_FILE="${INSTALL_DIR}/install.log"
-REPO_URL="https://github.com/suchanek/personal_agent.git"  # Update with actual repo URL
+LOG_FILE="${AGENT_HOME}/install.log"  # Log in home directory
+REPO_URL="https://github.com/suchanek/personal_agent.git"
 
 # Detect shell profile file
 # Check user's default shell
@@ -642,33 +642,42 @@ pull_lightrag_images() {
 setup_repository() {
     log "Setting up Personal Agent repository..."
 
-    # Create install directory if it doesn't exist
-    if [[ ! -d "${INSTALL_DIR}" ]]; then
-        if ! $DRY_RUN; then
-            log "Cloning repository..."
-            sudo -u "${AGENT_USER}" git clone "${REPO_URL}" "${INSTALL_DIR}"
-            log_success "Repository cloned"
-        else
-            log "[WOULD CLONE] ${REPO_URL} to ${INSTALL_DIR}"
-        fi
+    # Check if we're already in the repository
+    if [[ -f "${INSTALL_DIR}/pyproject.toml" ]]; then
+        log_success "Running from existing repository: ${INSTALL_DIR}"
     else
-        log_warning "Install directory already exists, skipping clone"
+        # Need to clone the repository
+        if [[ ! -d "${INSTALL_DIR}" ]]; then
+            if ! $DRY_RUN; then
+                log "Cloning repository..."
+                sudo -u "${AGENT_USER}" git clone "${REPO_URL}" "${INSTALL_DIR}"
+                log_success "Repository cloned"
+            else
+                log "[WOULD CLONE] ${REPO_URL} to ${INSTALL_DIR}"
+            fi
+        else
+            log_warning "Install directory already exists, skipping clone"
+        fi
+
+        # Verify pyproject.toml exists after clone
+        if [[ ! -f "${INSTALL_DIR}/pyproject.toml" ]]; then
+            log_error "pyproject.toml not found in ${INSTALL_DIR}"
+            log_error "Please ensure the repository is properly cloned"
+            return 1
+        fi
     fi
 
     if ! $DRY_RUN; then
-        # Change to install directory
-        cd "${INSTALL_DIR}"
-
         log "Creating virtual environment with uv..."
-        sudo -u "${AGENT_USER}" bash -c "cd ${INSTALL_DIR} && source ${PROFILE_FILE} 2>/dev/null && uv venv"
+        sudo -u "${AGENT_USER}" bash -c "cd '${INSTALL_DIR}' && source '${PROFILE_FILE}' 2>/dev/null; uv venv"
 
         log "Installing dependencies with Poetry..."
-        sudo -u "${AGENT_USER}" bash -c "cd ${INSTALL_DIR} && source ${PROFILE_FILE} 2>/dev/null && poetry install"
+        sudo -u "${AGENT_USER}" bash -c "cd '${INSTALL_DIR}' && source '${PROFILE_FILE}' 2>/dev/null; poetry install"
 
         log_success "Dependencies installed"
     else
-        log "[WOULD CREATE] virtual environment with uv"
-        log "[WOULD INSTALL] dependencies with Poetry"
+        log "[WOULD CREATE] virtual environment with uv in ${INSTALL_DIR}"
+        log "[WOULD INSTALL] dependencies with Poetry in ${INSTALL_DIR}"
     fi
 }
 
@@ -854,8 +863,8 @@ main() {
 
     # Create initial log directory
     if ! $DRY_RUN; then
-        mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || mkdir -p "/tmp"
-        touch "${LOG_FILE}" 2>/dev/null || LOG_FILE="/tmp/personal_agent_install.log"
+        mkdir -p "${AGENT_HOME}" 2>/dev/null || true
+        touch "${AGENT_HOME}/install.log" 2>/dev/null && LOG_FILE="${AGENT_HOME}/install.log" || LOG_FILE="/tmp/personal_agent_install.log"
     else
         LOG_FILE="/tmp/personal_agent_install_dryrun.log"
         echo "Dry-run log will be saved to: ${LOG_FILE}"
