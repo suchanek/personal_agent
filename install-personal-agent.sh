@@ -669,10 +669,10 @@ setup_repository() {
 
     if ! $DRY_RUN; then
         log "Creating virtual environment with uv..."
-        sudo -u "${AGENT_USER}" bash -c "cd '${INSTALL_DIR}' && source '${PROFILE_FILE}' 2>/dev/null; uv venv"
+        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv"
 
         log "Installing dependencies with Poetry..."
-        sudo -u "${AGENT_USER}" bash -c "cd '${INSTALL_DIR}' && source '${PROFILE_FILE}' 2>/dev/null; poetry install"
+        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
 
         log_success "Dependencies installed"
     else
