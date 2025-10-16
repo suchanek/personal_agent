@@ -1,0 +1,17 @@
+# Python 3.11.x
+
+# Core diffusion pipeline and ML stack
+torch==2.9.0 --extra-index-url https://download.pytorch.org/whl/cpudiffusers==0.35.2
+tqdm==4.67.1
+
+# Image handling & CV
+Pillow==12.0.0
+opencv-python==4.12.0.88
+exif==1.6.1
+
+# Visualization & plotting
+matplotlib==3.10.7
+ipyplot==1.1.2
+
+# Data manipulation
+pandas==2.3.3

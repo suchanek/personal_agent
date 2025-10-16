@@ -1,0 +1,8 @@
+name: sd311
+channels:
+  - apple
+  - schrodinger
+  - conda-forge
+dependencies:
+  - python=3.11
+prefix: /Users/egs/miniforge3/envs/sd311
