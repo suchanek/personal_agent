@@ -284,9 +284,10 @@ install_poetry() {
             return 0
         fi
 
-        log "Installing Poetry..."
-        # Set Poetry home to agent user's directory to avoid permission issues
-        sudo -u "${AGENT_USER}" bash -c 'export POETRY_HOME="$HOME/.local/share/pypoetry" && curl -sSL https://install.python-poetry.org | python3 -'
+        log "Installing Poetry with Homebrew Python 3.12..."
+        # Use Homebrew Python 3.12 explicitly to avoid Command Line Tools Python
+        # that doesn't support symlinks in venvs
+        sudo -u "${AGENT_USER}" bash -c 'export POETRY_HOME="$HOME/.local/share/pypoetry" && curl -sSL https://install.python-poetry.org | /opt/homebrew/opt/python@3.12/bin/python3.12 -'
         log_success "Poetry installed successfully"
     else
         log "[WOULD CHECK] if Poetry is installed"
