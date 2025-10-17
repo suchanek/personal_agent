@@ -32,8 +32,12 @@ Endpoints:
         - restart_system (optional, default: true): Restart agent/team system
 
     System:
-    - GET /api/v1/health - Health check
+    - GET /api/v1/health - Health check (main agent server only, port 8001)
     - GET /api/v1/status - System status
+    
+    Note: The health check endpoint is only available on the main agent server 
+          (paga_streamlit_agno.py on port 8001). The dashboard's REST API 
+          (port 8002) queries the main server for health status.
 
 Usage:
     # Store memory
@@ -129,79 +133,85 @@ class PersonalAgentRestAPI:
         """Setup all API routes."""
 
         # Health and status endpoints
-        @self.app.route("/api/v1/health", methods=["GET"])
-        def health_check():
-            try:
-                # Use global state to check system health
-                global_state = get_global_state()
-                if global_state is None:
-                    logger.error("global_state is None")
-                    raise Exception("Global state not available")
+        # Health check is only available for the main agent server (paga_streamlit_agno.py)
+        # Dashboard REST API (port 8002) doesn't expose health check - it queries port 8001 instead
+        if self.port != 8002:  # Only register health endpoint if NOT the dashboard API
 
-                global_status = global_state.get_status()
-                if global_status is None:
-                    logger.error("global_status is None")
-                    raise Exception("Global status not available")
+            @self.app.route("/api/v1/health", methods=["GET"])
+            def health_check():
+                try:
+                    # Use global state to check system health
+                    global_state = get_global_state()
+                    if global_state is None:
+                        logger.error("global_state is None")
+                        raise Exception("Global state not available")
 
-                # Check all required conditions
-                streamlit_connected = self.streamlit_session is not None
-                agent_available = global_status.get("agent_available", False)
-                team_available = global_status.get("team_available", False)
-                memory_available = global_status.get("memory_helper_available", False)
-                knowledge_available = global_status.get(
-                    "knowledge_helper_available", False
-                )
+                    global_status = global_state.get_status()
+                    if global_status is None:
+                        logger.error("global_status is None")
+                        raise Exception("Global status not available")
 
-                # Get user and model directly from global state (using correct keys)
-                user = global_status.get(
-                    "user", "unknown"
-                )  # get_status returns "user" key
-                model = global_status.get(
-                    "model", "unknown"
-                )  # get_status returns "model" key (mapped from llm_model)
+                    # Check all required conditions
+                    streamlit_connected = self.streamlit_session is not None
+                    agent_available = global_status.get("agent_available", False)
+                    team_available = global_status.get("team_available", False)
+                    memory_available = global_status.get(
+                        "memory_helper_available", False
+                    )
+                    knowledge_available = global_status.get(
+                        "knowledge_helper_available", False
+                    )
 
-                # System is healthy if all conditions are met, with exception that either team or agent must be available
-                is_healthy = (
-                    streamlit_connected
-                    and memory_available
-                    and knowledge_available
-                    and (agent_available or team_available)
-                )
+                    # Get user and model directly from global state (using correct keys)
+                    user = global_status.get(
+                        "user", "unknown"
+                    )  # get_status returns "user" key
+                    model = global_status.get(
+                        "model", "unknown"
+                    )  # get_status returns "model" key (mapped from llm_model)
 
-                status = "healthy" if is_healthy else "unhealthy"
+                    # System is healthy if all conditions are met, with exception that either team or agent must be available
+                    is_healthy = (
+                        streamlit_connected
+                        and memory_available
+                        and knowledge_available
+                        and (agent_available or team_available)
+                    )
 
-                return jsonify(
-                    {
-                        "status": status,
-                        "timestamp": datetime.now().isoformat(),
-                        "service": "personal-agent-api",
-                        "version": "1.0.0",
-                        "model": model,
-                        "user": user,
-                        "checks": {
-                            "streamlit_connected": streamlit_connected,
-                            "agent_available": agent_available,
-                            "team_available": team_available,
-                            "memory_available": memory_available,
-                            "knowledge_available": knowledge_available,
-                        },
-                    }
-                )
+                    status = "healthy" if is_healthy else "unhealthy"
 
-            except Exception as e:
-                logger.error(f"Error in health check: {e}")
-                return (
-                    jsonify(
+                    return jsonify(
                         {
-                            "status": "Unhealthy",
+                            "status": status,
                             "timestamp": datetime.now().isoformat(),
                             "service": "personal-agent-api",
                             "version": "1.0.0",
-                            "error": str(e),
+                            "model": model,
+                            "user": user,
+                            "checks": {
+                                "streamlit_connected": streamlit_connected,
+                                "agent_available": agent_available,
+                                "team_available": team_available,
+                                "memory_available": memory_available,
+                                "knowledge_available": knowledge_available,
+                            },
                         }
-                    ),
-                    503,
-                )
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error in health check: {e}")
+                    return (
+                        jsonify(
+                            {
+                                "status": "Unhealthy",
+                                "timestamp": datetime.now().isoformat(),
+                                "service": "personal-agent-api",
+                                "version": "1.0.0",
+                                "error": str(e),
+                            }
+                        ),
+                        503,
+                    )
 
         @self.app.route("/api/v1/status", methods=["GET"])
         def system_status():

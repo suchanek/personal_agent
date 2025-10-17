@@ -434,18 +434,12 @@ install_ollama() {
         log "[WOULD SET] permissions on /Applications/Ollama.app"
     fi
 
-    # Start Ollama if not running
-    if ! pgrep -f "Ollama.app" > /dev/null; then
-        log "Starting Ollama..."
-        if ! $DRY_RUN; then
-            sudo -u "${AGENT_USER}" open -a Ollama
-            sleep 10
-        else
-            log "[WOULD START] Ollama.app as ${AGENT_USER}"
-        fi
-    fi
+    # NOTE: We do NOT start Ollama.app here
+    # Instead, we'll set up a LaunchAgent service in setup_ollama_service()
+    # This prevents running two Ollama instances
 
-    log_success "Ollama is ready with Metal GPU acceleration"
+    log_success "Ollama installed with Metal GPU acceleration"
+    log "Ollama will be started as a LaunchAgent service"
 }
 
 ################################################################################
@@ -517,6 +511,17 @@ pull_ollama_models() {
 
 setup_ollama_service() {
     log "Setting up Ollama LaunchAgent service..."
+
+    # First, stop any running Ollama.app to prevent conflicts
+    if pgrep -f "Ollama.app" > /dev/null; then
+        log "Stopping Ollama.app to prevent conflicts with LaunchAgent service..."
+        if ! $DRY_RUN; then
+            pkill -f "Ollama.app" 2>/dev/null || true
+            sleep 2
+        else
+            log "[WOULD STOP] Ollama.app"
+        fi
+    fi
 
     local startup_script="/usr/local/bin/start_ollama.sh"
     local launch_agents_dir="${AGENT_HOME}/Library/LaunchAgents"
@@ -841,6 +846,17 @@ print_instructions() {
         echo ""
         echo "4. Optional: Configure API keys in:"
         echo "   ${INSTALL_DIR}/.env"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo -e "${YELLOW}Important Notes:${NC}"
+        echo ""
+        echo "• Ollama is running as a LaunchAgent background service (not the GUI app)"
+        echo "  The service starts automatically on login with optimized settings"
+        echo "  Check status: launchctl list | grep ollama"
+        echo "  View logs: tail -f ${AGENT_HOME}/Library/Logs/ollama.log"
+        echo ""
+        echo "• All users in the 'staff' group have access to Docker"
         echo ""
     fi
     echo "Installation log saved to: ${LOG_FILE}"

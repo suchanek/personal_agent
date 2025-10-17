@@ -18,12 +18,6 @@ from typing import Any, Dict, Iterator, List, Optional, Union
 from agno.agent import Agent, RunResponse
 from agno.run.response import RunResponseEvent
 
-from personal_agent.config import (
-    AGNO_KNOWLEDGE_DIR,
-    AGNO_STORAGE_DIR,
-    LLM_MODEL,
-    OLLAMA_URL,
-)
 from personal_agent.config.user_id_mgr import get_userid
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 
@@ -48,16 +42,13 @@ def get_agent_instance() -> Optional[AgnoPersonalAgent]:
         from personal_agent.core.agno_agent import create_agno_agent
 
         # Use asyncio.run to properly initialize the agent (same pattern as paga_streamlit_agno.py)
+        # Note: model_provider is read from centralized config, not passed as parameter
         agent = asyncio.run(
             create_agno_agent(
-                model_provider="ollama",
-                model_name=LLM_MODEL,
                 user_id=get_userid(),
                 debug=False,  # Disable debug for cleaner Streamlit output
                 enable_memory=True,
                 enable_mcp=True,
-                storage_dir=AGNO_STORAGE_DIR,
-                knowledge_dir=AGNO_KNOWLEDGE_DIR,
                 recreate=False,
             )
         )

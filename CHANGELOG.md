@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.8.74] - 2025-10-17
+
+### Changed
+- **Decoupled Dashboard from Docker Management**: To improve stability and user experience, the dashboard has been decoupled from direct Docker management. The "Docker Services" tab has been removed, and the UI now provides clear guidance and fallback instructions if the Docker daemon is not accessible, preventing crashes and permission errors. See [ADR-097](./refs/adr/097-decouple-dashboard-from-direct-docker-management.md) for details.
+- **Robust Ollama Service Management**: The installation script (`install-personal-agent.sh`) has been overhauled to configure Ollama as a persistent `launchd` background service on macOS. This prevents conflicts with the GUI app, ensures Ollama starts automatically on login, and provides a more stable and reliable experience. See [ADR-098](./refs/adr/098-robust-ollama-service-management.md) for details.
+
 ## [v0.8.73] - 2025-10-13
 
 ### Changed
