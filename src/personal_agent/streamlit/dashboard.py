@@ -2,16 +2,16 @@
 """
 Memory & User Management Dashboard
 
-A comprehensive Streamlit dashboard for managing memories, users, and Docker services
+A comprehensive Streamlit dashboard for managing memories and users
 in the Personal Agent system.
 
 Author: Personal Agent Development Team
 """
 
+import logging
 import os
 import sys
 import time
-import logging
 from pathlib import Path
 
 import streamlit as st
@@ -24,22 +24,24 @@ from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
 
+from personal_agent.streamlit.components.api_endpoints import api_endpoints_tab
 from personal_agent.streamlit.components.dashboard_memory_management import (
     memory_management_tab,
 )
-from personal_agent.streamlit.components.docker_services import docker_services_tab
 
 # Import components
 from personal_agent.streamlit.components.system_status import system_status_tab
 from personal_agent.streamlit.components.user_management import user_management_tab
-from personal_agent.streamlit.components.api_endpoints import api_endpoints_tab
+from personal_agent.streamlit.utils.agent_utils import get_agent_instance
 
 # Import utilities
 from personal_agent.streamlit.utils.system_utils import check_dependencies, load_css
-from personal_agent.streamlit.utils.agent_utils import get_agent_instance
 
 # Import REST API components
-from personal_agent.tools.global_state import update_global_state_from_streamlit, get_global_state
+from personal_agent.tools.global_state import (
+    get_global_state,
+    update_global_state_from_streamlit,
+)
 from personal_agent.tools.rest_api import start_rest_api
 
 # Constants for session state keys
@@ -146,10 +148,16 @@ def main():
                 # Update global state with the agent
                 global_state = get_global_state()
                 global_state.set("agent", agent)
-                global_state.set("agent_mode", "single")  # Assuming single agent mode for dashboard
+                global_state.set(
+                    "agent_mode", "single"
+                )  # Assuming single agent mode for dashboard
 
                 # Create and store memory/knowledge helpers
-                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                from personal_agent.tools.streamlit_helpers import (
+                    StreamlitKnowledgeHelper,
+                    StreamlitMemoryHelper,
+                )
+
                 memory_helper = StreamlitMemoryHelper(agent)
                 knowledge_helper = StreamlitKnowledgeHelper(agent)
                 global_state.set("memory_helper", memory_helper)
@@ -208,10 +216,12 @@ def main():
             # Fallback to direct user_id_mgr import if no agent
             try:
                 from personal_agent.config.user_id_mgr import get_userid
+
                 user_id = get_userid()
             except ImportError:
                 # Final fallback to environment variable
                 import os
+
                 user_id = os.getenv("USER_ID", "Unknown")
 
         # Get user details to show the display name
@@ -228,6 +238,7 @@ def main():
     except Exception as e:
         # Final fallback to environment variable
         import os
+
         user_id = os.getenv("USER_ID", "Unknown")
         st.sidebar.info(f"**{user_id}**")
         st.sidebar.caption(f"⚠️ User detection error: {str(e)}")
@@ -238,7 +249,7 @@ def main():
     # Navigation
     selected_tab = st.sidebar.radio(
         "Navigation",
-        ["System Status", "User Management", "Memory Management", "Docker Services", "API Endpoints"],
+        ["System Status", "User Management", "Memory Management", "API Endpoints"],
     )
 
     # Display version information
@@ -254,7 +265,12 @@ def main():
     st.sidebar.header("🚨 System Control")
 
     # Power off button
-    if st.sidebar.button("🔴 Power Off System", key="sidebar_power_off_btn", type="primary", use_container_width=True):
+    if st.sidebar.button(
+        "🔴 Power Off System",
+        key="sidebar_power_off_btn",
+        type="primary",
+        use_container_width=True,
+    ):
         # Show confirmation dialog
         st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = True
         st.rerun()
@@ -264,28 +280,41 @@ def main():
         # Clear the main pane and show only the shutdown confirmation
         st.markdown("---")
         st.error("⚠️ **SYSTEM SHUTDOWN CONFIRMATION**")
-        st.warning("This will permanently shut down the Personal Agent Management Dashboard.")
-        
+        st.warning(
+            "This will permanently shut down the Personal Agent Management Dashboard."
+        )
+
         # Create wider columns for better button layout
-        col_spacer1, col_cancel, col_spacer2, col_confirm, col_spacer3 = st.columns([1, 2, 1, 2, 1])
-        
+        col_spacer1, col_cancel, col_spacer2, col_confirm, col_spacer3 = st.columns(
+            [1, 2, 1, 2, 1]
+        )
+
         with col_cancel:
-            if st.button("❌ Cancel Shutdown", key="wide_cancel_power_off", use_container_width=True):
+            if st.button(
+                "❌ Cancel Shutdown",
+                key="wide_cancel_power_off",
+                use_container_width=True,
+            ):
                 st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = False
                 st.rerun()
-        
+
         with col_confirm:
-            if st.button("🔴 CONFIRM SHUTDOWN", key="wide_confirm_power_off", type="primary", use_container_width=True):
+            if st.button(
+                "🔴 CONFIRM SHUTDOWN",
+                key="wide_confirm_power_off",
+                type="primary",
+                use_container_width=True,
+            ):
                 # Clear confirmation state
                 st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = False
 
                 # Show success notification
                 st.toast("🎉 Shutting down system...", icon="🔴")
-                
+
                 # Import required modules for shutdown
-                import time
-                import threading
                 import logging
+                import threading
+                import time
 
                 # Set up logging
                 logger = logging.getLogger(__name__)
@@ -294,6 +323,7 @@ def main():
                 def graceful_shutdown():
                     """Perform graceful shutdown of the system."""
                     import os  # Import os within the function scope
+
                     try:
                         # Give time for the UI to show the shutdown message
                         time.sleep(3)
@@ -316,9 +346,9 @@ def main():
 
                 # Stop Streamlit execution
                 st.stop()
-        
+
         st.markdown("---")
-        
+
         # Don't show any other content when shutdown confirmation is active
         return
 
@@ -329,8 +359,6 @@ def main():
         user_management_tab()
     elif selected_tab == "Memory Management":
         memory_management_tab()
-    elif selected_tab == "Docker Services":
-        docker_services_tab()
     elif selected_tab == "API Endpoints":
         api_endpoints_tab()
 
