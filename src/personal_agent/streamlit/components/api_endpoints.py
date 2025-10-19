@@ -128,6 +128,20 @@ def _get_api_base_url():
 def _render_api_endpoints():
     """Display API endpoints organized by category."""
 
+    # Chat Endpoints
+    st.subheader("💬 Chat Endpoints")
+    chat_endpoints = [
+        {
+            "Method": "POST",
+            "Path": "/api/v1/chat",
+            "Description": "Send a message to the agent and get a response",
+            "Parameters": "message (required). Uses current system user.",
+        },
+    ]
+
+    chat_df = pd.DataFrame(chat_endpoints)
+    st.dataframe(chat_df, use_container_width=True)
+
     # Memory Endpoints
     st.subheader("🧠 Memory Endpoints")
     memory_endpoints = [
@@ -285,6 +299,17 @@ def _render_api_endpoints():
     st.subheader("💡 Usage Examples")
 
     base_url = _get_api_base_url()
+
+    with st.expander("Chat Example"):
+        st.code(
+            f"""
+# Send a message to the agent (uses current system user)
+curl -X POST {base_url}/api/v1/chat \\
+  -H "Content-Type: application/json" \\
+  -d '{{"message": "What is the capital of France?"}}'
+        """,
+            language="bash",
+        )
 
     with st.expander("Store Memory Example"):
         st.code(

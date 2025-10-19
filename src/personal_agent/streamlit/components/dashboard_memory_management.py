@@ -645,47 +645,63 @@ def _render_memory_settings():
     """Memory system settings."""
     st.subheader("Memory Settings")
 
-    # Memory storage settings
-    st.write("### Storage Settings")
+    # Clear all memories section
+    st.write("### Dangerous Actions")
+    st.warning("⚠️ **Warning:** The following actions are irreversible!")
 
-    col1, col2 = st.columns(2)
+    # Get memory helper
+    agent = get_agent_instance()
+    if not agent:
+        st.error("Agent not available")
+        return
 
-    with col1:
-        st.number_input(
-            "Max Memory Age (days)",
-            min_value=1,
-            max_value=365,
-            value=90,
-            help="Maximum age of memories before they are archived",
-        )
+    memory_helper = StreamlitMemoryHelper(agent)
 
-    with col2:
-        st.number_input(
-            "Memory Limit",
-            min_value=100,
-            max_value=100000,
-            value=10000,
-            step=100,
-            help="Maximum number of memories to store",
-        )
+    # Clear all memories button
+    if st.button("🗑️ Clear All Memories", type="primary", help="Delete all memories from local SQLite and LightRAG graph"):
+        st.session_state["show_clear_all_confirmation"] = True
 
-    # Memory systems
-    st.write("### Memory Systems")
+    # Show confirmation dialog if button was clicked
+    if st.session_state.get("show_clear_all_confirmation", False):
+        with st.expander("⚠️ Confirm Clear All Memories", expanded=True):
+            st.error("**This will permanently delete ALL memories from both local and graph storage!**")
+            st.write("This action cannot be undone. All user memories will be permanently removed.")
 
-    systems = {
-        "SQLite": True,
-        "LightRAG Graph": True,
-        "Vector Store": False,
-        "External API": False,
-    }
+            col_confirm1, col_confirm2 = st.columns([3, 1])
 
-    for system, enabled in systems.items():
-        st.checkbox(system, value=enabled, key=f"system_{system}")
+            with col_confirm1:
+                confirmation_text = st.text_input(
+                    "Type 'DELETE ALL' to confirm:",
+                    key="confirm_clear_all_text",
+                    placeholder="DELETE ALL"
+                )
 
-    # Save settings
-    if st.button("Save Settings"):
-        # Show success notification
-        st.toast("🎉 Memory settings saved successfully!", icon="✅")
-        time.sleep(2.0)  # 2 second delay
-        st.info("Some settings may require a restart to take effect.")
-        st.rerun()
+            with col_confirm2:
+                if st.button("Clear All", key="confirm_clear_all", type="primary"):
+                    if confirmation_text == "DELETE ALL":
+                        st.toast("Clearing all memories...", icon="🗑️")
+                        time.sleep(2)
+
+                        with st.spinner("Deleting all memories from local and graph storage..."):
+                            success, message = memory_helper.clear_memories()
+
+                            # Clear confirmation state
+                            st.session_state["show_clear_all_confirmation"] = False
+
+                            if success:
+                                st.toast("All memories cleared successfully!", icon="✅")
+                                # Clear the agent cache to ensure fresh data on next load
+                                st.cache_resource.clear()
+                                st.success(message)
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.toast(f"Failed to clear memories: {message}", icon="❌")
+                                st.error(message)
+                    else:
+                        st.error("Please type 'DELETE ALL' to confirm")
+
+                # Cancel button
+                if st.button("Cancel", key="cancel_clear_all"):
+                    st.session_state["show_clear_all_confirmation"] = False
+                    st.rerun()
