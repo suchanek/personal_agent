@@ -206,36 +206,13 @@ class SemanticDuplicateDetector:
         words2 = set(re.findall(r"\b\w+\b", norm2))
         exact_matches = words1.intersection(words2)
 
-        # If we have exact word matches, boost the score significantly
-        if exact_matches and len(words1) <= 3:  # For short queries (1-3 words)
-            match_ratio = len(exact_matches) / len(words1)
-            exact_word_score = 0.6 + (match_ratio * 0.4)  # 0.6 to 1.0 range
-
-            # Also calculate traditional semantic similarity
-            string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
-            terms1 = self._extract_key_terms(text1)
-            terms2 = self._extract_key_terms(text2)
-
-            if not terms1 and not terms2:
-                terms_similarity = 1.0
-            elif not terms1 or not terms2:
-                terms_similarity = 0.0
-            else:
-                intersection = len(terms1.intersection(terms2))
-                union = len(terms1.union(terms2))
-                terms_similarity = intersection / union if union > 0 else 0.0
-
-            traditional_score = (string_similarity * 0.6) + (terms_similarity * 0.4)
-
-            # Return the higher of exact word score or traditional score
-            return max(exact_word_score, traditional_score)
-
-        # For longer queries or no exact matches, use traditional method
-        string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
-
-        # Key terms similarity
+        # Extract key terms (non-stopwords) for more accurate comparison
         terms1 = self._extract_key_terms(text1)
         terms2 = self._extract_key_terms(text2)
+        key_term_matches = terms1.intersection(terms2)
+
+        # Calculate standard similarity scores first
+        string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
         if not terms1 and not terms2:
             terms_similarity = 1.0
@@ -246,9 +223,25 @@ class SemanticDuplicateDetector:
             union = len(terms1.union(terms2))
             terms_similarity = intersection / union if union > 0 else 0.0
 
-        # Weighted combination
+        # Standard weighted combination
         semantic_score = (string_similarity * 0.6) + (terms_similarity * 0.4)
 
+        # Apply boost for SHORT queries with exact word matches, but ONLY if key terms align well
+        if exact_matches and len(words1) <= 3 and terms1 and terms2:  # For short queries (1-3 words)
+            # Calculate overlap from BOTH perspectives
+            terms1_covered = len(key_term_matches) / len(terms1) if len(terms1) > 0 else 0
+            terms2_covered = len(key_term_matches) / len(terms2) if len(terms2) > 0 else 0
+
+            # Only apply boost if BOTH sides have high key term coverage (>= 80%)
+            # This prevents "I love halloween" vs "I love vanilla ice cream" from matching
+            if terms1_covered >= 0.8 and terms2_covered >= 0.8:
+                match_ratio = len(exact_matches) / len(words1)
+                exact_word_score = 0.6 + (match_ratio * 0.4)  # 0.6 to 1.0 range
+
+                # Return the higher of exact word score or semantic score
+                return max(exact_word_score, semantic_score)
+
+        # Return the semantic score (no boost applied)
         return semantic_score
 
     def is_duplicate(
