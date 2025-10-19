@@ -16,9 +16,8 @@ export PATH="/opt/homebrew/opt/qt5/bin:$PATH"
 export PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/opt/curl/bin:$PATH"
 export CPLUS_INCLUDE_PATH="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
-export PATH="/Users/egs/.local/bin:$PATH"
-export PATH="/Users/egs/clang+llvm-15.0.0-rc1-arm64-apple-darwin21.0/bin:$PATH"
-export PATH="/opt/homebrew/bin/python3.12:$PATH"
+export PATH="/Users/suchanek/.local/bin:$PATH"
+export PATH="/Users/suchanek/clang+llvm-15.0.0-rc1-arm64-apple-darwin21.0/bin:$PATH"
 export PATH=$PATH:$(go env GOPATH)/bin
 
 alias ccat='bat'
@@ -28,10 +27,10 @@ alias copilot="gh copilot"
 alias gcs="gh copilot suggest"
 alias gce="gh copilot explain"
 
-alias myml="cd /Users/egs/Documents/myML"
-alias nps="cd /Users/egs/Documents/myML/nps"
-alias logs="cd /Users/egs/Documents/myML/nps/logs"
-alias ppy="cd /Users/egs/repos/proteusPy"
+alias myml="cd /Users/suchanek/Documents/myML"
+alias nps="cd /Users/suchanek/Documents/myML/nps"
+alias logs="cd /Users/suchanek/Documents/myML/nps/logs"
+alias ppy="cd /Users/suchanek/repos/proteusPy"
 alias ds="ls -alF |more"
 
 alias act="conda activate"
@@ -117,7 +116,7 @@ function stbl_diff() {
   #cd ~/repos/MyMl/ArtDiffusion && conda activate torch3 && python txt2img.py $*
 }
 
-opy2pdf() {
+copy2pdf() {
     OUTPUT=~/Documents/proteusPyDocs/source
     input_file_name=$1
     echo -e "Processing: $1"
@@ -154,17 +153,17 @@ wm_decode() {
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/Users/egs/miniforge3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
-else
-    if [ -f "/Users/egs/miniforge3/etc/profile.d/conda.sh" ]; then
-        . "/Users/egs/miniforge3/etc/profile.d/conda.sh"
-    else
-        export PATH="/Users/egs/miniforge3/bin:$PATH"
-    fi
-fi
-unset __conda_setup
+#__conda_setup="$('/Users/suchanek/miniforge3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+#if [ $? -eq 0 ]; then
+#    eval "$__conda_setup"
+#else
+#    if [ -f "/Users/suchanek/miniforge3/etc/profile.d/conda.sh" ]; then
+#        . "/Users/suchanek/miniforge3/etc/profile.d/conda.sh"
+#    else
+#        export PATH="/Users/suchanek/miniforge3/bin:$PATH"
+#    fi
+#fi
+#unset __conda_setup
 # <<< conda initialize <<<
 
 #conda activate stblDiff
@@ -173,7 +172,7 @@ unset __conda_setup
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 ##
-# Your previous /Users/egs/.bash_profile file was backed up as /Users/egs/.bash_profile.macports-saved_2023-01-17_at_13:19:32
+# Your previous /Users/suchanek/.bash_profile file was backed up as /Users/suchanek/.bash_profile.macports-saved_2023-01-17_at_13:19:32
 ##
 
 # MacPorts Installer addition on 2023-01-17_at_13:19:32: adding an appropriate PATH variable for use with MacPorts.
@@ -190,7 +189,7 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 #export OPENAI_API_BASE=http://127.0.0.1:1234/
 #export BACKEND_TYPE=lmstudio
 
-if [ -f "/Users/egs/.config/fabric/fabric-bootstrap.inc" ]; then . "/Users/egs/.config/fabric/fabric-bootstrap.inc"; fi
+if [ -f "/Users/suchanek/.config/fabric/fabric-bootstrap.inc" ]; then . "/Users/suchanek/.config/fabric/fabric-bootstrap.inc"; fi
 
 # Setting PATH for Python 3.13
 # The original version is saved in .bash_profile.pysave
@@ -210,6 +209,11 @@ export PATH="$HOME/repos/llama.cpp/build-metal/bin:$PATH"
 
 
 # Added by LM Studio CLI (lms)
-export PATH="$PATH:/Users/egs/.cache/lm-studio/bin"
+export PATH="$PATH:/Users/suchanek/.cache/lm-studio/bin"
+# End of LM Studio CLI section
+
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/suchanek/.lmstudio/bin"
 # End of LM Studio CLI section
 
