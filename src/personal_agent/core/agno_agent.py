@@ -549,32 +549,21 @@ class AgnoPersonalAgent(Agent):
         if add_thought_callback:
             add_thought_callback("🚀 Executing agent...")
 
-        # Use the proper pattern: call super().run() with stream parameter
-        run_result = super().run(query, user_id=self.user_id, stream=stream, **kwargs)
+        # Use the proper pattern: call super().arun() with stream parameter (async version)
+        run_result = await super().arun(query, user_id=self.user_id, stream=stream, **kwargs)
 
         if stream:
             # Return the stream directly for proper RunResponse handling
             return run_result
         else:
-            # Collect all chunks from the stream for backward compatibility
+            # When stream=False, arun() returns a single RunResponse, not an iterator
+            self._last_response = run_result
             content_parts = []
             self._collected_tool_calls = []
 
-            # Handle both iterator and single response cases
-            try:
-                # Try to iterate over the result
-                for chunk in run_result:  # Use regular for loop, not async for
-                    # Store the last response for tool call extraction
-                    self._last_response = chunk
-
-                    # Collect content from chunks
-                    if hasattr(chunk, "content") and chunk.content:
-                        content_parts.append(chunk.content)
-            except TypeError:
-                # Single response case - not iterable
-                self._last_response = run_result
-                if hasattr(run_result, "content") and run_result.content:
-                    content_parts.append(run_result.content)
+            # Extract content from the RunResponse
+            if hasattr(run_result, "content") and run_result.content:
+                content_parts.append(run_result.content)
 
             # Join all content parts
             content = "".join(content_parts)

@@ -31,12 +31,18 @@ Endpoints:
         - restart_containers (optional, default: true): Restart Docker containers
         - restart_system (optional, default: true): Restart agent/team system
 
+    Chat:
+    - POST /api/v1/chat - Send a message to the agent and get a response
+        Parameters:
+        - message (required): The message to send to the agent
+        Note: Uses the current system user (USER_ID from environment)
+
     System:
     - GET /api/v1/health - Health check (main agent server only, port 8001)
     - GET /api/v1/status - System status
-    
-    Note: The health check endpoint is only available on the main agent server 
-          (paga_streamlit_agno.py on port 8001). The dashboard's REST API 
+
+    Note: The health check endpoint is only available on the main agent server
+          (paga_streamlit_agno.py on port 8001). The dashboard's REST API
           (port 8002) queries the main server for health status.
 
 Usage:
@@ -725,6 +731,81 @@ class PersonalAgentRestAPI:
                 logger.error(f"Error getting knowledge status via API: {e}")
                 return jsonify({"success": "False", "error": str(e)}), 500
 
+        # Chat endpoints
+        @self.app.route("/api/v1/chat", methods=["POST"])
+        def chat():
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No JSON data provided"}), 400
+
+                message = data.get("message", "").strip()
+                if not message:
+                    return jsonify({"error": "Message is required"}), 400
+
+                # Get current system user from global configuration
+                from ..config.user_id_mgr import get_current_user_id
+                current_user = get_current_user_id()
+
+                # Get agent from global state
+                agent = self._get_agent()
+                if not agent:
+                    return jsonify({"error": "Agent not available"}), 503
+
+                logger.info(f"Chat request via API for user '{current_user}': {message[:50]}...")
+
+                # Run the agent with the message
+                try:
+                    # Execute agent run asynchronously using arun() for async tool compatibility
+                    import asyncio
+
+                    logger.info("About to call agent.arun() with message")
+
+                    # Define async wrapper to properly handle the async call
+                    async def run_agent_async():
+                        return await agent.arun(message, stream=False)
+
+                    response = asyncio.run(run_agent_async())
+                    logger.info("Successfully completed agent.arun() call")
+
+                    # Extract the response content from RunResponse object
+                    if hasattr(response, "content"):
+                        response_text = response.content
+                    elif isinstance(response, str):
+                        response_text = response
+                    else:
+                        response_text = str(response)
+
+                    logger.info(
+                        f"Chat response via API: {response_text[:100]}..."
+                    )
+
+                    return jsonify(
+                        {
+                            "success": True,
+                            "message": message,
+                            "response": response_text,
+                            "user_id": current_user,
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error executing agent run: {e}")
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "error": f"Agent execution failed: {str(e)}",
+                            }
+                        ),
+                        500,
+                    )
+
+            except Exception as e:
+                logger.error(f"Error in chat endpoint: {e}")
+                return jsonify({"success": False, "error": str(e)}), 500
+
         # User endpoints
         @self.app.route("/api/v1/users", methods=["GET"])
         def list_users():
@@ -966,6 +1047,9 @@ class PersonalAgentRestAPI:
                             "health": "/api/v1/health",
                             "status": "/api/v1/status",
                             "discovery": "/api/v1/discovery",
+                            "chat": {
+                                "send": "/api/v1/chat",
+                            },
                             "memory": {
                                 "store": "/api/v1/memory/store",
                                 "store_url": "/api/v1/memory/store-url",
