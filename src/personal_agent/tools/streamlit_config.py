@@ -34,7 +34,7 @@ def parse_args():
         "--recreate",
         action="store_true",
         help="Recreate the knowledge base and clear all memories",
-        default=True,
+        default=False,
     )
 
     parser.add_argument(
@@ -163,12 +163,15 @@ def get_available_models(base_url, provider=None):
             # OpenAI uses /v1/models endpoint with API key authentication
             # Load API key from environment
             import os
+
             from dotenv import load_dotenv
+
             load_dotenv()
 
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
                 import streamlit as st
+
                 st.error("OPENAI_API_KEY not found in environment")
                 return []
 
@@ -184,14 +187,27 @@ def get_available_models(base_url, provider=None):
                 if "data" in data:
                     # Filter to only chat-capable models
                     all_models = [model["id"] for model in data["data"]]
-                    chat_models = [m for m in all_models if any(prefix in m.lower() for prefix in ['gpt', 'o1', 'o3'])]
+                    chat_models = [
+                        m
+                        for m in all_models
+                        if any(prefix in m.lower() for prefix in ["gpt", "o1", "o3"])
+                    ]
                     return sorted(chat_models)
                 return []
             else:
                 import streamlit as st
-                st.warning(f"Failed to fetch models from OpenAI: {response.status_code}")
+
+                st.warning(
+                    f"Failed to fetch models from OpenAI: {response.status_code}"
+                )
                 # Return common OpenAI models as fallback
-                return ["gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+                return [
+                    "gpt-4.1",
+                    "gpt-4.1-mini",
+                    "gpt-4o",
+                    "gpt-4o-mini",
+                    "gpt-4-turbo",
+                ]
         elif provider == "lm-studio":
             # LM Studio uses OpenAI-compatible /v1/models endpoint
             response = requests.get(f"{base_url}/v1/models", timeout=5)
@@ -229,7 +245,11 @@ def get_available_models(base_url, provider=None):
     except requests.exceptions.RequestException as e:
         import streamlit as st
 
-        provider_name = "OpenAI" if provider == "openai" else ("LM Studio" if provider == "lm-studio" else "Ollama")
+        provider_name = (
+            "OpenAI"
+            if provider == "openai"
+            else ("LM Studio" if provider == "lm-studio" else "Ollama")
+        )
         st.error(f"Error connecting to {provider_name} at {base_url}: {str(e)}")
         return []
 
