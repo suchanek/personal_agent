@@ -710,23 +710,47 @@ def render_memory_tab():
                     except (ValueError, AttributeError):
                         pass
 
+            # Try to get user's birth date as the start date
+            user_birth_date = None
+            try:
+                from personal_agent.core.user_registry import UserRegistry
+
+                user_registry = UserRegistry()
+                current_user = user_registry.get_current_user()
+                if current_user and current_user.get("birth_date"):
+                    birth_date_str = current_user["birth_date"]
+                    user_birth_date = datetime.strptime(
+                        birth_date_str, "%Y-%m-%d"
+                    ).date()
+            except Exception as e:
+                logger.debug(f"Could not retrieve user birth date: {e}")
+
             if memory_dates:
-                default_start_date = min(memory_dates)
+                # Use user birth date as start date if available, otherwise use earliest memory date
+                if user_birth_date:
+                    default_start_date = user_birth_date
+                else:
+                    default_start_date = min(memory_dates)
                 default_end_date = max(memory_dates)
             else:
-                # Fallback to last 5 days if no memories have dates
-                default_start_date = datetime.now().date() - timedelta(days=5)
-                default_end_date = datetime.now().date()
+                # Use user birth date if available, otherwise fallback to last 5 days
+                if user_birth_date:
+                    default_start_date = user_birth_date
+                    default_end_date = datetime.now().date()
+                else:
+                    # Fallback to last 5 days if no memories have dates and no birth date
+                    default_start_date = datetime.now().date() - timedelta(days=5)
+                    default_end_date = datetime.now().date()
 
         except Exception:
-            # Fallback to last 5 days if there's an error
+            # Final fallback to last 5 days if there's an error
             default_start_date = datetime.now().date() - timedelta(days=5)
             default_end_date = datetime.now().date()
 
         date_range = st.date_input(
             "Date Range",
             value=[default_start_date, default_end_date],
-            help="Filter memories by date range (automatically set to encompass all memory dates)",
+            help="Filter memories by date range (start date defaults to user's birth date if available, otherwise earliest memory date)",
         )
 
     with col3:
@@ -1215,24 +1239,33 @@ def render_sidebar():
 
         # Show provider-specific information based on CURRENT provider (not selected)
         from personal_agent.config import get_provider_default_model
+
         current_default_model = get_provider_default_model(current_provider)
-        
+
         if current_provider == "ollama":
-            st.caption("🐳 **Current**: Ollama - Local models, full control, no API costs")
+            st.caption(
+                "🐳 **Current**: Ollama - Local models, full control, no API costs"
+            )
         elif current_provider == "lm-studio":
-            st.caption("🎭 **Current**: LM Studio - Local models with user-friendly interface")
+            st.caption(
+                "🎭 **Current**: LM Studio - Local models with user-friendly interface"
+            )
         elif current_provider == "openai":
             st.caption("🔗 **Current**: OpenAI - Cloud models, requires API key")
 
         st.caption(f"📋 **Current Default Model:** {current_default_model}")
-        
+
         # Show preview of selected provider if different from current
         if selected_provider != current_provider:
             selected_default_model = get_provider_default_model(selected_provider)
             if selected_provider == "ollama":
-                st.caption("� **Preview**: Ollama - Local models, full control, no API costs")
+                st.caption(
+                    "� **Preview**: Ollama - Local models, full control, no API costs"
+                )
             elif selected_provider == "lm-studio":
-                st.caption("🔮 **Preview**: LM Studio - Local models with user-friendly interface")
+                st.caption(
+                    "🔮 **Preview**: LM Studio - Local models with user-friendly interface"
+                )
             elif selected_provider == "openai":
                 st.caption("🔮 **Preview**: OpenAI - Cloud models, requires API key")
             st.caption(f"📋 **New Default Model:** {selected_default_model}")
@@ -1245,6 +1278,7 @@ def render_sidebar():
                 ):
                     # Use PersonalAgentConfig for provider switching
                     from personal_agent.config.runtime_config import get_config
+
                     config = get_config()
 
                     # Switch provider (automatically sets default model)
@@ -1263,18 +1297,23 @@ def render_sidebar():
                     # Update session state to match config
                     st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
                     st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_url
-                    logger.info(f"🔄 Updated session state: model={new_default_model}, url={new_url}")
+                    logger.info(
+                        f"🔄 Updated session state: model={new_default_model}, url={new_url}"
+                    )
 
                     st.success(
                         f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}"
                     )
-                    st.info("💡 **Tip**: Click 'Fetch Available Models' to see models available in the new provider, then select and apply a model to reinitialize the agent/team.")
+                    st.info(
+                        "💡 **Tip**: Click 'Fetch Available Models' to see models available in the new provider, then select and apply a model to reinitialize the agent/team."
+                    )
                     st.rerun()
 
         st.header("Model Selection")
 
         # Show current provider and model prominently from config
         from personal_agent.config.runtime_config import get_config
+
         config = get_config()
         provider = config.provider
         provider_display = (
@@ -1324,9 +1363,9 @@ def render_sidebar():
             if st.button("🚀 Apply Model Selection"):
                 # Detect provider change based on model name
                 from personal_agent.tools.streamlit_config import (
+                    args,
                     detect_provider_from_model_name,
                     get_appropriate_base_url,
-                    args,
                 )
 
                 detected_provider = detect_provider_from_model_name(selected_model)
@@ -1343,23 +1382,35 @@ def render_sidebar():
                 if model_changed or url_changed or provider_changed:
                     # CRITICAL: If provider is changing, update URL FIRST before any initialization
                     if provider_changed:
-                        st.warning(f"🔄 Auto-detected provider change from {current_provider} to {detected_provider}")
-                        st.info("💡 **Note**: You selected a model that requires a different provider. The system will switch providers and use the selected model name.")
-                        
+                        st.warning(
+                            f"🔄 Auto-detected provider change from {current_provider} to {detected_provider}"
+                        )
+                        st.info(
+                            "💡 **Note**: You selected a model that requires a different provider. The system will switch providers and use the selected model name."
+                        )
+
                         # CRITICAL: Get the correct URL for the new provider BEFORE initialization
-                        target_url = get_appropriate_base_url(detected_provider, use_remote=args.remote)
+                        target_url = get_appropriate_base_url(
+                            detected_provider, use_remote=args.remote
+                        )
                         new_ollama_url = target_url  # Update URL to match provider
-                        logger.info(f"🔄 Provider change: Updated URL from {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]} to {new_ollama_url}")
-                    
+                        logger.info(
+                            f"🔄 Provider change: Updated URL from {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]} to {new_ollama_url}"
+                        )
+
                     # CRITICAL: Even if provider didn't change, ensure URL matches current provider
                     # This handles the case where user manually changed the URL input
                     if not provider_changed and url_changed:
                         # Verify the URL is appropriate for the current provider
-                        expected_url = get_appropriate_base_url(detected_provider, use_remote=args.remote)
+                        expected_url = get_appropriate_base_url(
+                            detected_provider, use_remote=args.remote
+                        )
                         if new_ollama_url != expected_url:
-                            logger.warning(f"⚠️ URL mismatch: User entered {new_ollama_url}, but provider {detected_provider} expects {expected_url}")
+                            logger.warning(
+                                f"⚠️ URL mismatch: User entered {new_ollama_url}, but provider {detected_provider} expects {expected_url}"
+                            )
                             # Use the user-provided URL but log the discrepancy
-                    
+
                     current_mode = st.session_state.get(
                         SESSION_KEY_AGENT_MODE, "single"
                     )
@@ -1416,11 +1467,13 @@ def render_sidebar():
                                         suggested_url,
                                     )
                                     new_ollama_url = suggested_url
-                                
+
                                 # Clear available models cache to force re-fetch from new provider
                                 if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
                                     del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
-                                    logger.info("🔄 Cleared model cache - user should re-fetch models for new provider")
+                                    logger.info(
+                                        "🔄 Cleared model cache - user should re-fetch models for new provider"
+                                    )
                             else:
                                 st.error(f"❌ Provider switch failed: {message}")
                                 return  # Exit early on provider switch failure
@@ -1534,10 +1587,12 @@ def render_sidebar():
                         if provider_changed:
                             enhanced_msg += f" (auto-switched from {current_provider})"
                             st.success(enhanced_msg)
-                            st.info("💡 **Tip**: After switching providers, click 'Fetch Available Models' to see models available in the new provider")
+                            st.info(
+                                "💡 **Tip**: After switching providers, click 'Fetch Available Models' to see models available in the new provider"
+                            )
                         else:
                             st.success(enhanced_msg)
-                        
+
                         st.rerun()
                 else:
                     st.info("Model and URL are already current")
@@ -1657,17 +1712,20 @@ def render_sidebar():
 
                 st.write(f"**OLLAMA_URL (local):** {OLLAMA_URL}")
                 st.write(f"**REMOTE_OLLAMA_URL:** {REMOTE_OLLAMA_URL}")
-                
+
                 # Show current provider and calculate effective URL dynamically
                 provider = os.getenv("PROVIDER", "ollama")
                 st.write(f"**Current Provider:** {provider}")
-                
+
                 # Calculate the effective URL based on current provider and remote flag
-                from personal_agent.tools.streamlit_config import get_appropriate_base_url
-                use_remote = st.session_state.get('args', {}).get('remote', False)
+                from personal_agent.tools.streamlit_config import (
+                    get_appropriate_base_url,
+                )
+
+                use_remote = st.session_state.get("args", {}).get("remote", False)
                 effective_url = get_appropriate_base_url(provider, use_remote)
                 st.write(f"**EFFECTIVE_URL (current provider):** {effective_url}")
-                
+
                 st.write(
                     f"**Session Ollama URL:** {st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]}"
                 )
