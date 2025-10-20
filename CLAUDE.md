@@ -113,7 +113,10 @@ poe switch-ollama
 
 ### Configuration and User Management
 - `src/personal_agent/config/settings.py` - Environment and configuration management
+- `src/personal_agent/config/runtime_config.py` - Global configuration manager (centralized, thread-safe)
 - `src/personal_agent/core/user_manager.py` - Multi-user support and switching
+- `src/personal_agent/core/user_registry.py` - User profile registry with extended fields (gender, NPC status)
+- `src/personal_agent/core/user_model.py` - User dataclass with validation
 - `src/personal_agent/config/user_id_mgr.py` - User ID management
 
 ### Interfaces
@@ -139,8 +142,11 @@ Tools are managed through `AgentToolManager`:
 ### User Management
 Multi-user support with complete isolation:
 - User data stored under `$PERSAG_ROOT/agno/<user_id>/`
+- Rich user profiles with extended fields (gender, NPC status for bot users, cognitive state)
+- UserRegistry now uses global configuration manager instead of direct environment variables
 - Dynamic path resolution and service coordination
 - Use `poe switch-user <user_id>` to switch between users
+- Web dashboard provides full user profile management with field validation
 
 ### Model Configuration
 Supports multiple LLM providers:

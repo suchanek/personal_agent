@@ -39,7 +39,7 @@ The agent now features a full-stack, dynamic multi-user system that allows for s
 ### Key Components:
 *   **`UserManager`**: The central orchestrator for all user-related operations (creation, switching, deletion).
 *   **`user_id_mgr.py`**: A dedicated module that handles all user ID and user-specific path management, including the automatic creation of the `~/.persag` environment.
-*   **`UserRegistry`**: A JSON-based registry to persistently manage user profiles.
+*   **`UserRegistry`**: A JSON-based registry to persistently manage user profiles with extended fields (email, phone, address, birth_date, delta_year, cognitive_state, gender, NPC status). Now uses the global configuration manager instead of environment variables.
 *   **`LightRAGManager`**: A Python-native manager to control LightRAG Docker services and inject the current `USER_ID` dynamically.
 *   **`smart-restart-lightrag.sh`**: A robust shell script to prevent port conflicts and ensure service stability during user switches. It now operates on the Docker configurations located in `~/.persag`.
 *   **`switch-user.py`**: A CLI script for creating and switching between users.

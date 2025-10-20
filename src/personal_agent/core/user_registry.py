@@ -1,17 +1,87 @@
 """
-User Registry
+User Registry - Multi-User Management for Personal Agent System
+================================================================
 
-Simple JSON-based registry for tracking users in the Personal Agent system.
+This module provides comprehensive user registry management for the Personal Agent
+system, supporting multiple users with complete profile information, validation,
+and persistence. The registry serves as the single source of truth for all users
+in the system and integrates seamlessly with the global configuration manager.
+
+The UserRegistry class manages:
+- User creation, retrieval, update, and deletion
+- Profile information (email, phone, address, birth date, cognitive state, gender, NPC status)
+- User validation using the User dataclass model
+- Automatic current user registration and tracking
+- JSON-based persistence with thread-safe operations
+- Integration with PersonalAgent's global configuration system
+
+Key Features:
+- **Multi-User Support**: Complete isolation between users with separate data directories
+- **Rich Profiles**: Extended user information including demographics and cognitive state
+- **Validation**: Field-level validation through User dataclass integration
+- **Auto-Registration**: Automatic registration of current user on first access
+- **Configuration Integration**: Uses global configuration manager instead of environment variables
+- **User Objects**: Conversion between dictionary and User dataclass representations
+
+Architecture:
+The registry stores all users in a single JSON file located at:
+    ~/.persag/users_registry.json (configurable via PersonalAgentConfig)
+
+Each user entry contains:
+- Basic info: user_id, user_name, user_type
+- Contact: email, phone, address
+- Personal: birth_date, delta_year, cognitive_state, gender
+- System: created_at, last_seen, npc (bot user flag)
+
+Usage:
+    from personal_agent.core.user_registry import UserRegistry
+
+    registry = UserRegistry()
+
+    # Add a new user
+    success = registry.add_user(
+        user_id="john_doe",
+        user_name="John Doe",
+        email="john@example.com",
+        gender="Male",
+        cognitive_state=100
+    )
+
+    # Get current user
+    current_user = registry.get_current_user()
+
+    # Update user profile
+    result = registry.update_user_profile(
+        "john_doe",
+        email="newemail@example.com",
+        cognitive_state=95
+    )
+
+Author: Eric G. Suchanek, PhD
+Revision Date: October 20, 2025
+License: Apache 2.0
+
+Copyright 2025 Eric G. Suchanek, PhD
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from personal_agent.config import PERSAG_HOME, STORAGE_BACKEND
-from personal_agent.config.user_id_mgr import get_current_user_id, get_userid
+from personal_agent.config.runtime_config import get_config
 
 from .user_model import User
 
@@ -24,12 +94,16 @@ class UserRegistry:
         Initialize the user registry.
 
         Args:
-            data_dir: Data directory path (defaults to config DATA_DIR)
-            storage_backend: Storage backend (defaults to config STORAGE_BACKEND)
+            data_dir: Data directory path (defaults to config persag_home)
+            storage_backend: Storage backend (defaults to config storage_backend)
         """
-        if data_dir is None or storage_backend is None:
-            data_dir = data_dir or PERSAG_HOME
-            storage_backend = storage_backend or STORAGE_BACKEND
+        # Get configuration from global config manager
+        config = get_config()
+
+        if data_dir is None:
+            data_dir = config.persag_home
+        if storage_backend is None:
+            storage_backend = config.storage_backend
 
         self.registry_file = Path(data_dir) / "users_registry.json"
         self.registry_file.parent.mkdir(parents=True, exist_ok=True)
@@ -244,22 +318,24 @@ class UserRegistry:
 
     def get_current_user(self) -> Optional[Dict[str, Any]]:
         """
-        Get the current user from the single source of truth (user_id_mgr).
+        Get the current user from the global configuration manager.
 
         Returns:
             Current user dictionary or None if not found
         """
-        return self.get_user(get_current_user_id())
+        config = get_config()
+        return self.get_user(config.user_id)
 
     def ensure_current_user_registered(self) -> bool:
         """
-        Ensure the current USER_ID is registered in the registry.
+        Ensure the current user_id is registered in the registry.
         Auto-registers if not found.
 
         Returns:
             True if user was already registered or successfully added
         """
-        current_user_id = get_userid()
+        config = get_config()
+        current_user_id = config.user_id
         if self.user_exists(current_user_id):
             # Update last_seen for existing user
             self.update_last_seen(current_user_id)
