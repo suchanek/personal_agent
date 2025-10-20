@@ -40,10 +40,13 @@ class User:
         None  # Years from birth when writing memories (e.g., 6 for writing as 6-year-old)
     )
     cognitive_state: int = 100  # 0-100 scale, default to 100
+    gender: str = "N/A"  # Must be 'Male', 'Female', or 'N/A'
+    npc: bool = False  # True if this user is a bot/NPC for knowledge consolidation
 
     def __post_init__(self):
         """Validate fields after initialization."""
         self.validate_cognitive_state()
+        self.validate_gender()
         if self.email:
             self.validate_email()
         if self.phone:
@@ -68,6 +71,25 @@ class User:
 
         if not (0 <= self.cognitive_state <= 100):
             raise ValueError("Cognitive state must be between 0 and 100")
+
+        return True
+
+    def validate_gender(self) -> bool:
+        """
+        Ensure gender is one of the allowed values.
+
+        Returns:
+            True if valid
+
+        Raises:
+            ValueError: If gender is not one of the allowed values
+        """
+        allowed_genders = {"Male", "Female", "N/A"}
+
+        if self.gender not in allowed_genders:
+            raise ValueError(
+                f"Gender must be one of {allowed_genders}, got: {self.gender}"
+            )
 
         return True
 
@@ -189,7 +211,10 @@ class User:
 
                 # Only validate memory year if birth_date is in the past
                 # If birth_date is in the future, allow any reasonable delta_year
-                if birth_datetime.date() <= datetime.now().date() and memory_year > current_year:
+                if (
+                    birth_datetime.date() <= datetime.now().date()
+                    and memory_year > current_year
+                ):
                     raise ValueError(
                         f"Delta year {self.delta_year} from birth year {birth_datetime.year} "
                         f"results in memory year {memory_year}, which is in the future"
@@ -221,6 +246,8 @@ class User:
             "birth_date": self.birth_date,
             "delta_year": self.delta_year,
             "cognitive_state": self.cognitive_state,
+            "gender": self.gender,
+            "npc": self.npc,
         }
 
     @classmethod
@@ -247,6 +274,8 @@ class User:
             birth_date=data.get("birth_date"),
             delta_year=data.get("delta_year"),
             cognitive_state=data.get("cognitive_state", 50),
+            gender=data.get("gender", "N/A"),
+            npc=data.get("npc", False),
         )
 
     def update_last_seen(self):
@@ -317,6 +346,8 @@ class User:
             "birth_date",
             "delta_year",
             "cognitive_state",
+            "gender",
+            "npc",
         }
 
         for field, value in kwargs.items():
@@ -339,6 +370,8 @@ class User:
                     self.validate_birth_date()
                 elif field == "delta_year" and value is not None:
                     self.validate_delta_year()
+                elif field == "gender":
+                    self.validate_gender()
 
                 updated_fields.append(field)
 
@@ -363,9 +396,7 @@ class User:
         Returns:
             Dictionary with profile completion information
         """
-        total_fields = (
-            6  # email, phone, address, birth_date, delta_year, cognitive_state
-        )
+        total_fields = 8  # email, phone, address, birth_date, delta_year, cognitive_state, gender, npc
         completed_fields = 0
 
         if self.email:
@@ -379,6 +410,10 @@ class User:
         if self.delta_year is not None:
             completed_fields += 1
         # cognitive_state always has a value (default 50)
+        completed_fields += 1
+        # gender always has a value (default "N/A")
+        completed_fields += 1
+        # npc always has a value (default False)
         completed_fields += 1
 
         return {
@@ -401,15 +436,19 @@ class User:
     def __str__(self) -> str:
         """String representation of the user."""
         # Include core fields and key optional fields for readability
-        parts = [f"id={self.user_id}", f"name={self.user_name}", f"type={self.user_type}"]
-        
+        parts = [
+            f"id={self.user_id}",
+            f"name={self.user_name}",
+            f"type={self.user_type}",
+        ]
+
         if self.email:
             parts.append(f"email={self.email}")
         if self.cognitive_state != 100:  # Only show if not default
             parts.append(f"cognitive_state={self.cognitive_state}")
         if self.delta_year is not None:
             parts.append(f"delta_year={self.delta_year}")
-            
+
         return f"User({', '.join(parts)})"
 
     def __repr__(self) -> str:

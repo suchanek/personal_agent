@@ -247,10 +247,25 @@ def main():
     st.sidebar.title("🧠 PersonalAgent Dashboard")
 
     # Navigation
+    # Initialize selected tab in session state if not exists
+    if "selected_tab" not in st.session_state:
+        st.session_state.selected_tab = "System Status"
+
     selected_tab = st.sidebar.radio(
         "Navigation",
         ["System Status", "User Management", "Memory Management", "API Endpoints"],
+        index=[
+            "System Status",
+            "User Management",
+            "Memory Management",
+            "API Endpoints",
+        ].index(st.session_state.selected_tab),
+        key="tab_selection",
     )
+
+    # Update session state when tab changes
+    if selected_tab != st.session_state.selected_tab:
+        st.session_state.selected_tab = selected_tab
 
     # Display version information
     try:
