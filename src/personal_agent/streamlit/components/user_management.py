@@ -100,6 +100,8 @@ def _render_user_overview():
                         st.write(f"Type: {user['user_type']}")
                         st.write(f"Birth Date: {user.get('birth_date', 'Not set')}")
                         st.write(f"Delta Year: {user.get('delta_year', 'Not set')}")
+                        st.write(f"Gender: {user.get('gender', 'N/A')}")
+                        st.write(f"NPC: {'Yes' if user.get('npc', False) else 'No'}")
                         st.write(f"Created: {user.get('created_at', 'N/A')}")
                         st.write(f"Last Seen: {user.get('last_seen', 'N/A')}")
 
@@ -200,6 +202,18 @@ def _render_create_user():
             help="User's cognitive state on a scale of 0-100",
         )
 
+        gender = st.selectbox(
+            "Gender",
+            ["N/A", "Male", "Female"],
+            help="User's gender",
+        )
+
+        npc = st.checkbox(
+            "NPC (Bot User)",
+            value=False,
+            help="Mark this user as an NPC (Non-Player Character) for knowledge consolidation",
+        )
+
         st.write("**System Options**")
         create_docker = st.checkbox(
             "Create Docker Containers",
@@ -227,6 +241,8 @@ def _render_create_user():
                     birth_date=birth_date.isoformat() if birth_date else None,
                     delta_year=delta_year if delta_year is not None else None,
                     cognitive_state=cognitive_state,
+                    gender=gender,
+                    npc=npc,
                     create_docker=create_docker,
                 )
 
@@ -260,8 +276,29 @@ def _render_profile_management():
         user_ids = [user["user_id"] for user in users]
 
         if user_ids:
-            # User selection
-            selected_user = st.selectbox("Select User to Manage", user_ids)
+            # Initialize selected user in session state if not exists
+            if "profile_selected_user" not in st.session_state:
+                st.session_state.profile_selected_user = user_ids[0]
+
+            # Ensure the selected user is still valid (in case user was deleted)
+            if st.session_state.profile_selected_user not in user_ids:
+                st.session_state.profile_selected_user = user_ids[0]
+
+            # User selection with session state persistence
+            selected_user = st.selectbox(
+                "Select User to Manage",
+                user_ids,
+                index=(
+                    user_ids.index(st.session_state.profile_selected_user)
+                    if st.session_state.profile_selected_user in user_ids
+                    else 0
+                ),
+                key="profile_user_selector",
+            )
+
+            # Update session state when user changes
+            if selected_user != st.session_state.profile_selected_user:
+                st.session_state.profile_selected_user = selected_user
 
             if selected_user:
                 # Get current user details
@@ -285,6 +322,10 @@ def _render_profile_management():
                         )
                         st.write(
                             f"Cognitive State: {user_details.get('cognitive_state', 50)}/100"
+                        )
+                        st.write(f"Gender: {user_details.get('gender', 'N/A')}")
+                        st.write(
+                            f"NPC: {'Yes' if user_details.get('npc', False) else 'No'}"
                         )
 
                     with col2:
@@ -403,6 +444,22 @@ def _render_profile_management():
                                 memory_year = new_birth_date.year + new_delta_year
                                 st.info(f"Memory context year: {memory_year}")
 
+                            # Gender
+                            current_gender = user_details.get("gender", "N/A")
+                            new_gender = st.selectbox(
+                                "Gender",
+                                ["N/A", "Male", "Female"],
+                                index=["N/A", "Male", "Female"].index(current_gender),
+                                help="User's gender",
+                            )
+
+                            # NPC Status
+                            new_npc = st.checkbox(
+                                "NPC (Bot User)",
+                                value=user_details.get("npc", False),
+                                help="Mark this user as an NPC (Non-Player Character) for knowledge consolidation",
+                            )
+
                             personal_submitted = st.form_submit_button(
                                 "Update Personal Info"
                             )
@@ -421,6 +478,8 @@ def _render_profile_management():
                                             if new_delta_year is not None
                                             else None
                                         ),
+                                        gender=new_gender,
+                                        npc=new_npc,
                                     )
 
                                     if result["success"]:
@@ -532,20 +591,40 @@ def _render_switch_user():
             available_users = [uid for uid in user_ids if uid != current_user_id]
 
             if available_users:
+                # Initialize selected user in session state if not exists
+                if "switch_selected_user" not in st.session_state:
+                    st.session_state.switch_selected_user = ""
+
+                # Ensure the selected user is still valid (in case user was deleted or became current)
+                if st.session_state.switch_selected_user not in available_users:
+                    st.session_state.switch_selected_user = ""
+
                 # User selection dropdown
                 st.write("**Select User to Switch To:**")
+                options = [""] + available_users
+                current_index = 0
+                if st.session_state.switch_selected_user in options:
+                    current_index = options.index(st.session_state.switch_selected_user)
+
                 selected_user = st.selectbox(
                     "Available Users",
-                    [""] + available_users,
+                    options,
+                    index=current_index,
                     help="Choose the user you want to switch to",
-                    key="switch_user_selectbox"
+                    key="switch_user_selectbox",
                 )
+
+                # Update session state when user changes
+                if selected_user != st.session_state.switch_selected_user:
+                    st.session_state.switch_selected_user = selected_user
 
                 if selected_user:
                     # Show selected user details
                     user_details = get_user_details(selected_user)
                     if user_details:
-                        st.success(f"**Selected:** {user_details.get('user_name', selected_user)} ({selected_user})")
+                        st.success(
+                            f"**Selected:** {user_details.get('user_name', selected_user)} ({selected_user})"
+                        )
 
                         # Display user information
                         col1, col2 = st.columns(2)
@@ -563,7 +642,9 @@ def _render_switch_user():
 
                             profile_summary = user_details.get("profile_summary", {})
                             if profile_summary and not profile_summary.get("error"):
-                                completion = profile_summary.get("completion_percentage", 0)
+                                completion = profile_summary.get(
+                                    "completion_percentage", 0
+                                )
                                 st.write(f"• Profile Complete: {completion:.1f}%")
                                 st.progress(completion / 100)
 
@@ -578,114 +659,174 @@ def _render_switch_user():
                         if st.button(
                             f"🔄 Switch to {user_details.get('user_name', selected_user)}",
                             type="primary",
-                            use_container_width=True
+                            use_container_width=True,
                         ):
-                                # Perform the switch via REST API
-                                with st.spinner(f"Switching to user '{selected_user}'... This may take a moment."):
-                                    try:
-                                        import requests
+                            # Perform the switch via REST API
+                            with st.spinner(
+                                f"Switching to user '{selected_user}'... This may take a moment."
+                            ):
+                                try:
+                                    import requests
 
-                                        # Call the REST API switch endpoint from paga_streamlit_agno
-                                        # Port 8001 is used by paga_streamlit_agno (dashboard uses 8002)
-                                        api_url = "http://localhost:8001/api/v1/users/switch"
+                                    # Call the REST API switch endpoint from paga_streamlit_agno
+                                    # Port 8001 is used by paga_streamlit_agno (dashboard uses 8002)
+                                    api_url = (
+                                        "http://localhost:8001/api/v1/users/switch"
+                                    )
 
-                                        response = requests.post(
-                                            api_url,
-                                            json={
-                                                "user_id": selected_user,
-                                                "restart_containers": True
-                                            },
-                                            timeout=30
-                                        )
+                                    response = requests.post(
+                                        api_url,
+                                        json={
+                                            "user_id": selected_user,
+                                            "restart_containers": True,
+                                        },
+                                        timeout=30,
+                                    )
 
-                                        if response.status_code == 200:
-                                            result = response.json()
-                                            if result.get("success") == "True":
-                                                st.success("✅ **User switched successfully!**")
-                                                st.info(f"**Now active as:** {selected_user}")
+                                    if response.status_code == 200:
+                                        result = response.json()
+                                        if result.get("success") == "True":
+                                            st.success(
+                                                "✅ **User switched successfully!**"
+                                            )
+                                            st.info(
+                                                f"**Now active as:** {selected_user}"
+                                            )
 
-                                                # Display success details
-                                                if result.get("actions_performed"):
-                                                    st.info("**Actions performed:**")
-                                                    for action in result["actions_performed"]:
-                                                        st.write(f"• {action}")
+                                            # Display success details
+                                            if result.get("actions_performed"):
+                                                st.info("**Actions performed:**")
+                                                for action in result[
+                                                    "actions_performed"
+                                                ]:
+                                                    st.write(f"• {action}")
 
-                                                # Clear cached user manager to refresh user list
-                                                from personal_agent.streamlit.utils.user_utils import get_user_manager
-                                                get_user_manager.clear()
+                                            # Clear cached user manager to refresh user list
+                                            from personal_agent.streamlit.utils.user_utils import (
+                                                get_user_manager,
+                                            )
 
-                                                # Success message with refresh suggestion
-                                                st.success("🎉 **Switch Complete!** You may need to refresh the page to see all changes take effect.")
-                                            else:
-                                                error_msg = result.get("error", "Unknown error")
-                                                st.error(f"❌ **Switch failed:** {error_msg}")
+                                            get_user_manager.clear()
+
+                                            # Success message with refresh suggestion
+                                            st.success(
+                                                "🎉 **Switch Complete!** You may need to refresh the page to see all changes take effect."
+                                            )
                                         else:
-                                            st.error(f"❌ Switch request failed with status code: {response.status_code}")
-                                            try:
-                                                error_detail = response.json().get("error", "No details available")
-                                                st.error(f"Error details: {error_detail}")
-                                            except:
-                                                pass
+                                            error_msg = result.get(
+                                                "error", "Unknown error"
+                                            )
+                                            st.error(
+                                                f"❌ **Switch failed:** {error_msg}"
+                                            )
+                                    else:
+                                        st.error(
+                                            f"❌ Switch request failed with status code: {response.status_code}"
+                                        )
+                                        try:
+                                            error_detail = response.json().get(
+                                                "error", "No details available"
+                                            )
+                                            st.error(f"Error details: {error_detail}")
+                                        except:
+                                            pass
 
-                                    except requests.exceptions.RequestException as e:
-                                        st.error(f"❌ **Error connecting to REST API:** {str(e)}")
-                                        st.info("Make sure the Personal Agent service (paga_streamlit_agno) is running on port 8001.")
-                                    except Exception as e:
-                                        st.error(f"❌ **Error during user switch:** {str(e)}")
-                                        st.info("If this error persists, try using the command-line switch-user.py script instead.")
+                                except requests.exceptions.RequestException as e:
+                                    st.error(
+                                        f"❌ **Error connecting to REST API:** {str(e)}"
+                                    )
+                                    st.info(
+                                        "Make sure the Personal Agent service (paga_streamlit_agno) is running on port 8001."
+                                    )
+                                except Exception as e:
+                                    st.error(
+                                        f"❌ **Error during user switch:** {str(e)}"
+                                    )
+                                    st.info(
+                                        "If this error persists, try using the command-line switch-user.py script instead."
+                                    )
 
                         # Alternative: Quick switch without confirmation (for power users)
                         with st.expander("⚡ Quick Switch (Advanced)"):
-                            st.warning("This bypasses additional confirmation and refreshes automatically. Use with caution!")
+                            st.warning(
+                                "This bypasses additional confirmation and refreshes automatically. Use with caution!"
+                            )
                             if st.button(
                                 f"⚡ Quick Switch to {user_details.get('user_name', selected_user)}",
-                                type="secondary"
+                                type="secondary",
                             ):
-                                with st.spinner(f"Quick switching to user '{selected_user}'..."):
+                                with st.spinner(
+                                    f"Quick switching to user '{selected_user}'..."
+                                ):
                                     try:
                                         import requests
 
                                         # Call the REST API switch endpoint
-                                        api_url = "http://localhost:8001/api/v1/users/switch"
+                                        api_url = (
+                                            "http://localhost:8001/api/v1/users/switch"
+                                        )
 
                                         response = requests.post(
                                             api_url,
                                             json={
                                                 "user_id": selected_user,
-                                                "restart_containers": True
+                                                "restart_containers": True,
                                             },
-                                            timeout=30
+                                            timeout=30,
                                         )
 
                                         if response.status_code == 200:
                                             result = response.json()
                                             if result.get("success") == "True":
-                                                st.success("✅ **Quick switch completed!**")
-                                                st.info(f"**Now active as:** {selected_user}")
+                                                st.success(
+                                                    "✅ **Quick switch completed!**"
+                                                )
+                                                st.info(
+                                                    f"**Now active as:** {selected_user}"
+                                                )
 
                                                 # Clear cached user manager
-                                                from personal_agent.streamlit.utils.user_utils import get_user_manager
+                                                from personal_agent.streamlit.utils.user_utils import (
+                                                    get_user_manager,
+                                                )
+
                                                 get_user_manager.clear()
 
                                                 st.success("🔄 Refreshing user data...")
                                                 st.rerun()
                                             else:
-                                                st.error(f"❌ **Quick switch failed:** {result.get('error', 'Unknown error')}")
+                                                st.error(
+                                                    f"❌ **Quick switch failed:** {result.get('error', 'Unknown error')}"
+                                                )
                                         else:
-                                            st.error(f"❌ Quick switch request failed with status code: {response.status_code}")
+                                            st.error(
+                                                f"❌ Quick switch request failed with status code: {response.status_code}"
+                                            )
 
                                     except requests.exceptions.RequestException as e:
-                                        st.error(f"❌ **Error connecting to REST API:** {str(e)}")
-                                        st.info("Make sure the Personal Agent service (paga_streamlit_agno) is running on port 8001.")
+                                        st.error(
+                                            f"❌ **Error connecting to REST API:** {str(e)}"
+                                        )
+                                        st.info(
+                                            "Make sure the Personal Agent service (paga_streamlit_agno) is running on port 8001."
+                                        )
                                     except Exception as e:
-                                        st.error(f"❌ **Error during quick switch:** {str(e)}")
+                                        st.error(
+                                            f"❌ **Error during quick switch:** {str(e)}"
+                                        )
 
                     else:
-                        st.error(f"Could not retrieve details for user '{selected_user}'")
+                        st.error(
+                            f"Could not retrieve details for user '{selected_user}'"
+                        )
                 else:
-                    st.info("👆 Select a user from the dropdown above to switch to them.")
+                    st.info(
+                        "👆 Select a user from the dropdown above to switch to them."
+                    )
             else:
-                st.info("ℹ️ No other users available to switch to. Create additional users first.")
+                st.info(
+                    "ℹ️ No other users available to switch to. Create additional users first."
+                )
         else:
             st.info("ℹ️ No users found. Create users first before switching.")
 
