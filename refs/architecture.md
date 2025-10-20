@@ -58,6 +58,9 @@ This layer is the primary entry point for user interaction.
 
 - **Streamlit Web UI (`paga_streamlit`)**: A rich, interactive web interface for managing the agent, users, and system settings. It provides a full-featured dashboard for memory synchronization, user switching, and model selection.
 - **Command-Line Interface (`paga_cli`)**: A lightweight, scriptable interface for advanced users and automation. It supports all core functionalities, including agent interaction, user management, and system configuration.
+- **REST API**: A comprehensive REST API for programmatic access to all agent capabilities, including memory operations, knowledge queries, and agent interactions. Enables integration with external tools and automation workflows.
+- **macOS/iOS Shortcuts Integration**: Native Apple Shortcuts provide seamless mobile and desktop access to core agent functions (add memories, search knowledge, chat with agent) without requiring web interface access. Uses REST API for secure communication.
+- **Tailscale Network Integration**: Secure, zero-config VPN providing encrypted remote access to the agent from any device. Enables private network connectivity without exposing services to the public internet.
 
 ### 2.2. Agent Core (Agno Framework)
 
@@ -73,7 +76,7 @@ The heart of the system, powered by the **Agno Framework**. This layer is respon
 
 This layer provides the agent with long-term memory and access to a structured knowledge base. It features a dual-system approach for both memory and knowledge.
 
-- **Semantic Memory Manager**: A sophisticated system that stores and retrieves user-specific memories. It uses a hybrid approach, combining a local SQLite database for structured data and a LanceDB-powered vector store for semantic search. Memory operations are exposed as standalone functions that are registered directly as agent tools, eliminating the need for a separate tool wrapper class.
+- **Semantic Memory Manager**: A sophisticated system that stores and retrieves user-specific memories. It uses a hybrid approach, combining a local SQLite database for structured data and a LanceDB-powered vector store for semantic search. Memory operations are exposed as standalone functions that are registered directly as agent tools, eliminating the need for a separate tool wrapper class. User context is retrieved from the global configuration manager.
 - **Dual Knowledge Base Architecture**: The system supports two distinct, parallel knowledge bases:
     - **Local Semantic KB (LanceDB)**: A fast, local vector store for semantic search on ingested documents. It uses dedicated `SemanticKnowledgeIngestionTools` for content ingestion and provides rapid similarity-based retrieval.
     - **Graph Knowledge Base (LightRAG)**: A powerful, RAG-enhanced knowledge base for storing and reasoning about complex relationships and large document collections. It uses `KnowledgeIngestionTools` and supports advanced graph-based reasoning.
@@ -81,20 +84,20 @@ This layer provides the agent with long-term memory and access to a structured k
 - **Enriched Graph Ingestion Pipeline**: Enhanced entity and relationship extraction process that improves knowledge graph construction accuracy through advanced NLP processing and file upload approaches.
 - **Multi-User System**: A robust system that ensures data isolation and service stability in a multi-user environment. It dynamically manages user contexts, configurations, and services.
 
-### 2.5. Multi-User Management Layer
+### 2.4. Multi-User Management Layer
 
 This layer provides comprehensive multi-user support with dynamic context switching and data isolation:
 
 - **UserManager**: The central orchestrator for all user-related operations including creation, switching, and deletion. Manages the complete user lifecycle and ensures proper service coordination.
-- **UserRegistry**: A JSON-based registry that persistently manages user profiles, storing user metadata and configuration preferences.
-- **Dynamic Context Management**: Uses `env.userid` file at the project root as the single source of truth for the current user context. This enables runtime user switching without system restarts.
+- **UserRegistry**: A JSON-based registry that persistently manages rich user profiles with extended fields including demographics (gender), system roles (NPC status for bot users), and cognitive states. Uses the global configuration manager for centralized settings access instead of direct environment variables.
+- **Dynamic Context Management**: Uses `~/.persag/env.userid` file as the single source of truth for the current user context. This enables runtime user switching without system restarts.
 - **LightRAGManager**: A Python-native manager that controls LightRAG Docker services and dynamically injects the current `USER_ID` into service configurations.
 - **Service Isolation**: Each user maintains separate data directories, memory stores, and LightRAG instances to ensure complete data isolation.
 - **Operational Tools**:
   - `switch-user.py`: CLI script for creating and switching between users
   - `smart-restart-lightrag.sh`: Robust shell script that prevents port conflicts and ensures service stability during user switches
 
-### 2.6. Tool Execution Architecture
+### 2.5. Tool Execution Architecture
 
 The system implements a mandatory **ephemeral agent pattern** for all MCP tool interactions to ensure absolute stability:
 
@@ -107,7 +110,7 @@ The system implements a mandatory **ephemeral agent pattern** for all MCP tool i
 
 The system supports multiple model providers through a unified interface:
 
-- **Ollama Integration**: Primary local LLM provider supporting models like llama3.1:8b, qwen3:8b, and qwen2.5:7b-instruct
+- **Ollama Integration**: Primary local LLM provider supporting models like llama3.1:8b, qwen3:8b, and qwen2.5:7b-instruct. Ollama runs as a centralized LaunchAgent service (user-independent) for system-wide availability across all users.
 - **LMStudio Integration**: Specialized support for MLX-optimized models on Apple Silicon (e.g., qwen3-4b-mlx), treated as OpenAI-compatible endpoints
 - **OpenAI-Compatible Interface**: Unified API interface that allows seamless switching between Ollama and LMStudio models
 - **Runtime Role Mapping Fix**: Implements a workaround for a critical bug in the Agno framework where the `system` role was incorrectly mapped to `developer`, causing API errors
@@ -131,6 +134,8 @@ The architecture integrates multiple specialized components through well-defined
 - **Docker Service Integration**: Automated lifecycle management for LightRAG and other containerized services
 - **Multi-Provider Model Integration**: Seamless switching between Ollama and LMStudio model providers
 - **MCP Protocol Integration**: Standardized interface for external tool and service access
+- **REST API Integration**: Comprehensive API endpoints enabling programmatic access and mobile/desktop shortcuts integration
+- **Tailscale Network Integration**: Secure remote access via encrypted VPN without port forwarding or public exposure
 
 ### 3.2. Data Integration
 - **Cross-System Memory Sync**: Coordination between SQLite local storage and LightRAG graph memory
@@ -150,13 +155,15 @@ The system prioritizes data privacy and security through local processing and is
 - **Context Isolation**: Each user maintains completely separate memory, knowledge, and configuration contexts
 - **Service Isolation**: Per-user LightRAG instances prevent cross-user data contamination
 - **Dynamic Context Switching**: Secure user switching without data persistence across sessions
+- **Network Security**: Tailscale integration provides encrypted, zero-trust network access without exposing services publicly
+- **API Authentication**: REST API endpoints secured for authorized access from mobile shortcuts and external integrations
 
 ## 5. Data Flow
 
 The data flow within the system is designed to be efficient and secure, incorporating the multi-user context and ephemeral tool patterns:
 
 1.  **User Input**: The user interacts with the agent through one of the interfaces (Web UI or CLI).
-2.  **User Context Resolution**: The system reads the current user context from `env.userid` file and applies user-specific configurations.
+2.  **User Context Resolution**: The system reads the current user context from `~/.persag/env.userid` file (via the global configuration manager) and applies user-specific configurations.
 3.  **Agent Core Processing**: The Agent Core receives the input and, using the Agno Framework with lazy initialization, determines the user's intent.
 4.  **Tool Selection**: The agent selects the appropriate tool(s) to handle the request. For MCP tools, it creates ephemeral clients following the mandatory stability pattern.
 5.  **Memory/Knowledge Access**: If the request requires memory or knowledge access, the KnowledgeCoordinator routes queries to the appropriate backend (local semantic or LightRAG graph). All operations are user-specific.
@@ -191,6 +198,7 @@ Advanced memory consistency management across dual storage systems:
 
 Dynamic configuration system supporting multi-user environments:
 
+- **Global Configuration Manager** (`PersonalAgentConfig`): Thread-safe singleton providing centralized access to all configuration settings, replacing scattered environment variable usage. Components should use `get_config()` instead of `os.getenv()`.
 - **Dynamic User Context**: The `USER_ID` is managed automatically by the user system and should not be set manually in environment files.
 - **User-Specific Directories**: Each user maintains separate data directories for LightRAG storage, memory databases, and input processing.
 - **Service Configuration Injection**: Runtime injection of user context into Docker services and configuration files.
@@ -225,11 +233,15 @@ The system uses a hierarchical and user-aware set of environment variables to ma
 The system is designed for local deployment with emphasis on ease of use and multi-user support:
 
 - **Dependencies**: Managed with Poetry for consistent development environments.
-- **Service Orchestration**: Key services like LightRAG and Ollama are managed with Docker Compose, with intelligent restart capabilities.
+- **Service Orchestration**: Key services like LightRAG are managed with Docker Compose, with intelligent restart capabilities. Ollama runs as a centralized LaunchAgent service (user-independent) for system-wide access.
 - **User Management**: Dynamic user creation and switching through CLI tools and web interface.
+- **Network Access**: 
+  - Local access via localhost interfaces
+  - Secure remote access via Tailscale encrypted VPN
+  - REST API for programmatic and mobile shortcuts integration
 - **Configuration**:
-  - System-wide settings via environment variables
-  - User context managed through `env.userid` file
+  - System-wide settings via global configuration manager (`PersonalAgentConfig`)
+  - User context managed through `~/.persag/env.userid` file
   - Dynamic service configuration injection
   - Automated directory structure creation per user
 

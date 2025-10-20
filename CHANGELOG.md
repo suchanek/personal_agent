@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.8.75] - 2025-10-20
+
+### Added
+- **Enhanced User Profile Model**: Extended the `User` dataclass with `gender` (validated against "Male", "Female", "N/A") and `npc` (boolean) fields, enabling richer user profiles and support for bot users. These fields are fully integrated across the entire stack including serialization, persistence, and UI components.
+
+### Changed
+- **Centralized Configuration in User Registry**: Refactored `user_registry.py` to use the global `PersonalAgentConfig` singleton (`get_config()`) instead of scattered environment variables, improving maintainability and consistency with the rest of the codebase.
+- **Enhanced Dashboard User Management**: Updated the Streamlit dashboard's user management interface to include gender selection (selectbox) and NPC designation (checkbox) in the Personal Info tab, with proper session state management for UI persistence across user selections and tab changes.
+- **Improved UI Persistence**: Implemented comprehensive session state management in the dashboard to maintain selected tabs and user selections across reruns, preventing the frustrating behavior of resetting to the main pane when managing users.
+
+### Fixed
+- **User Model Validation**: Added robust validation for the new gender field with clear error messages for invalid values, ensuring data integrity throughout the system.
+- **Documentation Accuracy**: Corrected and expanded `architecture.md` to accurately document previously undocumented features including REST API endpoints, macOS/iOS Shortcuts integration, Tailscale secure networking, and the centralized Ollama LaunchAgent service.
+
+### Documentation
+- **Comprehensive Module Attribution**: Updated module docstrings across the user management stack with proper author attribution (Eric G. Suchanek, PhD), current revision dates, and Apache 2.0 license information.
+- **Architecture Documentation Updates**: Extensively updated `architecture.md`, `CLAUDE.md`, and `GEMINI.md` to reflect the enhanced user management capabilities, configuration patterns, and network access features.
+
 ## [v0.8.74] - 2025-10-17
 
 ### Changed
