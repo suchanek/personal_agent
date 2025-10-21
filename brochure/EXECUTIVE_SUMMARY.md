@@ -74,7 +74,7 @@ The Personal Agent system presents a groundbreaking opportunity for individuals 
 - **Recognition Assistance**: Help identifying people and places using stored information
 - **Routine Maintenance**: Maintaining familiar patterns and preferences as cognition changes
 - **Caregiver Support**: Providing family members with insights into the patient's history and preferences
-- **Memory Care Alerts**: We have some guardrails in place to identify statements of potential
+- **Memory Care Alerts**: We have some guardrails in place to identify statements of potential self-harm.
 
 #### 👑 **Dignity Preservation**
 
