@@ -15,41 +15,96 @@ The system is designed to be a modular, extensible, and powerful personal assist
 
 The architecture can be visualized as a series of interconnected layers, each with a distinct responsibility:
 
-```
-+---------------------------------------------------------------+
-|                    Interfaces (UI/CLI)                       |
-|        (Streamlit Web UI, Command-Line Interface)            |
-+-------------------------------+-------------------------------+
-                                |
-+-------------------------------v-------------------------------+
-|                        Agent Core (Agno)                     |
-|     (Orchestration, Lazy Init, Task Mgmt, Tool Routing)      |
-+-------------------------------+-------------------------------+
-                                |
-+-------------------------------v-------------------------------+
-|                   Multi-User Management Layer                |
-|    (UserManager, UserRegistry, Dynamic Context Switching)    |
-+-------------------------------+-------------------------------+
-                                |
-+-------------------------------v-------------------------------+
-|              Memory & Knowledge Management Layer             |
-|   (Semantic Memory, Dual KB, KnowledgeCoordinator, Sync)     |
-+-------------------------------+-------------------------------+
-                                |
-+-------------------------------v-------------------------------+
-|                   Tool Execution Architecture                |
-|        (Ephemeral MCP Agents, Resource Isolation)            |
-+-------------------------------+-------------------------------+
-                                |
-+-------------------------------v-------------------------------+
-|                    Model Integration Layer                   |
-|           (Ollama, LMStudio, OpenAI-Compatible)              |
-+-------------------------------+-------------------------------+
-                                |
-+-------------------------------v-------------------------------+
-|                     Backend Services                         |
-|        (LightRAG Server, Docker Services, Monitoring)        |
-+---------------------------------------------------------------+
+```mermaid
+graph TB
+    subgraph "Interface Layer"
+        UI[Streamlit Web UI]
+        CLI[Command-Line Interface]
+        API[REST API]
+        SHORTCUTS[macOS/iOS Shortcuts]
+    end
+
+    subgraph "Agent Core Layer"
+        AGNO[Agent Core - Agno Framework]
+        ORCH[Orchestration & Lazy Init]
+        TASK[Team Management]
+        ROUTE[Tool Routing]
+    end
+
+    subgraph "Multi-User Management"
+        UMGR[UserManager]
+        UREG[UserRegistry]
+        CTX[Dynamic Context Switching]
+    end
+
+    subgraph "Memory & Knowledge Layer"
+        MEM[Semantic Memory Manager]
+        LOCAL_KB[Local Semantic KB - LanceDB]
+        GRAPH_KB[Graph KB - LightRAG]
+        COORD[KnowledgeCoordinator]
+    end
+
+    subgraph "Tool Execution Layer"
+        EPHEMERAL[Ephemeral MCP Agents]
+        ISOLATION[Resource Isolation]
+        TOOLS[Tool Registry]
+    end
+
+    subgraph "Model Integration Layer"
+        OLLAMA[Ollama Local Models]
+        LMSTUDIO[LMStudio MLX Models]
+        OPENAI[OpenAI-Compatible API]
+    end
+
+    subgraph "Backend Services"
+        LIGHTRAG[LightRAG Docker Service]
+        MCP[MCP Servers]
+        DOCKER[Docker Orchestration]
+        MONITOR[Pipeline Monitoring]
+    end
+
+    UI --> AGNO
+    CLI --> AGNO
+    API --> AGNO
+    SHORTCUTS --> API
+
+    AGNO --> ORCH
+    ORCH --> TASK
+    ORCH --> ROUTE
+
+    ROUTE --> UMGR
+    UMGR --> UREG
+    UMGR --> CTX
+
+    CTX --> MEM
+    CTX --> COORD
+    COORD --> LOCAL_KB
+    COORD --> GRAPH_KB
+
+    ROUTE --> EPHEMERAL
+    EPHEMERAL --> ISOLATION
+    EPHEMERAL --> TOOLS
+
+    ORCH --> OLLAMA
+    ORCH --> LMSTUDIO
+    ORCH --> OPENAI
+
+    GRAPH_KB --> LIGHTRAG
+    TOOLS --> MCP
+    LIGHTRAG --> DOCKER
+    DOCKER --> MONITOR
+
+    style UI fill:#e1f5ff
+    style CLI fill:#e1f5ff
+    style API fill:#e1f5ff
+    style SHORTCUTS fill:#e1f5ff
+    style AGNO fill:#fff4e1
+    style UMGR fill:#f3e5f5
+    style MEM fill:#e8f5e9
+    style COORD fill:#e8f5e9
+    style EPHEMERAL fill:#fce4ec
+    style OLLAMA fill:#fff3e0
+    style LIGHTRAG fill:#e0f2f1
 ```
 
 ### 2.1. Interfaces
@@ -209,14 +264,31 @@ Dynamic configuration system supporting multi-user environments:
 The system uses a hierarchical and user-aware set of environment variables to manage data paths, ensuring strict user isolation and maintainability. Direct usage of the base `DATA_DIR` is prohibited in application code; instead, more specific variables should be used.
 
 **Directory Structure:**
-```
-/Users/Shared/personal_agent_data/  (PERSAG_ROOT)
-└── agno/                          (STORAGE_BACKEND)
-    └── {user_id}/                 (USER_ID)
-        ├── data/                  (USER_DATA_DIR)
-        ├── knowledge/             (AGNO_KNOWLEDGE_DIR)
-        ├── rag_storage/           (LIGHTRAG_STORAGE_DIR)
-        └── inputs/                (LIGHTRAG_INPUTS_DIR)
+
+```mermaid
+graph TB
+    ROOT["/Users/Shared/personal_agent_data/<br/>(PERSAG_ROOT)"]
+    BACKEND["agno/<br/>(STORAGE_BACKEND)"]
+    USER["{user_id}/<br/>(USER_ID)"]
+    DATA["data/<br/>(USER_DATA_DIR)"]
+    KNOWLEDGE["knowledge/<br/>(AGNO_KNOWLEDGE_DIR)"]
+    RAG["rag_storage/<br/>(LIGHTRAG_STORAGE_DIR)"]
+    INPUTS["inputs/<br/>(LIGHTRAG_INPUTS_DIR)"]
+
+    ROOT --> BACKEND
+    BACKEND --> USER
+    USER --> DATA
+    USER --> KNOWLEDGE
+    USER --> RAG
+    USER --> INPUTS
+
+    style ROOT fill:#e3f2fd
+    style BACKEND fill:#f3e5f5
+    style USER fill:#fff9c4
+    style DATA fill:#c8e6c9
+    style KNOWLEDGE fill:#c8e6c9
+    style RAG fill:#c8e6c9
+    style INPUTS fill:#c8e6c9
 ```
 
 **Environment Variables Hierarchy:**
