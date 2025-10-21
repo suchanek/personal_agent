@@ -53,12 +53,12 @@ The game-changing capability that sets this system apart:
 
 **Technology Convergence:**
 - Affordable, powerful hardware (Mac Mini M-series) enables local LLM inference
-- Advanced frameworks (Agno) provide agentic capabilities
+- Advanced Python frameworks provide agentic capabilities
 - Hybrid RAG + graph systems enable sophisticated knowledge reasoning
 - Growing privacy concerns drive demand for local-first solutions
 
 **Cost Economics:**
-- One-time hardware investment (~$600-1200 for Mac Mini)
+- One-time hardware investment (~$1200 for Mac Mini)
 - Zero ongoing API costs (vs. $20-200/month for cloud AI services)
 - Unlimited usage without per-query charges
 - Complete data control without privacy compromises
