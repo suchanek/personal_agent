@@ -1,3 +1,5 @@
+![Personal Agent Logo](logo-horizontal-transparent.png)
+
 # 🤖 Personal Agent System: Executive Summary
 
 **Author:** Eric G. Suchanek, PhD  

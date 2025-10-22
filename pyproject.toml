@@ -287,7 +287,7 @@ sequence = ["mcp-setup", "demo-memory", "demo-team", "example-mcp"]
 # === Documentation ===
 [tool.poe.tasks.docs]
 help = "Generate project documentation using pdoc"
-shell = "cd src && pdoc -o ../docs personal_agent"
+shell = "cd src && pdoc --o ../docs --logo ../docs/logo.png personal_agent"
 
 [tool.pylint.messages_control]
 disable = [
