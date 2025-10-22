@@ -1,3 +1,5 @@
+![Personal Agent Logo](logo-horizontal-transparent.png)
+
 # Personal Agent System Architecture
 
 This document outlines the architecture of the Personal Agent AI assistant, a sophisticated memory/knowledge system built on the Agno Framework. It integrates local AI models via Ollama, advanced knowledge management with LightRAG, and a dynamic multi-user environment.
