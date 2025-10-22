@@ -1,6 +1,6 @@
-# System Architecture
+# Personal Agent System Architecture
 
-This document outlines the architecture of the personal AI assistant, a sophisticated system built on the Agno Framework. It integrates local AI models via Ollama, advanced knowledge management with LightRAG, and a dynamic multi-user environment.
+This document outlines the architecture of the Personal Agent AI assistant, a sophisticated memory/knowledge system built on the Agno Framework. It integrates local AI models via Ollama, advanced knowledge management with LightRAG, and a dynamic multi-user environment.
 
 ## 1. Core Philosophy
 
@@ -121,10 +121,10 @@ This layer is the primary entry point for user interaction.
 
 The heart of the system, powered by the **Agno Framework**. This layer is responsible for:
 
-- **Orchestration**: Managing the overall workflow of the agent, from receiving user input to generating a response.
+- **Orchestration**: Managing the overall workflow of the agent or team, from receiving user input to generating a response.
 - **Lazy Initialization**: The core `AgnoPersonalAgent` uses a lazy initialization pattern where the agent is created instantly without waiting for heavy components like models and memory systems to load. The actual initialization happens automatically and transparently the first time the agent is used (e.g., when `run()` is called). This eliminates the need for explicit `async initialize()` calls and simplifies agent creation, particularly in team-based scenarios.
 - **Task Management**: Decomposing complex tasks into smaller, manageable steps.
-- **Tool Routing**: Intelligently selecting and invoking the appropriate tools to fulfill user requests.
+- **Agent Routing**: Intelligently selecting and invoking the appropriate agents to fulfill user requests.
 - **State Management**: Maintaining the agent's internal state and conversation history.
 
 ### 2.3. Memory & Knowledge Management Layer
@@ -152,7 +152,7 @@ This layer provides comprehensive multi-user support with dynamic context switch
   - `switch-user.py`: CLI script for creating and switching between users
   - `smart-restart-lightrag.sh`: Robust shell script that prevents port conflicts and ensures service stability during user switches
 
-### 2.5. Tool Execution Architecture
+### 2.5. MCP Server Execution Architecture
 
 The system implements a mandatory **ephemeral agent pattern** for all MCP tool interactions to ensure absolute stability:
 
@@ -168,7 +168,6 @@ The system supports multiple model providers through a unified interface:
 - **Ollama Integration**: Primary local LLM provider supporting models like llama3.1:8b, qwen3:8b, and qwen2.5:7b-instruct. Ollama runs as a centralized LaunchAgent service (user-independent) for system-wide availability across all users.
 - **LMStudio Integration**: Specialized support for MLX-optimized models on Apple Silicon (e.g., qwen3-4b-mlx), treated as OpenAI-compatible endpoints
 - **OpenAI-Compatible Interface**: Unified API interface that allows seamless switching between Ollama and LMStudio models
-- **Runtime Role Mapping Fix**: Implements a workaround for a critical bug in the Agno framework where the `system` role was incorrectly mapped to `developer`, causing API errors
 - **Dynamic Model Switching**: Support for runtime model changes through the web interface without system restart
 
 ### 2.8. Backend Services
@@ -300,6 +299,29 @@ graph TB
 -   **`LIGHTRAG_STORAGE_DIR`**: The directory for the current user's LightRAG storage.
 -   **`LIGHTRAG_INPUTS_DIR`**: The directory for the current user's LightRAG input files.
 
+### 6.4. Management Dashboard
+
+A comprehensive Streamlit-based web interface (`dashboard.py`) provides centralized system management and monitoring:
+
+- **System Status Monitoring**: Real-time display of system health, service status, and resource utilization
+- **User Management**: 
+  - Create, update, and delete user profiles with rich demographic information
+  - View and edit user details including contact information, preferences, and system roles
+  - Dynamic user switching with automatic service reconfiguration
+  - Support for bot users (NPC designation) for knowledge consolidation
+- **Memory Management**:
+  - View, search, and filter memories with dynamic human-readable timestamps
+  - Add new memories directly through the interface
+  - Monitor memory synchronization between local and graph storage systems
+  - Repair inconsistencies between storage backends
+  - Real-time memory statistics and distribution by topic
+- **REST API Endpoints**: Documentation and testing interface for programmatic API access
+- **Theme Support**: Light and dark mode themes for improved usability
+- **Global State Integration**: Shared agent instance and session state with REST API server for consistent data access
+- **Power Management**: Graceful system shutdown with confirmation dialog
+
+The dashboard initializes a cached agent instance and updates global state to enable both UI and REST API operations. It serves as the primary administrative interface for the Personal Agent system, accessible via `poe dashboard` or direct Streamlit execution.
+
 ## 7. Deployment and Configuration
 
 The system is designed for local deployment with emphasis on ease of use and multi-user support:
@@ -331,6 +353,7 @@ The architecture has been shaped by critical decisions documented in Architectur
 - **ADR-030: Agno Role Mapping Bug Workaround**: Implements runtime patch for critical framework bug.
 - **ADR-043: AgnoPersonalAgent Lazy Initialization**: Implements lazy initialization pattern.
 - **ADR-044: Semantic Knowledge Ingestion and Unified Querying**: Introduces dual knowledge base architecture with unified querying.
+- **ADR-096: Centralized Configuration Management**: Introduces the central runtime configuration manager for thread-safe environment variable/configuration management.
 
 ## 9. Performance and Scalability
 
