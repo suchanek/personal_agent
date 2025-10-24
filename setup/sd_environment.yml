@@ -1,0 +1,24 @@
+name: sd311
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip>=24.0
+  - setuptools
+  - wheel
+  - readline
+  - sqlite
+  - zlib
+  - pip:
+      - torch==2.9.0
+      - diffusers==0.35.2
+      - transformers==4.45.1
+      - accelerate==0.34.2
+      - safetensors==0.4.5
+      - pillow==12.0.0
+      - opencv-python==4.12.0.88
+      - pandas==2.3.3
+      - tqdm==4.67.1
+      - matplotlib==3.10.7
+      - exif==1.6.1

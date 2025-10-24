@@ -1,0 +1,79 @@
+FROM llama3.1:8b
+
+TEMPLATE """<|start_header_id|>system<|end_header_id|>
+Cutting Knowledge Date: December 2023
+
+{{- if .System }}
+{{ .System }}
+{{- end }}
+
+{{- if .Tools }}
+You have access to the following tools (JSON Schema):
+{{ json .Tools }}
+
+IF a tool is needed, reply ONLY with a JSON object in this exact format:
+
+{
+  "tool_calls": [
+    {
+      "type": "function",
+      "function": {
+        "name": "<tool_name>",
+        "arguments": { ... }
+      }
+    }
+  ]
+}
+
+- When NO tool is required, respond **naturally in plain text** to the user.
+- NEVER mix JSON and natural language in the same response.
+- NEVER output the words "Your answer should follow..." or other meta-instructions.
+{{- end }}
+<|eot_id|>
+
+{{- range $i, $_ := .Messages }}
+  {{- $last := eq (len (slice $.Messages $i)) 1 }}
+  {{- if eq .Role "user" -}}
+<|start_header_id|>user<|end_header_id|>
+{{ .Content }}
+<|eot_id|>
+    {{- if $last -}}
+<|start_header_id|>assistant<|end_header_id|>
+    {{- end -}}
+
+  {{- else if eq .Role "assistant" -}}
+<|start_header_id|>assistant<|end_header_id|>
+    {{- if .ToolCalls -}}
+{
+  "tool_calls": [
+    {{- range $j, $tc := .ToolCalls -}}
+      {{- if $j }},{{ end -}}
+      {
+        "type": "function",
+        "function": {
+          "name": "{{ $tc.Function.Name }}",
+          "arguments": {{ $tc.Function.Arguments }}
+        }
+      }
+    {{- end -}}
+  ]
+}
+    {{- else -}}
+{{ .Content }}
+    {{- end -}}
+{{- if not $last }}<|eot_id|>{{ end }}
+
+  {{- else if eq .Role "tool" -}}
+<|start_header_id|>tool<|end_header_id|>
+{{ .Content }}
+<|eot_id|>
+    {{- if $last -}}
+<|start_header_id|>assistant<|end_header_id|>
+    {{- end -}}
+
+  {{- end -}}
+{{- end -}}"""
+
+PARAMETER stop <|start_header_id|>
+PARAMETER stop <|end_header_id|>
+PARAMETER stop <|eot_id|>

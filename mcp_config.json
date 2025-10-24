@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "mindsdb": {
+      "url": "http://localhost:47334",
+      "tools": ["list_databases", "query"]
+    }
+  }
+}

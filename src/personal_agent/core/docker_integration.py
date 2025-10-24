@@ -254,6 +254,30 @@ def ensure_docker_user_consistency(user_id: Optional[str] = None, auto_fix: bool
         return False, error_msg
 
 
+def stop_lightrag_services() -> Tuple[bool, str]:
+    """Convenience function to stop all LightRAG Docker services.
+    
+    Returns:
+        Tuple of (success, message)
+    """
+    try:
+        # We don't need a user_id to stop services, but manager needs it.
+        manager = DockerIntegrationManager()
+        if not manager.docker_sync:
+            return True, "Docker sync not available - skipping stop services"
+            
+        success = manager.docker_sync.stop_all_services()
+        if success:
+            return True, "All LightRAG services stopped successfully."
+        else:
+            return False, "Failed to stop one or more LightRAG services."
+            
+    except Exception as e:
+        error_msg = f"Error stopping LightRAG services: {e}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
 def check_docker_user_consistency(user_id: Optional[str] = None) -> Tuple[bool, str]:
     """Convenience function to check Docker USER_ID consistency without fixing.
     

@@ -25,10 +25,10 @@ logger: Optional[logging.Logger] = None
 
 
 async def run_agno_cli_wrapper(
-    query: str = None,
+    query: str = None,  # noqa: ARG001
     use_remote_ollama: bool = False,
     recreate: bool = False,
-    instruction_level: str = "STANDARD",
+    instruction_level: str = None,
 ):
     """
     Wrapper function to initialize system and run CLI.
@@ -36,12 +36,12 @@ async def run_agno_cli_wrapper(
     :param query: Initial query to run (currently unused)
     :param use_remote_ollama: Whether to use the remote Ollama server instead of local
     :param recreate: Whether to recreate the knowledge base
-    :param instruction_level: The instruction level for the agent
+    :param instruction_level: The instruction level for the agent (None uses config default)
     """
-    global agno_agent
+    global agno_agent  # noqa: PLW0603
 
     # Initialize system
-    agent, query_kb, store_int, clear_kb, ollama_url = await initialize_agno_system(
+    agent, ollama_url = await initialize_agno_system(
         use_remote_ollama, recreate=recreate, instruction_level=instruction_level
     )
 
@@ -65,13 +65,16 @@ def cli_main():
         "--remote", action="store_true", help="Use remote Ollama server"
     )
     parser.add_argument(
-        "--recreate", action="store_true", help="Recreate the knowledge base"
+        "--recreate",
+        action="store_true",
+        help="Recreate the knowledge base",
+        default=False,
     )
     parser.add_argument(
         "--instruction-level",
         type=str,
-        default="STANDARD",
-        help="Set the instruction level for the agent (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL)",
+        default=None,
+        help="Set the instruction level for the agent (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL). If not provided, uses config default.",
     )
     args = parser.parse_args()
 
@@ -83,8 +86,6 @@ def cli_main():
             instruction_level=args.instruction_level,
         )
     )
-
-
 
 
 if __name__ == "__main__":

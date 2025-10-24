@@ -12,7 +12,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 # Default: ~/.persag, overridable via environment variable PERSAG_HOME
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 
-
 if __name__ == "__main__":
     # When run directly, use absolute imports
     sys.path.insert(0, str(BASE_DIR))
@@ -138,8 +137,9 @@ def get_user_storage_paths():
             - LIGHTRAG_MEMORY_STORAGE_DIR: LightRAG memory storage
             - LIGHTRAG_MEMORY_INPUTS_DIR: LightRAG memory input files
     """
-    # Import here to avoid circular imports
-    from .settings import PERSAG_ROOT, STORAGE_BACKEND
+    # Get values directly from environment to avoid circular imports
+    PERSAG_ROOT = os.getenv("PERSAG_ROOT", "/Users/Shared/personal_agent_data")
+    STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "agno")
 
     current_user_id = get_userid()
     return {
@@ -181,8 +181,9 @@ def refresh_user_dependent_settings(user_id: str = None):
     Returns:
         Dictionary with updated settings
     """
-    # Import here to avoid circular imports
-    from .settings import PERSAG_ROOT, STORAGE_BACKEND
+    # Get values directly from environment to avoid circular imports
+    PERSAG_ROOT = os.getenv("PERSAG_ROOT", "/Users/Shared/personal_agent_data")
+    STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "agno")
 
     current_user_id = user_id or get_userid()
 

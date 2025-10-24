@@ -33,23 +33,26 @@ Core Functionality:
     - Unified querying through KnowledgeCoordinator
 
 Available Methods:
-    LightRAG Operations:
-    - ingest_knowledge_file: Upload files to LightRAG server
-    - ingest_knowledge_text: Upload text content to LightRAG server
-    - ingest_knowledge_from_url: Fetch and upload URL content to LightRAG
-    - batch_ingest_directory: Batch upload directory contents to LightRAG
+    Unified Operations (Recommended):
+    - ingest_file: Upload files to both LightRAG and semantic knowledge bases
+    - ingest_text: Upload text content to both LightRAG and semantic knowledge bases
+    - ingest_url: Fetch and upload URL content to both LightRAG and semantic knowledge bases
+    - query_knowledge_base: Unified querying across both knowledge bases
+
+    Individual LightRAG Operations:
+    - ingest_knowledge_file: Upload files to LightRAG server only
+    - ingest_knowledge_text: Upload text content to LightRAG server only
+    - ingest_knowledge_from_url: Fetch and upload URL content to LightRAG only
+    - batch_ingest_directory: Batch upload directory contents to LightRAG only
     - query_lightrag_knowledge_direct: Direct LightRAG server queries
 
-    Semantic Operations:
-    - ingest_semantic_file: Add files to local semantic knowledge base
-    - ingest_semantic_text: Add text content to local semantic knowledge base
-    - ingest_semantic_from_url: Fetch and add URL content to semantic knowledge base
-    - batch_ingest_semantic_directory: Batch add directory contents to semantic KB
+    Individual Semantic Operations:
+    - ingest_semantic_file: Add files to local semantic knowledge base only
+    - ingest_semantic_text: Add text content to local semantic knowledge base only
+    - ingest_semantic_from_url: Fetch and add URL content to semantic knowledge base only
+    - batch_ingest_semantic_directory: Batch add directory contents to semantic KB only
     - query_semantic_knowledge: Direct semantic vector search
     - recreate_semantic_kb: Rebuild semantic knowledge base indices
-
-    Unified Operations:
-    - query_knowledge_base: Unified querying across both knowledge bases
 
 Supported Content Types:
     - Text documents (.txt, .md, .csv)
@@ -187,25 +190,21 @@ class KnowledgeTools(Toolkit):
         # Initialize knowledge coordinator for unified querying
         self.knowledge_coordinator = None
 
-        # Collect knowledge tool methods - now includes semantic KB methods
+        # Collect knowledge tool methods - now includes unified and individual methods
         tools = [
-            self.ingest_knowledge_file,
-            self.ingest_knowledge_text,
-            self.ingest_knowledge_from_url,
+            # Unified methods (recommended)
+            self.ingest_file,
+            self.ingest_text,
+            self.ingest_url,
             self.batch_ingest_directory,
-            self.query_knowledge_base,
-            self.query_lightrag_knowledge_direct,
-            self.ingest_semantic_file,
-            self.ingest_semantic_text,
-            self.ingest_semantic_from_url,
-            self.batch_ingest_semantic_directory,
-            self.query_semantic_knowledge,
             self.recreate_semantic_kb,
+            # Unified query method
+            self.query_knowledge_base,
         ]
 
         # Initialize the Toolkit
         super().__init__(
-            name="knowledge_tools",
+            name="persag_knowledge_tools",
             tools=tools,
             instructions="""Use these tools to manage factual information and documents in both knowledge bases.
             Store reference materials, facts, and documents that don't change.
@@ -457,7 +456,10 @@ class KnowledgeTools(Toolkit):
     def batch_ingest_directory(
         self, directory_path: str, file_pattern: str = "*", recursive: bool = False
     ) -> str:
-        """Ingest multiple files from a directory into the knowledge base.
+        """Ingest multiple files from a directory into both LightRAG and semantic knowledge bases.
+
+        This unified method combines the functionality of the individual batch_ingest_directory
+        methods, storing files in both knowledge base systems for comprehensive coverage.
 
         Args:
             directory_path: Path to the directory containing files
@@ -465,7 +467,7 @@ class KnowledgeTools(Toolkit):
             recursive: Whether to search subdirectories recursively
 
         Returns:
-            Summary of ingestion results.
+            Combined summary of ingestion results from both systems.
         """
         try:
             # Expand path shortcuts
@@ -498,50 +500,110 @@ class KnowledgeTools(Toolkit):
             if len(files) > 50:
                 return f"❌ Too many files ({len(files)}). Please process in smaller batches (max 50 files)."
 
-            # Process files
-            results = {"success": 0, "failed": 0, "errors": []}
+            # Track results from both systems
+            results = {
+                "lightrag": {"success": 0, "failed": 0, "errors": []},
+                "semantic": {"success": 0, "failed": 0, "errors": []},
+                "total_files": len(files),
+                "both_success": 0,
+                "partial_success": 0,
+                "both_failed": 0,
+            }
 
+            # Process files using the unified ingest_file method
             for file_path in files:
                 try:
-                    result = self.ingest_knowledge_file(str(file_path))
-                    if "✅" in result:
-                        results["success"] += 1
-                        log_debug(f"Successfully ingested: {file_path.name}")
-                    else:
-                        results["failed"] += 1
-                        results["errors"].append(f"{file_path.name}: {result}")
-                        logger.warning(f"Failed to ingest {file_path.name}: {result}")
+                    result = self.ingest_file(str(file_path))
 
-                    # Small delay to avoid overwhelming the server
+                    # Parse the unified result to understand what happened
+                    if (
+                        "✅ Successfully ingested" in result
+                        and "both LightRAG and semantic" in result
+                    ):
+                        # Both succeeded
+                        results["both_success"] += 1
+                        results["lightrag"]["success"] += 1
+                        results["semantic"]["success"] += 1
+                        log_debug(
+                            f"Successfully ingested into both systems: {file_path.name}"
+                        )
+                    elif "⚠️ Partial success" in result:
+                        # One succeeded, one failed
+                        results["partial_success"] += 1
+                        if "LightRAG" in result and "succeeded" in result:
+                            results["lightrag"]["success"] += 1
+                            results["semantic"]["failed"] += 1
+                        elif "semantic" in result and "succeeded" in result:
+                            results["semantic"]["success"] += 1
+                            results["lightrag"]["failed"] += 1
+                        logger.warning(
+                            f"Partial success for {file_path.name}: {result}"
+                        )
+                    else:
+                        # Both failed
+                        results["both_failed"] += 1
+                        results["lightrag"]["failed"] += 1
+                        results["semantic"]["failed"] += 1
+                        results["lightrag"]["errors"].append(
+                            f"{file_path.name}: {result}"
+                        )
+                        results["semantic"]["errors"].append(
+                            f"{file_path.name}: {result}"
+                        )
+                        logger.error(
+                            f"Both systems failed for {file_path.name}: {result}"
+                        )
+
+                    # Small delay to avoid overwhelming the systems
                     time.sleep(0.5)
 
                 except Exception as e:
-                    results["failed"] += 1
+                    # Both systems failed due to exception
+                    results["both_failed"] += 1
+                    results["lightrag"]["failed"] += 1
+                    results["semantic"]["failed"] += 1
                     error_msg = f"{file_path.name}: {str(e)}"
-                    results["errors"].append(error_msg)
-                    logger.error(f"Error processing {file_path.name}: {e}")
+                    results["lightrag"]["errors"].append(error_msg)
+                    results["semantic"]["errors"].append(error_msg)
+                    logger.error(f"Exception processing {file_path.name}: {e}")
 
-            # Format results
-            summary = f"📊 Batch ingestion complete: {results['success']} successful, {results['failed']} failed"
+            # Format comprehensive results
+            summary = f"📊 Unified Batch Ingestion Complete ({results['total_files']} files processed):\n"
+            summary += f"✅ Both systems successful: {results['both_success']}\n"
+            summary += f"⚠️ Partial success: {results['partial_success']}\n"
+            summary += f"❌ Both systems failed: {results['both_failed']}\n\n"
 
-            if results["errors"]:
-                summary += "\n\nErrors:\n" + "\n".join(
-                    f"- {error}" for error in results["errors"][:10]
+            summary += f"LightRAG Results: {results['lightrag']['success']} successful, {results['lightrag']['failed']} failed\n"
+            summary += f"Semantic Results: {results['semantic']['success']} successful, {results['semantic']['failed']} failed"
+
+            # Add error details if any
+            if results["lightrag"]["errors"] or results["semantic"]["errors"]:
+                summary += "\n\nError Details:"
+
+                # Show unique errors (avoid duplicates from both_failed cases)
+                all_errors = set(
+                    results["lightrag"]["errors"] + results["semantic"]["errors"]
                 )
-                if len(results["errors"]) > 10:
-                    summary += f"\n... and {len(results['errors']) - 10} more errors"
+                error_list = list(all_errors)[:10]  # Limit to 10 errors
+
+                for error in error_list:
+                    summary += f"\n- {error}"
+
+                if len(all_errors) > 10:
+                    summary += f"\n... and {len(all_errors) - 10} more errors"
 
             logger.info(
-                f"Batch ingestion completed: {results['success']}/{len(files)} files successful"
+                f"Unified batch ingestion completed: {results['both_success']} fully successful, "
+                f"{results['partial_success']} partial, {results['both_failed']} failed out of {results['total_files']} files"
             )
             return summary
 
         except Exception as e:
-            logger.error(f"Error in batch ingestion: {e}")
-            return f"❌ Error in batch ingestion: {str(e)}"
+            logger.error(f"Error in unified batch ingestion: {e}")
+            return f"❌ Error in unified batch ingestion: {str(e)}"
 
     async def query_knowledge_base(
-        self, query: str, mode: str = "auto", limit: Optional[int] = 5
+        self, query: str, mode: Optional[str] = "auto", limit: Optional[int] = 5
     ) -> str:
         """Query the unified knowledge base to retrieve stored factual information and documents.
 
@@ -612,9 +674,9 @@ class KnowledgeTools(Toolkit):
                     )
                     return f"❌ This appears to be a creative request ('{query}'). The knowledge base is for searching existing stored information, not for generating new content. Please rephrase as a search for existing knowledge, or ask me to create content directly without using knowledge tools."
 
-            # Validate mode
+            # Validate mode - handle None case
             valid_modes = ["local", "global", "hybrid", "naive"]
-            if mode not in valid_modes:
+            if mode is None or mode not in valid_modes:
                 mode = "auto"
 
             # Handle None limit
@@ -743,7 +805,9 @@ class KnowledgeTools(Toolkit):
             logger.error(f"Error querying KnowledgeBase knowledge base: {e}")
             return f"❌ Error querying knowledge base: {str(e)}"
 
-    def ingest_semantic_file(self, file_path: str, title: str = None, defer_reload: bool = False) -> str:
+    def ingest_semantic_file(
+        self, file_path: str, title: str = None, defer_reload: bool = False
+    ) -> str:
         """Ingest a file into the local semantic knowledge base.
 
         Args:
@@ -792,7 +856,7 @@ class KnowledgeTools(Toolkit):
                 logger.warning(f"File type {mime_type} may not be fully supported")
 
             # Copy file to semantic knowledge directory
-            semantic_knowledge_dir = Path(settings.DATA_DIR) / "knowledge"
+            semantic_knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename to avoid conflicts
@@ -811,7 +875,10 @@ class KnowledgeTools(Toolkit):
             try:
                 if self.agno_knowledge:
                     if not defer_reload:
-                        logger.debug("Recreating semantic KB after single file ingestion: %s", filename)
+                        logger.debug(
+                            "Recreating semantic KB after single file ingestion: %s",
+                            filename,
+                        )
                         self._reload_knowledge_base_sync(self.agno_knowledge)
                         logger.info(
                             f"Successfully ingested semantic knowledge file: {filename}"
@@ -842,7 +909,11 @@ class KnowledgeTools(Toolkit):
             return f"❌ Error ingesting file: {str(e)}"
 
     def ingest_semantic_text(
-        self, content: str, title: str, file_type: str = "txt", defer_reload: bool = False
+        self,
+        content: str,
+        title: str,
+        file_type: str = "txt",
+        defer_reload: bool = False,
     ) -> str:
         """Ingest text content directly into the local semantic knowledge base.
 
@@ -870,7 +941,7 @@ class KnowledgeTools(Toolkit):
                 file_type = ".txt"  # Default to txt
 
             # Create semantic knowledge directory
-            semantic_knowledge_dir = Path(settings.DATA_DIR) / "knowledge"
+            semantic_knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename
@@ -896,7 +967,10 @@ class KnowledgeTools(Toolkit):
             try:
                 if self.agno_knowledge:
                     if not defer_reload:
-                        logger.debug("Recreating semantic KB after single text ingestion: %s", title)
+                        logger.debug(
+                            "Recreating semantic KB after single text ingestion: %s",
+                            title,
+                        )
                         self._reload_knowledge_base_sync(self.agno_knowledge)
 
                         logger.info(
@@ -1060,7 +1134,9 @@ class KnowledgeTools(Toolkit):
 
             for file_path in files:
                 try:
-                    result = self.ingest_semantic_file(str(file_path), defer_reload=True)
+                    result = self.ingest_semantic_file(
+                        str(file_path), defer_reload=True
+                    )
                     if "✅" in result:
                         results["success"] += 1
                         log_debug(f"Successfully ingested: {file_path.name}")
@@ -1099,14 +1175,18 @@ class KnowledgeTools(Toolkit):
                             "Semantic KB instance not available to recreate after batch ingestion"
                         )
             except Exception as e:
-                logger.error("Failed to recreate semantic KB after batch ingestion: %s", e)
+                logger.error(
+                    "Failed to recreate semantic KB after batch ingestion: %s", e
+                )
 
             # Format results
             summary = f"📊 Batch semantic ingestion complete: {results['success']} successful, {results['failed']} failed"
 
             if recreated:
-                summary += "\n\n✅ Semantic knowledge base recreated after batch ingestion."
-            elif results['success'] > 0 and not self.agno_knowledge:
+                summary += (
+                    "\n\n✅ Semantic knowledge base recreated after batch ingestion."
+                )
+            elif results["success"] > 0 and not self.agno_knowledge:
                 summary += "\n\n⚠️ Files ingested but no semantic knowledge base available to recreate."
 
             if results["errors"]:
@@ -1254,6 +1334,290 @@ class KnowledgeTools(Toolkit):
         except Exception as e:
             logger.error(f"Error recreating semantic knowledge base: {e}")
             return f"❌ Error recreating semantic knowledge base: {str(e)}"
+
+    # Unified ingestion methods that combine both LightRAG and semantic operations
+    def ingest_file(self, file_path: str, title: str = None) -> str:
+        """Ingest a file into both LightRAG and semantic knowledge bases.
+
+        This unified method combines the functionality of ingest_knowledge_file and
+        ingest_semantic_file, storing the content in both knowledge base systems
+        for comprehensive coverage.
+
+        Args:
+            file_path: Path to the file to ingest
+            title: Optional title for the knowledge entry (defaults to filename)
+
+        Returns:
+            Combined success/error message from both operations.
+        """
+        try:
+            # Validate inputs first
+            if not file_path or not file_path.strip():
+                return "❌ Error: File path cannot be empty"
+
+            # Expand path shortcuts
+            if file_path.startswith("~/"):
+                file_path = os.path.expanduser(file_path)
+            elif file_path.startswith("./"):
+                file_path = os.path.abspath(file_path)
+
+            # Validate file exists
+            if not os.path.exists(file_path):
+                return f"❌ Error: File not found at '{file_path}'"
+
+            if not os.path.isfile(file_path):
+                return f"❌ Error: '{file_path}' is not a file"
+
+            filename = os.path.basename(file_path)
+            if not title:
+                title = os.path.splitext(filename)[0]
+
+            # Track results from both operations
+            results = {"lightrag": None, "semantic": None}
+
+            # Attempt LightRAG ingestion
+            try:
+                lightrag_result = self.ingest_knowledge_file(file_path, title)
+                results["lightrag"] = lightrag_result
+                logger.debug(
+                    f"LightRAG ingestion result for {filename}: {lightrag_result[:100]}..."
+                )
+            except Exception as e:
+                results["lightrag"] = f"❌ LightRAG error: {str(e)}"
+                logger.error(f"LightRAG ingestion failed for {filename}: {e}")
+
+            # Attempt semantic ingestion
+            try:
+                semantic_result = self.ingest_semantic_file(file_path, title)
+                results["semantic"] = semantic_result
+                logger.debug(
+                    f"Semantic ingestion result for {filename}: {semantic_result[:100]}..."
+                )
+            except Exception as e:
+                results["semantic"] = f"❌ Semantic error: {str(e)}"
+                logger.error(f"Semantic ingestion failed for {filename}: {e}")
+
+            # Determine overall success
+            lightrag_success = results["lightrag"] is not None and "✅" in str(
+                results["lightrag"]
+            )
+            semantic_success = results["semantic"] is not None and "✅" in str(
+                results["semantic"]
+            )
+
+            if lightrag_success and semantic_success:
+                logger.info(
+                    f"Successfully ingested '{filename}' into both knowledge bases"
+                )
+                return f"✅ Successfully ingested '{filename}' into both LightRAG and semantic knowledge bases."
+            elif lightrag_success or semantic_success:
+                # Partial success
+                success_systems = []
+                failed_systems = []
+
+                if lightrag_success:
+                    success_systems.append("LightRAG")
+                else:
+                    failed_systems.append(f"LightRAG ({results['lightrag']})")
+
+                if semantic_success:
+                    success_systems.append("semantic")
+                else:
+                    failed_systems.append(f"semantic ({results['semantic']})")
+
+                logger.warning(
+                    f"Partial success ingesting '{filename}': {success_systems} succeeded, {failed_systems} failed"
+                )
+                return f"⚠️ Partial success for '{filename}': {', '.join(success_systems)} succeeded. Failed: {', '.join(failed_systems)}"
+            else:
+                # Both failed
+                logger.error(f"Both ingestion methods failed for '{filename}'")
+                return f"❌ Failed to ingest '{filename}' into both knowledge bases:\n- LightRAG: {results['lightrag']}\n- Semantic: {results['semantic']}"
+
+        except Exception as e:
+            logger.error(f"Error in unified file ingestion for {file_path}: {e}")
+            return f"❌ Error in unified file ingestion: {str(e)}"
+
+    def ingest_text(self, content: str, title: str, file_type: str = "txt") -> str:
+        """Ingest text content into both LightRAG and semantic knowledge bases.
+
+        This unified method combines the functionality of ingest_knowledge_text and
+        ingest_semantic_text, storing the content in both knowledge base systems
+        for comprehensive coverage.
+
+        Args:
+            content: The text content to ingest
+            title: Title for the knowledge entry
+            file_type: File extension to use (txt, md, html, etc.)
+
+        Returns:
+            Combined success/error message from both operations.
+        """
+        try:
+            # Validate inputs
+            if not content or not content.strip():
+                return "❌ Error: Content cannot be empty"
+
+            if not title or not title.strip():
+                return "❌ Error: Title is required"
+
+            # Track results from both operations
+            results = {"lightrag": None, "semantic": None}
+
+            # Attempt LightRAG ingestion
+            try:
+                lightrag_result = self.ingest_knowledge_text(content, title, file_type)
+                results["lightrag"] = lightrag_result
+                logger.debug(
+                    f"LightRAG text ingestion result for '{title}': {lightrag_result[:100]}..."
+                )
+            except Exception as e:
+                results["lightrag"] = f"❌ LightRAG error: {str(e)}"
+                logger.error(f"LightRAG text ingestion failed for '{title}': {e}")
+
+            # Attempt semantic ingestion
+            try:
+                semantic_result = self.ingest_semantic_text(content, title, file_type)
+                results["semantic"] = semantic_result
+                logger.debug(
+                    f"Semantic text ingestion result for '{title}': {semantic_result[:100]}..."
+                )
+            except Exception as e:
+                results["semantic"] = f"❌ Semantic error: {str(e)}"
+                logger.error(f"Semantic text ingestion failed for '{title}': {e}")
+
+            # Determine overall success
+            lightrag_success = results["lightrag"] is not None and "✅" in str(
+                results["lightrag"]
+            )
+            semantic_success = results["semantic"] is not None and "✅" in str(
+                results["semantic"]
+            )
+
+            if lightrag_success and semantic_success:
+                logger.info(
+                    f"Successfully ingested text '{title}' into both knowledge bases"
+                )
+                return f"✅ Successfully ingested '{title}' into both LightRAG and semantic knowledge bases."
+            elif lightrag_success or semantic_success:
+                # Partial success
+                success_systems = []
+                failed_systems = []
+
+                if lightrag_success:
+                    success_systems.append("LightRAG")
+                else:
+                    failed_systems.append(f"LightRAG ({results['lightrag']})")
+
+                if semantic_success:
+                    success_systems.append("semantic")
+                else:
+                    failed_systems.append(f"semantic ({results['semantic']})")
+
+                logger.warning(
+                    f"Partial success ingesting text '{title}': {success_systems} succeeded, {failed_systems} failed"
+                )
+                return f"⚠️ Partial success for '{title}': {', '.join(success_systems)} succeeded. Failed: {', '.join(failed_systems)}"
+            else:
+                # Both failed
+                logger.error(f"Both text ingestion methods failed for '{title}'")
+                return f"❌ Failed to ingest '{title}' into both knowledge bases:\n- LightRAG: {results['lightrag']}\n- Semantic: {results['semantic']}"
+
+        except Exception as e:
+            logger.error(f"Error in unified text ingestion for '{title}': {e}")
+            return f"❌ Error in unified text ingestion: {str(e)}"
+
+    def ingest_url(self, url: str, title: str = None) -> str:
+        """Ingest content from a URL into both LightRAG and semantic knowledge bases.
+
+        This unified method combines the functionality of ingest_knowledge_from_url and
+        ingest_semantic_from_url, storing the content in both knowledge base systems
+        for comprehensive coverage.
+
+        Args:
+            url: URL to fetch content from
+            title: Optional title for the knowledge entry (defaults to page title or URL)
+
+        Returns:
+            Combined success/error message from both operations.
+        """
+        try:
+            # Validate URL
+            if not url or not url.strip():
+                return "❌ Error: URL cannot be empty"
+
+            from urllib.parse import urlparse
+
+            parsed_url = urlparse(url)
+            if not parsed_url.scheme or not parsed_url.netloc:
+                return f"❌ Error: Invalid URL format: {url}"
+
+            # Track results from both operations
+            results = {"lightrag": None, "semantic": None}
+
+            # Attempt LightRAG ingestion
+            try:
+                lightrag_result = self.ingest_knowledge_from_url(url, title)
+                results["lightrag"] = lightrag_result
+                logger.debug(
+                    f"LightRAG URL ingestion result for '{url}': {lightrag_result[:100]}..."
+                )
+            except Exception as e:
+                results["lightrag"] = f"❌ LightRAG error: {str(e)}"
+                logger.error(f"LightRAG URL ingestion failed for '{url}': {e}")
+
+            # Attempt semantic ingestion
+            try:
+                semantic_result = self.ingest_semantic_from_url(url, title)
+                results["semantic"] = semantic_result
+                logger.debug(
+                    f"Semantic URL ingestion result for '{url}': {semantic_result[:100]}..."
+                )
+            except Exception as e:
+                results["semantic"] = f"❌ Semantic error: {str(e)}"
+                logger.error(f"Semantic URL ingestion failed for '{url}': {e}")
+
+            # Determine overall success
+            lightrag_success = results["lightrag"] is not None and "✅" in str(
+                results["lightrag"]
+            )
+            semantic_success = results["semantic"] is not None and "✅" in str(
+                results["semantic"]
+            )
+
+            display_title = title or url
+            if lightrag_success and semantic_success:
+                logger.info(
+                    f"Successfully ingested URL '{url}' into both knowledge bases"
+                )
+                return f"✅ Successfully ingested '{display_title}' from URL into both LightRAG and semantic knowledge bases."
+            elif lightrag_success or semantic_success:
+                # Partial success
+                success_systems = []
+                failed_systems = []
+
+                if lightrag_success:
+                    success_systems.append("LightRAG")
+                else:
+                    failed_systems.append(f"LightRAG ({results['lightrag']})")
+
+                if semantic_success:
+                    success_systems.append("semantic")
+                else:
+                    failed_systems.append(f"semantic ({results['semantic']})")
+
+                logger.warning(
+                    f"Partial success ingesting URL '{url}': {success_systems} succeeded, {failed_systems} failed"
+                )
+                return f"⚠️ Partial success for '{display_title}': {', '.join(success_systems)} succeeded. Failed: {', '.join(failed_systems)}"
+            else:
+                # Both failed
+                logger.error(f"Both URL ingestion methods failed for '{url}'")
+                return f"❌ Failed to ingest '{display_title}' from URL into both knowledge bases:\n- LightRAG: {results['lightrag']}\n- Semantic: {results['semantic']}"
+
+        except Exception as e:
+            logger.error(f"Error in unified URL ingestion for '{url}': {e}")
+            return f"❌ Error in unified URL ingestion: {str(e)}"
 
     def _reload_knowledge_base_sync(self, knowledge_base):
         """Reload the knowledge base synchronously to avoid event loop issues."""

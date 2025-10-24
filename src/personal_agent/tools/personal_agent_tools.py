@@ -7,6 +7,7 @@ following the same pattern as YFinanceTools and DuckDuckGoTools.
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Any, List
 
 from agno.tools import Toolkit
@@ -16,6 +17,9 @@ from ..config import DATA_DIR, HOME_DIR
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
+
+# Global allowed directories for security checks
+ALLOWED_DIRS = [HOME_DIR, DATA_DIR, "/tmp", ".", "/"]
 
 
 class PersonalAgentFilesystemTools(Toolkit):
@@ -37,10 +41,11 @@ class PersonalAgentFilesystemTools(Toolkit):
         list_directory: bool = True,
         create_and_save_file: bool = True,
         intelligent_file_search: bool = True,
+        base_dir: str = str(Path(HOME_DIR)),
         **kwargs,
     ):
         tools: List[Any] = []
-
+        self.base_dir = base_dir
         if read_file:
             tools.append(self.read_file)
         if write_file:
@@ -64,29 +69,40 @@ class PersonalAgentFilesystemTools(Toolkit):
             The file content or error message.
         """
         try:
-            # Expand path shortcuts
-            if file_path.startswith("~/"):
-                file_path = os.path.expanduser(file_path)
-            elif file_path.startswith("./"):
-                file_path = os.path.abspath(file_path)
+            # DEBUG: Log initial path and its type
+            logger.info(
+                f"DEBUG read_file: Initial file_path='{file_path}', type={type(file_path)}"
+            )
+
+            # Use pathlib for robust path handling
+            path_to_read = Path(file_path).expanduser().resolve()
+            logger.info(
+                f"DEBUG read_file: After pathlib resolve: path_to_read='{path_to_read}'"
+            )
+
+            # Resolve allowed directories to absolute paths for security check
+            allowed_paths = [Path(p).expanduser().resolve() for p in ALLOWED_DIRS]
 
             # Security check - ensure file is within allowed directories
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
-            file_abs_path = os.path.abspath(file_path)
-
-            if not any(file_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            is_allowed = any(
+                str(path_to_read).startswith(str(p)) for p in allowed_paths
+            )
+            if not is_allowed:
                 return f"Error: Access denied to {file_path}. Only allowed in home, data, tmp, or current directories."
 
-            if not os.path.exists(file_path):
+            if not path_to_read.exists():
                 return f"Error: File {file_path} does not exist."
 
-            if not os.path.isfile(file_path):
+            if not path_to_read.is_file():
                 return f"Error: {file_path} is not a file."
 
-            with open(file_path, 'r', encoding='utf-8') as f:
+            logger.info(f"DEBUG read_file: About to read file: {path_to_read}")
+            with path_to_read.open("r", encoding="utf-8") as f:
                 content = f.read()
 
-            log_debug(f"Successfully read file: {file_path} ({len(content)} characters)")
+            logger.info(
+                f"Successfully read file: {file_path} ({len(content)} characters)"
+            )
             return content
 
         except PermissionError:
@@ -95,50 +111,104 @@ class PersonalAgentFilesystemTools(Toolkit):
             return f"Error: Unable to decode {file_path} as text file"
         except Exception as e:
             logger.error("Error reading file %s: %s", file_path, e)
+            logger.info(
+                f"DEBUG read_file: Exception details - file_path type: {type(file_path)}, value: '{file_path}'"
+            )
             return f"Error reading file: {str(e)}"
 
-    def write_file(self, file_path: str, content: str) -> str:
+    def write_file(self, file_path: str, content: str, overwrite: bool = True) -> str:
         """Write content to a file.
 
         Args:
             file_path: Path to the file to write
             content: Content to write to the file
+            overwrite: Whether to overwrite existing files (default: True)
 
         Returns:
             Success message or error message.
         """
         try:
+            # DEBUG: Log initial path and its type
+            logger.info(
+                f"DEBUG write_file: Initial file_path='{file_path}', type={type(file_path)}"
+            )
+
             # Expand path shortcuts
             if file_path.startswith("~/"):
                 file_path = os.path.expanduser(file_path)
+                logger.info(
+                    f"DEBUG write_file: After expanduser: file_path='{file_path}'"
+                )
             elif file_path.startswith("./"):
                 file_path = os.path.abspath(file_path)
+                logger.info(f"DEBUG write_file: After abspath: file_path='{file_path}'")
+
+            # DEBUG: Log path after expansion
+            logger.info(
+                f"DEBUG write_file: Final file_path='{file_path}', type={type(file_path)}"
+            )
 
             # Security check - ensure file is within allowed directories
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             file_abs_path = os.path.abspath(file_path)
+            logger.info(
+                f"DEBUG write_file: file_abs_path='{file_abs_path}', type={type(file_abs_path)}"
+            )
 
-            if not any(file_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                file_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {file_path}. Only allowed in home, data, tmp, or current directories."
+
+            # Check if file exists and handle overwrite logic
+            file_exists = os.path.exists(file_path)
+            if file_exists and not overwrite:
+                return (
+                    f"Error: File {file_path} already exists and overwrite is disabled."
+                )
 
             # Create directory if it doesn't exist (only if there's a directory path)
             dir_path = os.path.dirname(file_path)
+            logger.info(
+                f"DEBUG write_file: dir_path='{dir_path}', type={type(dir_path)}"
+            )
             if dir_path:  # Only create directory if there is one
+                logger.info(f"DEBUG write_file: Creating directory: {dir_path}")
                 os.makedirs(dir_path, exist_ok=True)
 
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Choose the appropriate file mode
+            if overwrite:
+                file_mode = "w"  # Overwrite mode
+            else:
+                file_mode = "x"  # Exclusive creation mode (fails if file exists)
 
-            log_debug(f"Successfully wrote file: {file_path} ({len(content)} characters)")
-            return f"Successfully wrote {len(content)} characters to {file_path}"
+            logger.info(
+                f"DEBUG write_file: About to open file with mode '{file_mode}': {file_path}"
+            )
+            try:
+                with open(file_path, file_mode, encoding="utf-8") as f:
+                    f.write(content)
+            except FileExistsError:
+                return (
+                    f"Error: File {file_path} already exists and overwrite is disabled."
+                )
+
+            logger.info(
+                f"Successfully wrote file: {file_path} ({len(content)} characters)"
+            )
+
+            action = "overwrote" if file_exists else "created"
+            return f"Successfully {action} {len(content)} characters to {file_path}"
 
         except PermissionError:
             return f"Error: Permission denied writing to {file_path}"
         except Exception as e:
             logger.error("Error writing file %s: %s", file_path, e)
+            logger.info(
+                f"DEBUG write_file: Exception details - file_path type: {type(file_path)}, value: '{file_path}'"
+            )
             return f"Error writing file: {str(e)}"
 
-    def list_directory(self, directory_path: str = ".") -> str:
+    def list_directory(self, directory_path: str = HOME_DIR) -> str:
         """List contents of a directory.
 
         Args:
@@ -155,10 +225,11 @@ class PersonalAgentFilesystemTools(Toolkit):
                 directory_path = os.path.abspath(directory_path)
 
             # Security check - ensure directory is within allowed directories
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             dir_abs_path = os.path.abspath(directory_path)
 
-            if not any(dir_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                dir_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {directory_path}. Only allowed in home, data, tmp, or current directories."
 
             if not os.path.exists(directory_path):
@@ -190,7 +261,7 @@ class PersonalAgentFilesystemTools(Toolkit):
                 return f"Directory {directory_path} is empty."
 
             result = f"Contents of {directory_path}:\n" + "\n".join(items)
-            log_debug(f"Listed directory: {directory_path} ({len(items)} items)")
+            logger.info(f"Listed directory: {directory_path} ({len(items)} items)")
             return result
 
         except PermissionError:
@@ -199,13 +270,22 @@ class PersonalAgentFilesystemTools(Toolkit):
             logger.error("Error listing directory %s: %s", directory_path, e)
             return f"Error listing directory: {str(e)}"
 
-    def create_and_save_file(self, filename: str, content: str, directory: str = "./") -> str:
+    def create_and_save_file(
+        self,
+        filename: str,
+        content: str,
+        directory: str = "./",
+        overwrite: bool = True,
+        variable_to_return: str = None,
+    ) -> str:
         """Create a new file with content in specified directory.
 
         Args:
             filename: Name of the file to create
             content: Content to write to the file
             directory: Directory to create the file in (default: current directory)
+            overwrite: Whether to overwrite existing files (default: True)
+            variable_to_return: Variable to return (ignored, for compatibility)
 
         Returns:
             Success message with full path or error message.
@@ -220,14 +300,16 @@ class PersonalAgentFilesystemTools(Toolkit):
             # Create full file path
             file_path = os.path.join(directory, filename)
 
-            # Use the write_file method for consistency
-            return self.write_file(file_path, content)
+            # Use the write_file method with the overwrite parameter
+            return self.write_file(file_path, content, overwrite=overwrite)
 
         except Exception as e:
             logger.error("Error creating file %s: %s", filename, e)
             return f"Error creating file: {str(e)}"
 
-    def intelligent_file_search(self, search_term: str, directory: str = ".", file_extensions: str = "") -> str:
+    def intelligent_file_search(
+        self, search_term: str, directory: str = ".", file_extensions: str = ""
+    ) -> str:
         """Search for files containing specific content or matching patterns.
 
         Args:
@@ -246,10 +328,11 @@ class PersonalAgentFilesystemTools(Toolkit):
                 directory = os.path.abspath(directory)
 
             # Security check
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             dir_abs_path = os.path.abspath(directory)
 
-            if not any(dir_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                dir_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {directory}. Only allowed in home, data, tmp, or current directories."
 
             if not os.path.exists(directory):
@@ -271,7 +354,9 @@ class PersonalAgentFilesystemTools(Toolkit):
 
                     # Check file extension filter
                     if extensions:
-                        file_ext = os.path.splitext(file)[1][1:].lower()  # Remove the dot
+                        file_ext = os.path.splitext(file)[1][
+                            1:
+                        ].lower()  # Remove the dot
                         if file_ext not in extensions:
                             continue
 
@@ -281,8 +366,12 @@ class PersonalAgentFilesystemTools(Toolkit):
 
                     # Check content match for text files
                     try:
-                        if os.path.getsize(file_path) < 10 * 1024 * 1024:  # Only search files < 10MB
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        if (
+                            os.path.getsize(file_path) < 10 * 1024 * 1024
+                        ):  # Only search files < 10MB
+                            with open(
+                                file_path, "r", encoding="utf-8", errors="ignore"
+                            ) as f:
                                 content = f.read()
                                 if search_term_lower in content.lower():
                                     content_match = True
@@ -296,16 +385,21 @@ class PersonalAgentFilesystemTools(Toolkit):
                         if content_match:
                             match_type.append("content")
 
-                        matches.append(f"📄 {relative_path} (match: {', '.join(match_type)})")
+                        matches.append(
+                            f"📄 {relative_path} (match: {', '.join(match_type)})"
+                        )
 
             if not matches:
                 return f"No files found containing '{search_term}' in {directory}"
 
-            result = f"Found {len(matches)} file(s) matching '{search_term}':\n" + "\n".join(matches[:20])
+            result = (
+                f"Found {len(matches)} file(s) matching '{search_term}':\n"
+                + "\n".join(matches[:20])
+            )
             if len(matches) > 20:
                 result += f"\n... and {len(matches) - 20} more files"
 
-            log_debug(f"File search for '{search_term}' found {len(matches)} matches")
+            logger.info(f"File search for '{search_term}' found {len(matches)} matches")
             return result
 
         except Exception as e:
@@ -329,7 +423,7 @@ class PersonalAgentSystemTools(Toolkit):
 
         super().__init__(name="personal_system", tools=tools, **kwargs)
 
-    def shell_command(self, command: str, working_directory: str = ".") -> str:
+    def shell_command(self, command: str, working_directory: str = HOME_DIR) -> str:
         """Execute a shell command safely.
 
         Args:
@@ -342,9 +436,20 @@ class PersonalAgentSystemTools(Toolkit):
         try:
             # Security check - block dangerous commands
             dangerous_commands = [
-                "rm -rf", "rmdir", "del", "format", "fdisk",
-                "mkfs", "dd", "sudo", "su", "chmod 777",
-                "curl", "wget", "nc", "netcat"
+                "rm -rf",
+                "rmdir",
+                "del",
+                "format",
+                "fdisk",
+                "mkfs",
+                "dd",
+                "sudo",
+                "su",
+                "chmod 777",
+                "curl",
+                "wget",
+                "nc",
+                "netcat",
             ]
 
             command_lower = command.lower()
@@ -359,10 +464,11 @@ class PersonalAgentSystemTools(Toolkit):
                 working_directory = os.path.abspath(working_directory)
 
             # Security check for working directory
-            allowed_dirs = [HOME_DIR, DATA_DIR, "/tmp", os.getcwd()]
             dir_abs_path = os.path.abspath(working_directory)
 
-            if not any(dir_abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+            if not any(
+                dir_abs_path.startswith(allowed_dir) for allowed_dir in ALLOWED_DIRS
+            ):
                 return f"Error: Access denied to {working_directory}. Only allowed in home, data, tmp, or current directories."
 
             # Execute command with timeout
@@ -372,7 +478,7 @@ class PersonalAgentSystemTools(Toolkit):
                 cwd=working_directory,
                 capture_output=True,
                 text=True,
-                timeout=30  # 30 second timeout
+                timeout=30,  # 30 second timeout
             )
 
             output = ""
@@ -382,7 +488,9 @@ class PersonalAgentSystemTools(Toolkit):
                 output += f"STDERR:\n{result.stderr}\n"
             output += f"Return code: {result.returncode}"
 
-            log_debug(f"Executed command: {command} (return code: {result.returncode})")
+            logger.info(
+                f"Executed command: {command} (return code: {result.returncode})"
+            )
             return output
 
         except subprocess.TimeoutExpired:
