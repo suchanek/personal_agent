@@ -17,7 +17,7 @@ The package supports three main frameworks:
 3. Agno (modern async agent framework) - primary interface
 
 Author: Personal Agent Development Team
-Last modified: 2025-08-09 14:52:45
+Last modified: 2025-10-24 09:08:15
 Version: 0.11.38
 """
 
