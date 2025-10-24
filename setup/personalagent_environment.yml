@@ -1,0 +1,29 @@
+name: personalagent311
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip>=24.0
+  - setuptools
+  - wheel
+  - uvicorn
+  - pip:
+      - fastapi>=0.114
+      - pydantic>=2.7
+      - httpx>=0.27
+      - websockets>=12.0
+      - loguru>=0.7
+      - rich>=13.7
+      - typer>=0.12
+      - uvloop>=0.19; platform_system != "Windows"
+      - orjson>=3.10
+      - python-dotenv>=1.0
+      - tenacity>=9.0
+      - sse-starlette>=2.0
+      - aiofiles>=23.0
+      - watchdog>=4.0
+      - lancedb>=0.7
+      - openai>=1.44
+      - anthropic>=0.34
+      - ollama>=0.3

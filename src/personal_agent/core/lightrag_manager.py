@@ -23,12 +23,15 @@ class LightRAGManager:
             project_root: Project root directory (deprecated, now uses PERSAG_HOME)
         """
         # Import settings to get the correct PERSAG_HOME-based paths
-        from personal_agent.config.settings import LIGHTRAG_SERVER_DIR, LIGHTRAG_MEMORY_DIR
-        
+        from personal_agent.config.settings import (
+            LIGHTRAG_MEMORY_DIR,
+            LIGHTRAG_SERVER_DIR,
+        )
+
         # Use the centralized configuration paths from PERSAG_HOME
         self.lightrag_server_dir = Path(LIGHTRAG_SERVER_DIR)
         self.lightrag_memory_dir = Path(LIGHTRAG_MEMORY_DIR)
-        
+
         # Keep project_root for backward compatibility, but it's no longer used for docker paths
         self.project_root = Path(project_root) if project_root else Path.cwd()
 
@@ -457,7 +460,7 @@ class LightRAGManager:
                                         # Determine mode
                                         if "host.docker.internal" in ollama_url:
                                             status["ollama_config"]["mode"] = "LOCAL"
-                                        elif "tesla.local" in ollama_url:
+                                        elif "100.100.248.61" in ollama_url:
                                             status["ollama_config"]["mode"] = "REMOTE"
                                         else:
                                             status["ollama_config"]["mode"] = "CUSTOM"

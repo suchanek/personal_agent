@@ -47,10 +47,14 @@ from .settings import (
     STORAGE_BACKEND,
     USE_MCP,
     USE_WEAVIATE,
+    USER_DATA_DIR,
     WEAVIATE_URL,
     get_env_bool,
     get_env_var,
     get_package_version,
+    get_provider_default_model,
+    get_qwen_instruct_settings,
+    get_qwen_thinking_settings,
 )
 from .user_id_mgr import (
     get_current_user_id,
@@ -96,13 +100,13 @@ __all__ = [
     "AGNO_STORAGE_DIR",
     "BASE_DIR",
     "DATA_DIR",
+    "USER_DATA_DIR",
     "HOME_DIR",
     "PERSAG_HOME",
     "PERSAG_ROOT",
     "REPO_DIR",
     "ROOT_DIR",
     "STORAGE_BACKEND",
-    
     # LightRAG configuration
     "LIGHTRAG_INPUTS_DIR",
     "LIGHTRAG_MEMORY_DIR",
@@ -115,7 +119,6 @@ __all__ = [
     "LIGHTRAG_SERVER_DIR",
     "LIGHTRAG_STORAGE_DIR",
     "LIGHTRAG_URL",
-    
     # LLM and service URLs
     "LLM_MODEL",
     "LMSTUDIO_URL",
@@ -123,7 +126,6 @@ __all__ = [
     "REMOTE_LMSTUDIO_URL",
     "REMOTE_OLLAMA_URL",
     "WEAVIATE_URL",
-    
     # Timeout and performance settings
     "EMBEDDING_TIMEOUT",
     "HTTPX_CONNECT_TIMEOUT",
@@ -137,27 +139,26 @@ __all__ = [
     "OLLAMA_TEMPERATURE",
     "OLLAMA_TIMEOUT",
     "PDF_CHUNK_SIZE",
-    
     # Logging and display
     "LOG_LEVEL",
     "LOG_LEVEL_STR",
     "PORT",
     "PROVIDER",
     "SHOW_SPLASH_SCREEN",
-    
     # Feature flags
     "USE_MCP",
     "USE_WEAVIATE",
-    
     # MCP servers
     "MCP_SERVERS",
-    
     # Utility functions
     "get_current_user_id",
     "get_env_bool",
     "get_env_var",
     "get_mcp_servers",
     "get_package_version",
+    "get_provider_default_model",
+    "get_qwen_instruct_settings",
+    "get_qwen_thinking_settings",
     "get_settings",
     "get_user_storage_paths",
     "get_userid",

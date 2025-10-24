@@ -1,0 +1,887 @@
+\documentclass[11pt,letterpaper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\usepackage{fontawesome5}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amssymb}
+
+% Color definitions
+\definecolor{primaryblue}{RGB}{0,102,204}
+\definecolor{secondarygreen}{RGB}{46,125,50}
+\definecolor{accentorange}{RGB}{255,87,34}
+\definecolor{lightgray}{RGB}{245,245,245}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+    citecolor=primaryblue
+}
+
+% Title formatting
+\titleformat{\section}
+  {\Large\bfseries\color{primaryblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries\color{secondarygreen}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Personal Agent}
+\fancyhead[R]{\small AI-Powered Digital Memory Companion}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Custom command for feature boxes
+\newtcolorbox{featurebox}[1]{
+  colback=lightgray,
+  colframe=primaryblue,
+  fonttitle=\bfseries,
+  title=#1,
+  arc=3mm
+}
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\Huge\bfseries\color{primaryblue} Personal Agent\par}
+\vspace{0.5cm}
+{\Large\color{secondarygreen} AI-Powered Digital Memory Companion\par}
+\vspace{2cm}
+
+{\LARGE\textbf{Preserve Your Story. Protect Your Memories. Secure Your Legacy}\par}
+
+\vfill
+
+{\large Version 0.8.7 \\ October 2025\par}
+\vspace{1cm}
+
+{\large Developed by Eric G. Suchanek, PhD\par}
+
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+Imagine having a personal assistant that never forgets---one that remembers your childhood stories, tracks your life goals, understands your relationships, and helps preserve your wisdom for future generations. Personal Agent is more than software; it's your AI-powered digital memory companion, designed to support individuals facing memory challenges while empowering everyone to capture and preserve their life story.
+
+\subsection{Why Personal Agent?}
+
+\subsubsection{For Everyone}
+\begin{itemize}[leftmargin=*]
+    \item Preserve precious memories and life experiences
+    \item Build a comprehensive digital life journal
+    \item Track personal growth and achievements
+    \item Share your wisdom with future generations
+\end{itemize}
+
+\subsubsection{For Those Facing Memory Challenges}
+\begin{itemize}[leftmargin=*]
+    \item Support for individuals with cognitive decline
+    \item Family caregivers can help record and preserve memories
+    \item Track cognitive health over time
+    \item Maintain connections to cherished experiences
+\end{itemize}
+
+\subsubsection{For Families}
+\begin{itemize}[leftmargin=*]
+    \item Capture childhood memories as they happen
+    \item Document family history and traditions
+    \item Create lasting legacies for future generations
+    \item Bridge generations through shared stories
+\end{itemize}
+
+\subsubsection{For Business}
+\begin{itemize}[leftmargin=*]
+    \item Solve the retirement knowledge crisis---capture decades of expertise before it walks out the door
+    \item Transform retiring employees into searchable knowledge bases
+    \item Preserve institutional memory and tribal knowledge
+    \item Enable seamless knowledge transfer to new team members
+    \item Convert years of experience into accessible, queryable wisdom
+    \item Maintain competitive advantages through preserved expertise
+\end{itemize}
+
+\subsubsection{For Academia}
+\begin{itemize}[leftmargin=*]
+    \item Create comprehensive research archives from publications, papers, and project documentation
+    \item Build searchable knowledge graphs connecting research concepts and collaborations
+    \item Preserve laboratory techniques and experimental insights
+    \item Support longitudinal studies with detailed memory and cognitive tracking
+    \item Enable cross-disciplinary research through unified knowledge systems
+    \item Document research methodologies and hard-won scientific insights
+\end{itemize}
+
+\newpage
+\section{Core Features}
+
+\subsection{Intelligent Memory Management}
+
+\begin{featurebox}{Never Lose a Memory Again}
+Personal Agent uses advanced artificial intelligence to help you capture, organize, and retrieve your memories with unprecedented ease.
+\end{featurebox}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Smart Topic Classification}: Automatically organizes memories into 20+ categories (family, work, hobbies, health, and more)
+    \item \textbf{Duplicate Detection}: Prevents redundant memories while preserving unique details
+    \item \textbf{Powerful Search}: Find any memory instantly using natural language
+    \item \textbf{Relationship Mapping}: Understands connections between people, places, and events
+\end{itemize}
+
+\subsection{Temporal Journaling: Remember When You Were\ldots}
+
+\begin{featurebox}{Travel Back in Time}
+One of our most innovative features lets you record memories from the perspective of your younger self---perfect for capturing childhood experiences or documenting your life chronologically.
+\end{featurebox}
+
+\subsubsection{How It Works}
+\begin{itemize}[leftmargin=*]
+    \item Set your ``memory age'' to any point in your life
+    \item The system automatically timestamps memories to that era
+    \item Build a complete life narrative from childhood to present
+    \item Ideal for therapeutic memory reconstruction
+\end{itemize}
+
+\textbf{Example:} Born in 1960? Set your memory age to 6, and when you say \textit{``I learned to ride my bicycle today!''} the system records it as happening in 1966.
+
+\subsection{Cognitive Health Tracking}
+
+\begin{featurebox}{Monitor and Adapt}
+Personal Agent is designed with cognitive health in mind, providing tools that adapt to each user's needs.
+\end{featurebox}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Cognitive State Scoring (Roadmap)}: Track cognitive function on a 0--100 scale
+    \item \textbf{Memory Confidence (Roadmap)}: Each memory is rated for reliability
+    \item \textbf{Trend Analysis (Roadmap)}: Monitor cognitive changes over time
+    \item \textbf{Adaptive Interface (Roadmap)}: System adjusts to user capabilities
+\end{itemize}
+
+\subsubsection{For Caregivers (Roadmap)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Planned:} Visual indicators to show cognitive state at a glance
+    \item \textbf{Planned:} Alerts for significant changes
+    \item \textbf{Planned:} Memory reliability scoring to verify important information
+    \item \textbf{Planned:} Track progress and patterns
+    \item \textbf{Note:} LightRAG servers already provide visual knowledge and memory graphs, but full integration into the caregiver interface is pending
+\end{itemize}
+
+\subsection{Memory by Proxy (Coming Soon)}
+
+\begin{featurebox}{Preserve Memories Together}
+Sometimes we need help remembering. Our Memory by Proxy feature allows trusted family members or caregivers to record memories on behalf of loved ones.
+\end{featurebox}
+
+\subsubsection{Perfect For}
+\begin{itemize}[leftmargin=*]
+    \item Children's memories recorded by parents
+    \item Elderly care with family support
+    \item Cognitive decline assistance
+    \item Medical or therapeutic documentation
+\end{itemize}
+
+\subsubsection{Features Include}
+\begin{itemize}[leftmargin=*]
+    \item Designated memory proxy assignment
+    \item Permission controls
+    \item Clear origin tracking (self vs. proxy)
+    \item Complete audit trail
+\end{itemize}
+
+\newpage
+\section{Privacy \& Security}
+
+\subsection{Your Data, Your Control}
+
+\begin{featurebox}{{100\% Local, 100\% Private}}
+Unlike cloud-based services, Personal Agent keeps ALL your data on your own computer. No corporate servers, no data mining, no privacy concerns.
+\end{featurebox}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Local Storage Only}: Everything stays on your machine
+    \item \textbf{No Cloud Dependencies}: Works completely offline
+    \item \textbf{Multi-User Isolation}: Each user's data is completely separate
+    \item \textbf{Docker Containers}: Services run in isolated, secure environments
+    \item \textbf{Proprietary Software}: Transparent, auditable architecture
+\end{itemize}
+
+\newpage
+\section{Easy-to-Use Interfaces}
+
+\subsection{Access Anywhere, Anytime}
+
+\subsubsection{Web Interface}
+Beautiful, intuitive browser-based interface perfect for daily use. Point-and-click simplicity with powerful features underneath.
+
+\subsubsection{Mobile Access via iPhone \& iPad}
+Your memories in your pocket! Using iOS Shortcuts and secure Tailscale VPN:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Voice Input}: Use Siri and macOS dictation to speak your memories
+    \item \textbf{Quick Search}: Find memories on the go
+    \item \textbf{Memory Stats}: Check your memory count anytime
+    \item \textbf{100\% Secure}: Only your registered devices can access
+\end{itemize}
+
+\subsubsection{Command Line Interface}
+For power users who prefer keyboard control and automation.
+
+\subsubsection{System Dashboard}
+Monitor system health, view statistics, and manage multiple users.
+
+\newpage
+\section{Mobile Access: Your Memories in Your Pocket}
+
+\subsection{Capture Memories Anytime, Anywhere}
+
+\subsubsection{iOS \& macOS Shortcuts + Apple Watch Integration}
+
+One of our most innovative features is seamless integration with iOS and macOS Shortcuts and Apple Watch, allowing you to interact with your Personal Agent directly from your iPhone, iPad, Mac, or wrist.
+
+\textbf{What Are iOS Shortcuts?} \\
+Built-in to every iPhone and iPad, Shortcuts let you automate tasks with a simple tap or voice command. We've created ready-to-use shortcuts that connect directly to your Personal Agent.
+
+\subsubsection{Available Shortcuts}
+
+\begin{description}
+    \item[Save Memory] ~\\
+        \begin{itemize}[leftmargin=*]
+            \item Tap a button or say ``Hey Siri, save a memory''
+            \item Speak or type your memory
+            \item Instantly stored on your personal server
+            \item Perfect for capturing fleeting moments
+        \end{itemize}
+
+    \item[Search Memories] ~\\
+        \begin{itemize}[leftmargin=*]
+            \item Quick search from your phone
+            \item Natural language queries
+            \item See results immediately
+            \item Great for remembering that thing you forgot!
+        \end{itemize}
+
+    \item[Memory Statistics] ~\\
+        \begin{itemize}[leftmargin=*]
+            \item Check how many memories you've saved
+            \item View topic distribution
+            \item See your recent activity
+            \item Monitor your journaling progress
+        \end{itemize}
+
+    \item[List Recent Memories] ~\\
+        \begin{itemize}[leftmargin=*]
+            \item Browse your latest entries
+            \item Filter by topic or date
+            \item Read memories on the go
+            \item Stay connected to your story
+        \end{itemize}
+
+    \item[Apple Watch Support] ~\\
+        \begin{itemize}[leftmargin=*]
+            \item Save memories with a wrist tap
+            \item Voice input via Siri on your watch
+            \item Quick memory stats glance
+            \item Check recent memories from your wrist
+            \item Perfect for hands-free memory capture
+        \end{itemize}
+\end{description}
+
+\subsection{How It Works: Tailscale Mesh VPN}
+
+Your Personal Agent runs on a dedicated Mac (recommended: Mac mini M4 Pro). Using Tailscale---a secure, modern VPN---your iPhone connects directly to your Mac through an encrypted tunnel.
+
+\subsubsection{Why This Matters}
+\begin{itemize}[leftmargin=*]
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{100\% Secure}: Only YOUR registered devices can connect
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{No Public Internet Exposure}: Your server isn't exposed to the internet
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{No Cloud Service}: Data goes directly from phone to your server
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Works Anywhere}: At home, at work, anywhere with internet
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Zero Configuration}: Set it up once, works forever
+\end{itemize}
+
+\subsection{Real-World Example}
+
+Imagine you're on a walk and suddenly remember a cherished childhood memory. Simply:
+\begin{enumerate}
+    \item Say ``Hey Siri, save a memory''
+    \item Speak the memory naturally
+    \item It's instantly stored on your personal server
+    \item Automatically categorized by topic
+    \item Searchable immediately
+\end{enumerate}
+
+Or you're at a family gathering and someone asks ``When did grandpa say that funny thing?'' Just open the Search Memory shortcut, type a few words, and find it instantly!
+
+\subsection{Privacy First, Always}
+
+Your memories travel directly from your iPhone to YOUR server through an encrypted Tailscale tunnel. No third-party services, no cloud companies, no data mining. Your memories are yours, period.
+
+\newpage
+\section{Technical Excellence}
+
+\subsection{Powered by Cutting-Edge AI}
+
+While you enjoy simplicity, sophisticated technology works behind the scenes.
+
+\subsubsection{Flexible AI Model Options}
+
+The system lets you choose the AI model that fits your needs:
+
+\paragraph{Local AI (Recommended - 100\% Private)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Ollama}: Free, private local AI
+    \begin{itemize}
+        \item Primary: Qwen 3 (4B) or Unsloth variants - Best balance of speed and capability
+        \item Alternative: Qwen 3 (8B) - More capable, slower responses
+        \item \textbf{Note}: LLaMA models show inconsistent results with complex tasks
+        \item Response time: 5--15 seconds for simple queries
+        \item No cost, no API, complete privacy
+    \end{itemize}
+
+    \item \textbf{LM Studio}: Alternative option
+    \begin{itemize}
+        \item Can be faster, but less predictable
+        \item Still evaluating for production use
+        \item Visual model management
+    \end{itemize}
+\end{itemize}
+
+\paragraph{Cloud AI (Optional - When You Need Maximum Power)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{OpenAI}: GPT-4o-mini or GPT-4
+    \begin{itemize}
+        \item \textbf{Trade-off}: Better capability, but data leaves your device
+        \item \textbf{Cost}: Pay-per-use via API credits (can add up)
+        \item Use case: Complex analysis when privacy is less critical
+        \item Response time: 3--8 seconds typically
+    \end{itemize}
+\end{itemize}
+
+\paragraph{Why 4B--8B Models Work Well}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Balanced}: Good capability without excessive wait times
+    \item \textbf{Privacy}: Everything stays on your Mac
+    \item \textbf{Cost}: Zero ongoing costs
+    \item \textbf{Apple Silicon}: Optimized for M-series Metal acceleration
+    \item \textbf{Memory Efficient}: Fits in 24GB with room for other apps
+    \item \textbf{Reliable Tool Use}: Qwen models handle function calling well
+\end{itemize}
+
+\subsection{Dual Knowledge Architecture}
+\begin{itemize}[leftmargin=*]
+    \item Local vector database for lightning-fast semantic searches
+    \item Graph database for understanding relationships and connections
+    \item Combined for comprehensive memory and knowledge retrieval
+    \item Automatic knowledge graph construction from ingested content
+    \item \textbf{Visual Graphs Available}: LightRAG servers already provide interactive knowledge and memory graphs (integration into main interface planned)
+\end{itemize}
+
+\subsection{Document \& Content Ingestion}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Automatic Knowledge Graph Building}: Ingest documents, publications, books, reports
+    \item \textbf{Entity Extraction}: Automatically identifies people, concepts, relationships
+    \item \textbf{Cross-Document Intelligence}: Finds connections across all your content
+    \item \textbf{Multi-Format Support}: Text files, PDFs, research papers, documentation
+    \item \textbf{Natural Language Queries}: Ask questions across your entire knowledge base
+    \item \textbf{Relationship Mapping}: Understand how ideas and concepts connect
+\end{itemize}
+
+\subsection{Advanced Natural Language Processing}
+\begin{itemize}[leftmargin=*]
+    \item Understands context and meaning
+    \item Extracts topics automatically
+    \item Identifies people, places, and events
+    \item Builds semantic relationships from unstructured text
+\end{itemize}
+
+\subsection{Smart Duplicate Detection}
+\begin{itemize}[leftmargin=*]
+    \item Semantic similarity analysis
+    \item Prevents redundant memories
+    \item Preserves unique variations
+\end{itemize}
+
+\newpage
+\section{Who Is This For?}
+
+\subsection{Individuals}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Memory Preservation}: Capture your life story for posterity
+    \item \textbf{Personal Growth}: Track progress toward goals and dreams
+    \item \textbf{Daily Journaling}: Record thoughts, experiences, and reflections
+    \item \textbf{Legacy Building}: Share your wisdom with future generations
+\end{itemize}
+
+\subsection{Families}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Childhood Memories}: Parents preserve their children's milestones
+    \item \textbf{Family History}: Document traditions, recipes, and stories
+    \item \textbf{Generational Bridge}: Connect grandparents with grandchildren through shared memories
+    \item \textbf{Photo \& Story Organization}: Keep memories connected to life events
+\end{itemize}
+
+\subsection{Healthcare \& Therapy}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Cognitive Support}: Assist individuals with memory impairment
+    \item \textbf{Therapeutic Tool}: Aid in memory reconstruction and therapy
+    \item \textbf{Progress Tracking}: Monitor cognitive health over time
+    \item \textbf{Caregiver Assistance}: Enable family involvement in memory care
+\end{itemize}
+
+\subsection{Researchers \& Writers}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Research Notes}: Organize complex information and connections
+    \item \textbf{Life Story Documentation}: Material for autobiographies or memoirs
+    \item \textbf{Interview Archive}: Preserve oral histories and personal narratives
+    \item \textbf{Publication Library}: Ingest your papers, books, and articles---automatically builds searchable knowledge graphs
+    \item \textbf{Cross-Reference Intelligence}: Query across all your written work instantly
+\end{itemize}
+
+\subsection{Organizations \& Institutions}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Institutional Memory}: Capture expertise before key personnel retire or transition
+    \item \textbf{Knowledge Base Creation}: Ingest publications, research papers, reports, and documentation
+    \item \textbf{Organizational Intelligence}: Build queryable knowledge graphs from institutional content
+    \item \textbf{Onboarding Acceleration}: New team members access decades of accumulated expertise
+    \item \textbf{Competitive Advantage}: Preserve and leverage intellectual capital
+    \item \textbf{Research Continuity}: Scientists and engineers leave searchable legacy of their work
+    \item \textbf{Best Practices Library}: Document tribal knowledge and hard-won lessons
+    \item \textbf{Expert Systems}: Create searchable embodiments of senior staff expertise
+\end{itemize}
+
+\subsubsection{What Can Be Ingested}
+\begin{itemize}[leftmargin=*]
+    \item Research publications and papers
+    \item Books and technical documentation
+    \item Reports and white papers
+    \item Meeting notes and project documentation
+    \item Standard operating procedures
+    \item Training materials
+    \item Personal writings and blog posts
+    \item Any text-based knowledge artifacts
+\end{itemize}
+
+\begin{tcolorbox}[colback=lightgray,colframe=secondarygreen,title=The Result]
+Your organization's collective knowledge becomes instantly searchable and queryable. Ask questions in natural language and get answers drawn from decades of accumulated expertise, publications, and institutional memory.
+\end{tcolorbox}
+
+\newpage
+\section{Getting Started}
+
+\subsection{Simple Setup}
+\begin{enumerate}
+    \item \textbf{Install}: One-command installation on macOS
+    \item \textbf{Create Profile}: Set up your personal profile in minutes
+    \item \textbf{Start Capturing}: Begin preserving memories immediately
+    \item \textbf{Explore}: Discover the power of AI-assisted memory management
+\end{enumerate}
+
+\subsection{System Requirements}
+
+\subsubsection{Recommended Configuration (Optimal Experience)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Device}: Mac mini M4 Pro (24GB RAM)
+    \item \textbf{Operating System}: macOS 14 (Sonoma) or later
+    \item \textbf{Storage}: 512GB SSD minimum (1TB recommended)
+    \item \textbf{Network}: Ethernet or Wi-Fi 6E (for Tailscale remote access)
+\end{itemize}
+
+\subsubsection{Why Mac mini M4 Pro?}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Apple Silicon Power}: Blazing-fast AI inference with Metal acceleration
+    \item \textbf{Silent Operation}: Whisper-quiet, perfect for home office
+    \item \textbf{Always-On Server}: Rock-solid 24/7 operation
+    \item \textbf{Energy Efficient}: $\sim$5--15W power consumption
+    \item \textbf{Compact}: Fits anywhere on your desk
+    \item \textbf{Future-Proof}: Handles AI workloads for years to come
+\end{itemize}
+
+\subsubsection{Alternative Configurations}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mac Studio}: More power (if budget allows)
+    \item \textbf{MacBook Pro}: Portable option (M3/M4 series)
+    \item \textbf{Mac mini M2}: Budget-friendly alternative
+    \item \textbf{Note}: System optimized for macOS with Apple Silicon
+\end{itemize}
+
+\newpage
+\section{Use Cases \& Stories}
+
+\subsection{Sarah's Story: Preserving Mom's Memories}
+
+\begin{quote}
+\textit{``When Mom started showing signs of memory loss, I worried we'd lose her precious stories. Personal Agent let me capture her memories while she could still share them. Now, even as her condition progresses, we have her stories and her wisdom preserved forever. We're looking forward to the upcoming cognitive tracking and caregiver proxy features that will help us monitor her condition and assist with daily memory management.''}
+
+--- \textbf{Maria R., Family Caregiver}
+\end{quote}
+
+\subsection{Michael's Story: Building a Legacy}
+
+\begin{quote}
+\textit{``I wanted my grandchildren to know me---really know me---even after I'm gone. Over the past year, I've captured childhood memories from the 1950s, stories from my career, lessons I've learned, and advice for future generations. The temporal journaling feature let me organize memories by age, creating a complete life narrative. It's the most meaningful gift I can give my family.''}
+
+--- \textbf{Robert M., Retired Engineer}
+\end{quote}
+
+\subsection{The Johnson Family: Capturing Childhood}
+
+\begin{quote}
+\textit{``Our kids are growing up so fast. Personal Agent helps us capture those fleeting moments---first words, funny sayings, school achievements, family adventures. It's so easy to just type or dictate a memory and have it automatically organized. Years from now, our children will have a complete record of their childhood to share with their own families.''}
+
+--- \textbf{The Johnson Family}
+\end{quote}
+
+\newpage
+\section{Key Statistics}
+
+\subsection{Proven Technology}
+
+\subsubsection{Performance (on Mac mini M4 Pro)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Response Time}: Varies by query complexity
+    \begin{itemize}
+        \item Simple queries: 5--15 seconds
+        \item Complex memory searches with synthesis: 30--120 seconds
+        \item Optimization ongoing---performance improving with each release
+    \end{itemize}
+    \item \textbf{Token Generation}: 20--40 tokens/second
+    \item \textbf{Memory Usage}: $\sim$12--16GB total system
+    \item \textbf{Power Consumption}: $\sim$5--15W (incredibly efficient)
+    \item \textbf{Uptime}: 99\%+ (stable macOS operation)
+\end{itemize}
+
+\subsubsection{Features}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{20+ Topic Categories}: Automatic organization across life domains
+    \item \textbf{100\% Privacy}: All data stored locally, zero cloud dependency
+    \item \textbf{Multi-User Support}: Complete isolation between family members
+    \item \textbf{52+ Test Memories}: Comprehensive testing ensures reliability
+    \item \textbf{0--100 Cognitive Scale}: Precise cognitive health tracking
+    \item \textbf{Infinite Memories}: Only limited by your storage space
+    \item \textbf{iOS Shortcuts}: 4 pre-built shortcuts for mobile access
+    \item \textbf{3 AI Providers}: Ollama, LM Studio, OpenAI (switchable)
+\end{itemize}
+
+\newpage
+\section{Professional Applications}
+
+\subsection{Healthcare Settings}
+
+\subsubsection{Memory Clinics}
+\begin{itemize}[leftmargin=*]
+    \item Track patient cognitive function over time
+    \item Document memory assessment sessions
+    \item Monitor treatment effectiveness
+    \item Support family involvement in care
+\end{itemize}
+
+\subsubsection{Therapy Practices}
+\begin{itemize}[leftmargin=*]
+    \item Aid in narrative therapy techniques
+    \item Track therapeutic progress
+    \item Support memory reconstruction
+    \item Enable between-session continuity
+\end{itemize}
+
+\subsubsection{Senior Living Communities}
+\begin{itemize}[leftmargin=*]
+    \item Preserve residents' life stories
+    \item Support reminiscence therapy programs
+    \item Enable family connection
+    \item Track cognitive health trends
+\end{itemize}
+
+\subsection{Research Institutions}
+
+\subsubsection{Memory Research}
+\begin{itemize}[leftmargin=*]
+    \item Longitudinal cognitive health studies
+    \item Memory formation and retrieval research
+    \item Aging and cognition investigations
+    \item Intervention effectiveness studies
+\end{itemize}
+
+\subsubsection{Oral History Projects}
+\begin{itemize}[leftmargin=*]
+    \item Document community histories
+    \item Preserve cultural knowledge
+    \item Create accessible archives
+    \item Support historical research
+\end{itemize}
+
+\subsection{Corporate \& Organizational Settings}
+
+\subsubsection{Knowledge Preservation \& Transfer}
+
+When experienced professionals retire or transition, decades of institutional knowledge walks out the door. Personal Agent provides a structured way to capture and preserve that irreplaceable expertise.
+
+\paragraph{The Retirement Knowledge Crisis}
+\begin{itemize}[leftmargin=*]
+    \item 35 years of experience and expertise
+    \item Unwritten rules and best practices
+    \item Hard-won lessons and insights
+    \item Institutional memory and tribal knowledge
+    \item Professional relationships and contexts
+\end{itemize}
+
+\paragraph{Real-World Scenario: Dr. Bob's Retirement}
+
+\textit{Dr. Bob has spent 35 years as a senior research scientist at a pharmaceutical company. He's been instrumental in drug development, troubleshooting complex experiments, and mentoring junior researchers. His retirement is approaching, and the company faces losing decades of irreplaceable knowledge.}
+
+\paragraph{The Solution}
+
+Using Personal Agent, Dr. Bob spends his final months capturing:
+
+\textbf{Conversational Knowledge Capture:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Experimental Techniques}: ``When running assay X, if you see Y result, it usually means Z. Here's what I learned to do\ldots''
+    \item \textbf{Troubleshooting Wisdom}: ``The centrifuge in Lab 3 runs hot. Always reduce RPM by 10\% or samples degrade.''
+    \item \textbf{Relationship Knowledge}: ``Dr. Chen at MIT has unpublished data on this compound. She's collaborative if you approach her at conferences.''
+    \item \textbf{Historical Context}: ``We tried this approach in 1998. Here's why it failed and what we learned.''
+    \item \textbf{Rules of Thumb}: ``If synthesis yields drop below 60\%, check the water purification system first---it's always the water system.''
+\end{itemize}
+
+\textbf{Document Ingestion:}
+\begin{itemize}[leftmargin=*]
+    \item 50+ research publications automatically ingested and knowledge-graphed
+    \item Lab notebooks and experimental protocols converted to searchable knowledge
+    \item Internal reports and presentations indexed and cross-referenced
+    \item Patent applications and technical documentation integrated
+    \item Conference presentations and unpublished findings preserved
+\end{itemize}
+
+The system automatically builds knowledge graphs connecting all of Dr. Bob's work---linking publications to memories, experiments to outcomes, and collaborators to breakthroughs.
+
+\paragraph{Example Query in Action}
+
+A junior scientist asks: \textit{``What troubleshooting steps did Dr. Bob recommend when synthesis yields are low?''}
+
+The system returns:
+\begin{itemize}[leftmargin=*]
+    \item His spoken memory about checking the water purification system
+    \item A 2015 publication where he discussed yield optimization
+    \item Lab notebook entries documenting similar problems
+    \item An internal report linking water quality to synthesis outcomes
+    \item Names of collaborators who worked on related issues
+\end{itemize}
+
+\paragraph{The Result}
+
+After retirement, the organization has:
+\begin{itemize}[leftmargin=*]
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Searchable Expertise Database}: Junior scientists can query Dr. Bob's knowledge in natural language
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Unified Knowledge Graph}: All publications, memories, and documents interconnected
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Onboarding Resource}: New hires learn from 35 years of experience and 50+ publications
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Problem-Solving Guide}: Access troubleshooting wisdom when issues arise
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Institutional Continuity}: Critical knowledge preserved and accessible
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Competitive Advantage}: Retain expertise that would otherwise be lost
+    \item \textcolor{secondarygreen}{\checkmark} \textbf{Cross-Reference Intelligence}: Ask ``What did Dr. Bob publish about compound X?'' and get memories + papers
+\end{itemize}
+
+\paragraph{Applications}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{R\&D Organizations}: Preserve scientific and engineering expertise
+    \item \textbf{Manufacturing}: Capture process knowledge and troubleshooting guides
+    \item \textbf{Professional Services}: Retain client relationship knowledge and best practices
+    \item \textbf{Academia}: Document research methodologies and lab techniques
+    \item \textbf{Healthcare}: Preserve clinical experience and diagnostic reasoning
+    \item \textbf{Engineering Firms}: Capture design principles and field experience
+\end{itemize}
+
+\paragraph{Benefits for Organizations}
+\begin{itemize}[leftmargin=*]
+    \item Reduce knowledge loss during transitions
+    \item Accelerate onboarding for new team members
+    \item Create living knowledge bases from experts
+    \item Preserve competitive advantages
+    \item Enable mentorship across time
+    \item Document best practices naturally through conversation
+\end{itemize}
+
+\newpage
+\section{Roadmap \& Future}
+
+\subsection{Near-Term Enhancements}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Memory by Proxy}: Full caregiver support system
+    \item \textbf{Cognitive Health Tracking}: Cognitive state scoring and trend analysis
+    \item \textbf{Memory Confidence Scoring}: Enhanced reliability tracking
+    \item \textbf{Visual Memory Graphs}: Full integration of existing LightRAG graph visualizations
+    \item \textbf{Timeline Visualization}: Interactive life story timelines
+    \item \textbf{Enhanced Analytics}: Deeper insights into memory patterns
+    \item \textbf{Memory Training Tools}: Cognitive exercises and memory strengthening activities
+\end{itemize}
+
+\subsection{Future Vision}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Audio Recording \& Ingestion}: Record and transcribe voice memos, interviews, oral histories
+    \item \textbf{Voice Replay}: Preserve the actual voice of loved ones alongside their stories
+    \item \textbf{Photo Integration}: Connect images to memories automatically
+    \item \textbf{Video Memory Capture}: Record and link video content to memories
+    \item \textbf{Multi-Modal Knowledge Base}: Ingest audio, video, and images into the knowledge graph
+    \item \textbf{Native Mobile Apps}: Dedicated iOS and Android applications
+    \item \textbf{Memory Sharing}: Selectively share memories with family
+    \item \textbf{AI Memory Assistant}: Proactive memory prompts and reminders
+\end{itemize}
+
+\newpage
+\section{Why Choose Personal Agent?}
+
+\subsection{The Complete Memory Solution}
+
+\subsubsection{Unlike Cloud Services}
+\begin{itemize}[leftmargin=*]
+    \item \textcolor{secondarygreen}{\checkmark} Complete privacy and data control
+    \item \textcolor{secondarygreen}{\checkmark} No monthly subscription fees
+    \item \textcolor{secondarygreen}{\checkmark} Works offline, no internet required
+    \item \textcolor{secondarygreen}{\checkmark} Your data never leaves your computer
+\end{itemize}
+
+\subsubsection{Unlike Simple Journal Apps}
+\begin{itemize}[leftmargin=*]
+    \item \textcolor{secondarygreen}{\checkmark} AI-powered organization and search
+    \item \textcolor{secondarygreen}{\checkmark} Automatic topic classification
+    \item \textcolor{secondarygreen}{\checkmark} Relationship and timeline understanding
+    \item \textcolor{secondarygreen}{\checkmark} Cognitive health tracking
+\end{itemize}
+
+\subsubsection{Unlike Paper Journals}
+\begin{itemize}[leftmargin=*]
+    \item \textcolor{secondarygreen}{\checkmark} Never lose or damage your memories
+    \item \textcolor{secondarygreen}{\checkmark} Instant search across all memories
+    \item \textcolor{secondarygreen}{\checkmark} Automatic organization
+    \item \textcolor{secondarygreen}{\checkmark} Easy to share with family (when you choose)
+\end{itemize}
+
+\subsubsection{Built For}
+\begin{itemize}[leftmargin=*]
+    \item \textcolor{secondarygreen}{\checkmark} Memory preservation and legacy building
+    \item \textcolor{secondarygreen}{\checkmark} Cognitive health support
+    \item \textcolor{secondarygreen}{\checkmark} Family history documentation
+    \item \textcolor{secondarygreen}{\checkmark} Therapeutic and healthcare applications
+    \item \textcolor{secondarygreen}{\checkmark} Personal growth and reflection
+\end{itemize}
+
+
+
+\newpage
+\section{Conclusion}
+
+\subsection{Your Story Matters}
+
+Every person has a unique story worth preserving. Whether you're capturing daily moments, supporting someone with memory challenges, or building a legacy for future generations, Personal Agent is here to help.
+
+\begin{center}
+\Large
+\textbf{Your memories are precious.}\\
+\textbf{Your story is irreplaceable.}\\
+\textbf{Your privacy is sacred.}
+\end{center}
+
+\vspace{1cm}
+
+\begin{center}
+\large
+Start preserving your story today.
+\end{center}
+
+\newpage
+\section{Get Started Today}
+
+\subsection{Transform How You Remember}
+
+Personal Agent is available now for download and installation. Whether you're preserving your own memories, supporting a loved one with memory challenges, or building a family legacy, we're here to help.
+
+\subsection{Installation Options}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Personal Edition}: Full-featured for individual and family use
+    \item \textbf{Professional Edition}: Enhanced support and organizational features
+    \item \textbf{Enterprise Licensing}: Available for healthcare, research, and corporate institutions
+\end{itemize}
+
+\subsection{Next Steps}
+\begin{enumerate}
+    \item Visit our website: \url{persagent.ai}
+    \item Download the installer for your platform
+    \item Follow the quick-start guide
+    \item Begin preserving memories immediately
+\end{enumerate}
+
+\subsection{Community \& Support}
+
+\subsubsection{Resources}
+\begin{itemize}[leftmargin=*]
+    \item Comprehensive documentation and tutorials
+    \item Video guides for all features
+    \item Community forum for sharing experiences
+    \item Regular updates and improvements
+\end{itemize}
+
+\subsubsection{Support Options}
+\begin{itemize}[leftmargin=*]
+    \item Detailed user manual
+    \item Video tutorial library
+    \item Community support forum
+    \item Email support for technical issues
+\end{itemize}
+
+\subsubsection{Beta Testing Program}
+\begin{itemize}[leftmargin=*]
+    \item Limited beta testing opportunities available
+    \item Applicants will be screened and selected
+    \item Priority given to diverse use cases
+    \item Help shape the future of memory preservation
+    \item Contact us to apply for beta access
+\end{itemize}
+
+\newpage
+\section*{Contact Information}
+
+\begin{center}
+{\Large\bfseries\color{primaryblue} Personal Agent}\\
+\vspace{0.3cm}
+{\large\color{secondarygreen} AI-Powered Digital Memory Companion}\\
+\vspace{1cm}
+
+Version 0.8.7 \\ October 2025\\
+\vspace{1cm}
+
+\textbf{For more information, downloads, and support:}\\
+\vspace{0.5cm}
+\begin{tabular}{ll}
+\textbf{Website:} & \url{peragent.ai} \\
+\textbf{Documentation:} & \url{docs.persagent.ai} \\
+\textbf{Community:} & \url{community.persagent.ai} \\
+\end{tabular}
+
+\vspace{2cm}
+
+\hrule
+\vspace{0.5cm}
+
+\textit{Personal Agent is proprietary software.}\\
+\textit{Developed by Eric G. Suchanek, PhD.}\\
+\vspace{0.3cm}
+\textit{\copyright\ 2025 Personal Agent Project. All rights reserved.}
+
+\end{center}
+
+\end{document}

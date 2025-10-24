@@ -21,6 +21,7 @@ Examples:
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict
 
@@ -147,11 +148,25 @@ def create_user_if_needed(
         return False
 
 
-def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
+def switch_user_context(user_id: str, restart_services: bool = True, restart_system: bool = True) -> bool:
     """Switch the user context and refresh all settings."""
     try:
         from personal_agent.config import DATA_DIR, PERSAG_HOME
         from personal_agent.core.user_manager import UserManager
+        from personal_agent.core.docker_integration import (
+            ensure_docker_user_consistency,
+            stop_lightrag_services,
+        )
+
+        # Shut down services before switching user to ensure a clean restart
+        if restart_services:
+            print_step("SHUTDOWN", "Stopping LightRAG services before user switch...")
+            success, message = stop_lightrag_services()
+            if success:
+                print_success("LightRAG services stopped successfully.")
+            else:
+                # This is a warning because services might already be stopped
+                print_warning(f"Could not stop all LightRAG services: {message}")
 
         user_manager = UserManager(data_dir=DATA_DIR, project_root=PERSAG_HOME)
 
@@ -160,7 +175,7 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
         # Perform the user switch
         result = user_manager.switch_user(
             user_id=user_id,
-            restart_lightrag=restart_services,
+            restart_lightrag=False,  # We handle this with the docker_integration module
             update_global_config=True,
         )
 
@@ -188,20 +203,111 @@ def switch_user_context(user_id: str, restart_services: bool = True) -> bool:
                     f"  • Memory Storage: {config_refresh.get('LIGHTRAG_MEMORY_STORAGE_DIR', 'N/A')}"
                 )
 
-            # Display LightRAG status if services were restarted
-            if restart_services and result.get("lightrag_status"):
-                lightrag_status = result["lightrag_status"]
-                if lightrag_status.get("success"):
-                    print_success("LightRAG services restarted successfully")
-                    if lightrag_status.get("services_restarted"):
-                        print_info(
-                            f"Services restarted: {', '.join(lightrag_status['services_restarted'])}"
-                        )
+            # Restart services using the robust docker_integration module
+            if restart_services:
+                print_step("SYNC", "Ensuring Docker services are synchronized...")
+                success, message = ensure_docker_user_consistency(
+                    user_id=user_id, auto_fix=True, force_restart=True
+                )
+                if success:
+                    print_success("Docker services synchronized successfully.")
                 else:
-                    print_warning("LightRAG restart had issues")
-                    if lightrag_status.get("errors"):
-                        for error in lightrag_status["errors"]:
-                            print_warning(f"  • {error}")
+                    print_error(f"Docker synchronization failed: {message}")
+                    return False
+
+            # Perform system restart (agent/team reinitialization) if requested
+            system_restart_result = None
+            if restart_system:
+                print_step("RESTART", "Performing system restart after user switch...")
+                try:
+                    # Import required modules for system restart
+                    from personal_agent.tools.global_state import get_global_state
+                    from personal_agent.tools.streamlit_agent_manager import initialize_agent, initialize_team
+                    from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+
+                    global_state = get_global_state()
+                    current_agent_mode = global_state.get("agent_mode", "single")
+                    current_model = global_state.get("llm_model", os.getenv("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"))
+                    current_ollama_url = global_state.get("ollama_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+
+                    # Clear global state for clean restart
+                    global_state.clear()
+
+                    # Reinitialize based on agent mode
+                    restart_success = False
+                    restart_message = ""
+
+                    if current_agent_mode == "team":
+                        try:
+                            team = initialize_team(current_model, current_ollama_url, recreate=True)
+                            if team:
+                                global_state.set("agent_mode", "team")
+                                global_state.set("team", team)
+                                global_state.set("llm_model", current_model)
+                                global_state.set("ollama_url", current_ollama_url)
+
+                                if hasattr(team, "members") and team.members:
+                                    knowledge_agent = team.members[0]
+                                    memory_helper = StreamlitMemoryHelper(knowledge_agent)
+                                    knowledge_helper_obj = StreamlitKnowledgeHelper(knowledge_agent)
+                                    global_state.set("memory_helper", memory_helper)
+                                    global_state.set("knowledge_helper", knowledge_helper_obj)
+
+                                restart_success = True
+                                restart_message = "System restarted successfully in team mode"
+                                print_success(restart_message)
+                            else:
+                                restart_message = "Failed to initialize team during restart"
+                                print_error(restart_message)
+                        except Exception as e:
+                            restart_message = f"Error restarting team: {str(e)}"
+                            print_error(restart_message)
+                    else:
+                        try:
+                            agent = initialize_agent(current_model, current_ollama_url, recreate=True)
+                            if agent:
+                                global_state.set("agent_mode", "single")
+                                global_state.set("agent", agent)
+                                global_state.set("llm_model", current_model)
+                                global_state.set("ollama_url", current_ollama_url)
+
+                                memory_helper = StreamlitMemoryHelper(agent)
+                                knowledge_helper_obj = StreamlitKnowledgeHelper(agent)
+                                global_state.set("memory_helper", memory_helper)
+                                global_state.set("knowledge_helper", knowledge_helper_obj)
+
+                                restart_success = True
+                                restart_message = "System restarted successfully in single agent mode"
+                                print_success(restart_message)
+                            else:
+                                restart_message = "Failed to initialize agent during restart"
+                                print_error(restart_message)
+                        except Exception as e:
+                            restart_message = f"Error restarting agent: {str(e)}"
+                            print_error(restart_message)
+
+                    system_restart_result = {
+                        "restart_performed": True,
+                        "restart_success": restart_success,
+                        "restart_message": restart_message,
+                        "agent_mode": current_agent_mode,
+                        "model": current_model
+                    }
+
+                except Exception as restart_error:
+                    print_error(f"Error during system restart after user switch: {restart_error}")
+                    system_restart_result = {
+                        "restart_performed": True,
+                        "restart_success": False,
+                        "restart_message": str(restart_error)
+                    }
+
+            # Display system restart results
+            if system_restart_result:
+                if system_restart_result["restart_success"]:
+                    print_info("System restart completed successfully")
+                else:
+                    print_warning(f"System restart had issues: {system_restart_result['restart_message']}")
 
             # Display warnings if any
             if result.get("warnings"):
@@ -401,6 +507,12 @@ Examples:
     )
 
     parser.add_argument(
+        "--no-system-restart",
+        action="store_true",
+        help="Don't restart the agent/team system after switching",
+    )
+
+    parser.add_argument(
         "--status", action="store_true", help="Display user status instead of switching"
     )
 
@@ -452,7 +564,8 @@ Examples:
 
     # Step 3: Switch user context
     restart_services = not args.no_restart
-    if not switch_user_context(args.user_id, restart_services):
+    restart_system = not args.no_system_restart
+    if not switch_user_context(args.user_id, restart_services, restart_system):
         print_error("Failed to switch user context")
         sys.exit(1)
 

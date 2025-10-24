@@ -113,14 +113,44 @@ def _render_memory_explorer():
         )
     
     with col2:
-        # Default date range: 5 days ago to today
-        default_start_date = datetime.now().date() - timedelta(days=5)
-        default_end_date = datetime.now().date()
-        
+        # Get all memories to determine the full date range
+        try:
+            all_memories = memory_helper.get_all_memories()
+            memory_dates = []
+
+            for memory in all_memories:
+                last_updated = getattr(memory, 'last_updated', None)
+                if last_updated:
+                    try:
+                        # Convert memory date to date object
+                        if isinstance(last_updated, str):
+                            # Try to parse the date string (assuming YYYY-MM-DD format)
+                            memory_date = datetime.strptime(last_updated.split()[0], '%Y-%m-%d').date()
+                        elif hasattr(last_updated, 'date'):
+                            memory_date = last_updated.date()
+                        else:
+                            memory_date = last_updated
+                        memory_dates.append(memory_date)
+                    except (ValueError, AttributeError):
+                        pass
+
+            if memory_dates:
+                default_start_date = min(memory_dates)
+                default_end_date = max(memory_dates)
+            else:
+                # Fallback to last 5 days if no memories have dates
+                default_start_date = datetime.now().date() - timedelta(days=5)
+                default_end_date = datetime.now().date()
+
+        except Exception:
+            # Fallback to last 5 days if there's an error
+            default_start_date = datetime.now().date() - timedelta(days=5)
+            default_end_date = datetime.now().date()
+
         date_range = st.date_input(
             "Date Range",
             value=[default_start_date, default_end_date],
-            help="Filter memories by date range (defaults to last 5 days)"
+            help="Filter memories by date range (automatically set to encompass all memory dates)"
         )
     
     with col3:
@@ -231,6 +261,10 @@ def _render_memory_explorer():
                             with col_confirm2:
                                 if st.button("Delete", key=f"confirm_delete_{memory_id}", type="primary"):
                                     if confirmation_text.lower() == "yes":
+                                        # Show toast notification with 2-second delay
+                                        st.toast(f"Deleting memory {memory_id}...", icon="🗑️")
+                                        time.sleep(2)
+                                        
                                         with st.spinner("Deleting memory..."):
                                             success, message = memory_helper.delete_memory(memory_id)
                                             
@@ -245,9 +279,12 @@ def _render_memory_explorer():
                                             st.session_state[f"show_delete_confirm_{memory_id}"] = False
                                             
                                             if success:
+                                                st.toast("Memory deleted successfully!", icon="✅")
                                                 # Clear the agent cache to ensure fresh data on next load
                                                 st.cache_resource.clear()
                                                 st.rerun()
+                                            else:
+                                                st.toast(f"Failed to delete memory: {message}", icon="❌")
                                     else:
                                         st.error("Please type 'yes' to confirm deletion")
                                 
@@ -353,13 +390,19 @@ def _render_memory_search():
                                 f"🗑️ Delete Memory",
                                 key=f"delete_search_{memory.memory_id}",
                             ):
+                                # Show toast notification with 2-second delay
+                                st.toast(f"Deleting memory {memory.memory_id}...", icon="🗑️")
+                                time.sleep(2)
+                                
                                 success, message = memory_helper.delete_memory(
                                     memory.memory_id
                                 )
                                 if success:
+                                    st.toast("Memory deleted successfully!", icon="✅")
                                     st.success(f"Memory deleted: {message}")
                                     st.rerun()
                                 else:
+                                    st.toast(f"Failed to delete memory: {message}", icon="❌")
                                     st.error(f"Failed to delete memory: {message}")
                 else:
                     st.info("No memories found matching your search.")
@@ -435,7 +478,10 @@ def _render_memory_sync():
                             st.warning(f"Error syncing memory: {e}")
 
                     if synced_count > 0:
-                        st.success(f"✅ Synced {synced_count} memories to graph system")
+                        # Show success notification
+                        st.toast(f"🎉 Synced {synced_count} memories to graph system!", icon="✅")
+                        time.sleep(2.0)  # 2 second delay
+                        st.rerun()
                     else:
                         st.info("No memories needed syncing")
             except Exception as e:
@@ -584,7 +630,10 @@ def _render_memory_sync():
                                 st.warning(f"Error importing memory: {e}")
 
                     if imported_count > 0:
-                        st.success(f"Successfully imported {imported_count} memories!")
+                        # Show success notification
+                        st.toast(f"🎉 Successfully imported {imported_count} memories!", icon="✅")
+                        time.sleep(2.0)  # 2 second delay
+                        st.rerun()
                     else:
                         st.warning("No memories were imported.")
 
@@ -596,44 +645,63 @@ def _render_memory_settings():
     """Memory system settings."""
     st.subheader("Memory Settings")
 
-    # Memory storage settings
-    st.write("### Storage Settings")
+    # Clear all memories section
+    st.write("### Dangerous Actions")
+    st.warning("⚠️ **Warning:** The following actions are irreversible!")
 
-    col1, col2 = st.columns(2)
+    # Get memory helper
+    agent = get_agent_instance()
+    if not agent:
+        st.error("Agent not available")
+        return
 
-    with col1:
-        st.number_input(
-            "Max Memory Age (days)",
-            min_value=1,
-            max_value=365,
-            value=90,
-            help="Maximum age of memories before they are archived",
-        )
+    memory_helper = StreamlitMemoryHelper(agent)
 
-    with col2:
-        st.number_input(
-            "Memory Limit",
-            min_value=100,
-            max_value=100000,
-            value=10000,
-            step=100,
-            help="Maximum number of memories to store",
-        )
+    # Clear all memories button
+    if st.button("🗑️ Clear All Memories", type="primary", help="Delete all memories from local SQLite and LightRAG graph"):
+        st.session_state["show_clear_all_confirmation"] = True
 
-    # Memory systems
-    st.write("### Memory Systems")
+    # Show confirmation dialog if button was clicked
+    if st.session_state.get("show_clear_all_confirmation", False):
+        with st.expander("⚠️ Confirm Clear All Memories", expanded=True):
+            st.error("**This will permanently delete ALL memories from both local and graph storage!**")
+            st.write("This action cannot be undone. All user memories will be permanently removed.")
 
-    systems = {
-        "SQLite": True,
-        "LightRAG Graph": True,
-        "Vector Store": False,
-        "External API": False,
-    }
+            col_confirm1, col_confirm2 = st.columns([3, 1])
 
-    for system, enabled in systems.items():
-        st.checkbox(system, value=enabled, key=f"system_{system}")
+            with col_confirm1:
+                confirmation_text = st.text_input(
+                    "Type 'DELETE ALL' to confirm:",
+                    key="confirm_clear_all_text",
+                    placeholder="DELETE ALL"
+                )
 
-    # Save settings
-    if st.button("Save Settings"):
-        st.success("Memory settings saved successfully!")
-        st.info("Some settings may require a restart to take effect.")
+            with col_confirm2:
+                if st.button("Clear All", key="confirm_clear_all", type="primary"):
+                    if confirmation_text == "DELETE ALL":
+                        st.toast("Clearing all memories...", icon="🗑️")
+                        time.sleep(2)
+
+                        with st.spinner("Deleting all memories from local and graph storage..."):
+                            success, message = memory_helper.clear_memories()
+
+                            # Clear confirmation state
+                            st.session_state["show_clear_all_confirmation"] = False
+
+                            if success:
+                                st.toast("All memories cleared successfully!", icon="✅")
+                                # Clear the agent cache to ensure fresh data on next load
+                                st.cache_resource.clear()
+                                st.success(message)
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.toast(f"Failed to clear memories: {message}", icon="❌")
+                                st.error(message)
+                    else:
+                        st.error("Please type 'DELETE ALL' to confirm")
+
+                # Cancel button
+                if st.button("Cancel", key="cancel_clear_all"):
+                    st.session_state["show_clear_all_confirmation"] = False
+                    st.rerun()

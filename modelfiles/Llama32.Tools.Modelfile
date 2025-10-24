@@ -1,0 +1,66 @@
+FROM llama3.2:3b
+
+TEMPLATE """<|start_header_id|>system<|end_header_id|>
+Cutting Knowledge Date: December 2023
+
+{{- if .System }}
+{{ .System }}
+{{- end }}
+
+{{- if .Tools }}
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{{- range .Tools }}
+{"type": "function", "function": {{ .Function }}}
+{{- end }}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>
+{{- end }}
+<|eot_id|>
+
+{{- range $i, $_ := .Messages }}
+  {{- $last := eq (len (slice $.Messages $i)) 1 }}
+  {{- if eq .Role "user" -}}
+<|start_header_id|>user<|end_header_id|>
+{{ .Content }}
+<|eot_id|>
+    {{- if $last -}}
+<|start_header_id|>assistant<|end_header_id|>
+    {{- end -}}
+
+  {{- else if eq .Role "assistant" -}}
+<|start_header_id|>assistant<|end_header_id|>
+    {{- if .ToolCalls -}}
+<tool_call>
+{{ range .ToolCalls }}{"name": "{{ .Function.Name }}", "arguments": {{ .Function.Arguments }}}
+{{ end }}</tool_call>
+    {{- else -}}
+{{ .Content }}
+    {{- end -}}
+{{- if not $last }}<|eot_id|>{{ end }}
+
+  {{- else if eq .Role "tool" -}}
+<|start_header_id|>user<|end_header_id|>
+<tool_response>
+{{ .Content }}
+</tool_response>
+<|eot_id|>
+    {{- if $last -}}
+<|start_header_id|>assistant<|end_header_id|>
+    {{- end -}}
+
+  {{- end -}}
+{{- end -}}"""
+
+PARAMETER stop <|start_header_id|>
+PARAMETER stop <|end_header_id|>
+PARAMETER stop <|eot_id|>

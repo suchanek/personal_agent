@@ -1,0 +1,219 @@
+# Setting PATH for Python 3.7
+# The original version is saved in .bash_profile.pysave
+# PATH="/Library/Frameworks/Python.framework/Versions/3.7/bin:${PATH}"
+# Environment variables have been moved to ~/.env
+set -a
+[ -f ~/.env ] && . ~/.env
+set +a
+
+export SDKROOT="`xcrun --show-sdk-path`"
+export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/local/opt/icu4c/bin:$PATH"
+export PATH="/usr/local/opt/icu4c/sbin:$PATH"
+export PATH="/Library/TeX/Distributions/.DefaultTeX/Contents/Programs/texbin:$PATH"
+export PATH="/usr/local/opt/graphviz/bin:$PATH"
+export PATH="/opt/homebrew/opt/qt5/bin:$PATH"
+export PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
+export PATH="/opt/homebrew/opt/curl/bin:$PATH"
+export CPLUS_INCLUDE_PATH="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+export PATH="/Users/suchanek/.local/bin:$PATH"
+export PATH="/Users/suchanek/clang+llvm-15.0.0-rc1-arm64-apple-darwin21.0/bin:$PATH"
+export PATH=$PATH:$(go env GOPATH)/bin
+
+alias ccat='bat'
+alias vact="source .venv/bin/activate"
+
+alias copilot="gh copilot"
+alias gcs="gh copilot suggest"
+alias gce="gh copilot explain"
+
+alias myml="cd /Users/suchanek/Documents/myML"
+alias nps="cd /Users/suchanek/Documents/myML/nps"
+alias logs="cd /Users/suchanek/Documents/myML/nps/logs"
+alias ppy="cd /Users/suchanek/repos/proteusPy"
+alias ds="ls -alF |more"
+
+alias act="conda activate"
+alias dact="conda deactivate"
+
+alias eab="proteusPy.DisulfideExtractor -e -f -b -c -1 -g -1 -t 12 -v -u"
+alias eas="proteusPy.DisulfideExtractor -e -s -b -c -1 -g -1 -t 12 -v -u"
+
+alias git-first-commit='git log --follow --diff-filter=A --format="%H %ad" --date=short --'
+# Alias to delete a tag locally and remotely
+alias git-delete-tag='function _git_delete_tag() { git tag -d "$1" && git push origin --delete "$1"; }; _git_delete_tag'
+
+alias imgdata='source ~/.bash_profile && conda activate torch3 && python ~/programs/imgdata.py "$@"'
+alias txt2img='source ~/.bash_profile && conda activate torch3 && cd ~/repos/MyMl/ArtDiffusion && python txt2img.py "$@"'
+alias MLXtxt2img='source ~/.bash_profile && conda activate mlx2 && cd ~/repos/mlx-examples/stable_diffusion && python txt2image.py "$@"'
+
+
+remove_top_level_dirs_in_zip() {
+    zipfile="$1"
+    
+    # Check if the file exists
+    if [[ ! -f "$zipfile" ]]; then
+        echo "File not found!"
+        return 1
+    fi
+
+    # List the top-level directories in the zip file
+    dirs=$(unzip -l "$zipfile" | awk '{print $NF}' | grep '/$' | awk -F'/' '{print $1}' | sort -u)
+
+    # Check if any directories were found
+    if [[ -z "$dirs" ]]; then
+        echo "No top-level directories found!"
+        return 0
+    fi
+
+    # Loop through the directories and remove them from the zip
+    for dir in $dirs; do
+	echo "removing $dir"
+        rm -rf "$dir/*" >/dev/null
+    done
+
+    echo "Removed top-level directories"
+}
+
+function stbl_diff() {
+  local prompt="A magical scene of a long highway fading into a mountain scene, with the sun setting. magical lighting, high detail."
+  local number=1
+  local guidance=7
+  local stps=20
+  local prefix="egs_img"
+  
+  
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -p|--prompt)
+        prompt="$2"
+        shift 2
+        ;;
+      -n|--number)
+        number="$2"
+        shift 2
+        ;;
+      -s|--stps)
+        stps="$2"
+        shift 2
+        ;;
+      -g|--guidance)
+        guidance="$2"
+        shift 2
+        ;;
+      -x|--prefix)
+        prefix="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        return 1
+        ;;
+    esac
+  done
+
+  cd ~/repos/MyMl/ArtDiffusion && conda activate torch3 && python txt2img.py -p prompt -x prefix -s stps -n number -g guidance 
+  #cd ~/repos/MyMl/ArtDiffusion && conda activate torch3 && python txt2img.py $*
+}
+
+copy2pdf() {
+    OUTPUT=~/Documents/proteusPyDocs/source
+    input_file_name=$1
+    echo -e "Processing: $1"
+    my_filename="${input_file_name%.*}"
+    sed -r '/[^\x20-\x7E]/d' $1 > cleaned.py
+    enscript -2rG --line-numbers  --highlight=python --color=1 -media=Letter -p out.ps -c cleaned.py
+    outname=$OUTPUT/$my_filename.pdf
+    echo -e "Creating: $outname"
+    ps2pdf out.ps $outname
+    rm out.ps cleaned.py
+}
+
+alias py2pdf="$HOME/programs/py2pdf.sh"
+
+prntPpy() {
+    cd ~/repos/proteusPy/proteusPy && for FILE in *.py; do py2pdf $FILE; done
+    cd ~/repos/proteusPy/programs && for FILE in *.py; do py2pdf $FILE; done
+}
+
+hgrep() {
+    history | grep "$1" | more
+}
+
+wm_encode() {
+    #do things with parameters like $1 such as
+    wm.py -a encode -v -t bytes -m dwtDct -w "$1" -o "$2" "$3"
+}
+
+wm_decode() {
+ wm.py -v -a decode -t bytes -m dwtDct -l "$1" "$2"
+}
+
+. "$HOME/.cargo/env"
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+#__conda_setup="$('/Users/suchanek/miniforge3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+#if [ $? -eq 0 ]; then
+#    eval "$__conda_setup"
+#else
+#    if [ -f "/Users/suchanek/miniforge3/etc/profile.d/conda.sh" ]; then
+#        . "/Users/suchanek/miniforge3/etc/profile.d/conda.sh"
+#    else
+#        export PATH="/Users/suchanek/miniforge3/bin:$PATH"
+#    fi
+#fi
+#unset __conda_setup
+# <<< conda initialize <<<
+
+#conda activate stblDiff
+
+# Set PATH, MANPATH, etc., for Homebrew.
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+##
+# Your previous /Users/suchanek/.bash_profile file was backed up as /Users/suchanek/.bash_profile.macports-saved_2023-01-17_at_13:19:32
+##
+
+# MacPorts Installer addition on 2023-01-17_at_13:19:32: adding an appropriate PATH variable for use with MacPorts.
+export PATH="/opt/local/bin:/opt/local/sbin:$PATH"
+# Finished adapting your PATH environment variable for use with MacPorts.
+
+
+# MacPorts Installer addition on 2023-01-17_at_13:19:32: adding an appropriate MANPATH variable for use with MacPorts.
+export MANPATH="/opt/local/share/man:$MANPATH"
+# Finished adapting your MANPATH environment variable for use with MacPorts.
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+#export OPENAI_API_BASE=http://127.0.0.1:1234/
+#export BACKEND_TYPE=lmstudio
+
+if [ -f "/Users/suchanek/.config/fabric/fabric-bootstrap.inc" ]; then . "/Users/suchanek/.config/fabric/fabric-bootstrap.inc"; fi
+
+# Setting PATH for Python 3.13
+# The original version is saved in .bash_profile.pysave
+PATH="/Library/Frameworks/Python.framework/Versions/3.13/bin:${PATH}"
+export PATH
+
+# Added by OrbStack: command-line tools and integration
+# This won't be added again if you remove it.
+source ~/.orbstack/shell/init.bash 2>/dev/null || :
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+alias kill-agent="lsof -ti:5001 | xargs kill -9"
+alias prun="poetry run"
+
+export PATH="$HOME/repos/llama.cpp:$PATH"
+export PATH="$HOME/repos/llama.cpp/build-metal/bin:$PATH"
+
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/suchanek/.cache/lm-studio/bin"
+# End of LM Studio CLI section
+
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/suchanek/.lmstudio/bin"
+# End of LM Studio CLI section
+

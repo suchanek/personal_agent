@@ -23,7 +23,7 @@ def _add_src_to_syspath():
 
 _add_src_to_syspath()
 
-from personal_agent.config import LLM_MODEL, OLLAMA_URL, USER_ID, AGNO_STORAGE_DIR
+from personal_agent.config import LLM_MODEL, OLLAMA_URL, AGNO_STORAGE_DIR, get_userid
 from personal_agent.team.personal_agent_team import (
     PersonalAgentTeamWrapper,
     create_personal_agent_team,
@@ -31,8 +31,9 @@ from personal_agent.team.personal_agent_team import (
 from personal_agent.team.specialized_agents import (
     create_calculator_agent,
     create_finance_agent,
-    create_memory_agent,
+    create_knowledge_memory_agent,
     create_web_research_agent,
+    create_writer_agent,
 )
 from personal_agent.utils import setup_logging
 
@@ -41,7 +42,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message
 logger = setup_logging(__name__)
 
 
-async def test_individual_agents():
+async def test_individual_agents(user_id):
     """Test individual specialized agents."""
     print("=" * 80)
     print("🧪 TESTING INDIVIDUAL SPECIALIZED AGENTS")
@@ -50,19 +51,19 @@ async def test_individual_agents():
     # Test Memory Agent
     print("\n🧠 Testing Memory Agent...")
     try:
-        memory_agent = create_memory_agent(
+        memory_agent = create_knowledge_memory_agent(
             storage_dir=AGNO_STORAGE_DIR,
-            user_id=USER_ID,
+            user_id=user_id,
             debug=True,
         )
         
         # Test storing a memory
-        store_response = await memory_agent.arun("Please remember that I love hiking and outdoor activities.")
-        print(f"✅ Memory storage: {store_response.content}")
+        store_response = await memory_agent.run("Please remember that I love hiking and outdoor activities.")
+        print(f"✅ Memory storage: {store_response}")
         
         # Test querying memory
-        query_response = await memory_agent.arun("What do you remember about my hobbies?")
-        print(f"✅ Memory query: {query_response.content}")
+        query_response = await memory_agent.run("What do you remember about my hobbies?")
+        print(f"✅ Memory query: {query_response}")
         
     except Exception as e:
         print(f"❌ Memory Agent test failed: {e}")
@@ -72,7 +73,8 @@ async def test_individual_agents():
     try:
         web_agent = create_web_research_agent(debug=True)
         response = await web_agent.arun("What are the top 3 AI news headlines today?")
-        print(f"✅ Web research: {response.content[:200]}...")
+        content = response.content if hasattr(response, 'content') else str(response)
+        print(f"✅ Web research: {content[:200]}...")
     except Exception as e:
         print(f"❌ Web Research Agent test failed: {e}")
 
@@ -81,7 +83,8 @@ async def test_individual_agents():
     try:
         finance_agent = create_finance_agent(debug=True)
         response = await finance_agent.arun("Get the current stock price for AAPL")
-        print(f"✅ Finance query: {response.content[:200]}...")
+        content = response.content if hasattr(response, 'content') else str(response)
+        print(f"✅ Finance query: {content[:200]}...")
     except Exception as e:
         print(f"❌ Finance Agent test failed: {e}")
 
@@ -90,12 +93,23 @@ async def test_individual_agents():
     try:
         calc_agent = create_calculator_agent(debug=True)
         response = await calc_agent.arun("Calculate the square root of 144")
-        print(f"✅ Calculation: {response.content}")
+        content = response.content if hasattr(response, 'content') else str(response)
+        print(f"✅ Calculation: {content}")
     except Exception as e:
         print(f"❌ Calculator Agent test failed: {e}")
 
+    # Test Writer Agent
+    print("\n✍️ Testing Writer Agent...")
+    try:
+        writer_agent = create_writer_agent(debug=True)
+        response = await writer_agent.arun("Write a short paragraph about the benefits of artificial intelligence")
+        content = response.content if hasattr(response, 'content') else str(response)
+        print(f"✅ Writing: {content[:200]}...")
+    except Exception as e:
+        print(f"❌ Writer Agent test failed: {e}")
 
-async def test_team_coordination():
+
+async def test_team_coordination(user_id):
     """Test the team coordination functionality."""
     print("\n" + "=" * 80)
     print("🤝 TESTING TEAM COORDINATION")
@@ -105,7 +119,7 @@ async def test_team_coordination():
         # Create team
         team = create_personal_agent_team(
             storage_dir=AGNO_STORAGE_DIR,
-            user_id=USER_ID,
+            user_id=user_id,
             debug=True,
         )
         
@@ -117,13 +131,14 @@ async def test_team_coordination():
             ("Web research test", "What's happening in AI news today?"),
             ("Finance test", "What's the current price of Tesla stock?"),
             ("Calculation test", "What's 15% of 250?"),
+            ("Writer test", "Write a brief summary about machine learning"),
             ("Mixed test", "Remember that I'm interested in Tesla stock, then tell me its current price"),
         ]
         
         for test_name, query in test_queries:
             print(f"\n🔍 {test_name}: {query}")
             try:
-                response = await team.arun(query, user_id=USER_ID)
+                response = await team.arun(query, user_id=user_id)
                 print(f"✅ Response: {response.content[:300]}...")
             except Exception as e:
                 print(f"❌ {test_name} failed: {e}")
@@ -132,7 +147,7 @@ async def test_team_coordination():
         print(f"❌ Team coordination test failed: {e}")
 
 
-async def test_team_wrapper():
+async def test_team_wrapper(user_id):
     """Test the PersonalAgentTeamWrapper class."""
     print("\n" + "=" * 80)
     print("🎭 TESTING TEAM WRAPPER")
@@ -142,7 +157,7 @@ async def test_team_wrapper():
         # Create team wrapper
         team_wrapper = PersonalAgentTeamWrapper(
             storage_dir=AGNO_STORAGE_DIR,
-            user_id=USER_ID,
+            user_id=user_id,
             debug=True,
         )
         
@@ -188,7 +203,7 @@ async def test_team_wrapper():
         print(f"❌ Team wrapper test failed: {e}")
 
 
-async def test_memory_specialization():
+async def test_memory_specialization(user_id):
     """Test that the memory agent properly specializes in memory operations."""
     print("\n" + "=" * 80)
     print("🧠 TESTING MEMORY SPECIALIZATION")
@@ -197,7 +212,7 @@ async def test_memory_specialization():
     try:
         team_wrapper = PersonalAgentTeamWrapper(
             storage_dir=AGNO_STORAGE_DIR,
-            user_id=USER_ID,
+            user_id=user_id,
             debug=True,
         )
         
@@ -228,6 +243,7 @@ async def test_memory_specialization():
 
 async def main():
     """Main test function."""
+    USER_ID = get_userid()
     print("🚀 PERSONAL AGENT TEAM TEST SUITE")
     print(f"Model: {LLM_MODEL}")
     print(f"Ollama URL: {OLLAMA_URL}")
@@ -236,16 +252,16 @@ async def main():
     
     try:
         # Test individual agents
-        await test_individual_agents()
+        await test_individual_agents(USER_ID)
         
         # Test team coordination
-        await test_team_coordination()
+        await test_team_coordination(USER_ID)
         
         # Test team wrapper
-        await test_team_wrapper()
+        await test_team_wrapper(USER_ID)
         
         # Test memory specialization
-        await test_memory_specialization()
+        await test_memory_specialization(USER_ID)
         
         print("\n" + "=" * 80)
         print("🎉 ALL TESTS COMPLETED!")

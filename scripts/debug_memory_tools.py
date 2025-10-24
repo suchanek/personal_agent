@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Debug script to verify memory_tools in show_config against AgentMemoryManager implementation
-and optionally initialize the AgnoPersonalAgent to surface AgnoMemoryTools registration logs.
+and optionally initialize the AgnoPersonalAgent to surface PersagMemoryTools registration logs.
 
 Usage:
   python scripts/debug_memory_tools.py
@@ -29,11 +29,15 @@ SRC_DIR = BASE_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# Imports from the project
-from personal_agent.tools.show_config import show_config, get_agentic_tools  # noqa: E402
+from personal_agent.config import settings  # noqa: E402
 from personal_agent.core.agent_memory_manager import AgentMemoryManager  # noqa: E402
 from personal_agent.core.agno_agent import AgnoPersonalAgent  # noqa: E402
-from personal_agent.config import settings  # noqa: E402
+
+# Imports from the project
+from personal_agent.tools.show_config import (  # noqa: E402
+    get_agentic_tools,
+    show_config,
+)
 
 
 def get_show_config_memory_tool_names() -> set[str]:
@@ -53,7 +57,11 @@ def get_agent_memory_manager_method_names() -> set[str]:
         if attr is None:
             continue
         # Class functions/methods can be coroutine functions or regular callables
-        if inspect.isfunction(attr) or inspect.ismethod(attr) or inspect.iscoroutinefunction(attr):
+        if (
+            inspect.isfunction(attr)
+            or inspect.ismethod(attr)
+            or inspect.iscoroutinefunction(attr)
+        ):
             names.add(name)
     return names
 
@@ -84,7 +92,7 @@ def compare_tools() -> dict:
 
 
 async def init_agent_and_dump_info() -> dict:
-    # Initialize agent to trigger AgnoMemoryTools logging we added in agno_agent.py
+    # Initialize agent to trigger PersagMemoryTools logging we added in agno_agent.py
     agent = AgnoPersonalAgent(debug=True, enable_memory=True)
     # Use the public initialize wrapper for clarity
     await agent.initialize(recreate=False)
@@ -95,11 +103,27 @@ async def init_agent_and_dump_info() -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Debug memory_tools vs AgentMemoryManager")
-    parser.add_argument("--json", action="store_true", help="Print show_config JSON output")
-    parser.add_argument("--init-agent", action="store_true", help="Initialize agent to emit debug logs and dump agent info")
-    parser.add_argument("--all", action="store_true", help="Run all checks (compare, json output, and init agent)")
-    parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "DEBUG"), help="Logging level (default DEBUG)")
+    parser = argparse.ArgumentParser(
+        description="Debug memory_tools vs AgentMemoryManager"
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Print show_config JSON output"
+    )
+    parser.add_argument(
+        "--init-agent",
+        action="store_true",
+        help="Initialize agent to emit debug logs and dump agent info",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run all checks (compare, json output, and init agent)",
+    )
+    parser.add_argument(
+        "--log-level",
+        default=os.getenv("LOG_LEVEL", "DEBUG"),
+        help="Logging level (default DEBUG)",
+    )
 
     args = parser.parse_args()
 
@@ -115,7 +139,10 @@ def main():
     result = compare_tools()
     print("=== Memory Tools Comparison ===")
     print("Show Config memory_tools:", ", ".join(result["show_config_memory_tools"]))
-    print("AgentMemoryManager methods (public callables):", ", ".join(result["agent_memory_manager_methods"]))
+    print(
+        "AgentMemoryManager methods (public callables):",
+        ", ".join(result["agent_memory_manager_methods"]),
+    )
     if result["missing_in_manager"]:
         overall_ok = False
         print("ERROR: Tools listed in show_config but NOT found on AgentMemoryManager:")
@@ -125,7 +152,9 @@ def main():
         print("OK: All show_config memory_tools exist on AgentMemoryManager")
 
     if result["extra_implemented_candidates"]:
-        print("Note: Additional AgentMemoryManager public callables not listed in show_config (candidates):")
+        print(
+            "Note: Additional AgentMemoryManager public callables not listed in show_config (candidates):"
+        )
         for name in result["extra_implemented_candidates"]:
             print(f"  - {name}")
     else:
@@ -138,31 +167,33 @@ def main():
             json_str = show_config(json_output=True)
             data = json.loads(json_str)
             mem_tools = (
-                data.get("agentic_tools", {})
-                .get("memory_tools", {})
-                .get("tools", [])
+                data.get("agentic_tools", {}).get("memory_tools", {}).get("tools", [])
             )
             print(json.dumps(mem_tools, indent=2))
         except Exception as e:
             overall_ok = False
             print(f"ERROR: Failed to render show_config JSON - {e}")
 
-    # 3) Initialize the agent (async) to trigger AgnoMemoryTools debug logs and dump agent info
+    # 3) Initialize the agent (async) to trigger PersagMemoryTools debug logs and dump agent info
     if args.init_agent or args.all:
         print("\n=== Initializing AgnoPersonalAgent (debug mode) ===")
         try:
             info = asyncio.run(init_agent_and_dump_info())
             print("Agent info summary:")
-            print(json.dumps(
-                {
-                    "model_provider": info.get("model_provider"),
-                    "model_name": info.get("model_name"),
-                    "memory_enabled": info.get("memory_enabled"),
-                    "tool_counts": info.get("tool_counts"),
-                },
-                indent=2,
-            ))
-            print("Initialized agent successfully. Check logs for AgnoMemoryTools registration details.")
+            print(
+                json.dumps(
+                    {
+                        "model_provider": info.get("model_provider"),
+                        "model_name": info.get("model_name"),
+                        "memory_enabled": info.get("memory_enabled"),
+                        "tool_counts": info.get("tool_counts"),
+                    },
+                    indent=2,
+                )
+            )
+            print(
+                "Initialized agent successfully. Check logs for PersagMemoryTools registration details."
+            )
         except Exception as e:
             overall_ok = False
             print(f"ERROR: Agent initialization failed - {e}")

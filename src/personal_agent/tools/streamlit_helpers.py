@@ -41,12 +41,11 @@ Note:
 
 Author:
     Eric G. Suchanek, PhD.
-    Last Revision: 2025-07-30 19:31:54
+    Last Revision: 2025-08-19 15:22:58
 """
 
 import asyncio
-import time
-from datetime import datetime
+import logging
 
 import streamlit as st
 
@@ -57,188 +56,350 @@ except ImportError:
     # Fallback if import fails
     MemoryStorageResult = None
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
 
 class StreamlitMemoryHelper:
+    """Simplified StreamlitMemoryHelper using the new agent memory function interfaces."""
+
     def __init__(self, agent):
         self.agent = agent
-        # Don't cache memory components - get them fresh each time
-        self._memory_manager = None
-        self._db = None
 
-    def _get_memory_manager_and_db(self):
-        """Get memory manager and db, ensuring agent is initialized first."""
+    def _ensure_agent_available(self):
+        """Ensure agent is available and has basic memory access."""
         if not self.agent:
-            return None, None
+            return False, "Agent not available"
 
-        # Check if agent is already initialized to avoid redundant initialization
-        is_initialized = getattr(self.agent, "_initialized", False)
-        
-        # Only initialize if not already initialized
-        if not is_initialized and hasattr(self.agent, "_ensure_initialized"):
-            try:
-                print(f"DEBUG: Agent not initialized, triggering lazy initialization...")
-                asyncio.run(self.agent._ensure_initialized())
-            except Exception as e:
-                print(f"Failed to initialize agent: {e}")
-                return None, None
-        elif is_initialized:
-            print(f"DEBUG: Agent already initialized, skipping initialization")
+        # Check for basic memory access - either through direct functions or memory system
+        has_memory_access = (
+            # Direct memory functions (single agent)
+            hasattr(self.agent, "store_user_memory")
+            or
+            # Memory system access (both single agent and team wrapper)
+            (hasattr(self.agent, "agno_memory") and self.agent.agno_memory)
+            or (hasattr(self.agent, "memory_manager") and self.agent.memory_manager)
+        )
 
-        # Now check for memory components
-        if hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
-            return self.agent.agno_memory.memory_manager, self.agent.agno_memory.db
-        return None, None
+        if not has_memory_access:
+            return False, "Agent has no memory access"
 
-    @property
-    def memory_manager(self):
-        """Dynamic property that always gets fresh memory manager."""
-        mm, _ = self._get_memory_manager_and_db()
-        return mm
-
-    @property
-    def db(self):
-        """Dynamic property that always gets fresh db."""
-        _, db = self._get_memory_manager_and_db()
-        return db
+        return True, "Agent ready"
 
     def search_memories(
         self, query: str, limit: int = 10, similarity_threshold: float = 0.3
     ):
-        mm = self.memory_manager  # This will trigger initialization
-        db = self.db
-        if not mm or not db:
+        """Search memories using the agent's query_memory function."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            st.error(f"Memory search not available: {message}")
             return []
+
         try:
-            return mm.search_memories(
-                query=query,
-                db=db,
-                user_id=self.agent.user_id,
-                limit=limit,
-                similarity_threshold=similarity_threshold,
-                search_topics=True,
-                topic_boost=0.5,
-            )
+            # For UI compatibility, we need to return memory objects, not formatted strings
+            # Access the memory manager directly through the agent's initialized components
+
+            # Ensure agent is initialized first
+            if hasattr(self.agent, "_ensure_initialized"):
+                self._run_async(self.agent._ensure_initialized())
+
+            # Access the memory manager directly for raw memory objects
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
+                # Use the SemanticMemoryManager's search method directly
+                raw_memories = self.agent.memory_manager.agno_memory.memory_manager.search_memories(
+                    query=query,
+                    db=self.agent.memory_manager.agno_memory.db,
+                    user_id=self.agent.user_id,
+                    limit=limit,
+                    similarity_threshold=similarity_threshold,
+                )
+                return raw_memories
+
+            # Fallback: try to access through different paths for team wrappers
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
+                raw_memories = self.agent.agno_memory.memory_manager.search_memories(
+                    query=query,
+                    db=self.agent.agno_memory.db,
+                    user_id=self.agent.user_id,
+                    limit=limit,
+                    similarity_threshold=similarity_threshold,
+                )
+                return raw_memories
+
+            return []
+
         except Exception as e:
-            st.error(f"Error in direct memory search: {e}")
+            st.error(f"Error searching memories: {e}")
             return []
 
     def get_all_memories(self):
-        """Get all memories using consistent SemanticMemoryManager interface"""
-        if not self.memory_manager or not self.db:
+        """Get all memories using the agent's memory system."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            st.error(f"Get all memories not available: {message}")
             return []
+
         try:
-            # Use same method as agent tools for consistency
-            results = self.memory_manager.search_memories(
-                query="",  # Empty query to get all memories
-                db=self.db,
-                user_id=self.agent.user_id,
-                limit=None,  # Get all memories
-                similarity_threshold=0.0,  # Very low threshold to get all
-                search_topics=False,
-            )
-            # Extract just the memory objects from the (memory, score) tuples
-            return [memory for memory, score in results]
+            # For UI compatibility, we need to return memory objects, not formatted strings
+            # Access the memory manager directly through the agent's initialized components
+
+            # Ensure agent is initialized first
+            if hasattr(self.agent, "_ensure_initialized"):
+                self._run_async(self.agent._ensure_initialized())
+
+            # Access the memory manager directly for raw memory objects
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
+                raw_memories = self.agent.memory_manager.agno_memory.memory_manager.get_all_memories(
+                    self.agent.memory_manager.agno_memory.db, self.agent.user_id
+                )
+                return raw_memories
+
+            # Fallback: try to access through different paths for team wrappers
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
+                raw_memories = self.agent.agno_memory.memory_manager.get_all_memories(
+                    self.agent.agno_memory.db, self.agent.user_id
+                )
+                return raw_memories
+
+            return []
+
         except Exception as e:
             st.error(f"Error getting all memories: {e}")
             return []
 
-    def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
-        """Adds a memory by calling the agent's public store_user_memory method."""
-        if not self.agent or not hasattr(self.agent, "store_user_memory"):
-            return (
-                False,
-                "Memory storage function not available on the agent.",
-                None,
-                None,
-            )
+    def list_all_memories(self):
+        """List all memories using the agent's list_all_memories function.
+
+        This method provides a simplified, user-friendly listing of all memories
+        by calling the agent's list_all_memories method which returns a formatted string.
+        """
+        available, message = self._ensure_agent_available()
+        if not available:
+            return f"List memories not available: {message}"
 
         try:
-            # Call the async method from the agent - this returns a MemoryStorageResult object
-            result = asyncio.run(
-                self.agent.store_user_memory(content=memory_text, topics=topics)
-            )
-
-            # Handle MemoryStorageResult object properly (like the CLI does)
-            if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or \
-               (hasattr(result, 'is_success') and hasattr(result, 'message')):
-                # This is a MemoryStorageResult object
-                success = result.is_success
-                message = result.message
-                memory_id = getattr(result, 'memory_id', None)
-                generated_topics = getattr(result, 'topics', topics)
-                
-                return success, message, memory_id, generated_topics
-            else:
-                # Fallback: treat as string (legacy behavior)
-                result_str = str(result)
-                if "❌" in result_str:
-                    success = False
-                    message = result_str
-                    memory_id = None
-                    generated_topics = []
+            # Check if the agent has the list_all_memories function
+            if hasattr(self.agent, "list_all_memories"):
+                # Check if the function returns a coroutine or a direct result
+                list_func = self.agent.list_all_memories
+                if asyncio.iscoroutinefunction(list_func):
+                    result = self._run_async(list_func())
                 else:
-                    success = True
-                    message = result_str
-                    # Attempt to parse memory_id from the success message
-                    try:
-                        memory_id = result_str.split("(ID: ")[1].split(")")[0]
-                    except IndexError:
-                        memory_id = None
-                    generated_topics = topics
+                    # Function is already sync (like in TeamWrapper)
+                    result = list_func()
+                return result
+            else:
+                # Fallback: use get_all_memories and format the result
+                memories = self.get_all_memories()
+                if not memories:
+                    return "🔍 No memories found. Try storing some information first!"
 
-                return success, message, memory_id, generated_topics
+                # Format memories in a simple list format
+                result = f"📝 MEMORY LIST ({len(memories)} total):\n\n"
+                for i, memory in enumerate(memories, 1):
+                    result += f"{i}. {memory.memory}\n"
+
+                return result
 
         except Exception as e:
-            return False, f"Error adding memory via agent: {e}", None, None
+            return f"❌ Error listing memories: {str(e)}"
+
+    def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
+        """Add a memory using the standalone memory function."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            return False, f"Memory storage not available: {message}", None, None
+
+        try:
+            from personal_agent.tools.memory_functions import store_user_memory
+            
+            # Use the standalone function
+            result = self._run_async(store_user_memory(self.agent, memory_text, topics))
+
+            # Handle MemoryStorageResult object
+            if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or (
+                hasattr(result, "is_success") and hasattr(result, "message")
+            ):
+                success = result.is_success
+                message = result.message
+                memory_id = getattr(result, "memory_id", None)
+                generated_topics = getattr(result, "topics", topics)
+                return success, message, memory_id, generated_topics
+            else:
+                # Fallback for unexpected result format
+                return False, f"Unexpected result format: {result}", None, None
+
+        except Exception as e:
+            return False, f"Error adding memory: {e}", None, None
+
+    def _run_async(self, coro):
+        """Helper to run async functions, handling existing event loops."""
+        try:
+            # Try to get the current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in a running loop, we need to use a different approach
+            import concurrent.futures
+            import threading
+
+            # Create a new event loop in a separate thread
+            def run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_thread)
+                return future.result()
+
+        except RuntimeError:
+            # No running event loop, safe to use asyncio.run()
+            return asyncio.run(coro)
 
     def clear_memories(self):
-        if not self.memory_manager or not self.db:
-            return False, "Memory system not available"
+        """Clear all memories using the standalone memory function."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            return False, f"Clear memories not available: {message}"
+
         try:
-            return self.memory_manager.clear_memories(
-                db=self.db, user_id=self.agent.user_id
-            )
+            from personal_agent.tools.memory_functions import clear_all_memories
+            
+            # Use the standalone function
+            result = self._run_async(clear_all_memories(self.agent))
+
+            # Parse the result string to determine success
+            if "✅" in result:
+                return True, result
+            else:
+                return False, result
+
         except Exception as e:
             return False, f"Error clearing memories: {e}"
 
     def get_memory_stats(self):
-        if not self.memory_manager or not self.db:
-            return {"error": "Memory system not available"}
+        """Get memory statistics using the agent's memory system directly."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            return {"error": f"Memory stats not available: {message}"}
+
         try:
-            return self.memory_manager.get_memory_stats(self.db, self.agent.user_id)
+            # Ensure agent is initialized first
+            if hasattr(self.agent, "_ensure_initialized"):
+                self._run_async(self.agent._ensure_initialized())
+
+            # Access the memory manager directly to get raw memory data
+            memories = []
+
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
+                # Use the SemanticMemoryManager's get_all_memories method directly
+                memories = self.agent.memory_manager.agno_memory.memory_manager.get_all_memories(
+                    self.agent.memory_manager.agno_memory.db, self.agent.user_id
+                )
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
+                # Fallback: try to access through different paths for team wrappers
+                memories = self.agent.agno_memory.memory_manager.get_all_memories(
+                    self.agent.agno_memory.db, self.agent.user_id
+                )
+
+            if not memories:
+                return {
+                    "total_memories": 0,
+                    "recent_memories_24h": 0,
+                    "average_memory_length": 0,
+                    "topic_distribution": {},
+                }
+
+            # Calculate statistics from raw memory data
+            total_memories = len(memories)
+
+            # Calculate recent memories (24h)
+            import time
+
+            current_time = time.time()
+            twenty_four_hours_ago = current_time - (24 * 60 * 60)
+            recent_memories_24h = sum(
+                1
+                for memory in memories
+                if hasattr(memory, "timestamp")
+                and memory.timestamp
+                and memory.timestamp > twenty_four_hours_ago
+            )
+
+            # Calculate average memory length
+            total_length = sum(len(memory.memory) for memory in memories)
+            average_memory_length = (
+                total_length / total_memories if total_memories > 0 else 0
+            )
+
+            # Calculate topic distribution
+            topic_distribution = {}
+            for memory in memories:
+                if hasattr(memory, "topics") and memory.topics:
+                    for topic in memory.topics:
+                        topic_distribution[topic] = topic_distribution.get(topic, 0) + 1
+
+            return {
+                "total_memories": total_memories,
+                "recent_memories_24h": recent_memories_24h,
+                "average_memory_length": average_memory_length,
+                "topic_distribution": topic_distribution,
+            }
+
         except Exception as e:
             return {"error": f"Error getting memory stats: {e}"}
 
     def delete_memory(self, memory_id: str):
-        """Delete a memory using the agent's built-in tool."""
-        if not self.agent:
-            return False, "Agent not available"
-        
+        """Delete a memory using the agent's delete_memory function."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            return False, f"Memory deletion not available: {message}"
+
         try:
-            # Add diagnostic logging
-            print(f"DEBUG: Attempting to delete memory {memory_id} using agent's memory tools")
-            print(f"DEBUG: Agent available: {self.agent is not None}")
-            print(f"DEBUG: User ID: {self.agent.user_id}")
-            
-            # Use the agent's memory_tools directly (deletes from both SQLite and LightRAG)
-            if hasattr(self.agent, 'memory_tools') and self.agent.memory_tools:
-                print(f"DEBUG: Using agent.memory_tools.delete_memory()")
-                result = asyncio.run(self.agent.memory_tools.delete_memory(memory_id))
-                print(f"DEBUG: Memory tools deletion result: {result}")
-                
-                # Parse the result - the tool returns a string with ✅ or ❌
-                if isinstance(result, str):
-                    if "✅" in result or "Successfully deleted" in result:
-                        return True, result
-                    else:
-                        return False, result
-                else:
-                    return False, f"Unexpected result type: {type(result)}"
+            logger.info(f"🗑️ Deleting memory using agent.delete_memory(): {memory_id}")
+
+            # Check if the function returns a coroutine or a direct result
+            delete_func = self.agent.delete_memory
+            if asyncio.iscoroutinefunction(delete_func):
+                result = self._run_async(delete_func(memory_id))
             else:
-                return False, "Memory tools not available"
-                
+                # Function is already sync (like in TeamWrapper)
+                result = delete_func(memory_id)
+
+            # Parse the result string to determine success
+            if isinstance(result, str):
+                if "✅" in result or "Successfully deleted" in result:
+                    logger.info(f"✅ Memory deletion successful: {result}")
+                    return True, result
+                else:
+                    logger.warning(f"❌ Memory deletion failed: {result}")
+                    return False, result
+            else:
+                logger.error(f"Unexpected result type: {type(result)}")
+                return False, f"Unexpected result type: {type(result)}"
+
         except Exception as e:
-            print(f"DEBUG: Exception in delete_memory: {e}")
+            logger.error(f"Exception in delete_memory: {e}", exc_info=True)
             return False, f"Error deleting memory: {e}"
 
     def update_memory(
@@ -248,60 +409,138 @@ class StreamlitMemoryHelper:
         topics: list = None,
         input_text: str = None,
     ):
-        if not self.memory_manager or not self.db:
-            return False, "Memory system not available"
+        """Update a memory using the agent's update_memory function."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            return False, f"Memory update not available: {message}"
+
         try:
-            return self.memory_manager.update_memory(
-                memory_id=memory_id,
-                memory_text=memory_text,
-                db=self.db,
-                user_id=self.agent.user_id,
-                topics=topics,
-                input_text=input_text,
-            )
+            # Check if the function returns a coroutine or a direct result
+            update_func = self.agent.update_memory
+            if asyncio.iscoroutinefunction(update_func):
+                result = self._run_async(update_func(memory_id, memory_text, topics))
+            else:
+                # Function is already sync (like in TeamWrapper)
+                result = update_func(memory_id, memory_text, topics)
+
+            # Parse the result string to determine success
+            if "✅" in result:
+                return True, result
+            else:
+                return False, result
+
         except Exception as e:
             return False, f"Error updating memory: {e}"
 
     def sync_memory_to_graph(self, memory_text: str, topics: list = None):
-        """Sync a memory to the LightRAG graph system to maintain consistency"""
-        if not self.agent or not hasattr(self.agent, "store_user_memory"):
-            return False, "Graph memory sync not available"
-
+        """Sync a memory to the LightRAG graph system."""
+        # This functionality is now handled automatically by store_user_memory
+        # which stores in both local SQLite and LightRAG graph systems
         try:
-            # Find the store_graph_memory tool from the agent
-            store_graph_memory_func = None
-            if self.agent.agent and hasattr(self.agent.agent, "tools"):
-                for tool in self.agent.agent.tools:
-                    if getattr(tool, "__name__", "") == "store_graph_memory":
-                        store_graph_memory_func = tool
-                        break
-
-            if store_graph_memory_func:
-                result = asyncio.run(store_graph_memory_func(memory_text, topics))
-                return True, result
+            result = self._run_async(
+                self.agent.store_user_memory(content=memory_text, topics=topics)
+            )
+            if hasattr(result, "graph_success") and result.graph_success:
+                return True, "Memory synced to graph successfully"
             else:
-                return False, "Graph memory tool not found"
-
+                return False, "Graph sync failed"
         except Exception as e:
             return False, f"Error syncing to graph: {e}"
 
     def get_memory_sync_status(self):
-        """Check sync status between local SQLite and LightRAG graph memories"""
-        try:
-            # Get local memory count
-            local_memories = self.get_all_memories()
-            local_count = len(local_memories)
+        """Get memory sync status by checking both local and graph memory systems."""
+        available, message = self._ensure_agent_available()
+        if not available:
+            return {
+                "error": f"Memory sync status not available: {message}",
+                "local_memory_count": 0,
+                "graph_entity_count": 0,
+                "sync_ratio": 0,
+                "status": "error",
+            }
 
-            # For sync status, we'll use a simpler approach that doesn't require async calls
-            # Since the main issue (memory count mismatch) is now fixed, we can provide
-            # a basic sync status based on local memory count
-            graph_count = local_count  # Assume synced for now
+        try:
+            # Ensure agent is initialized first
+            if hasattr(self.agent, "_ensure_initialized"):
+                self._run_async(self.agent._ensure_initialized())
+
+            # Get local memory count
+            local_memories = []
+            if (
+                hasattr(self.agent, "memory_manager")
+                and self.agent.memory_manager
+                and hasattr(self.agent.memory_manager, "agno_memory")
+                and self.agent.memory_manager.agno_memory
+            ):
+
+                local_memories = self.agent.memory_manager.agno_memory.memory_manager.get_all_memories(
+                    self.agent.memory_manager.agno_memory.db, self.agent.user_id
+                )
+            elif hasattr(self.agent, "agno_memory") and self.agent.agno_memory:
+                local_memories = self.agent.agno_memory.memory_manager.get_all_memories(
+                    self.agent.agno_memory.db, self.agent.user_id
+                )
+
+            local_memory_count = len(local_memories)
+
+            # Get graph entity count using the agent's new method
+            graph_entity_count = 0
+            try:
+                # Check if agent has the get_graph_entity_count method
+                if hasattr(self.agent, "get_graph_entity_count"):
+                    if asyncio.iscoroutinefunction(self.agent.get_graph_entity_count):
+                        graph_entity_count = self._run_async(
+                            self.agent.get_graph_entity_count()
+                        )
+                    else:
+                        graph_entity_count = self.agent.get_graph_entity_count()
+                else:
+                    # Fallback: try to access through team wrapper's knowledge agent
+                    if (
+                        hasattr(self.agent, "team")
+                        and hasattr(self.agent.team, "members")
+                        and self.agent.team.members
+                    ):
+                        knowledge_agent = self.agent.team.members[0]
+                        if hasattr(knowledge_agent, "get_graph_entity_count"):
+                            if asyncio.iscoroutinefunction(
+                                knowledge_agent.get_graph_entity_count
+                            ):
+                                graph_entity_count = self._run_async(
+                                    knowledge_agent.get_graph_entity_count()
+                                )
+                            else:
+                                graph_entity_count = (
+                                    knowledge_agent.get_graph_entity_count()
+                                )
+
+                logger.debug(f"Retrieved graph entity count: {graph_entity_count}")
+
+            except Exception as e:
+                logger.warning(f"Error getting graph entity count: {e}")
+                graph_entity_count = 0
+
+            # Calculate sync ratio
+            if local_memory_count == 0 and graph_entity_count == 0:
+                sync_ratio = 1.0  # Both empty = synced
+                status = "synced"
+            elif local_memory_count == 0:
+                sync_ratio = 0.0
+                status = "out_of_sync"
+            elif graph_entity_count == 0:
+                sync_ratio = 0.0
+                status = "out_of_sync"
+            else:
+                sync_ratio = min(local_memory_count, graph_entity_count) / max(
+                    local_memory_count, graph_entity_count
+                )
+                status = "synced" if sync_ratio > 0.9 else "out_of_sync"
 
             return {
-                "local_memory_count": local_count,
-                "graph_entity_count": graph_count,
-                "sync_ratio": 1.0 if local_count > 0 else 0,
-                "status": "synced",
+                "local_memory_count": local_memory_count,
+                "graph_entity_count": graph_entity_count,
+                "sync_ratio": sync_ratio,
+                "status": status,
             }
 
         except Exception as e:
@@ -315,10 +554,38 @@ class StreamlitMemoryHelper:
 
 
 class StreamlitKnowledgeHelper:
+    """Helper memory class for the Streamlit apps"""
+
     def __init__(self, agent):
         self.agent = agent
         # Don't cache knowledge_manager - get it fresh each time
         self._knowledge_manager = None
+
+    def _run_async(self, coro):
+        """Helper to run async functions, handling existing event loops."""
+        try:
+            # Try to get the current event loop
+            loop = asyncio.get_running_loop()
+            # If we're in a running loop, we need to use a different approach
+            import concurrent.futures
+            import threading
+
+            # Create a new event loop in a separate thread
+            def run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_thread)
+                return future.result()
+
+        except RuntimeError:
+            # No running event loop, safe to use asyncio.run()
+            return asyncio.run(coro)
 
     def _get_knowledge_manager(self):
         """Get knowledge manager, ensuring agent is initialized first."""
@@ -327,17 +594,19 @@ class StreamlitKnowledgeHelper:
 
         # Check if agent is already initialized to avoid redundant initialization
         is_initialized = getattr(self.agent, "_initialized", False)
-        
+
         # Only initialize if not already initialized
         if not is_initialized and hasattr(self.agent, "_ensure_initialized"):
             try:
-                print(f"DEBUG: Agent not initialized, triggering lazy initialization for knowledge...")
-                asyncio.run(self.agent._ensure_initialized())
+                logger.info(
+                    "Agent not initialized, triggering lazy initialization for knowledge..."
+                )
+                self._run_async(self.agent._ensure_initialized())
             except Exception as e:
-                print(f"Failed to initialize agent: {e}")
+                logger.error(f"Failed to initialize agent: {e}")
                 return None
         elif is_initialized:
-            print(f"DEBUG: Agent already initialized, skipping knowledge initialization")
+            logger.info("Agent already initialized, skipping knowledge initialization")
 
         # Now check for knowledge manager
         if hasattr(self.agent, "agno_knowledge") and self.agent.agno_knowledge:
@@ -349,7 +618,7 @@ class StreamlitKnowledgeHelper:
         """Dynamic property that always gets fresh knowledge manager."""
         return self._get_knowledge_manager()
 
-    def search_knowledge(self, query: str, limit: int = 10):
+    def search_knowledge(self, query: str, limit: int = None):
         km = self.knowledge_manager  # This will trigger initialization
         if not km:
             return []
@@ -370,7 +639,7 @@ class StreamlitKnowledgeHelper:
         # Force agent initialization if needed
         try:
             if hasattr(self.agent, "_ensure_initialized"):
-                asyncio.run(self.agent._ensure_initialized())
+                self._run_async(self.agent._ensure_initialized())
         except Exception as e:
             st.error(f"Failed to initialize agent: {e}")
             return None
@@ -379,7 +648,7 @@ class StreamlitKnowledgeHelper:
         # The agent initialization ensures all components are properly set up
 
         try:
-            result = asyncio.run(
+            result = self._run_async(
                 self.agent.query_lightrag_knowledge_direct(query, params=params)
             )
             return result

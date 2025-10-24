@@ -24,27 +24,29 @@ from agno.models.base import Model
 from pydantic import BaseModel, Field
 
 from ..config import get_current_user_id
-from .topic_classifier import TopicClassifier
 from ..utils import setup_logging
+from .topic_classifier import TopicClassifier
 
 logger = setup_logging(__name__)
 
 
 class MemoryStorageStatus(Enum):
     """Enum for memory storage operation results."""
-    SUCCESS = auto()                    # Memory stored successfully in both systems
-    SUCCESS_LOCAL_ONLY = auto()         # Stored in local SQLite, graph sync failed
-    DUPLICATE_EXACT = auto()           # Rejected: exact duplicate found
-    DUPLICATE_SEMANTIC = auto()        # Rejected: semantic duplicate found  
-    CONTENT_EMPTY = auto()             # Rejected: empty or invalid content
-    CONTENT_TOO_LONG = auto()          # Rejected: content exceeds max length
-    STORAGE_ERROR = auto()             # Error: database/storage failure
-    VALIDATION_ERROR = auto()          # Error: input validation failed
+
+    SUCCESS = auto()  # Memory stored successfully in both systems
+    SUCCESS_LOCAL_ONLY = auto()  # Stored in local SQLite, graph sync failed
+    DUPLICATE_EXACT = auto()  # Rejected: exact duplicate found
+    DUPLICATE_SEMANTIC = auto()  # Rejected: semantic duplicate found
+    CONTENT_EMPTY = auto()  # Rejected: empty or invalid content
+    CONTENT_TOO_LONG = auto()  # Rejected: content exceeds max length
+    STORAGE_ERROR = auto()  # Error: database/storage failure
+    VALIDATION_ERROR = auto()  # Error: input validation failed
 
 
 @dataclass
 class MemoryStorageResult:
     """Structured result for memory storage operations."""
+
     status: MemoryStorageStatus
     message: str
     memory_id: Optional[str] = None
@@ -52,12 +54,15 @@ class MemoryStorageResult:
     local_success: bool = False
     graph_success: bool = False
     similarity_score: Optional[float] = None
-    
+
     @property
     def is_success(self) -> bool:
         """True if memory was stored (fully or partially)."""
-        return self.status in [MemoryStorageStatus.SUCCESS, MemoryStorageStatus.SUCCESS_LOCAL_ONLY]
-    
+        return self.status in [
+            MemoryStorageStatus.SUCCESS,
+            MemoryStorageStatus.SUCCESS_LOCAL_ONLY,
+        ]
+
     @property
     def is_rejected(self) -> bool:
         """True if memory was rejected (duplicate, validation, etc.)."""
@@ -66,7 +71,7 @@ class MemoryStorageResult:
             MemoryStorageStatus.DUPLICATE_SEMANTIC,
             MemoryStorageStatus.CONTENT_EMPTY,
             MemoryStorageStatus.CONTENT_TOO_LONG,
-            MemoryStorageStatus.VALIDATION_ERROR
+            MemoryStorageStatus.VALIDATION_ERROR,
         ]
 
 
@@ -201,36 +206,13 @@ class SemanticDuplicateDetector:
         words2 = set(re.findall(r"\b\w+\b", norm2))
         exact_matches = words1.intersection(words2)
 
-        # If we have exact word matches, boost the score significantly
-        if exact_matches and len(words1) <= 3:  # For short queries (1-3 words)
-            match_ratio = len(exact_matches) / len(words1)
-            exact_word_score = 0.6 + (match_ratio * 0.4)  # 0.6 to 1.0 range
-
-            # Also calculate traditional semantic similarity
-            string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
-            terms1 = self._extract_key_terms(text1)
-            terms2 = self._extract_key_terms(text2)
-
-            if not terms1 and not terms2:
-                terms_similarity = 1.0
-            elif not terms1 or not terms2:
-                terms_similarity = 0.0
-            else:
-                intersection = len(terms1.intersection(terms2))
-                union = len(terms1.union(terms2))
-                terms_similarity = intersection / union if union > 0 else 0.0
-
-            traditional_score = (string_similarity * 0.6) + (terms_similarity * 0.4)
-
-            # Return the higher of exact word score or traditional score
-            return max(exact_word_score, traditional_score)
-
-        # For longer queries or no exact matches, use traditional method
-        string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
-
-        # Key terms similarity
+        # Extract key terms (non-stopwords) for more accurate comparison
         terms1 = self._extract_key_terms(text1)
         terms2 = self._extract_key_terms(text2)
+        key_term_matches = terms1.intersection(terms2)
+
+        # Calculate standard similarity scores first
+        string_similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
 
         if not terms1 and not terms2:
             terms_similarity = 1.0
@@ -241,9 +223,25 @@ class SemanticDuplicateDetector:
             union = len(terms1.union(terms2))
             terms_similarity = intersection / union if union > 0 else 0.0
 
-        # Weighted combination
+        # Standard weighted combination
         semantic_score = (string_similarity * 0.6) + (terms_similarity * 0.4)
 
+        # Apply boost for SHORT queries with exact word matches, but ONLY if key terms align well
+        if exact_matches and len(words1) <= 3 and terms1 and terms2:  # For short queries (1-3 words)
+            # Calculate overlap from BOTH perspectives
+            terms1_covered = len(key_term_matches) / len(terms1) if len(terms1) > 0 else 0
+            terms2_covered = len(key_term_matches) / len(terms2) if len(terms2) > 0 else 0
+
+            # Only apply boost if BOTH sides have high key term coverage (>= 80%)
+            # This prevents "I love halloween" vs "I love vanilla ice cream" from matching
+            if terms1_covered >= 0.8 and terms2_covered >= 0.8:
+                match_ratio = len(exact_matches) / len(words1)
+                exact_word_score = 0.6 + (match_ratio * 0.4)  # 0.6 to 1.0 range
+
+                # Return the higher of exact word score or semantic score
+                return max(exact_word_score, semantic_score)
+
+        # Return the semantic score (no boost applied)
         return semantic_score
 
     def is_duplicate(
@@ -355,7 +353,7 @@ class SemanticMemoryManager:
         if self.config.debug_mode:
             logger.setLevel(logging.DEBUG)
 
-        logger.info(
+        logger.debug(
             "Initialized SemanticMemoryManager with similarity_threshold=%.2f",
             config.similarity_threshold,
         )
@@ -456,6 +454,7 @@ class SemanticMemoryManager:
         user_id: str = None,
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
+        custom_timestamp: Optional[datetime] = None,
     ) -> MemoryStorageResult:
         """
         Add a memory with duplicate detection and topic classification.
@@ -470,14 +469,14 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         # Validate input
         if not memory_text or not memory_text.strip():
             return MemoryStorageResult(
                 status=MemoryStorageStatus.CONTENT_EMPTY,
                 message="Memory content cannot be empty",
                 local_success=False,
-                graph_success=False
+                graph_success=False,
             )
 
         # Get recent memories for duplicate checking
@@ -489,7 +488,7 @@ class SemanticMemoryManager:
                 status=MemoryStorageStatus.CONTENT_TOO_LONG,
                 message=f"Memory too long ({len(memory_text)} > {self.config.max_memory_length} chars)",
                 local_success=False,
-                graph_success=False
+                graph_success=False,
             )
 
         # Check for exact duplicates
@@ -500,7 +499,7 @@ class SemanticMemoryManager:
                 message=f"Exact duplicate of: '{exact_duplicate.memory}'",
                 local_success=False,
                 graph_success=False,
-                similarity_score=1.0
+                similarity_score=1.0,
             )
 
         # Check for semantic duplicates
@@ -508,14 +507,16 @@ class SemanticMemoryManager:
         if semantic_duplicate:
             # Get similarity score for the duplicate
             existing_texts = [mem.memory for mem in existing_memories]
-            _, _, similarity_score = self.duplicate_detector.is_duplicate(memory_text, existing_texts)
-            
+            _, _, similarity_score = self.duplicate_detector.is_duplicate(
+                memory_text, existing_texts
+            )
+
             return MemoryStorageResult(
                 status=MemoryStorageStatus.DUPLICATE_SEMANTIC,
                 message=f"Semantic duplicate of: '{semantic_duplicate.memory}'",
                 local_success=False,
                 graph_success=False,
-                similarity_score=similarity_score
+                similarity_score=similarity_score,
             )
 
         # Auto-classify topics if not provided
@@ -527,7 +528,7 @@ class SemanticMemoryManager:
             from uuid import uuid4
 
             memory_id = str(uuid4())
-            last_updated = datetime.now()
+            last_updated = custom_timestamp if custom_timestamp is not None else datetime.now()
 
             user_memory = UserMemory(
                 memory_id=memory_id,
@@ -563,7 +564,7 @@ class SemanticMemoryManager:
                 memory_id=memory_id,
                 topics=topics,
                 local_success=True,
-                graph_success=False  # Will be updated by the caller for dual storage
+                graph_success=False,  # Will be updated by the caller for dual storage
             )
 
         except Exception as e:
@@ -573,7 +574,7 @@ class SemanticMemoryManager:
                 status=MemoryStorageStatus.STORAGE_ERROR,
                 message=error_msg,
                 local_success=False,
-                graph_success=False
+                graph_success=False,
             )
 
     def update_memory(
@@ -599,7 +600,7 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         # Auto-classify topics if not provided
         if topics is None and self.config.enable_topic_classification:
             topics = self.topic_classifier.classify(memory_text)
@@ -651,6 +652,23 @@ class SemanticMemoryManager:
         :return: Tuple of (success, message)
         """
         try:
+            # Get current user ID if not provided
+            if user_id is None:
+                user_id = get_current_user_id()
+
+            # First check if the memory exists
+            memory_rows = db.read_memories(user_id=user_id)
+            memory_exists = False
+            for row in memory_rows:
+                if row.id == memory_id and row.user_id == user_id:
+                    memory_exists = True
+                    break
+
+            if not memory_exists:
+                logger.warning("Memory %s not found for user %s", memory_id, user_id)
+                return False, f"Memory {memory_id} not found"
+
+            # Delete the memory
             db.delete_memory(memory_id)
 
             self.memories_updated = True
@@ -659,10 +677,10 @@ class SemanticMemoryManager:
             if self.config.debug_mode:
                 print(f"🗑️ DELETED: {memory_id}")
 
-            return True, "Memory deleted successfully"
+            return True, f"Memory {memory_id} deleted successfully"
 
         except Exception as e:
-            error_msg = f"Error deleting memory: {e}"
+            error_msg = f"Error deleting memory {memory_id}: {e}"
             logger.error(error_msg)
             return False, error_msg
 
@@ -680,7 +698,7 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         if not topics:
             return False, "No topics provided for deletion."
 
@@ -738,7 +756,7 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         try:
             # Get all memories for the user first
             memory_rows = db.read_memories(user_id=user_id)
@@ -750,7 +768,7 @@ class SemanticMemoryManager:
 
             self.memories_updated = True
 
-            logger.info("Cleared all memories for user %s", user_id)
+            logger.warning("Cleared all memories for user %s", user_id)
             if self.config.debug_mode:
                 print(f"🧹 CLEARED: All memories for user {user_id}")
 
@@ -783,17 +801,41 @@ class SemanticMemoryManager:
         :param topic_boost: Score boost for topic matches (default: 0.5)
         :return: List of (UserMemory, combined_score) tuples
         """
+        import time
+
+        # LATENCY DEBUG: Start timing memory search
+        search_start_time = time.perf_counter()
+        logger.debug(
+            "🔍 MEMORY LATENCY: Starting search_memories for query: %s", query[:50]
+        )
+
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         try:
-            # Enhanced query expansion for better semantic matching
+            # LATENCY DEBUG: Time query expansion
+            expand_start = time.perf_counter()
             expanded_queries = self._expand_query(query)
+            expand_time = time.perf_counter() - expand_start
+            logger.debug(
+                "🔍 MEMORY LATENCY: Query expansion took %.3f seconds (%d queries)",
+                expand_time,
+                len(expanded_queries),
+            )
 
-            # Get all memories for the user
+            # LATENCY DEBUG: Time database read
+            db_start = time.perf_counter()
             memory_rows = db.read_memories(user_id=user_id)
+            db_time = time.perf_counter() - db_start
+            logger.debug(
+                "🔍 MEMORY LATENCY: Database read took %.3f seconds (%d rows)",
+                db_time,
+                len(memory_rows),
+            )
 
+            # LATENCY DEBUG: Time memory conversion
+            convert_start = time.perf_counter()
             user_memories = []
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
@@ -804,8 +846,15 @@ class SemanticMemoryManager:
                         logger.warning(
                             "Failed to convert memory row to UserMemory: %s", e
                         )
+            convert_time = time.perf_counter() - convert_start
+            logger.debug(
+                "🔍 MEMORY LATENCY: Memory conversion took %.3f seconds (%d memories)",
+                convert_time,
+                len(user_memories),
+            )
 
-            # Calculate similarities and topic matches
+            # LATENCY DEBUG: Time similarity calculations
+            similarity_start = time.perf_counter()
             results = []
             query_lower = query.lower().strip()
 
@@ -878,8 +927,31 @@ class SemanticMemoryManager:
                             keyword_score,
                         )
 
-            # Sort by combined score (descending) and limit
+            similarity_time = time.perf_counter() - similarity_start
+            logger.debug(
+                "🔍 MEMORY LATENCY: Similarity calculations took %.3f seconds (%d memories processed)",
+                similarity_time,
+                len(user_memories),
+            )
+
+            # LATENCY DEBUG: Time sorting
+            sort_start = time.perf_counter()
             results.sort(key=lambda x: x[1], reverse=True)
+            sort_time = time.perf_counter() - sort_start
+            logger.debug("🔍 MEMORY LATENCY: Sorting took %.3f seconds", sort_time)
+
+            # LATENCY DEBUG: Total timing
+            total_time = time.perf_counter() - search_start_time
+            logger.debug(
+                "🔍 MEMORY LATENCY: Total search_memories time: %.3f seconds (expand: %.3f, db: %.3f, convert: %.3f, similarity: %.3f, sort: %.3f)",
+                total_time,
+                expand_time,
+                db_time,
+                convert_time,
+                similarity_time,
+                sort_time,
+            )
+
             return results[:limit]
 
         except Exception as e:
@@ -905,7 +977,7 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         try:
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id, sort="desc")
@@ -929,9 +1001,7 @@ class SemanticMemoryManager:
             filtered_memories = []
             topic_set = {t.lower() for t in topics}
             for memory in user_memories:
-                if memory.topics and any(
-                    t.lower() in topic_set for t in memory.topics
-                ):
+                if memory.topics and any(t.lower() in topic_set for t in memory.topics):
                     filtered_memories.append(memory)
 
             # Sort by date (already sorted by read_memories) and limit
@@ -1044,7 +1114,7 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         try:
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id, sort="desc")
@@ -1060,12 +1130,41 @@ class SemanticMemoryManager:
                             "Failed to convert memory row to UserMemory: %s", e
                         )
 
-            logger.info("Retrieved %d memories for user %s", len(user_memories), user_id)
+            logger.info(
+                "Retrieved %d memories for user %s", len(user_memories), user_id
+            )
             return user_memories
 
         except Exception as e:
             logger.error("Error retrieving all memories: %s", e)
             return []
+
+    def list_all_memories(self, db: MemoryDb, user_id: str = None) -> List[str]:
+        """
+        Get all memory data as a simple list of strings.
+
+        This function takes the result of get_all_memories and extracts the memory
+        text (data field) from each memory object, returning a simple list of strings.
+
+        :param db: Memory database instance
+        :param user_id: User ID to retrieve memories for
+        :return: List of memory text strings
+        """
+        # Get all memories using the existing method
+        all_memories = self.get_all_memories(db, user_id)
+
+        # Extract the memory text (data field) from each memory object
+        memory_texts = []
+        for memory in all_memories:
+            if hasattr(memory, "memory") and memory.memory:
+                memory_texts.append(memory.memory)
+
+        logger.info(
+            "Listed %d memory texts for user %s",
+            len(memory_texts),
+            user_id or get_current_user_id(),
+        )
+        return memory_texts
 
     def get_memory_stats(self, db: MemoryDb, user_id: str = None) -> Dict[str, Any]:
         """
@@ -1078,7 +1177,7 @@ class SemanticMemoryManager:
         # Get current user ID if not provided
         if user_id is None:
             user_id = get_current_user_id()
-            
+
         try:
             memories = self._get_recent_memories(db, user_id)
 
@@ -1287,7 +1386,9 @@ class SemanticMemoryManager:
                 logger.debug(f"Added memory: {result.memory_id}")
 
                 # Add to existing memories list for subsequent duplicate checking
-                existing_user_memories.append(SimpleMemory(statement, result.memory_id or ""))
+                existing_user_memories.append(
+                    SimpleMemory(statement, result.memory_id or "")
+                )
             else:
                 memories_rejected += 1
                 actions_taken.append(

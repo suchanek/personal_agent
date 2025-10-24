@@ -23,6 +23,7 @@ import streamlit as st
 try:
     import altair as alt
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -35,10 +36,6 @@ if str(src_dir) not in sys.path:
 
 # Consolidated imports at module level with fallback defaults
 try:
-    from personal_agent.config.user_id_mgr import get_userid
-    from personal_agent.core.agno_agent import AgnoPersonalAgent
-    from personal_agent.core.memory import is_memory_connected
-    from personal_agent.utils.pag_logging import setup_logging
     from personal_agent.config.settings import (
         AGNO_KNOWLEDGE_DIR,
         AGNO_STORAGE_DIR,
@@ -46,13 +43,13 @@ try:
         OLLAMA_URL,
         USE_MCP,
     )
+    from personal_agent.config.user_id_mgr import get_userid
+    from personal_agent.core.agno_agent import AgnoPersonalAgent
+    from personal_agent.core.memory import is_memory_connected
+    from personal_agent.utils.pag_logging import setup_logging
 except ImportError:
     # Fallback for relative imports
     try:
-        from ..config import get_userid
-        from ..core.agno_agent import AgnoPersonalAgent
-        from ..core.memory import is_memory_connected
-        from ..utils.pag_logging import setup_logging
         from ..config.settings import (
             AGNO_KNOWLEDGE_DIR,
             AGNO_STORAGE_DIR,
@@ -60,24 +57,28 @@ except ImportError:
             OLLAMA_URL,
             USE_MCP,
         )
+        from ..config.user_id_mgr import get_userid
+        from ..core.agno_agent import AgnoPersonalAgent
+        from ..core.memory import is_memory_connected
+        from ..utils.pag_logging import setup_logging
     except ImportError:
         # Final fallback with default values
         def get_userid():
             return "default_user"
-        
+
         class AgnoPersonalAgent:
             pass
-        
+
         def is_memory_connected():
             return False
-        
+
         def setup_logging():
             return logging.getLogger(__name__)
-        
+
         # Default settings
         AGNO_KNOWLEDGE_DIR = "./knowledge"
         AGNO_STORAGE_DIR = "./storage"
-        LLM_MODEL = "llama3.2:3b"
+        LLM_MODEL = "qwen3:4b"
         OLLAMA_URL = "http://localhost:11434"
         USE_MCP = False
 
@@ -234,7 +235,9 @@ def handle_agno_response(run_stream: Iterator, display_metrics: bool = False) ->
         return f"Error processing response: {str(e)}"
 
 
-def extract_response_content(agent, display_metrics: bool = False, display_tool_calls: bool = False) -> tuple[str, dict, list, list]:
+def extract_response_content(
+    agent, display_metrics: bool = False, display_tool_calls: bool = False
+) -> tuple[str, dict, list, list]:
     """
     Extract response content, metrics, tool calls, and per-message data from agno agent after run.
     Uses the correct method to get tool calls from the agent.
@@ -255,7 +258,11 @@ def extract_response_content(agent, display_metrics: bool = False, display_tool_
             if hasattr(agent.run_response, "messages") and agent.run_response.messages:
                 # Get content from the last assistant message
                 for message in agent.run_response.messages:
-                    if message.role == "assistant" and hasattr(message, "content") and message.content:
+                    if (
+                        message.role == "assistant"
+                        and hasattr(message, "content")
+                        and message.content
+                    ):
                         response_content = message.content
 
             # Get aggregated metrics if requested
@@ -274,8 +281,11 @@ def extract_response_content(agent, display_metrics: bool = False, display_tool_
                 logger.warning(f"Error getting tool calls from agent: {e}")
 
         return (
-            response_content.strip() if response_content else "No response generated"
-        ), metrics, tool_calls, message_data
+            (response_content.strip() if response_content else "No response generated"),
+            metrics,
+            tool_calls,
+            message_data,
+        )
 
     except Exception as e:
         logger.error(f"Error extracting response content: {e}")
@@ -320,15 +330,15 @@ def sanitize_for_json_display(data):
 
 def format_tool_call_for_debug(tool_call):
     """Standardize tool call format for consistent storage and display."""
-    
+
     # Add debugging information to understand the object structure
     tool_type = type(tool_call).__name__
-    available_attributes = [attr for attr in dir(tool_call) if not attr.startswith('_')]
-    
+    available_attributes = [attr for attr in dir(tool_call) if not attr.startswith("_")]
+
     if logger:
         logger.debug(f"Processing tool call of type: {tool_type}")
         logger.debug(f"Available attributes: {available_attributes}")
-    
+
     # Handle ToolExecution objects specifically
     if hasattr(tool_call, "tool_name") and hasattr(tool_call, "tool_args"):
         # ToolExecution object format
@@ -336,7 +346,7 @@ def format_tool_call_for_debug(tool_call):
         tool_args = getattr(tool_call, "tool_args", {})
         tool_result = getattr(tool_call, "result", None)
         tool_error = getattr(tool_call, "tool_call_error", False)
-        
+
         return {
             "name": tool_name,
             "arguments": tool_args,
@@ -849,7 +859,9 @@ def main():
                 st.subheader("📊 Last Response Metrics")
                 with st.expander("View Metrics Details", expanded=True):
                     try:
-                        sanitized_metrics = sanitize_for_json_display(st.session_state.last_response_metrics)
+                        sanitized_metrics = sanitize_for_json_display(
+                            st.session_state.last_response_metrics
+                        )
                         st.json(sanitized_metrics)
                     except Exception as e:
                         st.error(f"Error displaying metrics: {str(e)}")
@@ -879,36 +891,45 @@ def main():
                             # Handle both old and new format
                             tool_name = tool_call.get("name", "Unknown")
                             tool_status = tool_call.get("status", "unknown")
-                            
+
                             # Status indicator
-                            status_icon = "✅" if tool_status == "success" else "❓" if tool_status == "unknown" else "❌"
-                            
+                            status_icon = (
+                                "✅"
+                                if tool_status == "success"
+                                else "❓" if tool_status == "unknown" else "❌"
+                            )
+
                             st.write(f"**Tool Call {i}:** {status_icon} {tool_name}")
-                            
+
                             # Show ID and type if available (old format)
                             if "id" in tool_call:
                                 st.write(f"- **ID:** {tool_call.get('id', 'N/A')}")
                             if "type" in tool_call:
                                 st.write(f"- **Type:** {tool_call.get('type', 'N/A')}")
-                            
+
                             # Show status
                             st.write(f"- **Status:** {tool_status}")
-                            
+
                             # Handle arguments (both old and new format)
                             args = None
-                            if 'function' in tool_call and isinstance(tool_call['function'], dict):
+                            if "function" in tool_call and isinstance(
+                                tool_call["function"], dict
+                            ):
                                 # Old format
-                                args = tool_call['function'].get('arguments', '{}')
-                                st.write(f"- **Function Name:** {tool_call['function'].get('name', 'N/A')}")
-                            elif 'arguments' in tool_call:
+                                args = tool_call["function"].get("arguments", "{}")
+                                st.write(
+                                    f"- **Function Name:** {tool_call['function'].get('name', 'N/A')}"
+                                )
+                            elif "arguments" in tool_call:
                                 # New format
-                                args = tool_call.get('arguments', {})
-                            
+                                args = tool_call.get("arguments", {})
+
                             if args is not None:
                                 st.write(f"- **Arguments:**")
                                 try:
                                     if isinstance(args, str):
                                         import json
+
                                         parsed_args = json.loads(args)
                                         st.json(parsed_args)
                                     elif isinstance(args, dict) and args:
@@ -917,7 +938,7 @@ def main():
                                         st.write(f"  {args}")
                                 except (json.JSONDecodeError, Exception):
                                     st.write(f"  {args}")
-                            
+
                             # Show result if available
                             if "result" in tool_call and tool_call["result"]:
                                 st.write(f"- **Result:**")
@@ -926,90 +947,131 @@ def main():
                                     st.write(f"  {result[:200]}...")
                                 else:
                                     st.write(f"  {result}")
-                            
+
                             # Show error if available
                             if "error" in tool_call:
                                 st.write(f"- **Error:** {tool_call['error']}")
-                            
+
                             # Show debugging information
                             if "raw_type" in tool_call:
                                 st.write(f"- **Raw Type:** {tool_call['raw_type']}")
-                            
+
                             if "available_attributes" in tool_call:
-                                with st.expander("🔍 Debug: Available Attributes", expanded=False):
+                                with st.expander(
+                                    "🔍 Debug: Available Attributes", expanded=False
+                                ):
                                     st.write("**All object attributes:**")
                                     st.write(tool_call["available_attributes"])
-                            
+
                             if "name_source" in tool_call:
-                                st.write(f"- **Name Source:** {tool_call['name_source']}")
+                                st.write(
+                                    f"- **Name Source:** {tool_call['name_source']}"
+                                )
                             if "args_source" in tool_call:
-                                st.write(f"- **Args Source:** {tool_call['args_source']}")
+                                st.write(
+                                    f"- **Args Source:** {tool_call['args_source']}"
+                                )
                             if "result_source" in tool_call:
-                                st.write(f"- **Result Source:** {tool_call['result_source']}")
-                            
+                                st.write(
+                                    f"- **Result Source:** {tool_call['result_source']}"
+                                )
+
                             if "raw_str" in tool_call:
-                                with st.expander("🔍 Debug: Raw Object String", expanded=False):
+                                with st.expander(
+                                    "🔍 Debug: Raw Object String", expanded=False
+                                ):
                                     st.code(tool_call["raw_str"])
-                            
+
                             st.write("---")
                 else:
                     st.info("No tool calls in last response.")
-            
+
             # Display per-message data if available
             if "last_response_message_data" in st.session_state:
                 message_data = st.session_state.last_response_message_data
                 if message_data:
                     st.subheader("📝 Per-Message Details")
-                    with st.expander("View Message-by-Message Breakdown", expanded=False):
+                    with st.expander(
+                        "View Message-by-Message Breakdown", expanded=False
+                    ):
                         # Handle both single message dict and list of messages
                         if isinstance(message_data, list):
                             message_list = message_data
                         else:
                             message_list = [message_data]
-                        
+
                         for i, msg_data in enumerate(message_list, 1):
                             st.write(f"**Assistant Message {i}:**")
                             if isinstance(msg_data, dict) and msg_data.get("content"):
-                                st.write(f"- **Content:** {msg_data['content'][:100]}{'...' if len(msg_data['content']) > 100 else ''}")
-                            if isinstance(msg_data, dict) and msg_data.get("tool_calls"):
-                                st.write(f"- **Tool Calls:** {len(msg_data['tool_calls'])} calls")
-                                for j, tc in enumerate(msg_data['tool_calls'], 1):
+                                st.write(
+                                    f"- **Content:** {msg_data['content'][:100]}{'...' if len(msg_data['content']) > 100 else ''}"
+                                )
+                            if isinstance(msg_data, dict) and msg_data.get(
+                                "tool_calls"
+                            ):
+                                st.write(
+                                    f"- **Tool Calls:** {len(msg_data['tool_calls'])} calls"
+                                )
+                                for j, tc in enumerate(msg_data["tool_calls"], 1):
                                     # Handle both old and new format
                                     tool_name = tc.get("name", "Unknown")
                                     if not tool_name or tool_name == "Unknown":
                                         # Try old format
-                                        if 'function' in tc and isinstance(tc['function'], dict):
-                                            tool_name = tc['function'].get('name', 'Unknown')
-                                    
+                                        if "function" in tc and isinstance(
+                                            tc["function"], dict
+                                        ):
+                                            tool_name = tc["function"].get(
+                                                "name", "Unknown"
+                                            )
+
                                     tool_status = tc.get("status", "unknown")
-                                    status_icon = "✅" if tool_status == "success" else "❓" if tool_status == "unknown" else "❌"
+                                    status_icon = (
+                                        "✅"
+                                        if tool_status == "success"
+                                        else "❓" if tool_status == "unknown" else "❌"
+                                    )
                                     st.write(f"  - Call {j}: {status_icon} {tool_name}")
                             if isinstance(msg_data, dict) and msg_data.get("metrics"):
                                 st.write(f"- **Message Metrics:**")
                                 try:
-                                    sanitized_metrics = sanitize_for_json_display(msg_data["metrics"])
+                                    sanitized_metrics = sanitize_for_json_display(
+                                        msg_data["metrics"]
+                                    )
                                     st.json(sanitized_metrics)
                                 except Exception as e:
-                                    st.error(f"Error displaying message metrics: {str(e)}")
-                                    st.write(f"**Raw Metrics:** {str(msg_data['metrics'])}")
+                                    st.error(
+                                        f"Error displaying message metrics: {str(e)}"
+                                    )
+                                    st.write(
+                                        f"**Raw Metrics:** {str(msg_data['metrics'])}"
+                                    )
                             st.write("---")
             else:
-                st.info("No tool calls available yet. Send a message that triggers tools to see tool calls.")
+                st.info(
+                    "No tool calls available yet. Send a message that triggers tools to see tool calls."
+                )
         else:
             st.info("🔧 Tool calls display disabled")
 
         # Performance Statistics Section
-        if PANDAS_AVAILABLE and st.session_state.performance_stats["total_requests"] > 0:
+        if (
+            PANDAS_AVAILABLE
+            and st.session_state.performance_stats["total_requests"] > 0
+        ):
             st.subheader("📊 Performance Statistics")
             stats = st.session_state.performance_stats
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Total Requests", stats["total_requests"])
                 st.metric("Avg Response Time", f"{stats['average_response_time']:.3f}s")
                 st.metric(
                     "Fastest Response",
-                    f"{stats['fastest_response']:.3f}s" if stats["fastest_response"] != float("inf") else "N/A"
+                    (
+                        f"{stats['fastest_response']:.3f}s"
+                        if stats["fastest_response"] != float("inf")
+                        else "N/A"
+                    ),
                 )
             with col2:
                 st.metric("Total Tool Calls", stats["tool_calls_count"])
@@ -1022,7 +1084,9 @@ def main():
                 df = pd.DataFrame(st.session_state.debug_metrics)
                 df = df[df["success"]]  # Only show successful requests
                 if not df.empty and len(df) > 1:
-                    chart_data = df[["timestamp", "response_time"]].copy().set_index("timestamp")
+                    chart_data = (
+                        df[["timestamp", "response_time"]].copy().set_index("timestamp")
+                    )
                     chart = (
                         alt.Chart(chart_data.reset_index())
                         .mark_line(point=True)
@@ -1038,9 +1102,13 @@ def main():
             # Recent Request Details
             st.subheader("🔍 Recent Request Details")
             if st.session_state.debug_metrics:
-                for entry in reversed(st.session_state.debug_metrics[-5:]):  # Show last 5
+                for entry in reversed(
+                    st.session_state.debug_metrics[-5:]
+                ):  # Show last 5
                     success_icon = "✅" if entry["success"] else "❌"
-                    with st.expander(f"{success_icon} {entry['timestamp']} - {entry['response_time']}s"):
+                    with st.expander(
+                        f"{success_icon} {entry['timestamp']} - {entry['response_time']}s"
+                    ):
                         st.write(f"**Prompt:** {entry['prompt']}")
                         st.write(f"**Response Time:** {entry['response_time']}s")
                         st.write(f"**Input Tokens:** {entry['input_tokens']}")
@@ -1048,12 +1116,16 @@ def main():
                         st.write(f"**Total Tokens:** {entry['total_tokens']}")
                         st.write(f"**Tool Calls:** {entry['tool_calls']}")
                         if not entry["success"]:
-                            st.write(f"**Error:** {entry.get('error', 'Unknown error')}")
+                            st.write(
+                                f"**Error:** {entry.get('error', 'Unknown error')}"
+                            )
             else:
                 st.info("No debug metrics available yet.")
 
         elif not PANDAS_AVAILABLE:
-            st.warning("📊 Performance charts require pandas and altair. Install with: `pip install pandas altair`")
+            st.warning(
+                "📊 Performance charts require pandas and altair. Install with: `pip install pandas altair`"
+            )
         else:
             st.info("📊 No performance data yet. Send a message to see statistics.")
 
@@ -1111,69 +1183,79 @@ def main():
             # Create containers for tool calls and response
             tool_calls_container = st.empty()
             resp_container = st.empty()
-            
+
             with st.spinner("🤔 Thinking..."):
                 start_time = time.time()
                 start_timestamp = datetime.now()
                 tool_calls_made = 0
                 tool_call_details = []
                 all_tools_used = []
-                
+
                 try:
                     # Handle AgnoPersonalAgent with proper tool call collection
                     if isinstance(current_agent, AgnoPersonalAgent):
-                        
+
                         async def run_agent_with_streaming():
                             nonlocal tool_calls_made, tool_call_details, all_tools_used
-                            
+
                             try:
                                 # Use the simplified agent.run() method
                                 response_content = await current_agent.run(
                                     prompt, add_thought_callback=None
                                 )
-                                
+
                                 # Get tool calls using the correct method that collects from streaming events
                                 tools_used = current_agent.get_last_tool_calls()
-                                
+
                                 # Process and display tool calls
                                 if tools_used:
                                     tool_calls_made = len(tools_used)
                                     if logger:
-                                        logger.info(f"Processing {len(tools_used)} tool calls from streaming events")
-                                    
+                                        logger.info(
+                                            f"Processing {len(tools_used)} tool calls from streaming events"
+                                        )
+
                                     for i, tool_call in enumerate(tools_used):
                                         if logger:
                                             logger.debug(f"Tool call {i}: {tool_call}")
-                                        formatted_tool = format_tool_call_for_debug(tool_call)
+                                        formatted_tool = format_tool_call_for_debug(
+                                            tool_call
+                                        )
                                         tool_call_details.append(formatted_tool)
                                         all_tools_used.append(tool_call)
-                                    
+
                                     # Display tool calls in real-time
-                                    display_tool_calls_inline(tool_calls_container, all_tools_used)
-                                
+                                    display_tool_calls_inline(
+                                        tool_calls_container, all_tools_used
+                                    )
+
                                 return response_content
-                                
+
                             except Exception as e:
                                 raise Exception(f"Error in agent execution: {e}") from e
-                        
+
                         # Run the async agent execution
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
                         try:
-                            response_content = loop.run_until_complete(run_agent_with_streaming())
+                            response_content = loop.run_until_complete(
+                                run_agent_with_streaming()
+                            )
                         finally:
                             loop.close()
-                        
+
                         # Use the response content directly
                         if not response_content:
                             response_content = "No response generated by agent"
-                    
+
                     else:
                         # Fallback for non-AgnoPersonalAgent
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
                         try:
-                            agent_response = loop.run_until_complete(current_agent.run(prompt))
+                            agent_response = loop.run_until_complete(
+                                current_agent.run(prompt)
+                            )
                             response_content = (
                                 agent_response.content
                                 if hasattr(agent_response, "content")
@@ -1191,18 +1273,28 @@ def main():
 
                     # Calculate token estimates
                     input_tokens = len(prompt.split()) * 1.3
-                    output_tokens = len(response_content.split()) * 1.3 if response_content else 0
+                    output_tokens = (
+                        len(response_content.split()) * 1.3 if response_content else 0
+                    )
                     total_tokens = input_tokens + output_tokens
 
                     # Update performance stats with real-time tool call count
                     stats = st.session_state.performance_stats
                     stats["total_requests"] += 1
                     stats["total_response_time"] += response_time
-                    stats["average_response_time"] = stats["total_response_time"] / stats["total_requests"]
+                    stats["average_response_time"] = (
+                        stats["total_response_time"] / stats["total_requests"]
+                    )
                     stats["total_tokens"] += total_tokens
-                    stats["average_tokens"] = stats["total_tokens"] / stats["total_requests"]
-                    stats["fastest_response"] = min(stats["fastest_response"], response_time)
-                    stats["slowest_response"] = max(stats["slowest_response"], response_time)
+                    stats["average_tokens"] = (
+                        stats["total_tokens"] / stats["total_requests"]
+                    )
+                    stats["fastest_response"] = min(
+                        stats["fastest_response"], response_time
+                    )
+                    stats["slowest_response"] = max(
+                        stats["slowest_response"], response_time
+                    )
                     stats["tool_calls_count"] += tool_calls_made
 
                     # Store debug metrics with standardized format
@@ -1228,8 +1320,10 @@ def main():
                         st.session_state.debug_metrics.pop(0)
 
                     # Extract metrics and tool calls for sidebar display
-                    final_response, metrics, tool_calls, message_data = extract_response_content(
-                        current_agent, display_metrics=True, display_tool_calls=True
+                    final_response, metrics, tool_calls, message_data = (
+                        extract_response_content(
+                            current_agent, display_metrics=True, display_tool_calls=True
+                        )
                     )
 
                     # Add to chat history with metadata for future reference
@@ -1248,11 +1342,17 @@ def main():
 
                     # Store tool calls and message data in session state for sidebar display
                     if st.session_state.get("show_tool_calls", False):
-                        st.session_state.last_response_tool_calls = tool_call_details if tool_call_details else []
-                        st.session_state.last_response_message_data = message_data if message_data else []
-                    
+                        st.session_state.last_response_tool_calls = (
+                            tool_call_details if tool_call_details else []
+                        )
+                        st.session_state.last_response_message_data = (
+                            message_data if message_data else []
+                        )
+
                     # Also add session metrics if available
-                    if st.session_state.get("show_metrics", False) and hasattr(current_agent, "session_metrics"):
+                    if st.session_state.get("show_metrics", False) and hasattr(
+                        current_agent, "session_metrics"
+                    ):
                         try:
                             session_metrics = current_agent.session_metrics
                             if session_metrics:

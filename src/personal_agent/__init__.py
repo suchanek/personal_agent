@@ -17,7 +17,7 @@ The package supports three main frameworks:
 3. Agno (modern async agent framework) - primary interface
 
 Author: Personal Agent Development Team
-Last modified: 2025-08-09 14:52:45
+Last modified: 2025-10-24 09:08:15
 Version: 0.11.38
 """
 
@@ -58,7 +58,7 @@ from .utils.pag_logging import (
 )
 
 # Package version (matches pyproject.toml)
-__version__ = "0.11.38dev"  # Defined once to avoid duplication
+__version__ = "0.8.73"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package
@@ -106,7 +106,6 @@ __all__ = [
     "run_agno_cli",
     "run_agno_cli_wrapper",
     # Utility functions
-    
     # Package info
     "__version__",
 ]

@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-from .settings import DATA_DIR, HOME_DIR, ROOT_DIR, get_env_var
+from .settings import DATA_DIR, HOME_DIR, ROOT_DIR, USER_DATA_DIR, get_env_var
 
 # MCP Server configurations
 MCP_SERVERS = {
@@ -13,8 +13,8 @@ MCP_SERVERS = {
     },
     "filesystem-data": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", DATA_DIR],
-        "description": "Access data directory for vector database",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", USER_DATA_DIR],
+        "description": "Access user-specific data directory for vector database",
     },
     "filesystem-root": {
         "command": "npx",

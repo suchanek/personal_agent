@@ -3,14 +3,13 @@ services:
     container_name: lightrag_memory
     image: ghcr.io/suchanek/lightrag_pagent:latest
     env_file:
-      - .env
+      - env.server
     ports:
       - 9622:9621
     volumes:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
-      - ./config.ini:/app/config.ini
-      - ./.env:/app/.env
+      - ./env.server:/app/.env
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -20,3 +19,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: "6"
+          memory: "8g"
+        

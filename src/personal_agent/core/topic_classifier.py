@@ -21,7 +21,9 @@ This module defines a TopicClassifier class that can be used to classify the top
 The TopicClassifier class provides a convenient way to categorize text data into predefined topics based on keyword and phrase matching. This could be useful in a variety of applications, such as content analysis, customer support, or information retrieval. The module's design allows for easy customization of the topic categories and associated keywords/phrases by modifying the configuration file.
 """
 
+import sys
 import re
+import argparse
 from dataclasses import dataclass
 from typing import Dict, List, Pattern
 
@@ -182,7 +184,7 @@ class TopicClassifier:
         tokens = [word for word in tokens if word not in self.stopwords]
         return " ".join(tokens)
 
-    def classify(self, text, return_list=True):
+    def classify(self, text, return_list=False):
         """
         Classify the topic(s) of a given text.
 
@@ -196,13 +198,15 @@ class TopicClassifier:
         """
         cleaned = self.clean_text(text)
         cleaned_words = cleaned.split()
+        # Keep original text for phrase matching (just lowercase, no stopword removal)
+        original_lower = text.lower()
         raw_scores = {category: 0 for category in self.categories}
 
-        # Check phrases first (higher weight)
+        # Check phrases first (higher weight) - use original text to preserve critical words like "myself"
         for category, phrases in self.phrases.items():
             if category in raw_scores:  # Make sure category exists in raw_scores
                 for phrase in phrases:
-                    if phrase.lower() in cleaned:
+                    if phrase.lower() in original_lower:
                         raw_scores[category] += self.phrase_weight
 
         # Check individual keywords with whole word matching
@@ -237,38 +241,80 @@ class TopicClassifier:
         else:
             return high_confidence
 
+    def classify_with_confidence(self, text):
+        """
+        Classify the topic(s) of a given text and return confidence scores.
+        
+        Args:
+            text (str): Text to classify
+            
+        Returns:
+            Dict[str, float]: Dictionary mapping topic names to confidence scores
+        """
+        return self.classify(text, return_list=False)
 
-if __name__ == "__main__":
+def demo():
     classifier = TopicClassifier()
     examples = [
-        "My name is John and I work at Google.",
-        "I love to play the piano and travel.",
-        "I am 35 years old and live in Paris.",
-        "I studied biology at university.",
-        "Married to a wonderful woman with 2 kids.",
-        "I prefer coffee over tea.",
-        "I plan to climb Mount Everest.",
-        "I have a peanut allergy.",
-        "I have a dog named Max and love animals.",
-        "I enjoy hiking and playing tennis on weekends.",
-        "I love to drive my car.",
-        "I have four children.",
-        "I was a Genius at the Apple Store!",
-        "I used to fly RC airplanes",
-        "I attended Johns Hopkins Medical School for my PhD.",
-        "I love tea",
-        "I hate hot weather",
-        "I'm feeling a bit stressed today.",
-        "Completely unrelated sentence.",
-    ]
+            "My name is John and I work at Google.",
+            "I love to play the piano and travel.",
+            "I am 35 years old and live in Paris.",
+            "I studied biology at university.",
+            "Married to a wonderful woman with 2 kids.",
+            "I prefer coffee over tea.",
+            "I plan to climb Mount Everest.",
+            "I have a peanut allergy.",
+            "I have a dog named Max and love animals.",
+            "I enjoy hiking and playing tennis on weekends.",
+            "I love to drive my car.",
+            "I have four children.",
+            "I was a Genius at the Apple Store!",
+            "I used to fly RC airplanes",
+            "I attended Johns Hopkins Medical School for my PhD.",
+            "I love tea",
+            "I hate hot weather",
+            "I'm feeling a bit stressed today.",
+            "I wrote in my journal about my feelings.",
+            "Completely unrelated sentence.",
+        ]
 
     print("=== Topic Classification Demo ===")
     for text in examples:
-        # Production mode: returns list of topics
-        topics_list = classifier.classify(text)
-        # Development mode: returns dict with confidence scores
-        topics_scores = classifier.classify(text, return_list=False)
+        # Default behavior: returns dict with confidence scores
+        topics_with_confidence = classifier.classify(text)
+        # Alternative: returns list of topic names only
+        topics_list = classifier.classify(text, return_list=True)
 
         print(f"Input: {text}")
-        print(f"Topics (list): {topics_list}")
-        print(f"Topics (scores): {topics_scores}\n")
+        print(f"Topics with confidence: {topics_with_confidence}")
+        print(f"Topics (list only): {topics_list}\n")
+    
+def main():
+    parser = argparse.ArgumentParser(description='Topic Classifier - Classify text into topics with confidence scores')
+    parser.add_argument('-d', '--demo', action='store_true', 
+                       help='Run demo mode with example texts')
+    parser.add_argument('text', nargs='*', 
+                       help='Text to classify (if not using demo mode)')
+    
+    args = parser.parse_args()
+    
+    if args.demo:
+        demo()
+    elif args.text:
+        # Join all text arguments into a single string
+        input_text = ' '.join(args.text)
+        classifier = TopicClassifier()
+        result = classifier.classify(input_text)
+        
+        print(f"Input: {input_text}")
+        print(f"Topics with confidence: {result}")
+    else:
+        parser.print_help()
+        print("\nExamples:")
+        print("  python topic_classifier.py 'I love programming and Python'")
+        print("  python topic_classifier.py -d")
+
+if __name__ == "__main__":
+    main()
+
+# end of file

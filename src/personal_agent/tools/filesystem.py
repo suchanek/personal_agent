@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from langchain.tools import tool
 
-from ..config import DATA_DIR, HOME_DIR, USE_MCP, USE_WEAVIATE
+from ..config import DATA_DIR, HOME_DIR, USER_DATA_DIR, USE_MCP, USE_WEAVIATE
 
 if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient
@@ -39,7 +39,7 @@ def mcp_read_file(file_path: str = ".") -> str:
         server_name = "filesystem-home"  # Default to home directory access
 
         # Choose server based on path and desired access level
-        if file_path.startswith(DATA_DIR + "/") or file_path.startswith("data/"):
+        if file_path.startswith(USER_DATA_DIR + "/") or file_path.startswith("data/"):
             server_name = "filesystem-data"
         elif file_path.startswith("/") and not file_path.startswith(HOME_DIR):
             # Use root server for paths outside home directory
@@ -324,61 +324,6 @@ def mcp_list_directory(directory_path: str = ".") -> str:
     except Exception as e:
         logger.error("Error listing directory via MCP: %s", str(e))
         return f"Error listing directory: {str(e)}"
-
-
-@tool
-def intelligent_file_search(
-    search_query: str = "Describe the files in this listing", directory: str = "/"
-) -> str:
-    """Search for files and enhance results with memory context."""
-    if not USE_MCP or mcp_client is None:
-        return "MCP is disabled, cannot search files."
-
-    try:
-        # First, search memory for relevant context
-        memory_context = []
-        if USE_WEAVIATE and vector_store is not None:
-            from ..tools.memory_tools import query_knowledge_base
-
-            memory_results = query_knowledge_base.invoke(
-                {"query": search_query, "limit": 3}
-            )
-            memory_context = (
-                memory_results
-                if memory_results != ["No relevant context found."]
-                else []
-            )
-        else:
-            # @todo
-            # integrate with our pylance system to query the database
-            pass
-
-        # Use MCP to list directory contents and search for relevant files
-        directory_listing = mcp_list_directory.invoke({"directory_path": directory})
-
-        # Use LLM to analyze which files might be relevant based on the search query
-        analysis_prompt = f"""
-        Based on the search query: "{search_query}"
-        
-        Directory listing: {directory_listing}
-        
-        Memory context: {memory_context}
-        
-        Which files in this directory are most relevant to the search query? 
-        Provide a focused analysis and suggest the top 2-3 most relevant files to examine.
-        """
-
-        # Store this search operation in memory
-        if USE_WEAVIATE and vector_store is not None:
-            interaction_text = f"File search: {search_query} in {directory}\nFound: {directory_listing[:200]}..."
-            store_interaction.invoke({"text": interaction_text, "topic": "file_search"})
-
-        logger.info("Performed intelligent file search: %s", search_query)
-        return f"Directory contents: {directory_listing}\n\nMemory context: {memory_context}\n\nAnalysis needed: {analysis_prompt}"
-
-    except Exception as e:
-        logger.error("Error in intelligent file search: %s", str(e))
-        return f"Error searching files: {str(e)}"
 
 
 @tool

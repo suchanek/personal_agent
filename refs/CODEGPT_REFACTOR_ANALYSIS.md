@@ -80,7 +80,7 @@ The Personal Agent has been significantly refactored with a well-organized modul
 - AI-powered research assistant
 
 **Native Tools:**
-- `src/personal_agent/tools/memory_tools.py` - Memory operations
+- `src/personal_agent/tools/weaviate_memory_tools.py` - Legacy Weaviate memory operations
 - `src/personal_agent/tools/filesystem.py` - File system operations
 - `src/personal_agent/tools/web.py` - Web browsing and research
 - `src/personal_agent/tools/personal_agent_tools.py` - Agent-specific utilities

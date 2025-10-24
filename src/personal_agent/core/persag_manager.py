@@ -29,7 +29,7 @@ class PersagManager:
         self, project_root: Optional[Path] = None
     ) -> Tuple[bool, str]:
         """
-        Ensure PERSAG_HOME structure exists and migrate project docker dirs if requested.
+        Ensure PERSAG_HOME structure exists and migrate project files if requested.
 
         Args:
             project_root: Path to project root for optional migration (optional)
@@ -44,13 +44,28 @@ class PersagManager:
             # Ensure backups directory exists
             self.backup_dir.mkdir(exist_ok=True)
 
-            # Optionally migrate docker directories if project_root provided
+            migration_messages = []
+
+            # Optionally migrate files if project_root provided
             if project_root:
+                # Migrate environment files
+                success, message = self.migrate_env_files(project_root)
+                if not success:
+                    return False, f"Environment file migration failed: {message}"
+                migration_messages.append(message)
+
+                # Migrate docker directories
                 success, message = self.migrate_docker_directories(project_root)
                 if not success:
                     return False, f"Docker migration failed: {message}"
+                migration_messages.append(message)
 
-            return True, f"{self.persag_dir} initialized successfully with USER_ID={current_user_id}"
+            if migration_messages:
+                combined_message = f"{self.persag_dir} initialized successfully with USER_ID={current_user_id}. {'; '.join(migration_messages)}"
+            else:
+                combined_message = f"{self.persag_dir} initialized successfully with USER_ID={current_user_id}"
+
+            return True, combined_message
 
         except Exception as e:
             logger.error(f"Failed to initialize {self.persag_dir}: {e}")
@@ -87,6 +102,48 @@ class PersagManager:
         except Exception as e:
             logger.error(f"Failed to set user ID: {e}")
             return False
+
+    def migrate_env_files(self, project_root: Path) -> Tuple[bool, str]:
+        """
+        Migrate .env file from project root to ~/.persag
+
+        Args:
+            project_root: Path to project root directory
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            migrated = []
+            
+            # Migrate .env file
+            source_env = project_root / ".env"
+            target_env = self.persag_dir / ".env"
+            
+            if source_env.exists() and not target_env.exists():
+                # Create backup first
+                backup_name = f"env_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                backup_path = self.backup_dir / backup_name
+                shutil.copy2(source_env, backup_path)
+                
+                # Copy to ~/.persag
+                shutil.copy2(source_env, target_env)
+                migrated.append(".env")
+                
+                logger.info(
+                    f"Migrated .env to {self.persag_dir} (backup: {backup_path})"
+                )
+            
+            # Note: env.userid is handled by load_user_from_file() in user_id_mgr
+            
+            if migrated:
+                return True, f"Migrated files: {', '.join(migrated)}"
+            else:
+                return True, "No env files needed migration"
+                
+        except Exception as e:
+            logger.error(f"Failed to migrate env files: {e}")
+            return False, str(e)
 
     def migrate_docker_directories(self, project_root: Path) -> Tuple[bool, str]:
         """
@@ -175,6 +232,11 @@ class PersagManager:
                 if not user_id or user_id == "default_user":
                     issues.append("Invalid or default user ID")
 
+            # Check .env file
+            env_file = self.persag_dir / ".env"
+            if not env_file.exists():
+                issues.append(".env file missing")
+
             # Check docker directories
             docker_config = self.get_docker_config()
             for name, config in docker_config.items():
@@ -209,4 +271,3 @@ def get_persag_manager() -> PersagManager:
     if _persag_manager is None:
         _persag_manager = PersagManager()
     return _persag_manager
-

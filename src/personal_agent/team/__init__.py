@@ -5,20 +5,20 @@ This module provides specialized agents that work together as a team,
 following the reasoning_multi_purpose_team.py pattern from agno examples.
 """
 
-from .specialized_agents import (
+from .basic_memory_agent import create_basic_memory_agent
+from .reasoning_team import (
+    cleanup_team,
+    cli_main,
     create_memory_agent,
-    create_web_research_agent,
-    create_finance_agent,
-    create_calculator_agent,
-    create_file_operations_agent,
+    create_team,
+    main,
 )
-from .personal_agent_team import create_personal_agent_team
 
 __all__ = [
+    # Reasoning team functions
     "create_memory_agent",
-    "create_web_research_agent", 
-    "create_finance_agent",
-    "create_calculator_agent",
-    "create_file_operations_agent",
-    "create_personal_agent_team",
+    "create_team",
+    "cleanup_team",
+    "main",
+    "cli_main",
 ]

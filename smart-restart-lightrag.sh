@@ -2,7 +2,12 @@
 
 # Smart LightRAG Docker Restart Script
 # Provides intelligent restart with proper port cleanup and waiting periods
-# to prevent "port already allocated" errors
+# to prevent "port already allocated" errors.
+# Assumes ~/.persag exists and that they contain the docker server dirs
+#
+# Last revision: 2025-09-25 19:58:02
+
+
 
 # Colors for output
 RED='\033[0;31m'
@@ -22,6 +27,37 @@ LIGHTRAG_SERVER_PORT=${LIGHTRAG_SERVER_PORT:-9621}
 LIGHTRAG_MEMORY_PORT=${LIGHTRAG_MEMORY_PORT:-9622}
 MAX_WAIT_TIME=${MAX_WAIT_TIME:-30}
 CLEANUP_WAIT=${CLEANUP_WAIT:-5}
+
+# Function to get AGNO_STORAGE_DIR from Python settings
+get_agno_storage_dir() {
+    python3 -c "
+import sys
+import os
+sys.path.insert(0, 'src')
+try:
+    from personal_agent.config.settings import AGNO_STORAGE_DIR
+    print(AGNO_STORAGE_DIR)
+except Exception as e:
+    print(f'Error getting AGNO_STORAGE_DIR: {e}', file=sys.stderr)
+    sys.exit(1)
+"
+}
+
+# Get and export AGNO_STORAGE_DIR for Docker volume mounts
+AGNO_STORAGE_DIR=$(get_agno_storage_dir)
+if [ $? -ne 0 ] || [ -z "$AGNO_STORAGE_DIR" ]; then
+    echo -e "${RED}❌ Failed to get AGNO_STORAGE_DIR from Python settings${NC}"
+    exit 1
+fi
+export AGNO_STORAGE_DIR
+
+# Ensure the storage directories exist
+mkdir -p "$AGNO_STORAGE_DIR/rag_storage"
+mkdir -p "$AGNO_STORAGE_DIR/inputs"
+mkdir -p "$AGNO_STORAGE_DIR/memory_rag_storage"
+mkdir -p "$AGNO_STORAGE_DIR/memory_inputs"
+
+echo -e "${CYAN}📁 Using AGNO_STORAGE_DIR: ${AGNO_STORAGE_DIR}${NC}"
 
 echo -e "${BLUE}🧠 Smart LightRAG Docker Restart${NC}"
 echo -e "${CYAN}Intelligent restart with proper port cleanup and waiting periods${NC}"

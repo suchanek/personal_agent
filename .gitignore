@@ -190,3 +190,8 @@ data/
 cookbook/
 examples/mcp_agent/tmp/
 
+poetry.lock
+
+
+node_modules/
+

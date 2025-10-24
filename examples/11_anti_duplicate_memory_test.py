@@ -37,12 +37,13 @@ async def test_original_memory_behavior():
 
     # Create original memory instance
     original_memory = Memory(
-        db=memory_db, model=Ollama(id=LLM_MODEL, host="http://tesla.local:11434")
+        db=memory_db,
+        model=Ollama(id=LLM_MODEL, host="http://100.100.248.61:11434"),
     )
 
     # Create agent with original memory
     agent = Agent(
-        model=Ollama(id=LLM_MODEL, host="http://tesla.local:11434"),
+        model=Ollama(id=LLM_MODEL, host="http://100.100.248.61:11434"),
         user_id=USER_ID,
         memory=original_memory,
         enable_agentic_memory=False,
@@ -148,14 +149,14 @@ async def test_anti_duplicate_memory():
     # Create anti-duplicate memory instance
     anti_dup_memory = AntiDuplicateMemory(
         db=memory_db,
-        model=Ollama(id=LLM_MODEL, host="http://tesla.local:11434"),
+        model=Ollama(id=LLM_MODEL, host="http://100.100.248.61:11434"),
         similarity_threshold=0.8,
         debug_mode=True,
     )
 
     # Create agent with anti-duplicate memory
     agent = Agent(
-        model=Ollama(id=LLM_MODEL, host="http://tesla.local:11434"),
+        model=Ollama(id=LLM_MODEL, host="http://100.100.248.61:11434"),
         user_id=USER_ID,
         memory=anti_dup_memory,
         enable_agentic_memory=False,
@@ -225,7 +226,7 @@ async def test_direct_duplicate_prevention():
     # Create anti-duplicate memory instance
     anti_dup_memory = AntiDuplicateMemory(
         db=memory_db,
-        model=Ollama(id=LLM_MODEL, host="http://tesla.local:11434"),
+        model=Ollama(id=LLM_MODEL, host="http://100.100.248.61:11434"),
         similarity_threshold=0.8,
         debug_mode=True,
     )
