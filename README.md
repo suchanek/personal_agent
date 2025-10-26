@@ -4,22 +4,50 @@ A modern, production-ready personal AI assistant built with the Agno framework, 
 
 ## ✨ Latest Updates
 
-### Recent Improvements (January 2025)
+### Recent Improvements (v0.8.73 - October 2025)
 
-- **🔒 License Update**: Migrated from GPL-3.0 to Apache-2.0 for commercial-friendly licensing with patent protection
-- **📝 Memory System Refactoring**: Streamlined CLI memory commands - reduced code complexity by 63% while maintaining full functionality
-- **🏗️ Standalone Memory Functions**: Memory operations now use direct agent methods instead of wrapper classes for better performance
-- **📚 Documentation Updates**: Enhanced architecture documentation and README with current system capabilities
-- **🎯 Command Fixes**: Corrected all CLI command references for consistency across documentation
+#### 🚀 **Installation & Setup**
+- **One-Click Installation**: New automated installer script (`install-personal-agent.sh`) handles all dependencies, services, and configuration
+- **Robust Service Management**: Ollama runs as persistent macOS LaunchAgent with automatic startup and optimized settings
+- **Smart Docker Integration**: Automated LightRAG container management with user synchronization
 
-### Previous Updates
+#### 📱 **Mobile & Remote Access**
+- **iOS/macOS Shortcuts**: 10+ pre-built shortcuts for mobile access (Remember, Memory Story, List Memories, Share URL, etc.)
+- **Secure Remote Access**: Tailscale VPN integration for encrypted private networking without port forwarding
+- **REST API**: Comprehensive programmatic access to memory, knowledge, chat, and system management endpoints
 
-The Streamlit web interface has been significantly upgraded to provide a unified experience for both single-agent and multi-agent team interactions.
+#### 🏗️ **Architecture Enhancements**
+- **Centralized Configuration**: Thread-safe `PersonalAgentConfig` singleton eliminates race conditions and provides single source of truth
+- **Simplified CLI**: 63% code reduction through direct agent delegation and clean separation of concerns
+- **Apache 2.0 License**: Migrated from GPL-3.0 for commercial-friendly licensing with patent protection
 
-- **Unified Dual-Mode UI**: A single, powerful interface (`poe serve-persag`) now manages both the single personal agent and the multi-agent team.
-- **Mode Switching**: Switch between single-agent and team modes at launch.
-- **Team CLI**: The separate command-line interface for multi-agent teams (`poe team`).
-- **System Dashboard**: Streamlit-based system management dashboard (`poe dashboard`).
+#### 👥 **User Management**
+- **Enhanced User Profiles**: Added gender field and NPC (bot user) designation for richer modeling
+- **Age-Perspective Memories**: Write memories from specific age perspectives with automatic timestamp adjustment
+- **Robust User Switching**: Explicit Docker service coordination prevents race conditions during user transitions
+
+#### 💾 **Memory System**
+- **Dynamic Timestamps**: Human-readable memory dates ("3 days ago", "at age 25") for better context
+- **Differentiated Retrieval**: Concise `list_all_memories` reduces token consumption by 60%+
+- **Standalone Functions**: Centralized memory operations eliminate code duplication across UI/CLI/API
+
+#### 🔌 **Model Provider Support**
+- **Multi-Provider Architecture**: Native support for Ollama, OpenAI, and LM Studio with runtime switching
+- **Unified Configuration**: Single `MODEL_PROVIDER` environment variable controls active provider
+- **Model Recommendations**: Qwen3 4B/8B models optimized for Apple Silicon with excellent tool use capability
+
+#### 🖥️ **Dashboard Improvements**
+- **User Profile Management**: Full editing interface with validation for extended fields
+- **Decoupled Infrastructure**: Removed direct Docker management for improved stability and graceful error handling
+- **Enhanced Memory UI**: Session state persistence, real-time sync status, and confirmation workflows
+
+### Previous Updates (v0.2.6 - September 2025)
+
+- **Unified Dual-Mode UI**: Single Streamlit interface (`poe serve-persag`) for both single-agent and multi-agent team modes
+- **Mode Switching**: Toggle between single-agent and team modes at runtime with `--single` flag
+- **Dual Knowledge Architecture**: Local semantic KB (LanceDB) + Graph KB (LightRAG) with intelligent query routing
+- **Manager-Based Architecture**: Specialized manager classes for models, memory, tools, knowledge, and users
+- **Lazy Initialization**: Instant agent creation with on-demand component loading (70%+ faster startup)
 
 ## Key Features
 
@@ -45,221 +73,193 @@ The Streamlit web interface has been significantly upgraded to provide a unified
 - **Memory Tools**: Comprehensive memory storage, retrieval, and management
 
 ### 🌐 **User Interface**
-- **Unified Dual-Mode UI**: A single Streamlit interface for both single-agent chat and multi-agent team collaboration.
-- **CLI Interface**: Full-featured command-line interface for direct interaction.
-- **Dynamic Mode Switching**: Toggle between single-agent and team modes at runtime in the web UI.
+- **Unified Dual-Mode UI**: A single Streamlit interface for both single-agent chat and multi-agent team collaboration
+- **CLI Interface**: Full-featured command-line interface for direct interaction
+- **REST API**: Comprehensive programmatic access for mobile shortcuts and external integrations
+- **iOS/macOS Shortcuts**: 10+ pre-built shortcuts for voice-activated memory capture and search
+- **System Dashboard**: Management interface for users, memories, and system health
+- **Dynamic Mode Switching**: Toggle between single-agent and team modes at runtime
+
+### 📱 **Mobile & Remote Access**
+- **Tailscale Integration**: Secure, encrypted VPN for remote access from anywhere
+- **Siri Integration**: "Hey Siri, Remember" for hands-free memory capture
+- **Apple Watch Support**: Save memories with a wrist tap via iOS shortcuts
+- **Zero Public Exposure**: No port forwarding or public internet exposure required
 
 ## 🚀 Quick Start
 
-> **🚀 Quick Start**: Run `poetry run paga` for the new unified Streamlit web interface or `poetry run paga_cli` for command-line interaction.
+> **🚀 Quick Start**: Use the automated installer for complete setup, then run `poe serve-persag` for the web interface or `poe cli` for command-line interaction.
 
-### Prerequisites
+### Prerequisites & Recommended Hardware
 
-- **Python**: 3.11 or higher
-- **Poetry**: For dependency management
-- **Docker**: For LightRAG services
-- **Ollama**: For local LLM inference
-- **Node.js**: For MCP servers (optional)
+**System Requirements:**
+- **macOS**: 14 (Sonoma) or later (required)
+- **Apple Silicon**: M-series chip recommended (M2/M3/M4)
+- **Storage**: 512GB SSD minimum (1TB recommended)
+- **RAM**: 16GB minimum (24GB recommended for optimal performance)
+- **Admin Access**: Required for installation
 
-### Installation
+**Recommended Configuration:**
+
+The Personal Agent is optimized to run as a dedicated server on a **Mac mini M4 Pro** with 24GB RAM:
+
+**Why Mac mini M4 Pro?**
+- 🚀 **Blazing-fast AI Inference**: Metal acceleration for local LLMs (20-40 tokens/sec)
+- 🔇 **Whisper-quiet Operation**: Perfect for home office or bedside placement
+- 🌐 **Always-On Server**: Rock-solid 24/7 operation for continuous access
+- ⚡ **Energy Efficient**: ~5-15W power consumption (incredibly efficient)
+- 📦 **Compact Design**: Fits anywhere on your desk
+- 🔮 **Future-Proof**: Handles AI workloads for years to come
+- 💰 **Cost-Effective**: Starting at ~$600-800 with excellent performance
+
+**Alternative Configurations:**
+- **Mac Studio**: More power for heavy workloads (if budget allows)
+- **MacBook Pro**: Portable option (M3/M4 series) for travel or dual-use
+- **Mac mini M2**: Budget-friendly alternative (16GB RAM minimum)
+
+**Performance on Mac mini M4 Pro (24GB RAM):**
+- Simple queries: 5-15 seconds
+- Complex memory searches: 30-120 seconds
+- Token generation: 20-40 tokens/second
+- Memory usage: ~12-16GB total system
+- Uptime: 99%+ (stable macOS operation)
+
+### Automated Installation (Recommended)
+
+The easiest way to install Personal Agent is using the automated installer script:
+
+```bash
+# Clone the repository
+git clone https://github.com/suchanek/personal_agent.git
+cd personal_agent
+
+# Run the installer (requires sudo for system-level installations)
+sudo ./install-personal-agent.sh
+
+# Optional: Test the installer without making changes
+sudo ./install-personal-agent.sh --dry-run
+```
+
+**What the Installer Does:**
+
+The installer automatically handles all setup tasks:
+- ✅ **Homebrew** installation and configuration
+- ✅ **Python 3.12** installation with PATH setup
+- ✅ **uv** and **Poetry** setup for dependency management
+- ✅ **Docker Desktop** installation and startup
+- ✅ **Ollama** installation with Metal GPU acceleration
+- ✅ **LM Studio** installation (optional)
+- ✅ **Ollama Models**: qwen3:8b, qwen3:1.7b, Unsloth 4B variant, nomic-embed-text
+- ✅ **LightRAG Docker Images**: Knowledge and memory server containers
+- ✅ **Repository Setup**: Clones to `~/repos/personal_agent`
+- ✅ **Virtual Environment**: Creates `.venv` with all dependencies
+- ✅ **Environment Configuration**: Generates `.env` file with defaults
+- ✅ **Ollama LaunchAgent**: Persistent service with automatic startup
+- ✅ **LightRAG Directories**: Service configuration and data storage
+- ✅ **Permissions**: Executable scripts and proper ownership
+- ✅ **Health Checks**: Verifies all components are working
+
+**After Installation:**
+
+Follow the on-screen instructions to complete setup:
+
+1. **Start LightRAG Services**:
+   ```bash
+   cd ~/repos/personal_agent
+   ./smart-restart-lightrag.sh
+   ```
+
+2. **Launch the Agent**:
+   ```bash
+   # Web interface (recommended, defaults to team mode)
+   poe serve-persag
+
+   # Single-agent mode
+   poe serve-persag --single
+
+   # Command-line interface
+   poe cli
+   ```
+
+3. **Configure API Keys** (optional):
+   Edit `~/repos/personal_agent/.env` to add optional API keys for GitHub, Brave Search, etc.
+
+Open `http://localhost:8501` for the Streamlit interface (opens automatically).
+
+### Manual Installation (Advanced)
+
+If you prefer manual installation or need to troubleshoot:
+
+<details>
+<summary>Click to expand manual installation steps</summary>
 
 1.  **Install Python 3.12**
 
-    It is recommended to use Python 3.12 for this project. You can install it using [Homebrew](https://brew.sh/):
-
     ```bash
     brew install python@3.12
+    export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"
     ```
 
-2.  **Update Your PATH**
-
-    To ensure that you are using the correct Python version, you need to update your shell's `PATH` variable. Add the following line to your shell's configuration file (e.g., `~/.zshrc`, `~/.bash_profile`, or `~/.bashrc`):
+2.  **Install uv and Poetry**
 
     ```bash
-    export PATH="/opt/homebrew/bin/python3.12:$PATH"
-    ```
-
-    After adding this line, restart your terminal or run `source ~/.zshrc` (or the appropriate file for your shell) to apply the changes.
-
-3.  **Install `uv`**
-
-    This project uses `uv` for fast Python package management. Install it with:
-
-    ```bash
+    # Install uv
     curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.cargo/bin:$PATH"
+
+    # Install Poetry with Python 3.12
+    curl -sSL https://install.python-poetry.org | /opt/homebrew/opt/python@3.12/bin/python3.12 -
+    export PATH="$HOME/.local/bin:$PATH"
     ```
 
-4.  **Create Virtual Environment**
-
-    Use `uv` to create the virtual environment:
+3.  **Install Docker Desktop**
 
     ```bash
+    brew install --cask docker
+    # Start Docker Desktop from Applications
+    ```
+
+4. **Install Ollama**
+
+    Download from https://ollama.com (required for Metal GPU acceleration)
+
+    ```bash
+    # Pull recommended models
+    ollama pull qwen3:8b
+    ollama pull hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K
+    ollama pull nomic-embed-text
+    ```
+
+5. **Clone Repository and Install Dependencies**
+
+    ```bash
+    git clone https://github.com/suchanek/personal_agent.git
+    cd personal_agent
     uv venv
-    ```
-
-    This will create a `.venv` directory in your project folder.
-
-5.  **Install Dependencies with Poetry**
-
-    Finally, use Poetry to install the project's dependencies into the virtual environment created by `uv`:
-
-    ```bash
     poetry install
     ```
 
-6. **Install Docker**
+6. **Configure Environment**
 
-    Docker is required for running the LightRAG services that provide the knowledge base functionality.
-
-    **macOS:**
     ```bash
-    # Install Docker Desktop from the official website
-    # Visit: https://www.docker.com/products/docker-desktop/
-    # Or install via Homebrew:
-    brew install --cask docker
+    cp .env.example .env
+    # Edit .env with your USER_ID and PERSAG_ROOT
     ```
-
-    **Linux (Ubuntu/Debian):**
-    ```bash
-    # Update package index
-    sudo apt-get update
-
-    # Install Docker
-    sudo apt-get install docker.io
-
-    # Start and enable Docker service
-    sudo systemctl start docker
-    sudo systemctl enable docker
-
-    # Add your user to the docker group (optional, to run without sudo)
-    sudo usermod -aG docker $USER
-    ```
-
-    **Verify Docker Installation:**
-    ```bash
-    docker --version
-    docker run hello-world
-    ```
-
-    **Pull Required Docker Images:**
-
-    The project uses LightRAG services that run in Docker containers. Pull the necessary images:
-
-    ```bash
-    # Pull the LightRAG server image (one image serves both server and memory )
-    docker pull ghcr.io/suchanek/lightrag_pagent:latest
 
 7. **Start LightRAG Services**
 
-Use the provided helper scripts to start and manage the LightRAG services:
+    ```bash
+    ./smart-restart-lightrag.sh
+    ```
 
-```bash
-# Smart restart with user synchronization
-./smart-restart-lightrag.sh
-```
+8. **Launch the Agent**
 
-7. **Setup Ollama**
+    ```bash
+    poe serve-persag  # Web interface
+    poe cli           # Command-line interface
+    ```
 
-First, install Ollama on your system.
-
-```bash
-# Install Ollama (macOS)
-# IMPORTANT: For GPU acceleration on Mac, download the official app from https://ollama.com
-# Do NOT use 'brew install ollama' as it may not support Metal acceleration.
-
-# After installing, pull the recommended models:
-ollama pull qwen3:8b
-ollama pull qwen3:1.7b
-ollama pull llama3.1:8b
-ollama pull nomic-embed-text
-```
-
-To run Ollama as a robust background service with the optimal settings for this project, follow these steps to create a startup script and a system service. These *must* be done in a terminal with root privileges, hence the `sudo` command.
-
-**Step 1: Prepare the Startup Script**
-
-This project includes a recommended startup script for Ollama at `scripts/start_ollama.sh`. To use it, copy it to a good user binary directory (e.g., `/usr/localbin`) so that it can be reliably found by the system service. These commands must be done as root.
-
-```bash
-# Create the ~/bin directory if it doesn't exist
-sudo mkdir -p /usr/local/bin
-
-# Copy the script
-sudo cp scripts/start_ollama.sh /usr/local/bin/start_ollama.sh
-
-# Make the script executable
-sudo chmod +x /usr/local/binstart_ollama.sh
-```
-
-**Step 2: Create the System Service (macOS)**
-
-This project includes a `launchd` service file at `scripts/com.personal-agent.ollama.plist`. This service will automatically run the `start_ollama.sh` script in the background.
-
-To install it, copy the file to your `/Library/LaunchAgents` directory.
-
-```bash
-
-# Copy the service file
-sudo cp scripts/com.personal-agent.ollama.plist /Library/LaunchAgents/com.personal-agent.ollama.plist
-```
-
-**Step 3: Start the Service**
-
-Load and start the new service. If you have the official Ollama app, make sure it is not running to avoid conflicts.
-
-```bash
-
-# Load and start your new custom service
-sudo launchctl load /Library/LaunchAgents/com.personal-agent.ollama.plist
-sudo launchctl start com.personal-agent.ollama
-```
-
-You can check the status and logs with:
-```bash
-# Check if the service is running
-sudo launchctl list | grep com.personal-agent.ollama
-
-# View the logs
-tail -f /Library/Logs/ollama.log
-```
-
-8. **Install Poe the Poet**
-
-[Poe the Poet](https://github.com/nat-n/poethepoet) is used as a task runner for this project, allowing you to use simple commands like `poe cli`. It is installed as a poetry plugin, so it should be installed automatically when you run `poetry install`.
-
-If for some reason it is not available, you can install it manually:
-```bash
-poetry self add poethepoet
-```
-
-9. **Configure Environment**
-
-Copy `.env.example` to `.env` and configure:
-
-```bash
-# Required: User and data configuration
-PERSAG_ROOT=/Users/your_username/.persag
-
-# Optional: API keys for enhanced functionality
-GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
-BRAVE_API_KEY=your_api_key_here
-...
-```
-
-10. **Start the Agent**
-
-```bash
-# Web interface (recommended, defaults to team mode)
-poe serve-persag
-
-# To start the web interface in single-agent mode
-poe serve-persag --single
-
-# Team CLI interface
-poe team
-```
-
-Open `http://localhost:8501` for the Streamlit interface if it doesn't open automatically.
+</details>
 
 ## � Usage
 
@@ -294,6 +294,60 @@ poe cli --recreate
 poe cli --help
 ```
 
+### REST API (`poe dashboard`)
+
+The system includes a comprehensive REST API for programmatic access:
+
+**Endpoints:**
+- **Memory Operations**: `/api/v1/memory/store`, `/api/v1/memory/search`, `/api/v1/memory/list`
+- **Knowledge Management**: `/api/v1/knowledge/ingest`, `/api/v1/knowledge/query`
+- **Chat Interface**: `/api/v1/chat` (streaming responses)
+- **System Health**: `/api/v1/health`, `/api/v1/status`
+
+**Usage Example:**
+```bash
+# Store a memory
+curl -X POST http://localhost:8501/api/v1/memory/store \
+  -H "Content-Type: application/json" \
+  -d '{"content": "I work as a software engineer at Google"}'
+
+# Search memories
+curl "http://localhost:8501/api/v1/memory/search?query=work&limit=5"
+```
+
+The API is automatically started when you launch the web interface and is used by the iOS/macOS shortcuts.
+
+### Mobile Access (iOS/macOS Shortcuts)
+
+Personal Agent includes 10+ pre-built Apple Shortcuts for mobile access:
+
+**Available Shortcuts** (in `setup/shortcuts/`):
+- **Remember**: Store memories via voice or text input
+- **Memory Story**: Generate narrative stories from your memories
+- **List memories**: View stored memories
+- **Display Memories**: Rich visualization of memories
+- **Switch User**: Change active user profile
+- **Share URL**: Ingest web content into knowledge base
+- **Persagent Running?**: Check service status
+
+**Setup:**
+1. Install Tailscale on your Mac and iOS device for secure remote access
+2. Import shortcuts from `setup/shortcuts/` directory
+3. Configure with your Mac's Tailscale IP address
+4. Use Siri or tap shortcuts to interact with your agent
+
+**Example:** Say "Hey Siri, Remember" and speak your memory. It's instantly stored on your personal server with automatic topic classification.
+
+### System Dashboard (`poe dashboard`)
+
+Comprehensive system management interface:
+
+- **User Management**: Create, edit, and delete user profiles with extended fields (gender, NPC status)
+- **Memory Management**: View, search, add, and delete memories with sync status monitoring
+- **System Health**: Monitor agent, team, memory, and knowledge system status
+- **REST API Documentation**: Interactive API endpoint testing
+- **Theme Support**: Light and dark mode themes
+
 ### Available Commands (via 'poe' <cmd>)
 
 ```bash
@@ -301,6 +355,7 @@ poe cli --help
 serve-persag                   # Unified Streamlit web interface (single agent or team)
 cli                            # Command-line interface (single agent)
 team                           # Command-line interface (multi-agent team)
+dashboard                      # System management dashboard with REST API
 
 # System utilities
 ./smart-restart-lightrag.sh    # Restart LightRAG services
@@ -309,6 +364,7 @@ install-mcp-servers            # Install MCP servers
 test-mcp-servers              # Test MCP server availability
 test-tools                    # Test tool functionality
 store-fact                    # Store facts directly in memory
+switch-user                   # Switch between user profiles
 ```
 
 ## 🏗️ Architecture
@@ -493,19 +549,18 @@ Use the "Show All Memories" button in the web interface
 
 ### Environment Variables
 
-The agent can be configured using a `.env` file in the project root.
+The agent can be configured using a `.env` file in the project root (automatically created by installer).
 
 ```bash
 # Required: User Identifier
 USER_ID="your_username"                    # The current user to run as
 
-# Optional: Data Root Directory
-# All user data, knowledge, and memory will be stored under this path.
-# Defaults to /Users/Shared/personal_agent_data
-AGNO_ROOT="/path/to/your/data/directory"
+# Required: Data Root Directory
+PERSAG_ROOT="/Users/your_username/.persag" # All user data, knowledge, and memory
 
-# Required: Ollama Configuration
-OLLAMA_URL="http://localhost:11434"       # Ollama server URL
+# Required: Model Provider Configuration
+MODEL_PROVIDER="ollama"                    # Options: ollama, openai, lm-studio
+OLLAMA_URL="http://localhost:11434"       # Ollama server URL (if using Ollama)
 
 # Optional: LightRAG Configuration
 LIGHTRAG_URL="http://localhost:9621"      # LightRAG knowledge server
@@ -514,16 +569,49 @@ LIGHTRAG_MEMORY_URL="http://localhost:9622" # LightRAG memory server
 # Optional: API Keys
 GITHUB_PERSONAL_ACCESS_TOKEN="token"      # GitHub integration
 BRAVE_API_KEY="key"                      # Brave search
+OPENAI_API_KEY="key"                     # If using OpenAI provider
 ```
 
 ### Model Configuration
 
-The agent supports dynamic model switching through the web interface:
+The agent supports multiple model providers with dynamic switching:
 
-- **qwen2.5:7b-instruct** (recommended)
-- **qwen3:8b** (fast and capable)
-- **llama3.1:8b** (alternative option)
-- **Any Ollama-compatible model**
+**Local AI (Recommended - 100% Private):**
+
+- **Ollama** (Default provider):
+  - **Qwen3 4B** (`hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K`) - **RECOMMENDED**
+    - Best balance of speed and capability
+    - Optimized for Apple Silicon with Metal acceleration
+    - Excellent tool use capability
+    - Response time: 2-5 seconds
+  - **Qwen3 8B** (`qwen3:8b`) - More capable, slower responses
+  - **Qwen3 1.7B** (`qwen3:1.7b`) - Ultra-fast for simple queries
+  - Note: LLaMA models show inconsistent results with complex tasks
+
+- **LM Studio** (Alternative local option):
+  - Support for GGUF models with visual management
+  - Faster inference on some models
+  - Still evaluating for production use
+  - Set `MODEL_PROVIDER=lm-studio` in `.env`
+
+**Cloud AI (Optional - When You Need Maximum Power):**
+
+- **OpenAI** (`MODEL_PROVIDER=openai`):
+  - GPT-4o-mini or GPT-4 for complex analysis
+  - Trade-off: Better capability, but data leaves your device
+  - Cost: Pay-per-use via API credits
+  - Response time: 3-8 seconds typically
+  - Use case: Complex analysis when privacy is less critical
+
+**Why 4B-8B Models Work Well:**
+- ✅ Balanced capability without excessive wait times
+- ✅ Complete privacy - everything stays on your Mac
+- ✅ Zero ongoing costs
+- ✅ Optimized for M-series Metal acceleration
+- ✅ Memory efficient - fits in 24GB with room for other apps
+- ✅ Reliable tool use - Qwen models handle function calling well
+
+Change providers and models dynamically through the web interface settings.
 
 ### Instruction Levels
 
@@ -570,11 +658,18 @@ The project includes comprehensive memory testing:
 **1. Ollama Connection Issues**
 
 ```bash
-# Check if Ollama is running
+# Check if Ollama LaunchAgent service is running
+sudo launchctl list | grep com.personalagent.ollama
+
+# Check Ollama models
 ollama list
 
-# Start Ollama service
-ollama serve
+# View service logs
+tail -f /var/log/ollama/ollama.out.log
+
+# Restart Ollama service if needed
+sudo launchctl unload /Library/LaunchDaemons/local.ollama.system.plist
+sudo launchctl load /Library/LaunchDaemons/local.ollama.system.plist
 
 # Test connection
 curl http://localhost:11434/api/tags
@@ -593,11 +688,14 @@ docker ps | grep lightrag
 **3. User Switching Issues**
 
 ```bash
-# Switch users
-python switch-user.py <user_id>
+# Switch users via poe command
+poe switch-user <user_id>
 
 # Check current user
-python switch-user.py --status
+poe switch-user --status
+
+# Alternative: Use the dashboard for GUI-based user management
+poe dashboard
 ```
 
 **4. Memory System Issues**
@@ -630,28 +728,49 @@ personal_agent/
 └── docs/                   # Documentation
 ```
 
-## 🔄 Recent Updates
+## 🔄 Version History
 
-### v0.11.39 (Current)
+### v0.8.73 (Current - October 2025)
 
-- ✅ **Robust User Deletion**: Comprehensive user data management with backup and dry-run capabilities
-- ✅ **Centralized Configuration**: Single source of truth for all configuration variables
-- ✅ **Enhanced Memory System**: Improved consistency and validation across all storage systems
-- ✅ **Modular Architecture**: Refactored agent into specialized manager classes
-- ✅ **Service Management**: Centralized Docker service orchestration
-- ✅ **Multi-User Support**: Dynamic user switching with isolated data storage
+**Major Features:**
+- ✅ **One-Click Installation**: Automated installer script with comprehensive dependency management
+- ✅ **REST API**: Complete programmatic access to memory, knowledge, and chat endpoints
+- ✅ **iOS/macOS Shortcuts**: 10+ pre-built shortcuts for mobile and desktop access
+- ✅ **Tailscale Integration**: Secure remote access via encrypted VPN
+- ✅ **Centralized Configuration**: Thread-safe `PersonalAgentConfig` singleton
+- ✅ **Apache 2.0 License**: Commercial-friendly licensing with patent protection
 
-### Key Improvements
+**Architecture Improvements:**
+- ✅ **Simplified CLI**: 63% code reduction through direct agent delegation
+- ✅ **Enhanced User Profiles**: Gender field and NPC designation for bot users
+- ✅ **Age-Perspective Memories**: Write memories from specific age perspectives
+- ✅ **Dynamic Timestamps**: Human-readable memory dates ("3 days ago", "at age 25")
+- ✅ **Robust Service Management**: Ollama LaunchAgent with automatic startup
+- ✅ **Multi-Provider Support**: Native Ollama, OpenAI, and LM Studio integration
 
-- **Lazy Initialization**: Efficient startup with on-demand component loading
-- **Manager-Based Architecture**: Modular design with specialized managers
-- **Enhanced Debugging**: Comprehensive debug interface in Streamlit
-- **Improved Reliability**: Better error handling and service management
-- **User Experience**: Streamlined interfaces and better documentation
+### v0.2.6 (September 2024)
+
+- ✅ **Unified Dual-Mode UI**: Single Streamlit interface for single-agent and team modes
+- ✅ **Dual Knowledge Architecture**: Local semantic KB + LightRAG graph with intelligent routing
+- ✅ **Manager-Based Architecture**: Specialized manager classes for all components
+- ✅ **Lazy Initialization**: 70%+ faster startup with on-demand component loading
+- ✅ **Standalone Memory Functions**: Centralized operations eliminating code duplication
+
+### Key Technical Achievements
+
+- **Performance**: Lazy initialization reduces startup time by 70%+
+- **Reliability**: Thread-safe singleton eliminates race conditions
+- **Developer Experience**: 63% CLI code reduction, extensive ADR documentation
+- **User Experience**: One-command installation, mobile access, remote connectivity
+- **Security**: 100% local processing, complete data privacy, encrypted remote access
 
 ## 🚀 Future Directions
 
-- **RESTful API**: A RESTful API is planned to provide a dedicated endpoint for mobile applications and third-party integrations, further enhancing the ability to add memories and interact with the agent from anywhere.
+- **Audio Recording & Ingestion**: Record and transcribe voice memos, interviews, oral histories
+- **Voice Replay**: Preserve the actual voice of loved ones alongside their stories
+- **Multi-Modal Knowledge Base**: Ingest audio, video, and images into the knowledge graph
+- **Photo Integration**: Connect images to memories automatically
+- **Native Mobile Apps**: Dedicated iOS and Android applications
 - **Enhanced Multi-Modal Support**: Extended support for image and audio input processing
 - **Advanced Team Workflows**: More sophisticated team collaboration patterns and coordination strategies
 

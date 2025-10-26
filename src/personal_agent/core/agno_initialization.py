@@ -87,17 +87,9 @@ async def initialize_agno_system(
         )
         instruction_level_enum = InstructionLevel.STANDARD
 
+    # Create the AgnoPersonalAgent
     agno_agent = await create_agno_agent(
-        model_provider=config.provider,  # Use configured provider
-        model_name=config.model,  # Use configured model
-        enable_memory=True,  # Enable native Agno memory
-        enable_mcp=config.use_mcp,  # Use configured MCP setting
-        storage_dir=config.agno_storage_dir,  # Pass the user-specific path
-        knowledge_dir=config.agno_knowledge_dir,  # Pass the user-specific path
-        debug=True,
-        user_id=get_userid(),
-        ollama_base_url=ollama_url,  # Pass the selected Ollama URL
-        recreate=recreate,
+        user_id=config.user_id,
         instruction_level=instruction_level_enum,
     )
 
