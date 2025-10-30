@@ -11,9 +11,9 @@ from dotenv import load_dotenv
 
 from .user_id_mgr import get_user_storage_paths, load_user_from_file
 
-# Define the base directory for .env file lookup (user's home directory)
-# This is where .env files are typically located
-BASE_DIR = Path.home()
+# Define the project's base directory.
+# This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 # Default: ~/.persag, overridable via environment variable PERSAG_HOME
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
