@@ -4,15 +4,16 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 import dotenv
 from dotenv import load_dotenv
 
 from .user_id_mgr import get_user_storage_paths, load_user_from_file
 
-# Define the project's base directory.
-# This file is at src/personal_agent/config/settings.py, so we go up 4 levels for the root.
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+# Define the base directory for .env file lookup (user's home directory)
+# This is where .env files are typically located
+BASE_DIR = Path.home()
 # Default: ~/.persag, overridable via environment variable PERSAG_HOME
 PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
 PERSAG_ROOT = os.getenv("PERSAG_ROOT", str(Path("/Users/Shared/personal_agent_data")))
@@ -42,7 +43,9 @@ if dotenv_loaded:
     # Load all variables from .env file into a cache
     _env_vars = dotenv.dotenv_values(dotenv_path=dotenv_path)
 else:
-    print("Unable to load .env!")
+    # Only show warning if .env file exists but failed to load (not if it simply doesn't exist)
+    if dotenv_path.exists():
+        print("Unable to load .env!")
 
 
 def get_env_var(key: str, fallback: str = "") -> str:
@@ -218,7 +221,9 @@ def get_provider_default_model(provider: str) -> str:
     return PROVIDER_DEFAULT_MODELS.get(provider, "qwen3:1.7b")
 
 
-def get_effective_model_name(provider: str, specified_model: str = None) -> str:
+def get_effective_model_name(
+    provider: str, specified_model: Optional[str] = None
+) -> str:
     """Get the effective model name to use, with provider-specific defaults.
 
     If no model is specified or the specified model appears incompatible with the provider,
