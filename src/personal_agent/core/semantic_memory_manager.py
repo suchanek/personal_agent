@@ -25,6 +25,11 @@ from pydantic import BaseModel, Field
 
 from ..config import get_current_user_id
 from ..utils import setup_logging
+from .enhanced_memory import (
+    EnhancedUserMemory,
+    ensure_enhanced_memory,
+    extract_user_memory,
+)
 from .topic_classifier import TopicClassifier
 
 logger = setup_logging(__name__)
@@ -227,10 +232,16 @@ class SemanticDuplicateDetector:
         semantic_score = (string_similarity * 0.6) + (terms_similarity * 0.4)
 
         # Apply boost for SHORT queries with exact word matches, but ONLY if key terms align well
-        if exact_matches and len(words1) <= 3 and terms1 and terms2:  # For short queries (1-3 words)
+        if (
+            exact_matches and len(words1) <= 3 and terms1 and terms2
+        ):  # For short queries (1-3 words)
             # Calculate overlap from BOTH perspectives
-            terms1_covered = len(key_term_matches) / len(terms1) if len(terms1) > 0 else 0
-            terms2_covered = len(key_term_matches) / len(terms2) if len(terms2) > 0 else 0
+            terms1_covered = (
+                len(key_term_matches) / len(terms1) if len(terms1) > 0 else 0
+            )
+            terms2_covered = (
+                len(key_term_matches) / len(terms2) if len(terms2) > 0 else 0
+            )
 
             # Only apply boost if BOTH sides have high key term coverage (>= 80%)
             # This prevents "I love halloween" vs "I love vanilla ice cream" from matching
@@ -435,8 +446,17 @@ class SemanticMemoryManager:
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        user_memory = UserMemory.from_dict(row.memory)
-                        user_memories.append(user_memory)
+                        # Try EnhancedUserMemory first (backward compatible)
+                        if (
+                            "confidence" in row.memory
+                            or "is_proxy" in row.memory
+                            or "proxy_agent" in row.memory
+                        ):
+                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                            user_memories.append(enhanced_memory.to_user_memory())
+                        else:
+                            user_memory = UserMemory.from_dict(row.memory)
+                            user_memories.append(user_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(
                             "Failed to convert memory row to UserMemory: %s", e
@@ -455,6 +475,9 @@ class SemanticMemoryManager:
         topics: Optional[List[str]] = None,
         input_text: Optional[str] = None,
         custom_timestamp: Optional[datetime] = None,
+        confidence: float = 1.0,
+        is_proxy: bool = False,
+        proxy_agent: Optional[str] = None,
     ) -> MemoryStorageResult:
         """
         Add a memory with duplicate detection and topic classification.
@@ -464,6 +487,10 @@ class SemanticMemoryManager:
         :param user_id: User ID for the memory
         :param topics: Optional list of topics (will be auto-classified if not provided)
         :param input_text: Optional input text that generated this memory
+        :param custom_timestamp: Optional custom timestamp for the memory
+        :param confidence: Confidence score for the memory (0.0-1.0)
+        :param is_proxy: Whether this memory was created by a proxy agent
+        :param proxy_agent: Name of the proxy agent that created this memory
         :return: MemoryStorageResult with detailed status information
         """
         # Get current user ID if not provided
@@ -528,9 +555,12 @@ class SemanticMemoryManager:
             from uuid import uuid4
 
             memory_id = str(uuid4())
-            last_updated = custom_timestamp if custom_timestamp is not None else datetime.now()
+            last_updated = (
+                custom_timestamp if custom_timestamp is not None else datetime.now()
+            )
 
-            user_memory = UserMemory(
+            # Create base UserMemory
+            base_memory = UserMemory(
                 memory_id=memory_id,
                 memory=memory_text,
                 topics=topics,
@@ -538,10 +568,18 @@ class SemanticMemoryManager:
                 input=input_text,
             )
 
+            # Wrap in EnhancedUserMemory to preserve enhanced fields
+            enhanced_memory = EnhancedUserMemory(
+                base_memory=base_memory,
+                confidence=confidence,
+                is_proxy=is_proxy,
+                proxy_agent=proxy_agent,
+            )
+
             memory_row = MemoryRow(
                 id=memory_id,
                 user_id=user_id,
-                memory=user_memory.to_dict(),
+                memory=enhanced_memory.to_dict(),  # This includes enhanced fields
                 last_updated=last_updated,
             )
 
@@ -840,7 +878,18 @@ class SemanticMemoryManager:
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        user_memory = UserMemory.from_dict(row.memory)
+                        # Check if this is an enhanced memory (has enhanced fields)
+                        if (
+                            "confidence" in row.memory
+                            or "is_proxy" in row.memory
+                            or "proxy_agent" in row.memory
+                        ):
+                            # Deserialize as EnhancedUserMemory then extract base
+                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                            user_memory = enhanced_memory.to_user_memory()
+                        else:
+                            # Regular UserMemory
+                            user_memory = UserMemory.from_dict(row.memory)
                         user_memories.append(user_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(
@@ -986,7 +1035,18 @@ class SemanticMemoryManager:
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        user_memory = UserMemory.from_dict(row.memory)
+                        # Check if this is an enhanced memory (has enhanced fields)
+                        if (
+                            "confidence" in row.memory
+                            or "is_proxy" in row.memory
+                            or "proxy_agent" in row.memory
+                        ):
+                            # Deserialize as EnhancedUserMemory then extract base
+                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                            user_memory = enhanced_memory.to_user_memory()
+                        else:
+                            # Regular UserMemory
+                            user_memory = UserMemory.from_dict(row.memory)
                         user_memories.append(user_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(
@@ -1123,7 +1183,18 @@ class SemanticMemoryManager:
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        user_memory = UserMemory.from_dict(row.memory)
+                        # Check if this is an enhanced memory (has enhanced fields)
+                        if (
+                            "confidence" in row.memory
+                            or "is_proxy" in row.memory
+                            or "proxy_agent" in row.memory
+                        ):
+                            # Deserialize as EnhancedUserMemory then extract base
+                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                            user_memory = enhanced_memory.to_user_memory()
+                        else:
+                            # Regular UserMemory
+                            user_memory = UserMemory.from_dict(row.memory)
                         user_memories.append(user_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(

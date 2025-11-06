@@ -24,10 +24,10 @@ Functions:
 
 Usage:
     from personal_agent.tools.memory_functions import store_user_memory, query_memory
-    
+
     # Store a memory
     result = await store_user_memory(agent, "I like skiing", ["hobbies"])
-    
+
     # Query memories
     memories = await query_memory(agent, "what do I like?", limit=5)
 
@@ -44,7 +44,12 @@ logger = setup_logging(__name__)
 
 
 async def store_user_memory(
-    agent, content: str = "", topics: Union[List[str], str, None] = None
+    agent,
+    content: str = "",
+    topics: Union[List[str], str, None] = None,
+    confidence: float = 1.0,
+    is_proxy: bool = False,
+    proxy_agent: str = None,
 ) -> MemoryStorageResult:
     """Store information as a user memory in both local SQLite and LightRAG graph systems.
 
@@ -52,6 +57,9 @@ async def store_user_memory(
         agent: Personal agent instance with memory capabilities
         content: The information to store as a memory
         topics: Optional list of topics/categories for the memory (None = auto-classify)
+        confidence: Confidence score for the memory (0.0-1.0)
+        is_proxy: Whether this memory was created by a proxy agent
+        proxy_agent: Name of the proxy agent that created this memory
 
     Returns:
         MemoryStorageResult: Structured result with detailed status information
@@ -59,18 +67,26 @@ async def store_user_memory(
     await agent._ensure_initialized()
     # Pass the user_details for delta_year timestamp adjustment
     # AgnoPersonalAgent has user_details, not user
-    user_data = getattr(agent, 'user_details', None) or getattr(agent, 'user', None)
+    user_data = getattr(agent, "user_details", None) or getattr(agent, "user", None)
 
     # Convert user_data to User object if it's a dictionary for delta_year support
     user_obj = None
     if user_data:
         if isinstance(user_data, dict):
             from ..core.user_model import User
+
             user_obj = User.from_dict(user_data)
-        elif hasattr(user_data, 'get_memory_timestamp'):
+        elif hasattr(user_data, "get_memory_timestamp"):
             user_obj = user_data
 
-    return await agent.memory_manager.store_user_memory(content, topics, user=user_obj)
+    return await agent.memory_manager.store_user_memory(
+        content,
+        topics,
+        user=user_obj,
+        confidence=confidence,
+        is_proxy=is_proxy,
+        proxy_agent=proxy_agent,
+    )
 
 
 async def query_memory(agent, query: str, limit: Union[int, None] = None) -> str:
