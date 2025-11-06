@@ -273,7 +273,9 @@ class User:
             address=data.get("address"),
             birth_date=data.get("birth_date"),
             delta_year=data.get("delta_year"),
-            cognitive_state=data.get("cognitive_state", 50),
+            cognitive_state=data.get(
+                "cognitive_state", 100
+            ),  # Default to 100 (healthy) to match dataclass default
             gender=data.get("gender", "N/A"),
             npc=data.get("npc", False),
         )
