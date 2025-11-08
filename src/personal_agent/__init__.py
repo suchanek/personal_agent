@@ -30,8 +30,32 @@ import os
 if "RUST_LOG" not in os.environ:
     os.environ["RUST_LOG"] = "error"
 
-# Import submodules as modules (for pdoc discovery)
-from . import cli, config, core, readers, streamlit, team, tools, utils, web
+
+# Lazy submodule imports - only import when accessed to avoid heavy dependencies
+# This allows lightweight scripts to import from config without triggering rich, etc.
+def __getattr__(name):
+    """Lazy import submodules on attribute access."""
+    if name in (
+        "cli",
+        "config",
+        "core",
+        "readers",
+        "streamlit",
+        "team",
+        "tools",
+        "utils",
+        "web",
+    ):
+        import importlib
+
+        return importlib.import_module(f".{name}", __package__)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    """Support for dir() to list available submodules."""
+    return list(__all__)
+
 
 # Import core components (only those used directly in this file)
 from .config import USE_MCP, get_mcp_servers
@@ -58,7 +82,7 @@ from .utils.pag_logging import (
 )
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.73"  # Defined once to avoid duplication
+__version__ = "0.8.74dev"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package

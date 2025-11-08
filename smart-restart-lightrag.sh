@@ -30,17 +30,7 @@ CLEANUP_WAIT=${CLEANUP_WAIT:-5}
 
 # Function to get AGNO_STORAGE_DIR from Python settings
 get_agno_storage_dir() {
-    python3 -c "
-import sys
-import os
-sys.path.insert(0, 'src')
-try:
-    from personal_agent.config.settings import AGNO_STORAGE_DIR
-    print(AGNO_STORAGE_DIR)
-except Exception as e:
-    print(f'Error getting AGNO_STORAGE_DIR: {e}', file=sys.stderr)
-    sys.exit(1)
-"
+    poetry run python -c "from personal_agent.config.user_id_mgr import get_user_storage_paths; print(get_user_storage_paths()['AGNO_STORAGE_DIR'])"
 }
 
 # Get and export AGNO_STORAGE_DIR for Docker volume mounts

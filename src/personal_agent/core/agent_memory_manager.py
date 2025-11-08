@@ -95,7 +95,13 @@ class AgentMemoryManager:
             return []
 
     async def store_user_memory(
-        self, content: str = "", topics: Union[List[str], str, None] = None, user=None
+        self,
+        content: str = "",
+        topics: Union[List[str], str, None] = None,
+        user=None,
+        confidence: float = 1.0,
+        is_proxy: bool = False,
+        proxy_agent: Optional[str] = None,
     ) -> MemoryStorageResult:
         """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
 
@@ -103,6 +109,9 @@ class AgentMemoryManager:
             content: The information to store as a memory
             topics: Optional list of topics/categories for the memory (None = auto-classify)
             user: Optional User instance for delta_year timestamp adjustment
+            confidence: Confidence score for the memory (0.0-1.0)
+            is_proxy: Whether this memory was created by a proxy agent
+            proxy_agent: Name of the proxy agent that created this memory
 
         Returns:
             MemoryStorageResult: Structured result with detailed status information
@@ -142,8 +151,26 @@ class AgentMemoryManager:
 
             # Get custom timestamp if user is provided and has delta_year set
             custom_timestamp = None
-            if user and hasattr(user, 'get_memory_timestamp'):
+            if user and hasattr(user, "get_memory_timestamp"):
                 custom_timestamp = user.get_memory_timestamp()
+
+            # Determine confidence based on proxy status and user cognitive state
+            # Proxy memories: full confidence (1.0)
+            # User memories: mapped to cognitive state (0.0-1.0 scale)
+            if is_proxy:
+                # Proxy-created memories always have full confidence
+                effective_confidence = 1.0
+            elif confidence != 1.0:
+                # If confidence was explicitly set, use that value
+                effective_confidence = confidence
+            else:
+                # Map user's cognitive state to confidence (0-100 scale -> 0.0-1.0)
+                if user and hasattr(user, "cognitive_state"):
+                    # Cognitive state is 0-100, normalize to 0.0-1.0
+                    effective_confidence = user.cognitive_state / 100.0
+                else:
+                    # Default to 1.0 if no user or cognitive state
+                    effective_confidence = 1.0
 
             # 1. Store in local SQLite memory system
             local_result = self.agno_memory.memory_manager.add_memory(
@@ -152,6 +179,9 @@ class AgentMemoryManager:
                 user_id=self.user_id,
                 topics=topics,
                 custom_timestamp=custom_timestamp,
+                confidence=effective_confidence,
+                is_proxy=is_proxy,
+                proxy_agent=proxy_agent,
             )
 
             # Handle different rejection cases

@@ -216,17 +216,43 @@ class StreamlitMemoryHelper:
         except Exception as e:
             return f"❌ Error listing memories: {str(e)}"
 
-    def add_memory(self, memory_text: str, topics: list = None, input_text: str = None):
-        """Add a memory using the standalone memory function."""
+    def add_memory(
+        self,
+        memory_text: str,
+        topics: list = None,
+        input_text: str = None,
+        confidence: float = 1.0,
+        is_proxy: bool = False,
+        proxy_agent: str = None,
+    ):
+        """Add a memory using the standalone memory function.
+
+        Args:
+            memory_text: The memory content to store
+            topics: Optional list of topics/categories
+            input_text: Optional input text (deprecated parameter, kept for compatibility)
+            confidence: Confidence score for the memory (0.0-1.0)
+            is_proxy: Whether this memory was created by a proxy agent
+            proxy_agent: Name of the proxy agent that created this memory
+        """
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Memory storage not available: {message}", None, None
 
         try:
             from personal_agent.tools.memory_functions import store_user_memory
-            
-            # Use the standalone function
-            result = self._run_async(store_user_memory(self.agent, memory_text, topics))
+
+            # Use the standalone function with enhanced fields
+            result = self._run_async(
+                store_user_memory(
+                    self.agent,
+                    memory_text,
+                    topics,
+                    confidence=confidence,
+                    is_proxy=is_proxy,
+                    proxy_agent=proxy_agent,
+                )
+            )
 
             # Handle MemoryStorageResult object
             if (MemoryStorageResult and isinstance(result, MemoryStorageResult)) or (
@@ -278,7 +304,7 @@ class StreamlitMemoryHelper:
 
         try:
             from personal_agent.tools.memory_functions import clear_all_memories
-            
+
             # Use the standalone function
             result = self._run_async(clear_all_memories(self.agent))
 
