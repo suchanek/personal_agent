@@ -463,12 +463,18 @@ install_lm_studio() {
 
 pull_ollama_models() {
     log "Checking and pulling Ollama models..."
+    echo ""
 
     local models=("qwen3:8b" "qwen3:1.7b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text")
     local pulled_count=0
     local skipped_count=0
+    local total_models=${#models[@]}
+    local current=0
 
     for model in "${models[@]}"; do
+        ((current++))
+        echo -e "${BLUE}[Model ${current}/${total_models}]${NC} Checking: ${CYAN}${model}${NC}"
+        
         # Check if model already exists
         if sudo -u "${AGENT_USER}" /usr/local/bin/ollama list 2>/dev/null | grep -q "^${model%%:*}" || \
            sudo -u "${AGENT_USER}" ollama list 2>/dev/null | grep -q "^${model%%:*}"; then
@@ -476,9 +482,12 @@ pull_ollama_models() {
             ((skipped_count++))
         else
             if ! $DRY_RUN; then
-                log "Pulling model: ${model}..."
-                if sudo -u "${AGENT_USER}" /usr/local/bin/ollama pull "${model}" 2>/dev/null || \
-                   sudo -u "${AGENT_USER}" ollama pull "${model}" 2>/dev/null; then
+                echo -e "${YELLOW}⏳ Downloading model: ${model}${NC}"
+                echo -e "${YELLOW}   This may take several minutes depending on model size...${NC}"
+                
+                # Run ollama pull with output visible
+                if sudo -u "${AGENT_USER}" /usr/local/bin/ollama pull "${model}" || \
+                   sudo -u "${AGENT_USER}" ollama pull "${model}"; then
                     log_success "Successfully pulled: ${model}"
                     ((pulled_count++))
                 else
@@ -489,6 +498,7 @@ pull_ollama_models() {
                 ((pulled_count++))
             fi
         fi
+        echo ""
     done
 
     if $DRY_RUN; then
@@ -560,6 +570,9 @@ export USER="${USER:-$(whoami)}"
 export LOGNAME="${LOGNAME:-$(whoami)}"
 export PATH="/usr/local/bin:/opt/homebrew/bin:${PATH}"
 
+# Ollama model storage location
+export OLLAMA_MODELS="/Users/Shared/personal_agent_data/ollama"
+
 # Ollama configuration
 export OLLAMA_HOST="0.0.0.0:11434"
 export OLLAMA_ORIGINS="*"
@@ -572,12 +585,15 @@ export OLLAMA_FLASH_ATTENTION="1"
 export OLLAMA_KV_CACHE_TYPE="f16"
 export OLLAMA_CONTEXT_LENGTH="12232"
 
+# Ensure model directory exists
+mkdir -p "$OLLAMA_MODELS"
+
 LOG_DIR="${HOME}/.local/log/ollama"
 OUT_LOG="${LOG_DIR}/ollama.out.log"
 ERR_LOG="${LOG_DIR}/ollama.err.log"
 mkdir -p "$LOG_DIR" "${HOME}/.cache" "${HOME}/.config" "${HOME}/.local/share"
 
-echo "[$(date '+%F %T')] start_ollama.sh: USER=${USER} HOST=${OLLAMA_HOST}" >>"$OUT_LOG" 2>&1
+echo "[$(date '+%F %T')] start_ollama.sh: USER=${USER} HOST=${OLLAMA_HOST} MODELS=${OLLAMA_MODELS}" >>"$OUT_LOG" 2>&1
 
 env | grep '^OLLAMA_' | tee "$LOG_DIR/ollama.env"
 
@@ -620,6 +636,8 @@ EOF
     <dict>
       <key>PATH</key>
       <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+      <key>OLLAMA_MODELS</key>
+      <string>/Users/Shared/personal_agent_data/ollama</string>
       <key>OLLAMA_HOST</key>
       <string>0.0.0.0:11434</string>
       <key>OLLAMA_ORIGINS</key>
@@ -657,8 +675,14 @@ EOF
         mkdir -p "${AGENT_HOME}/.local/log/ollama"
         chown -R "${AGENT_USER}:staff" "${AGENT_HOME}/.local/log/ollama"
         chmod 755 "${AGENT_HOME}/.local/log/ollama"
+        
+        # Create shared Ollama models directory
+        mkdir -p "/Users/Shared/personal_agent_data/ollama"
+        chmod 777 "/Users/Shared/personal_agent_data/ollama"
+        log_success "Created shared Ollama models directory: /Users/Shared/personal_agent_data/ollama"
     else
         log "[WOULD CREATE] ${AGENT_HOME}/.local/log/ollama directory"
+        log "[WOULD CREATE] /Users/Shared/personal_agent_data/ollama directory"
     fi
 
     # Load the user LaunchAgent service
@@ -789,23 +813,53 @@ configure_environment() {
 
     # Create .env file
     cat > "${env_file}" <<EOF
-# Personal Agent Configuration
+# Personal AI Agent Environment Variables
+# Minimal version - only essential overrides
 # Generated on $(date)
 
-# User Configuration
-USER_ID=${AGENT_USER}
-PERSAG_ROOT=${DATA_DIR}
+# =============================================================================
+# BASIC CONFIGURATION
+# =============================================================================
+DEBUG = 10
+INFO = 20
+WARNING = 30
+ERROR = 40
 
-# Ollama Configuration
-OLLAMA_URL=http://localhost:11434
+LOG_LEVEL=INFO
 
-# LightRAG Configuration
-LIGHTRAG_URL=http://localhost:9621
-LIGHTRAG_MEMORY_URL=http://localhost:9622
+# =============================================================================
+# DIRECTORY CONFIGURATION
+# =============================================================================
 
-# Optional: Add your API keys below
-# GITHUB_PERSONAL_ACCESS_TOKEN=your_token_here
-# BRAVE_API_KEY=your_api_key_here
+ROOT_DIR=/
+HOME_DIR=${AGENT_HOME}
+REPO_DIR=\${HOME_DIR}/repos
+
+# =============================================================================
+# AI MODEL CONFIGURATION
+# =============================================================================
+
+PROVIDER="ollama"
+
+# =============================================================================
+# API Access tokens - secret
+# =============================================================================
+
+# GitHub Personal Access Token
+GITHUB_PERSONAL_ACCESS_TOKEN=yourtoken
+# GitHub Token (for Agno GithubTools)
+GITHUB_TOKEN=yourtoken
+# GitHub Access Token (alternative name)
+GITHUB_ACCESS_TOKEN=yourtoken
+
+# Brave Search API Key  
+BRAVE_API_KEY=yourtoken
+
+# MULTIMODAL AGENTS: API Keys for Media Generation
+MODELS_LAB_API_KEY=yourtoken
+ELEVEN_LABS_API_KEY=yourtoken
+GIPHY_API_KEY=yourtoken
+OPENAI_API_KEY=sk-proj-yourtoken
 EOF
 
     # Set proper permissions
