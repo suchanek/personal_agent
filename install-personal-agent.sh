@@ -464,25 +464,6 @@ install_lm_studio() {
 
 pull_ollama_models() {
     log "Checking and pulling Ollama models..."
-    
-    # Wait for Ollama service to be ready
-    if ! $DRY_RUN; then
-        log "Waiting for Ollama service to be ready..."
-        local timeout=30
-        local count=0
-        while ! sudo -u "${AGENT_USER}" /usr/local/bin/ollama list &>/dev/null; do
-            if [[ $count -ge $timeout ]]; then
-                log_warning "Ollama service did not start in time, will attempt to pull models anyway"
-                break
-            fi
-            sleep 1
-            ((count++))
-        done
-        if [[ $count -lt $timeout ]]; then
-            log_success "Ollama service is ready"
-        fi
-    fi
-    
     echo ""
 
     local models=("qwen3:8b" "qwen3:1.7b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text")
@@ -709,7 +690,8 @@ EOF
         sudo -u "${AGENT_USER}" launchctl load "${plist_file}" 2>/dev/null || true
         
         # Give it a moment to start
-        sleep 3
+        log "Waiting for Ollama service to initialize..."
+        sleep 5
         
         # Check if it's running
         if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama.agent"; then
@@ -802,15 +784,15 @@ setup_repository() {
     log_success "Using repository directory: ${INSTALL_DIR}"
 
     if ! $DRY_RUN; then
-        log "Creating virtual environment with uv (Python 3.12, named 'persagent')..."
-        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed persagent"
+        log "Creating virtual environment with uv (Python 3.12)..."
+        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed"
 
         log "Installing dependencies with Poetry..."
         sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
 
         log_success "Dependencies installed"
     else
-        log "[WOULD CREATE] virtual environment with uv (Python 3.12, named 'persagent') in ${INSTALL_DIR}"
+        log "[WOULD CREATE] virtual environment .venv with uv (Python 3.12) in ${INSTALL_DIR}"
         log "[WOULD INSTALL] dependencies with Poetry in ${INSTALL_DIR}"
     fi
 }
