@@ -784,15 +784,15 @@ setup_repository() {
     log_success "Using repository directory: ${INSTALL_DIR}"
 
     if ! $DRY_RUN; then
-        log "Creating virtual environment with uv (Python 3.12)..."
-        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed"
+        log "Creating virtual environment 'persagent' with uv (Python 3.12)..."
+        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed --prompt persagent"
 
         log "Installing dependencies with Poetry..."
         sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
 
         log_success "Dependencies installed"
     else
-        log "[WOULD CREATE] virtual environment .venv with uv (Python 3.12) in ${INSTALL_DIR}"
+        log "[WOULD CREATE] virtual environment 'persagent' with uv (Python 3.12) in ${INSTALL_DIR}"
         log "[WOULD INSTALL] dependencies with Poetry in ${INSTALL_DIR}"
     fi
 }
