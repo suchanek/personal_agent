@@ -418,6 +418,35 @@ MODEL_PARAMETERS: Dict[str, ModelParameters] = {
         repetition_penalty=1.1,
         context_size=128000,
     ),
+    # Granite models - IBM's open-source models
+    "granite3.1-dense:2b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=65536,  # 64K context (128K capable, reduced for 24GB systems)
+    ),
+    "granite3.1-dense:8b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=65536,  # 64K context (128K capable, reduced for 24GB systems)
+    ),
+    "granite3.1-moe:1b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=65536,  # 64K context (128K capable, reduced for 24GB systems)
+    ),
+    "granite3.1-moe:3b": ModelParameters(
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repetition_penalty=1.1,
+        context_size=65536,  # 64K context (128K capable, reduced for 24GB systems)
+    ),
     # SmolLM models
     "smollm2:1.7B": ModelParameters(
         temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.1, context_size=12232
@@ -507,6 +536,11 @@ MODEL_CONTEXT_SIZES: Dict[str, int] = {
     "phi3:3.8b": 128000,
     "phi3:14b": 128000,
     "phi3.5:3.8b": 128000,
+    # Granite models - IBM's open-source models
+    "granite3.1-dense:2b": 65536,  # 64K context (128K capable, reduced for 24GB systems)
+    "granite3.1-dense:8b": 65536,  # 64K context (128K capable, reduced for 24GB systems)
+    "granite3.1-moe:1b": 65536,  # 64K context (128K capable, reduced for 24GB systems)
+    "granite3.1-moe:3b": 65536,  # 64K context (128K capable, reduced for 24GB systems)
     # Neural Chat models
     "neural-chat:7b": 12232,
     # Orca models
