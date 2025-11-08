@@ -464,6 +464,25 @@ install_lm_studio() {
 
 pull_ollama_models() {
     log "Checking and pulling Ollama models..."
+    
+    # Wait for Ollama service to be ready
+    if ! $DRY_RUN; then
+        log "Waiting for Ollama service to be ready..."
+        local timeout=30
+        local count=0
+        while ! sudo -u "${AGENT_USER}" /usr/local/bin/ollama list &>/dev/null; do
+            if [[ $count -ge $timeout ]]; then
+                log_warning "Ollama service did not start in time, will attempt to pull models anyway"
+                break
+            fi
+            sleep 1
+            ((count++))
+        done
+        if [[ $count -lt $timeout ]]; then
+            log_success "Ollama service is ready"
+        fi
+    fi
+    
     echo ""
 
     local models=("qwen3:8b" "qwen3:1.7b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text")
@@ -476,9 +495,8 @@ pull_ollama_models() {
         ((current++))
         echo -e "${BLUE}[Model ${current}/${total_models}]${NC} Checking: ${CYAN}${model}${NC}"
         
-        # Check if model already exists
-        if sudo -u "${AGENT_USER}" /usr/local/bin/ollama list 2>/dev/null | grep -q "^${model%%:*}" || \
-           sudo -u "${AGENT_USER}" ollama list 2>/dev/null | grep -q "^${model%%:*}"; then
+        # Check if model already exists (with timeout protection)
+        if timeout 5 sudo -u "${AGENT_USER}" /usr/local/bin/ollama list 2>/dev/null | grep -q "^${model%%:*}"; then
             log_success "Model already exists: ${model}"
             ((skipped_count++))
         else
@@ -487,8 +505,7 @@ pull_ollama_models() {
                 echo -e "${YELLOW}   This may take several minutes depending on model size...${NC}"
                 
                 # Run ollama pull with output visible
-                if sudo -u "${AGENT_USER}" /usr/local/bin/ollama pull "${model}" || \
-                   sudo -u "${AGENT_USER}" ollama pull "${model}"; then
+                if sudo -u "${AGENT_USER}" /usr/local/bin/ollama pull "${model}"; then
                     log_success "Successfully pulled: ${model}"
                     ((pulled_count++))
                 else
@@ -1034,10 +1051,10 @@ main() {
     install_docker
     install_ollama
     install_lm_studio
-    pull_ollama_models
     setup_repository
     configure_environment
     setup_ollama_service
+    pull_ollama_models
     pull_lightrag_images
     setup_lightrag_directories
     set_permissions
