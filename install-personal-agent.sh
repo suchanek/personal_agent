@@ -17,10 +17,9 @@ set -u  # Exit on undefined variable
 # Configuration
 AGENT_USER="${SUDO_USER:-$(logname 2>/dev/null || whoami)}"
 AGENT_HOME="/Users/${AGENT_USER}"
-INSTALL_DIR="${AGENT_HOME}/repos/personal_agent"  # Clone repo into ~/repos/personal_agent
+INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Use script's directory as install dir
 DATA_DIR="${AGENT_HOME}/.persag"
 LOG_FILE="${AGENT_HOME}/install.log"  # Log in home directory
-REPO_URL="https://github.com/suchanek/personal_agent.git"
 
 # Detect shell profile file
 # Check user's default shell
@@ -432,8 +431,8 @@ install_ollama() {
     # Instead, we'll set up a LaunchAgent service in setup_ollama_service()
     # This prevents running two Ollama instances
 
-    log_success "Ollama installed with Metal GPU acceleration"
-    log "Ollama will be started as a system-wide LaunchDaemon service"
+    log_success "Ollama installed with Metal GPU acceleration from official source"
+    log "Ollama will be configured as a user LaunchAgent service"
 }
 
 ################################################################################
@@ -500,58 +499,68 @@ pull_ollama_models() {
 }
 
 ################################################################################
-# Setup Ollama as System LaunchDaemon Service
+# Setup Ollama as User LaunchAgent Service
 ################################################################################
 
 setup_ollama_service() {
-    log "Setting up Ollama system-wide LaunchDaemon service..."
+    log "Setting up Ollama as user LaunchAgent (runs when ${AGENT_USER} is logged in)..."
 
     # First, stop any running Ollama services to prevent conflicts
     if pgrep -f "Ollama.app" > /dev/null; then
-        log "Stopping Ollama.app to prevent conflicts with LaunchDaemon service..."
+        log "Stopping Ollama.app to prevent conflicts with LaunchAgent service..."
         if ! $DRY_RUN; then
-            pkill -f "Ollama.app" 2>/dev/null || true
+            sudo -u "${AGENT_USER}" pkill -f "Ollama.app" 2>/dev/null || true
             sleep 2
         else
             log "[WOULD STOP] Ollama.app"
         fi
     fi
 
-    # Stop any existing LaunchDaemon
+    # Stop any existing system-wide LaunchDaemon (from previous installations)
     if launchctl list | grep -q "com.personalagent.ollama"; then
-        log "Unloading existing Ollama LaunchDaemon..."
+        log "Removing old system-wide Ollama LaunchDaemon..."
         if ! $DRY_RUN; then
             launchctl unload /Library/LaunchDaemons/local.ollama.system.plist 2>/dev/null || true
+            rm -f /Library/LaunchDaemons/local.ollama.system.plist
         else
-            log "[WOULD UNLOAD] existing LaunchDaemon"
+            log "[WOULD REMOVE] old system-wide LaunchDaemon"
         fi
     fi
 
-    local startup_script="/usr/local/bin/start_ollama.sh"
-    local plist_file="/Library/LaunchDaemons/local.ollama.system.plist"
+    local startup_script="${AGENT_HOME}/.local/bin/start_ollama.sh"
+    local plist_file="${AGENT_HOME}/Library/LaunchAgents/local.ollama.agent.plist"
     local setup_dir="${INSTALL_DIR}/setup"
+
+    # Create directory for startup script
+    if ! $DRY_RUN; then
+        mkdir -p "${AGENT_HOME}/.local/bin"
+        mkdir -p "${AGENT_HOME}/Library/LaunchAgents"
+    else
+        log "[WOULD CREATE] ${AGENT_HOME}/.local/bin"
+        log "[WOULD CREATE] ${AGENT_HOME}/Library/LaunchAgents"
+    fi
 
     # Copy the startup script from setup directory
     if ! $DRY_RUN; then
         log "Copying Ollama startup script to ${startup_script}..."
-        if [[ -f "${setup_dir}/start_ollama_root.sh" ]]; then
-            cp "${setup_dir}/start_ollama_root.sh" "${startup_script}"
+        if [[ -f "${setup_dir}/start_ollama_user.sh" ]]; then
+            cp "${setup_dir}/start_ollama_user.sh" "${startup_script}"
             chmod +x "${startup_script}"
-            log_success "Startup script installed from setup/start_ollama_root.sh"
+            chown "${AGENT_USER}:staff" "${startup_script}"
+            log_success "Startup script installed from setup/start_ollama_user.sh"
         else
-            log_warning "start_ollama_root.sh not found, creating default script..."
+            log_warning "start_ollama_user.sh not found, creating default script..."
             cat > "${startup_script}" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-# launchd (root) env
-export HOME="/var/root"
-export USER="root"
-export LOGNAME="root"
-export TMPDIR="/var/tmp"
-export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# User LaunchAgent environment
+export HOME="${HOME:-/Users/$(whoami)}"
+export USER="${USER:-$(whoami)}"
+export LOGNAME="${LOGNAME:-$(whoami)}"
+export PATH="/usr/local/bin:/opt/homebrew/bin:${PATH}"
 
-# Ollama env
+# Ollama configuration
 export OLLAMA_HOST="0.0.0.0:11434"
 export OLLAMA_ORIGINS="*"
 export OLLAMA_MAX_LOADED_MODELS="2"
@@ -563,45 +572,46 @@ export OLLAMA_FLASH_ATTENTION="1"
 export OLLAMA_KV_CACHE_TYPE="f16"
 export OLLAMA_CONTEXT_LENGTH="12232"
 
-LOG_DIR="/var/log/ollama"
+LOG_DIR="${HOME}/.local/log/ollama"
 OUT_LOG="${LOG_DIR}/ollama.out.log"
 ERR_LOG="${LOG_DIR}/ollama.err.log"
-mkdir -p "$LOG_DIR" "$HOME/.cache" "$HOME/.config" "$HOME/.local/share"
+mkdir -p "$LOG_DIR" "${HOME}/.cache" "${HOME}/.config" "${HOME}/.local/share"
 
-echo "[$(date '+%F %T')] start_ollama.sh: HOST=$OLLAMA_HOST" >>"$OUT_LOG" 2>&1
+echo "[$(date '+%F %T')] start_ollama.sh: USER=${USER} HOST=${OLLAMA_HOST}" >>"$OUT_LOG" 2>&1
 
 env | grep '^OLLAMA_' | tee "$LOG_DIR/ollama.env"
 
 exec /usr/local/bin/ollama serve >>"$OUT_LOG" 2>>"$ERR_LOG"
 EOF
             chmod +x "${startup_script}"
+            chown "${AGENT_USER}:staff" "${startup_script}"
             log_success "Default startup script created"
         fi
     else
-        log "[WOULD COPY] ${setup_dir}/start_ollama_root.sh to ${startup_script}"
+        log "[WOULD COPY] ${setup_dir}/start_ollama_user.sh to ${startup_script}"
     fi
 
     # Copy the plist file from setup directory
     if ! $DRY_RUN; then
-        log "Installing Ollama LaunchDaemon plist..."
-        if [[ -f "${setup_dir}/local.ollama.system.plist" ]]; then
-            cp "${setup_dir}/local.ollama.system.plist" "${plist_file}"
+        log "Installing Ollama LaunchAgent plist..."
+        if [[ -f "${setup_dir}/local.ollama.agent.plist" ]]; then
+            cp "${setup_dir}/local.ollama.agent.plist" "${plist_file}"
             
             # Update the plist to use the correct script path
-            sed -i '' "s|/Users/local/bin/start_ollama.sh|${startup_script}|g" "${plist_file}"
+            sed -i '' "s|/Users/persagent/.local/bin/start_ollama.sh|${startup_script}|g" "${plist_file}"
             
             chmod 644 "${plist_file}"
-            chown root:wheel "${plist_file}"
-            log_success "LaunchDaemon plist installed from setup/local.ollama.system.plist"
+            chown "${AGENT_USER}:staff" "${plist_file}"
+            log_success "LaunchAgent plist installed from setup/local.ollama.agent.plist"
         else
-            log_warning "local.ollama.system.plist not found, creating default plist..."
+            log_warning "local.ollama.agent.plist not found, creating default plist..."
             cat > "${plist_file}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
     <key>Label</key>
-    <string>com.personalagent.ollama</string>
+    <string>local.ollama.agent</string>
     <key>ProgramArguments</key>
     <array>
       <string>${startup_script}</string>
@@ -609,7 +619,7 @@ EOF
     <key>EnvironmentVariables</key>
     <dict>
       <key>PATH</key>
-      <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+      <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
       <key>OLLAMA_HOST</key>
       <string>0.0.0.0:11434</string>
       <key>OLLAMA_ORIGINS</key>
@@ -628,44 +638,45 @@ EOF
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/ollama/ollama.out.log</string>
+    <string>${AGENT_HOME}/.local/log/ollama/ollama.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/ollama/ollama.err.log</string>
+    <string>${AGENT_HOME}/.local/log/ollama/ollama.err.log</string>
   </dict>
 </plist>
 EOF
             chmod 644 "${plist_file}"
-            chown root:wheel "${plist_file}"
-            log_success "Default LaunchDaemon plist created"
+            chown "${AGENT_USER}:staff" "${plist_file}"
+            log_success "Default LaunchAgent plist created"
         fi
     else
-        log "[WOULD COPY] ${setup_dir}/local.ollama.system.plist to ${plist_file}"
+        log "[WOULD COPY] ${setup_dir}/local.ollama.agent.plist to ${plist_file}"
     fi
 
     # Create log directory
     if ! $DRY_RUN; then
-        mkdir -p /var/log/ollama
-        chmod 755 /var/log/ollama
+        mkdir -p "${AGENT_HOME}/.local/log/ollama"
+        chown -R "${AGENT_USER}:staff" "${AGENT_HOME}/.local/log/ollama"
+        chmod 755 "${AGENT_HOME}/.local/log/ollama"
     else
-        log "[WOULD CREATE] /var/log/ollama directory"
+        log "[WOULD CREATE] ${AGENT_HOME}/.local/log/ollama directory"
     fi
 
-    # Load the system-wide service
+    # Load the user LaunchAgent service
     if ! $DRY_RUN; then
-        log "Loading Ollama LaunchDaemon service..."
-        launchctl load "${plist_file}" 2>/dev/null || true
+        log "Loading Ollama LaunchAgent service for user ${AGENT_USER}..."
+        sudo -u "${AGENT_USER}" launchctl load "${plist_file}" 2>/dev/null || true
         
         # Give it a moment to start
         sleep 3
         
         # Check if it's running
-        if launchctl list | grep -q "com.personalagent.ollama"; then
-            log_success "Ollama LaunchDaemon service loaded successfully"
+        if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama.agent"; then
+            log_success "Ollama LaunchAgent service loaded successfully"
         else
-            log_warning "Ollama LaunchDaemon may not have started properly"
+            log_warning "Ollama LaunchAgent may not have started properly"
         fi
     else
-        log "[WOULD LOAD] LaunchDaemon service"
+        log "[WOULD LOAD] LaunchAgent service for user ${AGENT_USER}"
     fi
 }
 
@@ -676,7 +687,7 @@ EOF
 pull_lightrag_images() {
     log "Checking and pulling LightRAG Docker images..."
 
-    local image="ghcr.io/suchanek/lightrag_pagent:latest"
+    local image="egsuchanek/lightrag_pagent:latest"
 
     # Check if image already exists
     if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
@@ -739,52 +750,25 @@ setup_lightrag_directories() {
 setup_repository() {
     log "Setting up Personal Agent repository..."
 
-    # Check if we're running from the current directory (which might be the repo)
-    local current_dir="$(pwd)"
-    if [[ -f "${current_dir}/pyproject.toml" && -d "${current_dir}/setup" ]]; then
-        # We're running from the repo directory, use it as INSTALL_DIR
-        INSTALL_DIR="${current_dir}"
-        log_success "Running from repository directory: ${INSTALL_DIR}"
-        
-        # No need to change ownership - using current user's directory
-        log "Using current user's repository directory: ${INSTALL_DIR}"
-    elif [[ -f "${INSTALL_DIR}/pyproject.toml" ]]; then
-        log_success "Using existing repository: ${INSTALL_DIR}"
-    else
-        # Need to clone the repository
-        if [[ ! -d "${INSTALL_DIR}" ]]; then
-            if ! $DRY_RUN; then
-                log "Creating repository directory..."
-                mkdir -p "$(dirname "${INSTALL_DIR}")"
-                
-                log "Cloning repository..."
-                sudo -u "${AGENT_USER}" git clone "${REPO_URL}" "${INSTALL_DIR}"
-                log_success "Repository cloned"
-            else
-                log "[WOULD CLONE] ${REPO_URL} to ${INSTALL_DIR}"
-            fi
-        else
-            log_warning "Install directory already exists, skipping clone"
-        fi
-
-        # Verify pyproject.toml exists after clone
-        if [[ ! -f "${INSTALL_DIR}/pyproject.toml" ]]; then
-            log_error "pyproject.toml not found in ${INSTALL_DIR}"
-            log_error "Please ensure the repository is properly cloned"
-            return 1
-        fi
+    # Verify we're running from the repository
+    if [[ ! -f "${INSTALL_DIR}/pyproject.toml" ]]; then
+        log_error "pyproject.toml not found in ${INSTALL_DIR}"
+        log_error "This script must be run from the personal_agent repository directory"
+        exit 1
     fi
 
+    log_success "Using repository directory: ${INSTALL_DIR}"
+
     if ! $DRY_RUN; then
-        log "Creating virtual environment with uv..."
-        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv"
+        log "Creating virtual environment with uv (Python 3.12, named 'persagent')..."
+        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed persagent"
 
         log "Installing dependencies with Poetry..."
         sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
 
         log_success "Dependencies installed"
     else
-        log "[WOULD CREATE] virtual environment with uv in ${INSTALL_DIR}"
+        log "[WOULD CREATE] virtual environment with uv (Python 3.12, named 'persagent') in ${INSTALL_DIR}"
         log "[WOULD INSTALL] dependencies with Poetry in ${INSTALL_DIR}"
     fi
 }
@@ -887,11 +871,11 @@ health_checks() {
         log_warning "Docker: Not running (may need manual start)"
     fi
 
-    # Check Ollama LaunchDaemon
-    if launchctl list | grep -q "com.personalagent.ollama"; then
-        log_success "Ollama LaunchDaemon: OK"
+    # Check Ollama LaunchAgent
+    if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama.agent"; then
+        log_success "Ollama LaunchAgent: OK"
     else
-        log_warning "Ollama LaunchDaemon: Not running"
+        log_warning "Ollama LaunchAgent: Not running"
     fi
 
     # Check install directory
@@ -931,31 +915,33 @@ print_instructions() {
         echo ""
         echo "Next Steps:"
         echo ""
-        echo "1. Switch to the personalagent user:"
-        echo "   sudo su - personalagent"
+        echo "1. Log out and log back in as ${AGENT_USER}, or reload your shell:"
+        echo "   source ${PROFILE_FILE}"
         echo ""
-        echo "2. Start LightRAG services:"
+        echo "2. Navigate to the repository:"
         echo "   cd ${INSTALL_DIR}"
+        echo ""
+        echo "3. Start LightRAG services:"
         echo "   ./smart-restart-lightrag.sh"
         echo ""
-        echo "3. Start the Personal Agent:"
+        echo "4. Start the Personal Agent:"
         echo "   poe serve-persag              # Web interface"
         echo "   poe cli                       # Command-line interface"
         echo ""
-        echo "4. Optional: Configure API keys in:"
+        echo "5. Optional: Configure API keys in:"
         echo "   ${INSTALL_DIR}/.env"
         echo ""
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         echo -e "${YELLOW}Important Notes:${NC}"
         echo ""
-        echo "• Ollama is running as a system-wide LaunchDaemon service (not the GUI app)"
-        echo "  The service starts automatically at boot with optimized settings"
-        echo "  Check status: sudo launchctl list | grep com.personalagent.ollama"
-        echo "  View logs: tail -f /var/log/ollama/ollama.out.log"
-        echo "  Manage service: sudo launchctl [load|unload] /Library/LaunchDaemons/local.ollama.system.plist"
+        echo "• Ollama is running as a user LaunchAgent service"
+        echo "  The service starts automatically when ${AGENT_USER} logs in"
+        echo "  Check status: launchctl list | grep local.ollama.agent"
+        echo "  View logs: tail -f ${AGENT_HOME}/.local/log/ollama/ollama.out.log"
+        echo "  Manage service: launchctl [load|unload] ${AGENT_HOME}/Library/LaunchAgents/local.ollama.agent.plist"
         echo ""
-        echo "• All users in the 'staff' group have access to Docker"
+        echo "• The service will NOT run when ${AGENT_USER} is not logged in"
         echo ""
     fi
     echo "Installation log saved to: ${LOG_FILE}"

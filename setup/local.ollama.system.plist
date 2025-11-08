@@ -32,7 +32,7 @@
       <key>OLLAMA_NEW_ENGINE</key>
       <string>true</string>
       <key>OLLAMA_NEW_ESTIMATES</key><string>true</string>
-      <key>OLLAMA_MODELS</key><string>/Volumes/BigDataRaid/LLM/ollama-models</string>
+      <key>OLLAMA_MODELS</key><string>/Users/Shared/personal_agent_data/ollama_models</string>
 
       <!-- Optional:
       <key>OLLAMA_LOG_LEVEL</key><string>INFO</string>

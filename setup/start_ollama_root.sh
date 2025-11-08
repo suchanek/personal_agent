@@ -19,7 +19,7 @@ export OLLAMA_DEBUG="1"
 export OLLAMA_FLASH_ATTENTION="1"
 export OLLAMA_KV_CACHE_TYPE="f16"
 export OLLAMA_CONTEXT_LENGTH="12232"
-export OLLAMA_MODELS="/Volumes/BigDataRaid/LLM/ollama_models"
+export OLLAMA_MODELS="/Users/Shared/personal_agent_data/ollama_models/"
 
 LOG_DIR="/var/log/ollama"
 OUT_LOG="${LOG_DIR}/ollama.out.log"
