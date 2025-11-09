@@ -35,7 +35,8 @@ from .semantic_memory_manager import (
     SemanticMemoryManagerConfig,
     create_semantic_memory_manager,
 )
-from .smol_agent import create_smolagents_executor, create_smolagents_model
+# Legacy smolagents import removed - no longer used
+# from .smol_agent import create_smolagents_executor, create_smolagents_model
 from .smollm2_parser import (
     extract_content_from_smollm2_response,
     format_smollm2_system_prompt,
@@ -73,9 +74,9 @@ __all__ = [
     "AgentKnowledgeManager",
     "AgentMemoryManager", 
     "AgentModelManager",
-    # Smolagents
-    "create_smolagents_executor",
-    "create_smolagents_model",
+    # Legacy smolagents exports removed - no longer used
+    # "create_smolagents_executor",
+    # "create_smolagents_model",
     # Agno storage
     "create_agno_storage",
     "create_agno_memory",

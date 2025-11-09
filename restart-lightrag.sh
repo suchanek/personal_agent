@@ -30,14 +30,27 @@ CLEANUP_WAIT=${CLEANUP_WAIT:-5}
 
 # Function to get AGNO_STORAGE_DIR from Python settings
 get_agno_storage_dir() {
-    poetry run python -c "from personal_agent.config.user_id_mgr import get_user_storage_paths; print(get_user_storage_paths()['AGNO_STORAGE_DIR'])"
+    # Try to get from Python, but don't fail if it errors
+    poetry run python -c "from personal_agent.config.user_id_mgr import get_user_storage_paths; print(get_user_storage_paths()['AGNO_STORAGE_DIR'])" 2>/dev/null
 }
 
 # Get and export AGNO_STORAGE_DIR for Docker volume mounts
+# Try to get from Python first, fall back to environment variable or default
 AGNO_STORAGE_DIR=$(get_agno_storage_dir)
-if [ $? -ne 0 ] || [ -z "$AGNO_STORAGE_DIR" ]; then
-    echo -e "${RED}❌ Failed to get AGNO_STORAGE_DIR from Python settings${NC}"
-    exit 1
+if [ -z "$AGNO_STORAGE_DIR" ]; then
+    # Fall back to environment variable or construct default
+    PERSAG_ROOT="${PERSAG_ROOT:-/Users/Shared/personal_agent_data}"
+    STORAGE_BACKEND="${STORAGE_BACKEND:-agno}"
+    
+    # Get USER_ID from ~/.persagent/env.userid if it exists
+    USER_ID_FILE="$PERSAG_HOME/env.userid"
+    if [ -f "$USER_ID_FILE" ]; then
+        USER_ID=$(grep "USER_ID" "$USER_ID_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'" | xargs)
+    fi
+    USER_ID="${USER_ID:-default_user}"
+    
+    AGNO_STORAGE_DIR="${PERSAG_ROOT}/${STORAGE_BACKEND}/${USER_ID}"
+    echo -e "${YELLOW}⚠️  Using fallback AGNO_STORAGE_DIR: ${AGNO_STORAGE_DIR}${NC}"
 fi
 export AGNO_STORAGE_DIR
 
@@ -52,6 +65,15 @@ echo -e "${CYAN}📁 Using AGNO_STORAGE_DIR: ${AGNO_STORAGE_DIR}${NC}"
 echo -e "${BLUE}🧠 Smart LightRAG Docker Restart${NC}"
 echo -e "${CYAN}Intelligent restart with proper port cleanup and waiting periods${NC}"
 printf '%*s\n' 70 '' | tr ' ' '='
+
+# Check for stale repo .env file that might cause permission issues
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    echo -e "${YELLOW}⚠️  WARNING: Found .env file in repo directory${NC}"
+    echo -e "${YELLOW}   This file should not exist - configuration is now in ~/.env${NC}"
+    echo -e "${YELLOW}   Consider removing: rm $SCRIPT_DIR/.env${NC}"
+    echo ""
+fi
 
 # Function to check if a port is available
 check_port_available() {
