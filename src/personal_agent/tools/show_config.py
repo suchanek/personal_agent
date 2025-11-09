@@ -125,7 +125,14 @@ def output_json():
 
 
 def load_env_file(env_path):
-    """Load environment variables from a .env file."""
+    """Load environment variables from a .env file.
+
+    Args:
+        env_path (Path): Path to the environment file
+
+    Returns:
+        dict: Dictionary of environment variables with expanded values
+    """
     env_vars = {}
     if env_path.exists():
         try:
@@ -134,6 +141,12 @@ def load_env_file(env_path):
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         key, value = line.split("=", 1)
+                        # Strip inline comments (anything after # that's not in quotes)
+                        # Simple approach: split on # and take first part, then strip
+                        if "#" in value and not (
+                            value.startswith('"') or value.startswith("'")
+                        ):
+                            value = value.split("#")[0].strip()
                         # Remove quotes if present
                         value = value.strip("\"'")
                         env_vars[key] = value
@@ -142,8 +155,52 @@ def load_env_file(env_path):
     return env_vars
 
 
+def expand_env_variables(value, env_vars):
+    """Expand environment variable references in a value.
+
+    Supports both ${VAR} and $VAR syntax.
+
+    Args:
+        value (str): Value potentially containing variable references
+        env_vars (dict): Dictionary of available environment variables
+
+    Returns:
+        str: Value with variables expanded
+    """
+    import os
+    import re
+
+    if not isinstance(value, str):
+        return value
+
+    # Combine file-based env_vars with actual environment variables
+    combined_env = {**os.environ, **env_vars}
+
+    # Expand ${VAR} syntax
+    def replace_braced(match):
+        var_name = match.group(1)
+        return combined_env.get(var_name, match.group(0))
+
+    # Expand $VAR syntax (but not followed by {)
+    def replace_unbraced(match):
+        var_name = match.group(1)
+        return combined_env.get(var_name, match.group(0))
+
+    # First expand ${VAR} syntax
+    expanded = re.sub(r"\$\{([A-Z_][A-Z0-9_]*)\}", replace_braced, value)
+
+    # Then expand $VAR syntax (not followed by {)
+    expanded = re.sub(r"\$([A-Z_][A-Z0-9_]*)(?!\{)", replace_unbraced, expanded)
+
+    return expanded
+
+
 def get_docker_env_variables_by_server():
-    """Get environment variables from Docker env files organized by server."""
+    """Get environment variables from Docker env files organized by server.
+
+    Returns:
+        dict: Dictionary of server configurations with expanded environment variables
+    """
     config = get_config()
     snapshot = config.snapshot()
     persag_home = snapshot.persag_home
@@ -170,17 +227,27 @@ def get_docker_env_variables_by_server():
         # Load env_file variables
         if files["env_file"].exists():
             env_vars = load_env_file(files["env_file"])
+            # Expand variables using the loaded env_vars as context
+            expanded_vars = {
+                key: expand_env_variables(value, env_vars)
+                for key, value in env_vars.items()
+            }
             docker_vars_by_server[server_name]["env_file"] = {
                 "path": str(files["env_file"]),
-                "variables": env_vars,
+                "variables": expanded_vars,
             }
 
         # Load mounted .env variables
         if files["mounted_env"].exists():
             env_vars = load_env_file(files["mounted_env"])
+            # Expand variables using the loaded env_vars as context
+            expanded_vars = {
+                key: expand_env_variables(value, env_vars)
+                for key, value in env_vars.items()
+            }
             docker_vars_by_server[server_name]["mounted_env"] = {
                 "path": str(files["mounted_env"]),
-                "variables": env_vars,
+                "variables": expanded_vars,
             }
 
     return docker_vars_by_server
@@ -456,6 +523,9 @@ def print_config_colored():
 
                 if env_info["variables"]:
                     for key, value in sorted(env_info["variables"].items()):
+                        # Skip comment-only values
+                        if not value or value.strip().startswith("#"):
+                            continue
                         # Mask sensitive values
                         display_value = value
                         if any(
@@ -679,6 +749,9 @@ def print_config_no_color():
 
                 if env_info["variables"]:
                     for key, value in sorted(env_info["variables"].items()):
+                        # Skip comment-only values
+                        if not value or value.strip().startswith("#"):
+                            continue
                         # Mask sensitive values
                         display_value = value
                         if any(
