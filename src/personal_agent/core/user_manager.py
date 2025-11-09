@@ -195,7 +195,7 @@ class UserManager:
                     "Updated global USER_ID environment variable"
                 )
 
-                # Write to ~/.persag/env.userid to persist the change
+                # Write to ~/.persagent/env.userid to persist the change
                 try:
                     from ..core.persag_manager import get_persag_manager
 
@@ -203,15 +203,15 @@ class UserManager:
                     success = persag_manager.set_userid(user_id)
                     if success:
                         results["actions_performed"].append(
-                            f"Persisted current user to ~/.persag/env.userid"
+                            f"Persisted current user to ~/.persagent/env.userid"
                         )
                     else:
                         results["warnings"].append(
-                            "Could not write to ~/.persag/env.userid"
+                            "Could not write to ~/.persagent/env.userid"
                         )
                 except Exception as e:
                     results["warnings"].append(
-                        f"Could not write to ~/.persag/env.userid: {e}"
+                        f"Could not write to ~/.persagent/env.userid: {e}"
                     )
 
                 # Refresh user-dependent configuration settings

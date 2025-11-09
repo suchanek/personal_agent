@@ -3,7 +3,7 @@
 # LightRAG Docker Restart Script
 # Provides intelligent restart with proper port cleanup and waiting periods
 # to prevent "port already allocated" errors.
-# Assumes ~/.persag exists and that they contain the docker server dirs
+# Assumes ~/.persagent exists and that they contain the docker server dirs
 #
 # Author: Eric G. Suchanek, PhD.
 # Last revision: 2025-11-09 17:10:56
@@ -19,8 +19,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-# Resolve base ~/.persag directory and allow env overrides
-PERSAG_HOME="${PERSAG_HOME:-$HOME/.persag}"
+# Resolve base ~/.persagent directory and allow env overrides
+PERSAG_HOME="${PERSAG_HOME:-$HOME/.persagent}"
 LIGHTRAG_SERVER_DIR="${LIGHTRAG_SERVER_DIR:-$PERSAG_HOME/lightrag_server}"
 LIGHTRAG_MEMORY_DIR="${LIGHTRAG_MEMORY_DIR:-$PERSAG_HOME/lightrag_memory_server}"
 LIGHTRAG_SERVER_PORT=${LIGHTRAG_SERVER_PORT:-9621}

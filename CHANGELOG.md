@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Configuration Directory Rebranding**: Renamed the user configuration directory from `~/.persag` to `~/.persagent` for better brand alignment with "Personal Agent". This change affects all configuration and Docker management files, providing clearer naming that reflects the application's identity. All code references, scripts, documentation, and installation procedures have been updated to use the new `.persagent` directory name consistently.
+
+### Fixed
+- **LightRAG Memory Server Docker Configuration**: Corrected the `docker-compose.yml` environment file reference for the memory server to properly point to `env.memory_server` instead of the generic `env.server`, ensuring correct configuration loading during container startup.
+
 ## [v0.8.75] - 2025-10-20
 
 ### Added

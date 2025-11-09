@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ANSI color codes for output
 class Colors:
     """ANSI color codes for terminal output formatting."""
-    
+
     RED = "\033[0;31m"
     GREEN = "\033[0;32m"
     YELLOW = "\033[1;33m"
@@ -31,7 +31,7 @@ class Colors:
     CYAN = "\033[0;36m"
     WHITE = "\033[1;37m"
     NC = "\033[0m"  # No Color
-    
+
     @classmethod
     def colorize(cls, text: str, color: str) -> str:
         """Apply color to text with automatic reset."""
@@ -46,32 +46,34 @@ class DockerUserSync:
 
         Args:
             dry_run: If True, show what would be done without making changes
-            
+
         Raises:
             ValueError: If system_user_id cannot be determined
         """
         from ..persag_manager import get_persag_manager
-        
+
         self.dry_run = dry_run
         self.persag_manager = get_persag_manager()
-        
-        # Get system user ID from ~/.persag
+
+        # Get system user ID from ~/.persagent
         self.system_user_id = self.persag_manager.get_userid()
         if not self.system_user_id:
-            raise ValueError("Could not determine system USER_ID from ~/.persag")
+            raise ValueError("Could not determine system USER_ID from ~/.persagent")
 
-        # Docker server configurations - now using ~/.persag paths
+        # Docker server configurations - now using ~/.persagent paths
         self.docker_configs = self.persag_manager.get_docker_config()
 
-        # Backup directory in ~/.persag
-        self.backup_dir = self.persag_manager.persag_dir / "backups" / "docker_env_backups"
+        # Backup directory in ~/.persagent
+        self.backup_dir = (
+            self.persag_manager.persag_dir / "backups" / "docker_env_backups"
+        )
         try:
             self.backup_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             logger.error("Failed to create backup directory %s: %s", self.backup_dir, e)
             raise ValueError(f"Cannot create backup directory: {e}")
 
-        logger.info("Initialized DockerUserSync with ~/.persag")
+        logger.info("Initialized DockerUserSync with ~/.persagent")
         logger.info("System USER_ID: %s", self.system_user_id)
         logger.info("Dry run mode: %s", self.dry_run)
 
@@ -86,33 +88,33 @@ class DockerUserSync:
             )
 
     def _get_system_user_id(self) -> Optional[str]:
-        """Get system USER_ID from ~/.persag (override parent method)"""
+        """Get system USER_ID from ~/.persagent (override parent method)"""
         return self.persag_manager.get_userid()
 
     def _is_valid_user_id(self, user_id: str) -> bool:
         """Validate USER_ID format.
-        
+
         Args:
             user_id: The USER_ID string to validate
-            
+
         Returns:
             True if valid, False otherwise
         """
         if not user_id or not isinstance(user_id, str):
             return False
-        
+
         # Remove quotes if present
-        user_id = user_id.strip('\'"')
-        
+        user_id = user_id.strip("'\"")
+
         # Basic validation: non-empty, reasonable length, no dangerous characters
         if not user_id or len(user_id) > 100:
             return False
-            
+
         # Check for potentially dangerous characters
-        dangerous_chars = [';', '&', '|', '`', '$', '(', ')', '{', '}', '[', ']']
+        dangerous_chars = [";", "&", "|", "`", "$", "(", ")", "{", "}", "[", "]"]
         if any(char in user_id for char in dangerous_chars):
             return False
-            
+
         return True
 
     def get_env_file_user_id(self, env_file_path: Path) -> Optional[str]:
@@ -123,13 +125,15 @@ class DockerUserSync:
 
         Returns:
             USER_ID value or None if not found or invalid
-            
+
         Raises:
             ValueError: If env_file_path is not a Path object
         """
         if not isinstance(env_file_path, Path):
-            raise ValueError(f"env_file_path must be a Path object, got {type(env_file_path)}")
-            
+            raise ValueError(
+                f"env_file_path must be a Path object, got {type(env_file_path)}"
+            )
+
         if not env_file_path.exists():
             logger.warning("Environment file not found: %s", env_file_path)
             return None
@@ -144,8 +148,12 @@ class DockerUserSync:
                         if self._is_valid_user_id(user_id):
                             return user_id
                         else:
-                            logger.warning("Invalid USER_ID format at line %d in %s: %s",
-                                         line_num, env_file_path, user_id)
+                            logger.warning(
+                                "Invalid USER_ID format at line %d in %s: %s",
+                                line_num,
+                                env_file_path,
+                                user_id,
+                            )
                             return None
             return None
         except (OSError, UnicodeDecodeError) as e:
@@ -164,17 +172,19 @@ class DockerUserSync:
 
         Returns:
             True if successful, False otherwise
-            
+
         Raises:
             ValueError: If inputs are invalid
         """
         # Input validation
         if not isinstance(env_file_path, Path):
-            raise ValueError(f"env_file_path must be a Path object, got {type(env_file_path)}")
-        
+            raise ValueError(
+                f"env_file_path must be a Path object, got {type(env_file_path)}"
+            )
+
         if not isinstance(new_user_id, str):
             raise ValueError(f"new_user_id must be a string, got {type(new_user_id)}")
-            
+
         if not self._is_valid_user_id(new_user_id):
             raise ValueError(f"Invalid USER_ID format: {new_user_id}")
 
@@ -213,7 +223,7 @@ class DockerUserSync:
             temp_path = env_file_path.with_suffix(f"{env_file_path.suffix}.tmp")
             with open(temp_path, "w", encoding="utf-8") as f:
                 f.writelines(lines)
-            
+
             # Atomic move
             temp_path.replace(env_file_path)
 
@@ -267,18 +277,20 @@ class DockerUserSync:
 
         Returns:
             True if container is running, False otherwise
-            
+
         Raises:
             ValueError: If container_name is invalid
         """
         if not isinstance(container_name, str):
-            raise ValueError(f"container_name must be a string, got {type(container_name)}")
-            
+            raise ValueError(
+                f"container_name must be a string, got {type(container_name)}"
+            )
+
         if not container_name or not container_name.strip():
             raise ValueError("container_name cannot be empty or whitespace-only")
-            
+
         container_name = container_name.strip()
-        
+
         try:
             result = subprocess.run(
                 [
@@ -295,7 +307,7 @@ class DockerUserSync:
                 timeout=30,  # Add timeout to prevent hanging
             )
             # Check for exact match in output
-            running_containers = result.stdout.strip().split('\n')
+            running_containers = result.stdout.strip().split("\n")
             return container_name in running_containers
         except subprocess.TimeoutExpired:
             logger.error("Timeout checking container status for %s", container_name)
@@ -304,7 +316,9 @@ class DockerUserSync:
             logger.warning("Docker command failed for %s: %s", container_name, e.stderr)
             return False
         except Exception as e:
-            logger.error("Unexpected error checking container %s: %s", container_name, e)
+            logger.error(
+                "Unexpected error checking container %s: %s", container_name, e
+            )
             return False
 
     def stop_docker_service(self, server_config: Dict) -> bool:
@@ -315,13 +329,15 @@ class DockerUserSync:
 
         Returns:
             True if successful, False otherwise
-            
+
         Raises:
             ValueError: If server_config is invalid
         """
         if not isinstance(server_config, dict):
-            raise ValueError(f"server_config must be a dictionary, got {type(server_config)}")
-            
+            raise ValueError(
+                f"server_config must be a dictionary, got {type(server_config)}"
+            )
+
         required_keys = ["dir", "compose_file"]
         missing_keys = [key for key in required_keys if key not in server_config]
         if missing_keys:
@@ -335,7 +351,7 @@ class DockerUserSync:
         if not server_dir.exists():
             logger.error("Server directory does not exist: %s", server_dir)
             return False
-            
+
         # Check if compose file exists
         if not compose_path.exists():
             logger.error("Docker compose file does not exist: %s", compose_path)
@@ -366,7 +382,9 @@ class DockerUserSync:
             )
             return False
         except Exception as e:
-            logger.error("Unexpected error stopping Docker service in %s: %s", server_dir, e)
+            logger.error(
+                "Unexpected error stopping Docker service in %s: %s", server_dir, e
+            )
             return False
 
     def start_docker_service(self, server_config: Dict) -> bool:
@@ -377,13 +395,15 @@ class DockerUserSync:
 
         Returns:
             True if successful, False otherwise
-            
+
         Raises:
             ValueError: If server_config is invalid
         """
         if not isinstance(server_config, dict):
-            raise ValueError(f"server_config must be a dictionary, got {type(server_config)}")
-            
+            raise ValueError(
+                f"server_config must be a dictionary, got {type(server_config)}"
+            )
+
         required_keys = ["dir", "compose_file"]
         missing_keys = [key for key in required_keys if key not in server_config]
         if missing_keys:
@@ -397,7 +417,7 @@ class DockerUserSync:
         if not server_dir.exists():
             logger.error("Server directory does not exist: %s", server_dir)
             return False
-            
+
         # Check if compose file exists
         if not compose_path.exists():
             logger.error("Docker compose file does not exist: %s", compose_path)
@@ -411,7 +431,7 @@ class DockerUserSync:
             # Get the environment file path and read the environment variables
             env_file_path = server_dir / server_config.get("env_file", ".env")
             docker_env = os.environ.copy()
-            
+
             # Read environment variables from the env file and add them to the environment
             if env_file_path.exists():
                 try:
@@ -421,33 +441,47 @@ class DockerUserSync:
                             if line and not line.startswith("#") and "=" in line:
                                 key, value = line.split("=", 1)
                                 key = key.strip()
-                                value = value.strip().strip('\'"')
-                                
+                                value = value.strip().strip("'\"")
+
                                 # Remove inline comments from the value
                                 if "#" in value:
                                     value = value.split("#")[0].strip()
-                                
+
                                 # Handle variable expansion for AGNO_STORAGE_DIR
                                 if "${" in value:
                                     # Simple variable expansion for common patterns
                                     import re
+
                                     def expand_var(match):
                                         var_name = match.group(1)
                                         return docker_env.get(var_name, "")
-                                    value = re.sub(r'\$\{([^}]+)\}', expand_var, value)
-                                
+
+                                    value = re.sub(r"\$\{([^}]+)\}", expand_var, value)
+
                                 docker_env[key] = value
-                                logger.debug("Set environment variable %s=%s", key, value)
+                                logger.debug(
+                                    "Set environment variable %s=%s", key, value
+                                )
                 except Exception as e:
-                    logger.warning("Error reading environment file %s: %s", env_file_path, e)
-            
+                    logger.warning(
+                        "Error reading environment file %s: %s", env_file_path, e
+                    )
+
             # Ensure critical environment variables are set
-            if "AGNO_STORAGE_DIR" not in docker_env or not docker_env["AGNO_STORAGE_DIR"]:
-                logger.error("AGNO_STORAGE_DIR not set in environment - Docker mount will fail")
+            if (
+                "AGNO_STORAGE_DIR" not in docker_env
+                or not docker_env["AGNO_STORAGE_DIR"]
+            ):
+                logger.error(
+                    "AGNO_STORAGE_DIR not set in environment - Docker mount will fail"
+                )
                 return False
-            
-            logger.info("Starting Docker service with AGNO_STORAGE_DIR=%s", docker_env.get("AGNO_STORAGE_DIR"))
-            
+
+            logger.info(
+                "Starting Docker service with AGNO_STORAGE_DIR=%s",
+                docker_env.get("AGNO_STORAGE_DIR"),
+            )
+
             result = subprocess.run(
                 ["docker-compose", "-f", compose_file, "up", "-d", "--wait"],
                 cwd=server_dir,
@@ -469,7 +503,9 @@ class DockerUserSync:
             )
             return False
         except Exception as e:
-            logger.error("Unexpected error starting Docker service in %s: %s", server_dir, e)
+            logger.error(
+                "Unexpected error starting Docker service in %s: %s", server_dir, e
+            )
             return False
 
     def stop_all_services(self) -> bool:
@@ -489,12 +525,18 @@ class DockerUserSync:
                     logger.error(f"Failed to stop {server_name}")
                     all_stopped = False
             else:
-                print(f"{Colors.GREEN}   ✅ {server_name} is already stopped.{Colors.NC}")
-        
+                print(
+                    f"{Colors.GREEN}   ✅ {server_name} is already stopped.{Colors.NC}"
+                )
+
         if all_stopped:
-            print(f"\n{Colors.GREEN}🎉 All Docker services stopped successfully!{Colors.NC}")
+            print(
+                f"\n{Colors.GREEN}🎉 All Docker services stopped successfully!{Colors.NC}"
+            )
         else:
-            print(f"\n{Colors.RED}❌ Some services could not be stopped. Check logs.{Colors.NC}")
+            print(
+                f"\n{Colors.RED}❌ Some services could not be stopped. Check logs.{Colors.NC}"
+            )
 
         return all_stopped
 

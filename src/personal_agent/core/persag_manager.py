@@ -1,7 +1,7 @@
 """
 Personal Agent Configuration Manager
 
-Manages ~/.persag directory structure and user configuration.
+Manages ~/.persagent directory structure and user configuration.
 """
 
 import logging
@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from ..config.settings import PERSAG_HOME
-from ..config.user_id_mgr import load_user_from_file, get_userid
+from ..config.user_id_mgr import get_userid, load_user_from_file
 
 logger = logging.getLogger(__name__)
 
 
 class PersagManager:
-    """Manages ~/.persag directory structure and configuration"""
+    """Manages ~/.persagent directory structure and configuration"""
 
     def __init__(self):
         self.persag_dir = Path(PERSAG_HOME)
@@ -38,7 +38,7 @@ class PersagManager:
             Tuple of (success, message)
         """
         try:
-            # Initialize ~/.persag (or PERSAG_HOME) and USER_ID via central manager
+            # Initialize ~/.persagent (or PERSAG_HOME) and USER_ID via central manager
             current_user_id = load_user_from_file()
 
             # Ensure backups directory exists
@@ -105,7 +105,7 @@ class PersagManager:
 
     def migrate_env_files(self, project_root: Path) -> Tuple[bool, str]:
         """
-        Migrate .env file from project root to ~/.persag
+        Migrate .env file from project root to ~/.persagent
 
         Args:
             project_root: Path to project root directory
@@ -115,39 +115,39 @@ class PersagManager:
         """
         try:
             migrated = []
-            
+
             # Migrate .env file
             source_env = project_root / ".env"
             target_env = self.persag_dir / ".env"
-            
+
             if source_env.exists() and not target_env.exists():
                 # Create backup first
                 backup_name = f"env_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                 backup_path = self.backup_dir / backup_name
                 shutil.copy2(source_env, backup_path)
-                
-                # Copy to ~/.persag
+
+                # Copy to ~/.persagent
                 shutil.copy2(source_env, target_env)
                 migrated.append(".env")
-                
+
                 logger.info(
                     f"Migrated .env to {self.persag_dir} (backup: {backup_path})"
                 )
-            
+
             # Note: env.userid is handled by load_user_from_file() in user_id_mgr
-            
+
             if migrated:
                 return True, f"Migrated files: {', '.join(migrated)}"
             else:
                 return True, "No env files needed migration"
-                
+
         except Exception as e:
             logger.error(f"Failed to migrate env files: {e}")
             return False, str(e)
 
     def migrate_docker_directories(self, project_root: Path) -> Tuple[bool, str]:
         """
-        Migrate docker directories from project root to ~/.persag
+        Migrate docker directories from project root to ~/.persagent
 
         Args:
             project_root: Path to project root directory
@@ -171,7 +171,7 @@ class PersagManager:
                     backup_path = self.backup_dir / backup_name
                     shutil.copytree(source_dir, backup_path)
 
-                    # Copy to ~/.persag
+                    # Copy to ~/.persagent
                     shutil.copytree(source_dir, target_dir)
                     migrated.append(dir_name)
 
@@ -190,7 +190,7 @@ class PersagManager:
 
     def get_docker_config(self) -> Dict[str, Dict[str, Any]]:
         """
-        Get docker configuration for ~/.persag directories
+        Get docker configuration for ~/.persagent directories
 
         Returns:
             Docker configuration dictionary

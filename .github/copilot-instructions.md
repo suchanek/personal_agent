@@ -35,9 +35,9 @@ The system uses a modular, manager-based pattern with **AgnoPersonalAgent** as t
 
 ### Multi-User Support
 **Dynamic User System**: Complete user isolation with runtime switching
-- User registry: `~/.persag/user_registry.json`
-- Current user: `~/.persag/current_user.json`
-- User data: `$PERSAG_ROOT/agno/<user_id>/` + `~/.persag/<user_id>/`
+- User registry: `~/.persagent/user_registry.json`
+- Current user: `~/.persagent/current_user.json`
+- User data: `$PERSAG_ROOT/agno/<user_id>/` + `~/.persagent/<user_id>/`
 - Switch via `poe switch-user <user_id>` or `python switch-user.py <user_id>`
 
 ## Development Workflow
@@ -168,7 +168,7 @@ $PERSAG_ROOT/agno/<user_id>/
 └── lancedb/                 # Vector embeddings
 
 # User registry and Docker configs
-~/.persag/
+~/.persagent/
 ├── current_user.json        # Active user ID
 ├── user_registry.json       # All registered users
 ├── lightrag_server/         # Knowledge Docker config

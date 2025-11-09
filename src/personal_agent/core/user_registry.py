@@ -25,7 +25,7 @@ Key Features:
 
 Architecture:
 The registry stores all users in a single JSON file located at:
-    ~/.persag/users_registry.json (configurable via PersonalAgentConfig)
+    ~/.persagent/users_registry.json (configurable via PersonalAgentConfig)
 
 Each user entry contains:
 - Basic info: user_id, user_name, user_type

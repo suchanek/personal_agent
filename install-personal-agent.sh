@@ -18,7 +18,7 @@ set -u  # Exit on undefined variable
 AGENT_USER="${SUDO_USER:-$(logname 2>/dev/null || whoami)}"
 AGENT_HOME="/Users/${AGENT_USER}"
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Use script's directory as install dir
-DATA_DIR="${AGENT_HOME}/.persag"
+DATA_DIR="${AGENT_HOME}/.persagent"
 LOG_FILE="${AGENT_HOME}/install.log"  # Log in home directory
 
 # Detect shell profile file

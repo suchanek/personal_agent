@@ -9,8 +9,8 @@ from pathlib import Path
 # Define the project's base directory.
 # This file is at src/personal_agent/config/user_id_mgr.py, so we go up 4 levels for the root.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-# Default: ~/.persag, overridable via environment variable PERSAG_HOME
-PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
+# Default: ~/.persagent, overridable via environment variable PERSAG_HOME
+PERSAG_HOME = os.getenv("PERSAG_HOME", str(Path.home() / ".persagent"))
 
 if __name__ == "__main__":
     # When run directly, use absolute imports
@@ -23,12 +23,12 @@ _logger = logging.getLogger(__name__)
 def load_user_from_file():
     """Initialize PERSAG environment and load user configuration.
 
-    Creates the ~/.persag directory structure if it doesn't exist, copies default
+    Creates the ~/.persagent directory structure if it doesn't exist, copies default
     LightRAG server configurations from the project root, and manages the user ID
     file (env.userid). Sets up the complete user environment on first run.
 
     Directory Setup:
-        - Creates ~/.persag/ if missing
+        - Creates ~/.persagent/ if missing
         - Copies lightrag_server/ and lightrag_memory_server/ directories
         - Creates/manages env.userid file with USER_ID configuration
 
@@ -42,10 +42,10 @@ def load_user_from_file():
     """
     try:
 
-        persag_dir = Path(os.getenv("PERSAG_HOME", str(Path.home() / ".persag")))
+        persag_dir = Path(os.getenv("PERSAG_HOME", str(Path.home() / ".persagent")))
         userid_file = persag_dir / "env.userid"
 
-        # Create ~/.persag and copy default configs if it doesn't exist
+        # Create ~/.persagent and copy default configs if it doesn't exist
         if not persag_dir.exists():
             _logger.info(f"PERSAG directory not found. Creating at: {persag_dir}")
             persag_dir.mkdir(parents=True, exist_ok=True)
@@ -90,32 +90,32 @@ def load_user_from_file():
         return default_user_id
 
     except Exception as e:
-        _logger.warning(f"Failed to load user ID from ~/.persag: {e}")
+        _logger.warning(f"Failed to load user ID from ~/.persagent: {e}")
         fallback_user_id = os.getenv("USER_ID", "default_user")
         os.environ["USER_ID"] = fallback_user_id
         return fallback_user_id
 
 
 def get_userid() -> str:
-    """Retrieve the current USER_ID dynamically from ~/.persag/env.userid.
+    """Retrieve the current USER_ID dynamically from ~/.persagent/env.userid.
 
     Always reads from the filesystem to ensure the most current user ID is returned,
     supporting dynamic user switching without requiring module reload.
 
     Returns:
-        str: Current user ID from ~/.persag/env.userid or 'default_user' fallback
+        str: Current user ID from ~/.persagent/env.userid or 'default_user' fallback
     """
     return load_user_from_file()
 
 
 def get_current_user_id():
-    """Get the current USER_ID dynamically from ~/.persag/env.userid.
+    """Get the current USER_ID dynamically from ~/.persagent/env.userid.
 
-    This function always reads from ~/.persag/env.userid to ensure we get the latest value
+    This function always reads from ~/.persagent/env.userid to ensure we get the latest value
     after user switching, rather than the cached value from module import time.
 
     Returns:
-        Current USER_ID from ~/.persag/env.userid or default fallback
+        Current USER_ID from ~/.persagent/env.userid or default fallback
     """
     return get_userid()
 
@@ -176,7 +176,7 @@ def refresh_user_dependent_settings(user_id: str = None):
 
     Args:
         user_id: Optional user_id to refresh settings for. If not provided,
-                 the current user_id from ~/.persag will be used.
+                 the current user_id from ~/.persagent will be used.
 
     Returns:
         Dictionary with updated settings

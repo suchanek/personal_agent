@@ -130,7 +130,7 @@ class PersonalAgentConfig:
 
         # Load initial configuration from environment variables
         with self._config_lock:
-            # Use the user_id_mgr to get the current user (reads from ~/.persag/env.userid)
+            # Use the user_id_mgr to get the current user (reads from ~/.persagent/env.userid)
             try:
                 from personal_agent.config.user_id_mgr import get_userid
 
@@ -188,7 +188,9 @@ class PersonalAgentConfig:
                 "PERSAG_ROOT", "/Users/Shared/personal_agent_data"
             )
             self._storage_backend = os.getenv("STORAGE_BACKEND", "agno")
-            self._persag_home = os.getenv("PERSAG_HOME", str(Path.home() / ".persag"))
+            self._persag_home = os.getenv(
+                "PERSAG_HOME", str(Path.home() / ".persagent")
+            )
 
             # LightRAG server port configurations
             self._lightrag_port = os.getenv("LIGHTRAG_PORT", "9621")
@@ -284,11 +286,11 @@ class PersonalAgentConfig:
 
         This integrates with the existing user management system by:
         1. Setting the USER_ID environment variable
-        2. Writing to ~/.persag/env.userid for persistence (if persist=True)
+        2. Writing to ~/.persagent/env.userid for persistence (if persist=True)
         3. Refreshing user-dependent settings (paths, etc.)
 
         :param user_id: New user ID
-        :param persist: If True, write to ~/.persag/env.userid for persistence
+        :param persist: If True, write to ~/.persagent/env.userid for persistence
         """
         with self._config_lock:
             old_value = self._user_id
@@ -296,7 +298,7 @@ class PersonalAgentConfig:
             os.environ["USER_ID"] = user_id
             logger.info("User ID changed: %s -> %s", old_value, user_id)
 
-            # Persist to ~/.persag/env.userid if requested
+            # Persist to ~/.persagent/env.userid if requested
             if persist:
                 try:
                     from personal_agent.core.persag_manager import get_persag_manager
@@ -304,10 +306,10 @@ class PersonalAgentConfig:
                     persag_manager = get_persag_manager()
                     success = persag_manager.set_userid(user_id)
                     if success:
-                        logger.info("Persisted user ID to ~/.persag/env.userid")
+                        logger.info("Persisted user ID to ~/.persagent/env.userid")
                     else:
                         logger.warning(
-                            "Could not persist user ID to ~/.persag/env.userid"
+                            "Could not persist user ID to ~/.persagent/env.userid"
                         )
                 except Exception:
                     logger.exception("Error persisting user ID")
@@ -543,7 +545,7 @@ class PersonalAgentConfig:
 
     @property
     def persag_home(self) -> str:
-        """Get the PERSAG_HOME directory (typically ~/.persag)."""
+        """Get the PERSAG_HOME directory (typically ~/.persagent)."""
         with self._config_lock:
             return self._persag_home
 

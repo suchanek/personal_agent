@@ -3,7 +3,7 @@ services:
     container_name: lightrag_memory
     image: egsuchanek/lightrag_pagent:latest
     env_file:
-      - env.server
+      - env.memory_server
     ports:
       - 9622:9621
     volumes:
