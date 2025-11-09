@@ -154,7 +154,9 @@ def get_docker_env_variables_by_server():
             "mounted_env": Path(persag_home) / "lightrag_server" / ".env",
         },
         "lightrag_memory_server": {
-            "env_file": Path(persag_home) / ".env",
+            "env_file": Path(persag_home)
+            / "lightrag_memory_server"
+            / "env.memory_server",
             "mounted_env": Path(persag_home)
             / "lightrag_memory_server"
             / "env.memory_server",

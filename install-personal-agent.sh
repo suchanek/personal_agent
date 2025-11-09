@@ -466,7 +466,7 @@ pull_ollama_models() {
     log "Checking and pulling Ollama models..."
     echo ""
 
-    local models=("qwen3:8b" "qwen3:1.7b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text")
+    local models=("qwen3:8b" "qwen3:1.7b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text" "granite3.1-dense:2b" "granite3.1-moe:1b")
     local pulled_count=0
     local skipped_count=0
     local total_models=${#models[@]}
@@ -549,17 +549,10 @@ setup_ollama_service() {
         log "[WOULD CREATE] ${AGENT_HOME}/Library/LaunchAgents"
     fi
 
-    # Copy the startup script from setup directory
+    # Create the startup script
     if ! $DRY_RUN; then
-        log "Copying Ollama startup script to ${startup_script}..."
-        if [[ -f "${setup_dir}/start_ollama_user.sh" ]]; then
-            cp "${setup_dir}/start_ollama_user.sh" "${startup_script}"
-            chmod +x "${startup_script}"
-            chown "${AGENT_USER}:staff" "${startup_script}"
-            log_success "Startup script installed from setup/start_ollama_user.sh"
-        else
-            log_warning "start_ollama_user.sh not found, creating default script..."
-            cat > "${startup_script}" <<'EOF'
+        log "Creating Ollama startup script at ${startup_script}..."
+        cat > "${startup_script}" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -598,29 +591,17 @@ env | grep '^OLLAMA_' | tee "$LOG_DIR/ollama.env"
 
 exec /usr/local/bin/ollama serve >>"$OUT_LOG" 2>>"$ERR_LOG"
 EOF
-            chmod +x "${startup_script}"
-            chown "${AGENT_USER}:staff" "${startup_script}"
-            log_success "Default startup script created"
-        fi
+        chmod +x "${startup_script}"
+        chown "${AGENT_USER}:staff" "${startup_script}"
+        log_success "Startup script created"
     else
-        log "[WOULD COPY] ${setup_dir}/start_ollama_user.sh to ${startup_script}"
+        log "[WOULD CREATE] ${startup_script}"
     fi
 
-    # Copy the plist file from setup directory
+    # Create the plist file
     if ! $DRY_RUN; then
-        log "Installing Ollama LaunchAgent plist..."
-        if [[ -f "${setup_dir}/local.ollama.agent.plist" ]]; then
-            cp "${setup_dir}/local.ollama.agent.plist" "${plist_file}"
-            
-            # Update the plist to use the correct script path
-            sed -i '' "s|/Users/persagent/.local/bin/start_ollama.sh|${startup_script}|g" "${plist_file}"
-            
-            chmod 644 "${plist_file}"
-            chown "${AGENT_USER}:staff" "${plist_file}"
-            log_success "LaunchAgent plist installed from setup/local.ollama.agent.plist"
-        else
-            log_warning "local.ollama.agent.plist not found, creating default plist..."
-            cat > "${plist_file}" <<EOF
+        log "Creating Ollama LaunchAgent plist..."
+        cat > "${plist_file}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -661,12 +642,11 @@ EOF
   </dict>
 </plist>
 EOF
-            chmod 644 "${plist_file}"
-            chown "${AGENT_USER}:staff" "${plist_file}"
-            log_success "Default LaunchAgent plist created"
-        fi
+        chmod 644 "${plist_file}"
+        chown "${AGENT_USER}:staff" "${plist_file}"
+        log_success "LaunchAgent plist created"
     else
-        log "[WOULD COPY] ${setup_dir}/local.ollama.agent.plist to ${plist_file}"
+        log "[WOULD CREATE] ${plist_file}"
     fi
 
     # Create log directory
@@ -804,14 +784,14 @@ setup_repository() {
 configure_environment() {
     log "Configuring environment..."
 
-    local env_file="${INSTALL_DIR}/.env"
+    local env_file="${AGENT_HOME}/.env"
 
     if [[ -f "${env_file}" ]]; then
-        log_success ".env file already exists, skipping creation"
+        log_success ".env file already exists at ${env_file}, skipping creation"
         return 0
     fi
 
-    # Create .env file
+    # Create .env file in home directory
     cat > "${env_file}" <<EOF
 # Personal AI Agent Environment Variables
 # Minimal version - only essential overrides

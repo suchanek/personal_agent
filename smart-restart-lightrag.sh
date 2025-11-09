@@ -5,7 +5,8 @@
 # to prevent "port already allocated" errors.
 # Assumes ~/.persag exists and that they contain the docker server dirs
 #
-# Last revision: 2025-09-25 19:58:02
+# Author: Eric G. Suchanek, PhD.
+# Last revision: 2025-11-08 18:19:18
 
 
 

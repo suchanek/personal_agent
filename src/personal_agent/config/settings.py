@@ -23,7 +23,9 @@ INSTRUCTION_LEVEL = "STANDARD"
 # see below for the ollama server urls
 
 # Set up paths for environment files
-dotenv_path = BASE_DIR / ".env"
+# Always use home directory .env (user-specific secrets)
+# The installer creates this from a safe template
+dotenv_path = Path.home() / ".env"
 
 # Load environment variables from .env file
 dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
@@ -31,6 +33,18 @@ dotenv_loaded = load_dotenv(dotenv_path=dotenv_path)
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Check if .env was loaded successfully
+if not dotenv_loaded:
+    if dotenv_path.exists():
+        logger.warning(
+            "Failed to load .env from %s - using environment defaults", dotenv_path
+        )
+    else:
+        logger.info(
+            "No .env file found at %s - using environment defaults (run installer to create)",
+            dotenv_path,
+        )
 
 
 # Initialize ~/.persag (PERSAG_HOME) and load user ID
@@ -42,10 +56,8 @@ _env_vars = {}
 if dotenv_loaded:
     # Load all variables from .env file into a cache
     _env_vars = dotenv.dotenv_values(dotenv_path=dotenv_path)
-else:
-    # Only show warning if .env file exists but failed to load (not if it simply doesn't exist)
-    if dotenv_path.exists():
-        print("Unable to load .env!")
+# If dotenv failed or file doesn't exist, _env_vars remains empty dict
+# get_env_var() will fall back to os.getenv() for all variables
 
 
 def get_env_var(key: str, fallback: str = "") -> str:
