@@ -9,7 +9,7 @@ services:
     volumes:
       - "${AGNO_STORAGE_DIR}/memory_rag_storage:/app/data/rag_storage"
       - "${AGNO_STORAGE_DIR}/memory_inputs:/app/data/inputs"
-      - ./env.server:/app/.env
+      - ./env.memory_server:/app/.env
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

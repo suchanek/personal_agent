@@ -269,6 +269,10 @@ def get_docker_env_variables():
 
 def get_docker_compose_summary():
     """Get a summary of the docker-compose configurations."""
+    from personal_agent.config.runtime_config import get_config
+    
+    config = get_config()
+    snapshot = config.snapshot()
     project_root = get_project_root()
 
     docker_compose_files = {
@@ -278,6 +282,11 @@ def get_docker_compose_summary():
         / "docker-compose.yml",
     }
 
+    # Build environment context with AGNO_STORAGE_DIR
+    import os
+    env_context = dict(os.environ)
+    env_context["AGNO_STORAGE_DIR"] = snapshot.agno_storage_dir
+
     summary = {}
     for name, path in docker_compose_files.items():
         if path.exists():
@@ -285,10 +294,20 @@ def get_docker_compose_summary():
                 try:
                     data = yaml.safe_load(f)
                     service_config = next(iter(data.get("services", {}).values()), {})
+                    
+                    # Expand environment variables in volumes
+                    volumes = service_config.get("volumes", [])
+                    expanded_volumes = []
+                    if volumes:
+                        for volume in volumes:
+                            # Expand ${VAR} and $VAR in volume strings using env context
+                            expanded_volume = expand_env_variables(volume, env_context)
+                            expanded_volumes.append(expanded_volume)
+                    
                     summary[name] = {
                         "image": service_config.get("image"),
                         "ports": service_config.get("ports"),
-                        "volumes": service_config.get("volumes"),
+                        "volumes": expanded_volumes,
                         "environment": service_config.get("environment"),
                     }
                 except yaml.YAMLError as e:
