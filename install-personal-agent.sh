@@ -568,7 +568,7 @@ export OLLAMA_MODELS="/Users/Shared/personal_agent_data/ollama"
 # Ollama configuration
 export OLLAMA_HOST="0.0.0.0:11434"
 export OLLAMA_ORIGINS="*"
-export OLLAMA_MAX_LOADED_MODELS="2"
+export OLLAMA_MAX_LOADED_MODELS="3"
 export OLLAMA_NUM_PARALLEL="8"
 export OLLAMA_MAX_QUEUE="512"
 export OLLAMA_KEEP_ALIVE="30m"
@@ -623,7 +623,7 @@ EOF
       <key>OLLAMA_ORIGINS</key>
       <string>*</string>
       <key>OLLAMA_MAX_LOADED_MODELS</key>
-      <string>2</string>
+      <string>3</string>
       <key>OLLAMA_NUM_PARALLEL</key>
       <string>8</string>
       <key>OLLAMA_MAX_QUEUE</key>
