@@ -4,9 +4,13 @@
 
 ### Changed
 - **Configuration Directory Rebranding**: Renamed the user configuration directory from `~/.persag` to `~/.persagent` for better brand alignment with "Personal Agent". This change affects all configuration and Docker management files, providing clearer naming that reflects the application's identity. All code references, scripts, documentation, and installation procedures have been updated to use the new `.persagent` directory name consistently.
+- **Ollama Memory Optimization for 24GB Systems**: Optimized Ollama configuration for production deployment on memory-constrained systems by switching from f16 to q8_0 KV cache type, reducing per-model memory usage from ~7GB to ~3.5GB (50% savings). This enables safe operation of 3 concurrent models on 24GB RAM systems (10.5GB vs 21GB with f16). Updated `OLLAMA_MAX_LOADED_MODELS` from 2 to 3 to improve concurrency. Added comprehensive documentation comments across all configuration files explaining the optimization rationale and deployment considerations. See [OLLAMA_MEMORY_OPTIMIZATION_24GB.md](./refs/OLLAMA_MEMORY_OPTIMIZATION_24GB.md) for details.
 
 ### Fixed
 - **LightRAG Memory Server Docker Configuration**: Corrected the `docker-compose.yml` environment file reference for the memory server to properly point to `env.memory_server` instead of the generic `env.server`, ensuring correct configuration loading during container startup.
+
+### Removed
+- **Unused Ollama Template Files**: Removed obsolete `setup/start_ollama.sh` template file that was not referenced by the installation process, eliminating configuration confusion. The install script generates the startup script directly via heredoc as the single source of truth.
 
 ## [v0.8.75] - 2025-10-20
 

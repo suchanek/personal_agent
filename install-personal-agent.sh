@@ -574,7 +574,12 @@ export OLLAMA_MAX_QUEUE="512"
 export OLLAMA_KEEP_ALIVE="30m"
 export OLLAMA_DEBUG="1"
 export OLLAMA_FLASH_ATTENTION="1"
-export OLLAMA_KV_CACHE_TYPE="f16"
+# KV Cache Type: q8_0 (8-bit quantized) optimized for 24GB systems
+# - Uses ~50% less memory than f16 (~3.5GB vs 7GB per model)
+# - Allows safe operation with 3 models on 24GB RAM (10.5GB vs 21GB)
+# - Minimal quality degradation compared to f16
+# - Alternative: f16 for systems with 32GB+ RAM
+export OLLAMA_KV_CACHE_TYPE="q8_0"
 export OLLAMA_CONTEXT_LENGTH="12232"
 
 # Ensure model directory exists
@@ -630,6 +635,8 @@ EOF
       <string>512</string>
       <key>OLLAMA_KEEP_ALIVE</key>
       <string>30m</string>
+      <key>OLLAMA_KV_CACHE_TYPE</key>
+      <string>q8_0</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

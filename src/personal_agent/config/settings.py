@@ -307,6 +307,12 @@ OLLAMA_TIMEOUT = get_env_var("OLLAMA_TIMEOUT", "7200")
 OLLAMA_KEEP_ALIVE = get_env_var("OLLAMA_KEEP_ALIVE", "3600")
 OLLAMA_NUM_PREDICT = get_env_var("OLLAMA_NUM_PREDICT", "16384")
 OLLAMA_TEMPERATURE = get_env_var("OLLAMA_TEMPERATURE", "0.4")
+# KV Cache Type: q8_0 (8-bit quantized) optimized for 24GB deployment systems
+# - Uses ~50% less memory than f16 (~3.5GB vs 7GB per model)
+# - Allows safe operation with 3 models on 24GB RAM (10.5GB vs 21GB)
+# - Minimal quality degradation compared to f16
+# - Alternative: "f16" for development systems with 32GB+ RAM
+OLLAMA_KV_CACHE_TYPE = "q8_0"
 OLLAMA_MAX_LOADED_MODELS = 3
 OLLAMA_NUM_PARALLEL = 2
 
