@@ -546,16 +546,17 @@ class AgentMemoryManager:
                         )
 
                         # Delete the knowledge graph files
-                        import os
+                        # Use dynamic path construction to avoid stale cached values
+                        from ..config.user_id_mgr import get_user_storage_paths
 
-                        from ..config.settings import (
-                            LIGHTRAG_MEMORY_STORAGE_DIR,
-                            LIGHTRAG_STORAGE_DIR,
-                        )
+                        storage_paths = get_user_storage_paths()
+                        lightrag_memory_storage_dir = storage_paths[
+                            "LIGHTRAG_MEMORY_STORAGE_DIR"
+                        ]
 
                         graph_file_paths = [
                             os.path.join(
-                                LIGHTRAG_MEMORY_STORAGE_DIR,
+                                lightrag_memory_storage_dir,
                                 "graph_chunk_entity_relation.graphml",
                             )
                         ]

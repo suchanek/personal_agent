@@ -17,16 +17,18 @@ Key Features:
 """
 
 import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning, module='click')
+
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="click")
 
 import asyncio
 import fnmatch
+import json
 import os
 import sys
-from typing import Any, Dict, List, Optional
-import aiohttp
-import json
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import aiohttp
 
 from ..config import settings
 
@@ -36,8 +38,14 @@ class LightRAGDocumentManager:
 
     def __init__(self, server_url: Optional[str] = None):
         self.server_url = server_url or settings.LIGHTRAG_URL
-        self.storage_dir = Path(settings.AGNO_STORAGE_DIR)
-        self.status_file_path = self.storage_dir / "rag_storage" / "kv_store_doc_status.json"
+        # Use dynamic path resolution to avoid stale cached values
+        from ..config.user_id_mgr import get_user_storage_paths
+
+        storage_paths = get_user_storage_paths()
+        self.storage_dir = Path(storage_paths["AGNO_STORAGE_DIR"])
+        self.status_file_path = (
+            self.storage_dir / "rag_storage" / "kv_store_doc_status.json"
+        )
         print(f"🌐 Using LightRAG server URL: {self.server_url}")
         print(f"🗄️ Using storage path: {self.storage_dir}")
 
@@ -57,7 +65,7 @@ class LightRAGDocumentManager:
             print(f"❌ LightRAG server not accessible at: {self.server_url}")
             print("   Please ensure the LightRAG server is running.")
             return False
-        
+
         print("✅ LightRAG server is accessible.")
         return True
 
@@ -65,15 +73,17 @@ class LightRAGDocumentManager:
         """Fetches all documents from the LightRAG server."""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.server_url}/documents", timeout=30) as resp:
+                async with session.get(
+                    f"{self.server_url}/documents", timeout=30
+                ) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
                         print(f"❌ Server error {resp.status}: {error_text}")
                         return []
-                    
+
                     data = await resp.json()
                     all_docs = []
-                    
+
                     # The API returns documents grouped by status in a "statuses" dict
                     if isinstance(data, dict) and "statuses" in data:
                         statuses = data["statuses"]
@@ -88,7 +98,9 @@ class LightRAGDocumentManager:
                         return data
                     else:
                         print(f"⚠️ Unexpected response format: {type(data)}")
-                        print(f"Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+                        print(
+                            f"Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
+                        )
                         return []
         except Exception as e:
             print(f"❌ Error fetching documents: {e}")
@@ -130,24 +142,21 @@ class LightRAGDocumentManager:
             # Collect all document IDs for batch deletion
             doc_ids = [doc_info["id"] for doc_info in docs_to_delete]
             print(f"   - Deleting {len(doc_ids)} documents in batch...")
-            
+
             async with aiohttp.ClientSession() as session:
                 try:
                     # Use the DELETE /documents/delete_document endpoint with proper format
-                    payload = {
-                        "doc_ids": doc_ids,
-                        "delete_file": delete_source
-                    }
+                    payload = {"doc_ids": doc_ids, "delete_file": delete_source}
                     async with session.delete(
                         f"{self.server_url}/documents/delete_document",
                         json=payload,
-                        timeout=60  # Longer timeout for batch operations
+                        timeout=60,  # Longer timeout for batch operations
                     ) as resp:
                         if resp.status == 200:
                             result_data = await resp.json()
                             status = result_data.get("status", "unknown")
                             message = result_data.get("message", "No message")
-                            
+
                             if status == "deletion_started":
                                 print(f"   ✅ Success: {message}")
                                 results["deleted_successfully"] = len(doc_ids)
@@ -177,9 +186,7 @@ class LightRAGDocumentManager:
                 # Clear all cache modes
                 payload = {"modes": None}  # None clears all cache
                 async with session.post(
-                    f"{self.server_url}/documents/clear_cache", 
-                    json=payload,
-                    timeout=30
+                    f"{self.server_url}/documents/clear_cache", json=payload, timeout=30
                 ) as resp:
                     if resp.status == 200:
                         print("✅ Server cache cleared successfully")
@@ -196,7 +203,9 @@ class LightRAGDocumentManager:
         print("✅ LightRAG server deletion complete.")
         return results
 
-    async def retry_documents(self, doc_ids: List[str], all_docs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def retry_documents(
+        self, doc_ids: List[str], all_docs: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Retries failed documents by deleting their server entry and triggering a new scan."""
         results = {
             "total_requested": len(doc_ids),
@@ -219,28 +228,34 @@ class LightRAGDocumentManager:
 
             doc_info = docs_by_id[doc_id]
             if doc_info.get("status") != "failed":
-                print(f"   - ⚠️ Document '{doc_id}' is not in 'failed' state (status: {doc_info.get('status')}). Skipping.")
+                print(
+                    f"   - ⚠️ Document '{doc_id}' is not in 'failed' state (status: {doc_info.get('status')}). Skipping."
+                )
                 results["not_failed"] += 1
                 continue
-            
+
             source_path_relative = doc_info.get("file_path")
             if not source_path_relative:
-                print(f"   - ❌ Source file path is missing for doc '{doc_id}'. Cannot retry.")
+                print(
+                    f"   - ❌ Source file path is missing for doc '{doc_id}'. Cannot retry."
+                )
                 results["source_file_missing"] += 1
                 continue
 
             # The file_path from the server is relative. We construct the full path
             # by assuming it's within an 'inputs' directory inside the main storage path.
             full_source_path = self.storage_dir / "inputs" / source_path_relative
-            
+
             print(f"     (Checking for source file at: {full_source_path})")
 
             if not full_source_path.exists():
                 print(f"   - ❌ Source file for doc '{doc_id}' not found.")
                 results["source_file_missing"] += 1
                 continue
-            
-            print(f"   - ✅ Document '{doc_id}' ({source_path_relative}) is eligible for retry.")
+
+            print(
+                f"   - ✅ Document '{doc_id}' ({source_path_relative}) is eligible for retry."
+            )
             docs_to_retry.append(doc_info)
 
         if not docs_to_retry:
@@ -248,18 +263,22 @@ class LightRAGDocumentManager:
             return results
 
         # Phase 2: Delete the failed document entries from LightRAG, one by one.
-        print("\n🗑️ Phase 2: Deleting failed document entries from LightRAG (one by one)")
+        print(
+            "\n🗑️ Phase 2: Deleting failed document entries from LightRAG (one by one)"
+        )
         deleted_count = 0
         for doc_info in docs_to_retry:
             doc_id = doc_info["id"]
-            print(f"   - Deleting document: {doc_id} ({doc_info.get('file_path', 'N/A')})")
+            print(
+                f"   - Deleting document: {doc_id} ({doc_info.get('file_path', 'N/A')})"
+            )
             delete_payload = {"doc_ids": [doc_id]}
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.delete(
                         f"{self.server_url}/documents/delete_document",
                         json=delete_payload,
-                        timeout=60
+                        timeout=60,
                     ) as resp:
                         if resp.status == 200:
                             print(f"     ✅ Successfully deleted.")
@@ -275,8 +294,10 @@ class LightRAGDocumentManager:
                 msg = f"An exception occurred during deletion of {doc_id}: {e}"
                 print(f"   ❌ {msg}")
                 results["errors"].append(msg)
-        
-        print(f"\n   ✅ Deletion phase complete. Successfully deleted {deleted_count}/{len(docs_to_retry)} documents.")
+
+        print(
+            f"\n   ✅ Deletion phase complete. Successfully deleted {deleted_count}/{len(docs_to_retry)} documents."
+        )
 
         # Add a delay to give the server time to process the deletions before scanning.
         print("\n⏱️ Waiting 5 seconds for server to process deletions...")
@@ -286,7 +307,9 @@ class LightRAGDocumentManager:
         print("\n🔄 Phase 3: Triggering server scan to re-process files")
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.post(f"{self.server_url}/documents/scan", timeout=30) as resp:
+                async with session.post(
+                    f"{self.server_url}/documents/scan", timeout=30
+                ) as resp:
                     if resp.status == 200:
                         print("   ✅ Server scan initiated successfully.")
                         print("      Documents will be re-processed in the background.")
@@ -313,27 +336,34 @@ class LightRAGDocumentManager:
         for doc in all_docs:
             status = doc.get("status", "UNKNOWN")
             status_counts[status] = status_counts.get(status, 0) + 1
-        
+
         return {
             "total_documents": len(all_docs),
             "status_breakdown": status_counts,
             "server_url": self.server_url,
-            "storage_dir": str(self.storage_dir)
+            "storage_dir": str(self.storage_dir),
         }
 
-    def filter_documents_by_status(self, all_docs: List[Dict[str, Any]], status: str) -> List[Dict[str, Any]]:
+    def filter_documents_by_status(
+        self, all_docs: List[Dict[str, Any]], status: str
+    ) -> List[Dict[str, Any]]:
         """Filter documents by their status."""
         return [d for d in all_docs if d.get("status") == status.lower()]
 
-    def filter_documents_by_ids(self, all_docs: List[Dict[str, Any]], doc_ids: List[str]) -> List[Dict[str, Any]]:
+    def filter_documents_by_ids(
+        self, all_docs: List[Dict[str, Any]], doc_ids: List[str]
+    ) -> List[Dict[str, Any]]:
         """Filter documents by their IDs."""
         docs_by_id = {doc["id"]: doc for doc in all_docs}
         return [docs_by_id[doc_id] for doc_id in doc_ids if doc_id in docs_by_id]
 
-    def filter_documents_by_name_pattern(self, all_docs: List[Dict[str, Any]], pattern: str) -> List[Dict[str, Any]]:
+    def filter_documents_by_name_pattern(
+        self, all_docs: List[Dict[str, Any]], pattern: str
+    ) -> List[Dict[str, Any]]:
         """Filter documents by file name pattern (glob-style)."""
         return [
-            d for d in all_docs
+            d
+            for d in all_docs
             if d.get("file_path") and fnmatch.fnmatch(d["file_path"], pattern)
         ]
 
@@ -350,17 +380,17 @@ class LightRAGDocumentManager:
             "total_targeted": len(original_doc_ids),
             "verified_deleted": verified_deleted_count,
             "still_present": still_present_count,
-            "deletion_successful": still_present_count == 0
+            "deletion_successful": still_present_count == 0,
         }
 
 
 async def main():
     """Main function to handle command-line interface and execute document management operations."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="LightRAG Document Manager")
     parser.add_argument("--server-url", help="LightRAG server URL")
-    
+
     # Actions
     parser.add_argument(
         "--status", action="store_true", help="Show storage and document status"
@@ -383,8 +413,10 @@ async def main():
         "--delete-name", help="Delete documents matching a name pattern"
     )
     parser.add_argument("--retry", nargs="+", help="Retry documents by ID")
-    parser.add_argument("--retry-all", action="store_true", help="Retry all failed documents")
-    
+    parser.add_argument(
+        "--retry-all", action="store_true", help="Retry all failed documents"
+    )
+
     # Options
     parser.add_argument(
         "--nuke", action="store_true", help="Comprehensive deletion mode"
@@ -421,12 +453,12 @@ async def main():
         server_status = await manager.check_server_status()
         print(f"Server Status: {'🟢 Online' if server_status else '🔴 Offline'}")
         print(f"  URL: {manager.server_url}")
-        
+
         status_summary = manager.get_status_summary(all_docs)
         print(f"Documents Found: {status_summary['total_documents']}")
-        
+
         # Count by status
-        for status, count in status_summary['status_breakdown'].items():
+        for status, count in status_summary["status_breakdown"].items():
             print(f"  - {status}: {count}")
         return 0
 
@@ -461,7 +493,9 @@ async def main():
         print("🔄 RETRY SUMMARY")
         print("=" * 60)
         print(f"Total documents targeted: {results['total_requested']}")
-        print(f"Retried successfully (re-queued via scan): {results['retried_successfully']}")
+        print(
+            f"Retried successfully (re-queued via scan): {results['retried_successfully']}"
+        )
         print(f"Not found on server: {results['not_found']}")
         print(f"Not in 'failed' state: {results['not_failed']}")
         print(f"Source file missing: {results['source_file_missing']}")
@@ -475,16 +509,18 @@ async def main():
     if args.retry_all:
         print("\n🔄 Finding all failed documents to retry...")
         failed_docs = manager.filter_documents_by_status(all_docs, "failed")
-        
+
         if not failed_docs:
             print("✅ No failed documents found. Nothing to do.")
             return 0
-            
+
         failed_doc_ids = [d["id"] for d in failed_docs]
         print(f"🎯 Found {len(failed_doc_ids)} failed documents to retry.")
 
         if not args.no_confirm:
-            response = input(f"\nProceed with retrying all {len(failed_doc_ids)} failed documents? (y/N): ")
+            response = input(
+                f"\nProceed with retrying all {len(failed_doc_ids)} failed documents? (y/N): "
+            )
             if response.lower() not in ["y", "yes"]:
                 print("❌ Retry cancelled.")
                 return 0
@@ -494,7 +530,9 @@ async def main():
         print("🔄 RETRY ALL SUMMARY")
         print("=" * 60)
         print(f"Total documents targeted: {results['total_requested']}")
-        print(f"Retried successfully (re-queued via scan): {results['retried_successfully']}")
+        print(
+            f"Retried successfully (re-queued via scan): {results['retried_successfully']}"
+        )
         print(f"Not found on server: {results['not_found']}")
         print(f"Not in 'failed' state: {results['not_failed']}")
         print(f"Source file missing: {results['source_file_missing']}")
@@ -523,11 +561,15 @@ async def main():
     elif args.delete_failed:
         docs_to_delete = manager.filter_documents_by_status(all_docs, "failed")
     elif args.delete_status:
-        docs_to_delete = manager.filter_documents_by_status(all_docs, args.delete_status)
+        docs_to_delete = manager.filter_documents_by_status(
+            all_docs, args.delete_status
+        )
     elif args.delete_ids:
         docs_to_delete = manager.filter_documents_by_ids(all_docs, args.delete_ids)
     elif args.delete_name:
-        docs_to_delete = manager.filter_documents_by_name_pattern(all_docs, args.delete_name)
+        docs_to_delete = manager.filter_documents_by_name_pattern(
+            all_docs, args.delete_name
+        )
 
     if not docs_to_delete:
         print("\n✅ No documents found matching the criteria. Nothing to do.")

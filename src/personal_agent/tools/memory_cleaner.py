@@ -2,7 +2,7 @@
 """
 Memory Cleaner Module
 
-A comprehensive module to clear both semantic memories (local SQLite) and 
+A comprehensive module to clear both semantic memories (local SQLite) and
 LightRAG graph memories (knowledge graph) to prevent drift between the two systems.
 
 This module provides a unified interface to clear:
@@ -14,16 +14,13 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
 import aiohttp
-from ..config.settings import (
-    AGNO_STORAGE_DIR,
-    LIGHTRAG_MEMORY_URL,
-    get_userid,
-)
-from ..core.semantic_memory_manager import create_semantic_memory_manager
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
+
+from ..config.settings import AGNO_STORAGE_DIR, LIGHTRAG_MEMORY_URL, get_userid
+from ..core.semantic_memory_manager import create_semantic_memory_manager
 
 
 class MemoryClearingManager:
@@ -49,7 +46,7 @@ class MemoryClearingManager:
         if user_id is None:
             user_id = get_userid()
         self.user_id = user_id
-        
+
         print("🧠 Memory Clearing Manager initialized")
         print(f"   User ID: {self.user_id}")
         print(f"   Storage Directory: {self.storage_dir}")
@@ -61,12 +58,14 @@ class MemoryClearingManager:
         try:
             # Ensure storage directory exists
             self.storage_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Use the EXACT same initialization pattern as create_agno_memory() in agno_storage.py
             # This ensures we're working with the same database and table as the actual agent
             self.memory_db = SqliteMemoryDb(
                 table_name="personal_agent_memory",  # <-- FIXED: Use the correct table name!
-                db_file=str(self.storage_dir / "agent_memory.db"),  # <-- FIXED: Use the correct file name!
+                db_file=str(
+                    self.storage_dir / "agent_memory.db"
+                ),  # <-- FIXED: Use the correct file name!
             )
 
             # Create semantic memory manager with the same configuration as the agent
@@ -79,7 +78,9 @@ class MemoryClearingManager:
                 print(f"✅ Semantic memory components initialized using agent pattern")
                 print(f"   Database file: {self.storage_dir / 'agent_memory.db'}")
                 print(f"   Table name: personal_agent_memory")
-                print(f"   Database exists: {(self.storage_dir / 'agent_memory.db').exists()}")
+                print(
+                    f"   Database exists: {(self.storage_dir / 'agent_memory.db').exists()}"
+                )
             return True
 
         except Exception as e:
@@ -90,7 +91,9 @@ class MemoryClearingManager:
         """Check if LightRAG memory server is running."""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.lightrag_memory_url}/health", timeout=10) as resp:
+                async with session.get(
+                    f"{self.lightrag_memory_url}/health", timeout=10
+                ) as resp:
                     return resp.status == 200
         except Exception as e:
             if self.verbose:
@@ -101,7 +104,9 @@ class MemoryClearingManager:
         """Get all documents from LightRAG memory server."""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.lightrag_memory_url}/documents", timeout=30) as resp:
+                async with session.get(
+                    f"{self.lightrag_memory_url}/documents", timeout=30
+                ) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
                         print(f"❌ Server error {resp.status}: {error_text}")
@@ -130,7 +135,9 @@ class MemoryClearingManager:
             print(f"❌ Error fetching LightRAG documents: {e}")
             return []
 
-    async def _clear_lightrag_documents(self, doc_ids: list, dry_run: bool = False) -> Dict[str, Any]:
+    async def _clear_lightrag_documents(
+        self, doc_ids: list, dry_run: bool = False
+    ) -> Dict[str, Any]:
         """Clear documents from LightRAG memory server."""
         if dry_run:
             return {
@@ -151,12 +158,12 @@ class MemoryClearingManager:
                 # Delete documents using batch deletion
                 payload = {
                     "doc_ids": doc_ids,
-                    "delete_file": True  # DELETE source files to prevent rescan
+                    "delete_file": True,  # DELETE source files to prevent rescan
                 }
                 async with session.delete(
                     f"{self.lightrag_memory_url}/documents/delete_document",
                     json=payload,
-                    timeout=60
+                    timeout=60,
                 ) as resp:
                     if resp.status == 200:
                         result_data = await resp.json()
@@ -166,10 +173,10 @@ class MemoryClearingManager:
                         if status == "deletion_started":
                             # Clear cache after deletion
                             await self._clear_lightrag_cache()
-                            
+
                             # Also delete the knowledge graph file
                             await self._delete_knowledge_graph_file()
-                            
+
                             return {
                                 "success": True,
                                 "message": f"Successfully deleted {len(doc_ids)} documents from LightRAG",
@@ -203,7 +210,7 @@ class MemoryClearingManager:
                 async with session.post(
                     f"{self.lightrag_memory_url}/documents/clear_cache",
                     json=payload,
-                    timeout=30
+                    timeout=30,
                 ) as resp:
                     if resp.status == 200:
                         if self.verbose:
@@ -211,22 +218,32 @@ class MemoryClearingManager:
                         return True
                     else:
                         error_text = await resp.text()
-                        print(f"❌ Failed to clear LightRAG cache: {resp.status} - {error_text}")
+                        print(
+                            f"❌ Failed to clear LightRAG cache: {resp.status} - {error_text}"
+                        )
                         return False
         except Exception as e:
             print(f"❌ Failed to clear LightRAG cache: {e}")
             return False
-            
+
     async def _delete_knowledge_graph_file(self) -> bool:
         """Delete the knowledge graph file from LightRAG storage directories."""
-        from ..config.settings import LIGHTRAG_STORAGE_DIR, LIGHTRAG_MEMORY_STORAGE_DIR
+        # Use dynamic path construction to avoid stale cached values
         import os
-        
+
+        from ..config.user_id_mgr import get_user_storage_paths
+
+        storage_paths = get_user_storage_paths()
+        lightrag_storage_dir = storage_paths["LIGHTRAG_STORAGE_DIR"]
+        lightrag_memory_storage_dir = storage_paths["LIGHTRAG_MEMORY_STORAGE_DIR"]
+
         graph_file_paths = [
-            os.path.join(LIGHTRAG_STORAGE_DIR, "graph_chunk_entity_relation.graphml"),
-            os.path.join(LIGHTRAG_MEMORY_STORAGE_DIR, "graph_chunk_entity_relation.graphml")
+            os.path.join(lightrag_storage_dir, "graph_chunk_entity_relation.graphml"),
+            os.path.join(
+                lightrag_memory_storage_dir, "graph_chunk_entity_relation.graphml"
+            ),
         ]
-        
+
         success = True
         for graph_file_path in graph_file_paths:
             try:
@@ -239,25 +256,27 @@ class MemoryClearingManager:
                         print(f"ℹ️ Knowledge graph file not found: {graph_file_path}")
             except Exception as e:
                 success = False
-                print(f"❌ Failed to delete knowledge graph file {graph_file_path}: {e}")
-                
+                print(
+                    f"❌ Failed to delete knowledge graph file {graph_file_path}: {e}"
+                )
+
         return success
 
     def _vacuum_database(self) -> bool:
         """Vacuum the SQLite database to ensure deletions are committed and space is reclaimed."""
         try:
             import sqlite3
-            
+
             # Use the correct database file path that matches the agent
             agent_db_path = self.storage_dir / "agent_memory.db"
-            
+
             if agent_db_path.exists():
                 # Connect directly to the SQLite database and vacuum it
                 conn = sqlite3.connect(str(agent_db_path))
                 conn.execute("VACUUM")
                 conn.commit()
                 conn.close()
-                
+
                 if self.verbose:
                     print("✅ Database vacuumed successfully")
                 return True
@@ -265,7 +284,7 @@ class MemoryClearingManager:
                 if self.verbose:
                     print("ℹ️ Database file does not exist, skipping vacuum")
                 return True
-                
+
         except Exception as e:
             if self.verbose:
                 print(f"⚠️ Warning: Could not vacuum database: {e}")
@@ -278,8 +297,7 @@ class MemoryClearingManager:
 
         try:
             stats = self.memory_manager.get_memory_stats(
-                db=self.memory_db,
-                user_id=self.user_id
+                db=self.memory_db, user_id=self.user_id
             )
             return stats
         except Exception as e:
@@ -299,52 +317,58 @@ class MemoryClearingManager:
             # Get count before clearing for verification
             pre_clear_stats = self._get_semantic_memory_stats()
             pre_clear_count = pre_clear_stats.get("total_memories", 0)
-            
+
             if self.verbose:
                 print(f"📊 Pre-clear: {pre_clear_count} memories found")
-            
+
             # Clear memories using the memory manager
             success, message = self.memory_manager.clear_memories(
-                db=self.memory_db,
-                user_id=self.user_id
+                db=self.memory_db, user_id=self.user_id
             )
-            
+
             if success:
                 # Force database connection to flush and close
                 try:
                     # Try to close the database connection to ensure changes are persisted
-                    if hasattr(self.memory_db, 'close'):
+                    if hasattr(self.memory_db, "close"):
                         self.memory_db.close()
-                    
+
                     # Add a small delay to ensure database operations complete
                     import time
+
                     time.sleep(0.1)
-                    
+
                     # Vacuum the database to ensure deletions are committed
                     self._vacuum_database()
-                    
+
                     # Reinitialize the database connection for verification
                     self._initialize_semantic_memory()
-                    
+
                     # Verify clearing was successful
                     post_clear_stats = self._get_semantic_memory_stats()
                     post_clear_count = post_clear_stats.get("total_memories", 0)
-                    
+
                     if self.verbose:
                         print(f"📊 Post-clear: {post_clear_count} memories found")
-                    
+
                     if post_clear_count == 0:
-                        return True, f"Successfully cleared {pre_clear_count} semantic memories (verified)"
+                        return (
+                            True,
+                            f"Successfully cleared {pre_clear_count} semantic memories (verified)",
+                        )
                     else:
-                        return False, f"Clearing incomplete: {post_clear_count} memories still remain after clearing {pre_clear_count}"
-                        
+                        return (
+                            False,
+                            f"Clearing incomplete: {post_clear_count} memories still remain after clearing {pre_clear_count}",
+                        )
+
                 except Exception as e:
                     if self.verbose:
                         print(f"⚠️ Warning: Could not verify clearing: {e}")
                     return True, f"{message} (verification failed: {e})"
-            
+
             return success, message
-            
+
         except Exception as e:
             return False, f"Error clearing semantic memories: {e}"
 
@@ -392,7 +416,9 @@ class MemoryClearingManager:
                 results["semantic_memory"]["success"] = success
                 results["semantic_memory"]["message"] = message
             else:
-                results["semantic_memory"]["message"] = "Failed to initialize semantic memory"
+                results["semantic_memory"][
+                    "message"
+                ] = "Failed to initialize semantic memory"
 
         # Clear LightRAG memories
         if not semantic_only:
@@ -403,14 +429,20 @@ class MemoryClearingManager:
                 documents = await self._get_lightrag_documents()
                 if documents:
                     doc_ids = [doc["id"] for doc in documents]
-                    clear_result = await self._clear_lightrag_documents(doc_ids, dry_run)
+                    clear_result = await self._clear_lightrag_documents(
+                        doc_ids, dry_run
+                    )
                     results["lightrag_memory"]["success"] = clear_result["success"]
                     results["lightrag_memory"]["message"] = clear_result["message"]
                 else:
                     results["lightrag_memory"]["success"] = True
-                    results["lightrag_memory"]["message"] = "No LightRAG documents to clear"
+                    results["lightrag_memory"][
+                        "message"
+                    ] = "No LightRAG documents to clear"
             else:
-                results["lightrag_memory"]["message"] = "LightRAG memory server not available"
+                results["lightrag_memory"][
+                    "message"
+                ] = "LightRAG memory server not available"
 
         # Determine overall success
         attempted_systems = []
@@ -455,8 +487,8 @@ class MemoryClearingManager:
 
         # Overall verification
         verification["fully_cleared"] = (
-            verification["semantic_memory"]["cleared"] and
-            verification["lightrag_memory"]["cleared"]
+            verification["semantic_memory"]["cleared"]
+            and verification["lightrag_memory"]["cleared"]
         )
 
         return verification
@@ -526,7 +558,9 @@ def print_clearing_results(results: Dict[str, Any]) -> None:
         print(f"   Message: {lightrag['message']}")
 
     # Overall Result
-    print(f"\n🎯 Overall Result: {'✅ SUCCESS' if results['overall_success'] else '❌ PARTIAL/FAILED'}")
+    print(
+        f"\n🎯 Overall Result: {'✅ SUCCESS' if results['overall_success'] else '❌ PARTIAL/FAILED'}"
+    )
 
 
 def print_verification_results(verification: Dict[str, Any]) -> None:
@@ -548,37 +582,43 @@ def print_verification_results(verification: Dict[str, Any]) -> None:
     print(f"   Remaining Documents: {lightrag['remaining_count']}")
 
     # Overall Verification
-    print(f"\n🎯 Fully Cleared: {'✅ YES' if verification['fully_cleared'] else '❌ NO'}")
+    print(
+        f"\n🎯 Fully Cleared: {'✅ YES' if verification['fully_cleared'] else '❌ NO'}"
+    )
 
 
 async def main():
     """Main function to handle command-line interface and execute clearing operations."""
-    parser = argparse.ArgumentParser(description="Clear All Memories - Semantic and LightRAG")
+    parser = argparse.ArgumentParser(
+        description="Clear All Memories - Semantic and LightRAG"
+    )
 
     # Action options
     parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would be cleared without actually clearing"
+        "--dry-run",
+        action="store_true",
+        help="Show what would be cleared without actually clearing",
     )
     parser.add_argument(
         "--no-confirm", action="store_true", help="Skip confirmation prompts"
     )
     parser.add_argument(
-        "--semantic-only", action="store_true", help="Clear only the semantic memory system"
+        "--semantic-only",
+        action="store_true",
+        help="Clear only the semantic memory system",
     )
     parser.add_argument(
-        "--lightrag-only", action="store_true", help="Clear only the LightRAG graph memory system"
+        "--lightrag-only",
+        action="store_true",
+        help="Clear only the LightRAG graph memory system",
     )
     parser.add_argument(
         "--verify", action="store_true", help="Verify that memories have been cleared"
     )
 
     # Configuration options
-    parser.add_argument(
-        "--user-id", help="Specify user ID (default: from config)"
-    )
-    parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("--user-id", help="Specify user ID (default: from config)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 
@@ -591,10 +631,7 @@ async def main():
     user_id = args.user_id if args.user_id else get_userid()
 
     # Create memory clearing manager
-    manager = MemoryClearingManager(
-        user_id=user_id,
-        verbose=args.verbose
-    )
+    manager = MemoryClearingManager(user_id=user_id, verbose=args.verbose)
 
     try:
         # Handle verification mode
@@ -640,13 +677,17 @@ async def main():
 
         # Confirmation prompt
         if not args.no_confirm and not args.dry_run:
-            response = input(f"\n⚠️  Are you sure you want to clear these memories? This action cannot be undone! (y/N): ")
+            response = input(
+                f"\n⚠️  Are you sure you want to clear these memories? This action cannot be undone! (y/N): "
+            )
             if response.lower() not in ["y", "yes"]:
                 print("❌ Operation cancelled.")
                 return 0
 
         # Perform clearing
-        print(f"\n🧹 {'Simulating' if args.dry_run else 'Performing'} memory clearing...")
+        print(
+            f"\n🧹 {'Simulating' if args.dry_run else 'Performing'} memory clearing..."
+        )
         results = await manager.clear_all_memories(
             dry_run=args.dry_run,
             semantic_only=args.semantic_only,
@@ -663,7 +704,9 @@ async def main():
             print_verification_results(verification)
 
             if not verification["fully_cleared"]:
-                print("\n⚠️  Warning: Verification indicates some memories may still remain.")
+                print(
+                    "\n⚠️  Warning: Verification indicates some memories may still remain."
+                )
                 return 1
 
         return 0 if results["overall_success"] else 1
@@ -675,6 +718,7 @@ async def main():
         print(f"\n❌ Unexpected error: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 

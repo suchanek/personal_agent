@@ -262,7 +262,8 @@ class KnowledgeTools(Toolkit):
                 logger.warning(f"File type {mime_type} may not be fully supported")
 
             # Copy file to knowledge directory
-            knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
+            # Use knowledge_manager's knowledge_dir instead of static settings
+            knowledge_dir = self.knowledge_manager.knowledge_dir
             knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename to avoid conflicts
@@ -326,7 +327,8 @@ class KnowledgeTools(Toolkit):
                 file_type = ".txt"  # Default to txt
 
             # Create knowledge directory
-            knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
+            # Use knowledge_manager's knowledge_dir instead of static settings
+            knowledge_dir = self.knowledge_manager.knowledge_dir
             knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename
@@ -856,7 +858,8 @@ class KnowledgeTools(Toolkit):
                 logger.warning(f"File type {mime_type} may not be fully supported")
 
             # Copy file to semantic knowledge directory
-            semantic_knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
+            # Use knowledge_manager's knowledge_dir instead of static settings
+            semantic_knowledge_dir = self.knowledge_manager.knowledge_dir
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename to avoid conflicts
@@ -941,7 +944,8 @@ class KnowledgeTools(Toolkit):
                 file_type = ".txt"  # Default to txt
 
             # Create semantic knowledge directory
-            semantic_knowledge_dir = Path(settings.AGNO_KNOWLEDGE_DIR)
+            # Use knowledge_manager's knowledge_dir instead of static settings
+            semantic_knowledge_dir = self.knowledge_manager.knowledge_dir
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename
