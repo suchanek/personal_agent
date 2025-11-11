@@ -12,10 +12,11 @@ import json
 import os
 import sys
 import time
-import streamlit as st
-import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import pandas as pd
+import streamlit as st
 
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -104,14 +105,14 @@ def _render_memory_explorer():
 
     # Filters
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         memory_type = st.selectbox(
             "Memory Type",
             ["All", "Conversation", "Document", "Tool", "System"],
-            help="Filter memories by type"
+            help="Filter memories by type",
         )
-    
+
     with col2:
         # Get all memories to determine the full date range
         try:
@@ -119,14 +120,16 @@ def _render_memory_explorer():
             memory_dates = []
 
             for memory in all_memories:
-                last_updated = getattr(memory, 'last_updated', None)
+                last_updated = getattr(memory, "last_updated", None)
                 if last_updated:
                     try:
                         # Convert memory date to date object
                         if isinstance(last_updated, str):
                             # Try to parse the date string (assuming YYYY-MM-DD format)
-                            memory_date = datetime.strptime(last_updated.split()[0], '%Y-%m-%d').date()
-                        elif hasattr(last_updated, 'date'):
+                            memory_date = datetime.strptime(
+                                last_updated.split()[0], "%Y-%m-%d"
+                            ).date()
+                        elif hasattr(last_updated, "date"):
                             memory_date = last_updated.date()
                         else:
                             memory_date = last_updated
@@ -150,9 +153,9 @@ def _render_memory_explorer():
         date_range = st.date_input(
             "Date Range",
             value=[default_start_date, default_end_date],
-            help="Filter memories by date range (automatically set to encompass all memory dates)"
+            help="Filter memories by date range (automatically set to encompass all memory dates)",
         )
-    
+
     with col3:
         limit = st.number_input(
             "Limit",
@@ -160,31 +163,33 @@ def _render_memory_explorer():
             max_value=1000,
             value=100,
             step=10,
-            help="Maximum number of memories to display"
+            help="Maximum number of memories to display",
         )
 
     # Get all memories using the helper
     try:
         raw_memories = memory_helper.get_all_memories()
-        
+
         # Apply filters
         filtered_memories = raw_memories
-        
+
         # Filter by date range if specified
         if len(date_range) == 2:
             start_date, end_date = date_range
             filtered_memories = []
             for memory in raw_memories:
-                memory_date = getattr(memory, 'last_updated', None)
+                memory_date = getattr(memory, "last_updated", None)
                 if memory_date:
                     try:
                         # Convert memory date to date object for comparison
                         if isinstance(memory_date, str):
                             # Try to parse the date string (assuming YYYY-MM-DD format)
-                            memory_date = datetime.strptime(memory_date.split()[0], '%Y-%m-%d').date()
-                        elif hasattr(memory_date, 'date'):
+                            memory_date = datetime.strptime(
+                                memory_date.split()[0], "%Y-%m-%d"
+                            ).date()
+                        elif hasattr(memory_date, "date"):
                             memory_date = memory_date.date()
-                        
+
                         # Check if memory date is within range
                         if start_date <= memory_date <= end_date:
                             filtered_memories.append(memory)
@@ -194,13 +199,15 @@ def _render_memory_explorer():
                 else:
                     # If no date, include the memory
                     filtered_memories.append(memory)
-        
+
         # Apply limit
         filtered_memories = filtered_memories[:limit]
 
         if filtered_memories:
             # Display memory count
-            st.caption(f"Displaying {len(filtered_memories)} of {len(raw_memories)} total memories")
+            st.caption(
+                f"Displaying {len(filtered_memories)} of {len(raw_memories)} total memories"
+            )
 
             # Display memories in single line format with trashcan icon
             for i, memory in enumerate(filtered_memories):
@@ -209,28 +216,59 @@ def _render_memory_explorer():
                 last_updated = getattr(memory, "last_updated", "N/A")
                 topics = getattr(memory, "topics", [])
 
+                # Enhanced fields
+                confidence = getattr(memory, "confidence", 1.0)
+                is_proxy = getattr(memory, "is_proxy", False)
+                proxy_agent = getattr(memory, "proxy_agent", None)
+
                 # Create a container for each memory row
                 with st.container():
                     col1, col2, col3 = st.columns([8, 1, 1])
 
                     with col1:
-                        # Display memory in single line format
+                        # Build display string with enhanced fields
                         topics_str = f" | Topics: {', '.join(topics)}" if topics else ""
-                        st.write(f"**{memory_id}:** {memory_content[:100]}{'...' if len(memory_content) > 100 else ''} | Updated: {last_updated}{topics_str}")
+
+                        # Add confidence indicator (only if not 1.0)
+                        if confidence < 1.0:
+                            conf_emoji = (
+                                "🟡"
+                                if confidence >= 0.7
+                                else "🟠" if confidence >= 0.4 else "🔴"
+                            )
+                            confidence_str = f" | {conf_emoji} {int(confidence * 100)}%"
+                        else:
+                            confidence_str = ""
+
+                        # Add proxy indicator
+                        proxy_str = (
+                            f" | 🤖 {proxy_agent}"
+                            if is_proxy and proxy_agent
+                            else " | 🤖 Proxy" if is_proxy else ""
+                        )
+
+                        st.write(
+                            f"**{memory_id}:** {memory_content[:100]}{'...' if len(memory_content) > 100 else ''} | Updated: {last_updated}{topics_str}{confidence_str}{proxy_str}"
+                        )
 
                     with col2:
                         # Trashcan icon button
-                        if st.button("🗑️", key=f"trash_{memory_id}", help="Delete Memory"):
+                        if st.button(
+                            "🗑️", key=f"trash_{memory_id}", help="Delete Memory"
+                        ):
                             st.session_state[f"show_delete_confirm_{memory_id}"] = True
 
                     with col3:
-                        # Export button
+                        # Export button with enhanced fields
                         export_data = json.dumps(
                             {
                                 "id": memory_id,
                                 "content": memory_content,
                                 "last_updated": str(last_updated),
                                 "topics": topics,
+                                "confidence": confidence,
+                                "is_proxy": is_proxy,
+                                "proxy_agent": proxy_agent,
                             },
                             indent=2,
                         )
@@ -246,55 +284,85 @@ def _render_memory_explorer():
                     # Show confirmation dropdown if trashcan was clicked
                     if st.session_state.get(f"show_delete_confirm_{memory_id}", False):
                         with st.expander("⚠️ Confirm Deletion", expanded=True):
-                            st.warning(f"Are you sure you want to delete memory: **{memory_id}**?")
-                            st.write(f"Content: {memory_content[:200]}{'...' if len(memory_content) > 200 else ''}")
-                            
+                            st.warning(
+                                f"Are you sure you want to delete memory: **{memory_id}**?"
+                            )
+                            st.write(
+                                f"Content: {memory_content[:200]}{'...' if len(memory_content) > 200 else ''}"
+                            )
+
                             col_confirm1, col_confirm2 = st.columns([3, 1])
-                            
+
                             with col_confirm1:
                                 confirmation_text = st.text_input(
                                     "Type 'yes' to confirm deletion:",
                                     key=f"confirm_text_{memory_id}",
-                                    placeholder="yes"
+                                    placeholder="yes",
                                 )
-                            
+
                             with col_confirm2:
-                                if st.button("Delete", key=f"confirm_delete_{memory_id}", type="primary"):
+                                if st.button(
+                                    "Delete",
+                                    key=f"confirm_delete_{memory_id}",
+                                    type="primary",
+                                ):
                                     if confirmation_text.lower() == "yes":
                                         # Show toast notification with 2-second delay
-                                        st.toast(f"Deleting memory {memory_id}...", icon="🗑️")
+                                        st.toast(
+                                            f"Deleting memory {memory_id}...", icon="🗑️"
+                                        )
                                         time.sleep(2)
-                                        
+
                                         with st.spinner("Deleting memory..."):
-                                            success, message = memory_helper.delete_memory(memory_id)
-                                            
+                                            success, message = (
+                                                memory_helper.delete_memory(memory_id)
+                                            )
+
                                             # Store deletion status in session state for 5-second display
-                                            st.session_state[f"deletion_status_{memory_id}"] = {
+                                            st.session_state[
+                                                f"deletion_status_{memory_id}"
+                                            ] = {
                                                 "success": success,
                                                 "message": message,
-                                                "timestamp": time.time()
+                                                "timestamp": time.time(),
                                             }
-                                            
+
                                             # Clear confirmation state
-                                            st.session_state[f"show_delete_confirm_{memory_id}"] = False
-                                            
+                                            st.session_state[
+                                                f"show_delete_confirm_{memory_id}"
+                                            ] = False
+
                                             if success:
-                                                st.toast("Memory deleted successfully!", icon="✅")
+                                                st.toast(
+                                                    "Memory deleted successfully!",
+                                                    icon="✅",
+                                                )
                                                 # Clear the agent cache to ensure fresh data on next load
                                                 st.cache_resource.clear()
                                                 st.rerun()
                                             else:
-                                                st.toast(f"Failed to delete memory: {message}", icon="❌")
+                                                st.toast(
+                                                    f"Failed to delete memory: {message}",
+                                                    icon="❌",
+                                                )
                                     else:
-                                        st.error("Please type 'yes' to confirm deletion")
-                                
+                                        st.error(
+                                            "Please type 'yes' to confirm deletion"
+                                        )
+
                                 # Cancel button
-                                if st.button("Cancel", key=f"cancel_delete_{memory_id}"):
-                                    st.session_state[f"show_delete_confirm_{memory_id}"] = False
+                                if st.button(
+                                    "Cancel", key=f"cancel_delete_{memory_id}"
+                                ):
+                                    st.session_state[
+                                        f"show_delete_confirm_{memory_id}"
+                                    ] = False
                                     st.rerun()
 
                     # Show deletion status for 5 seconds
-                    deletion_status = st.session_state.get(f"deletion_status_{memory_id}")
+                    deletion_status = st.session_state.get(
+                        f"deletion_status_{memory_id}"
+                    )
                     if deletion_status:
                         current_time = time.time()
                         if current_time - deletion_status["timestamp"] < 5:
@@ -370,11 +438,33 @@ def _render_memory_search():
 
                     # Display search results
                     for i, (memory, score) in enumerate(search_results, 1):
+                        # Get enhanced fields
+                        confidence = getattr(memory, "confidence", 1.0)
+                        is_proxy = getattr(memory, "is_proxy", False)
+                        proxy_agent = getattr(memory, "proxy_agent", None)
+
+                        # Build title with confidence and proxy indicators
+                        conf_indicator = (
+                            f" | {int(confidence * 100)}% conf"
+                            if confidence < 1.0
+                            else ""
+                        )
+                        proxy_indicator = (
+                            f" | 🤖 {proxy_agent}"
+                            if is_proxy and proxy_agent
+                            else " | 🤖 Proxy" if is_proxy else ""
+                        )
+
                         with st.expander(
-                            f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}..."
+                            f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}...{conf_indicator}{proxy_indicator}"
                         ):
                             st.write(f"**Memory:** {memory.memory}")
                             st.write(f"**Similarity Score:** {score:.3f}")
+                            st.write(f"**Confidence:** {int(confidence * 100)}%")
+                            if is_proxy:
+                                st.write(
+                                    f"**🤖 Proxy Memory** (Agent: {proxy_agent or 'Unknown'})"
+                                )
                             topics = getattr(memory, "topics", [])
                             if topics:
                                 st.write(f"**Topics:** {', '.join(topics)}")
@@ -391,9 +481,11 @@ def _render_memory_search():
                                 key=f"delete_search_{memory.memory_id}",
                             ):
                                 # Show toast notification with 2-second delay
-                                st.toast(f"Deleting memory {memory.memory_id}...", icon="🗑️")
+                                st.toast(
+                                    f"Deleting memory {memory.memory_id}...", icon="🗑️"
+                                )
                                 time.sleep(2)
-                                
+
                                 success, message = memory_helper.delete_memory(
                                     memory.memory_id
                                 )
@@ -402,7 +494,9 @@ def _render_memory_search():
                                     st.success(f"Memory deleted: {message}")
                                     st.rerun()
                                 else:
-                                    st.toast(f"Failed to delete memory: {message}", icon="❌")
+                                    st.toast(
+                                        f"Failed to delete memory: {message}", icon="❌"
+                                    )
                                     st.error(f"Failed to delete memory: {message}")
                 else:
                     st.info("No memories found matching your search.")
@@ -479,7 +573,10 @@ def _render_memory_sync():
 
                     if synced_count > 0:
                         # Show success notification
-                        st.toast(f"🎉 Synced {synced_count} memories to graph system!", icon="✅")
+                        st.toast(
+                            f"🎉 Synced {synced_count} memories to graph system!",
+                            icon="✅",
+                        )
                         time.sleep(2.0)  # 2 second delay
                         st.rerun()
                     else:
@@ -631,7 +728,10 @@ def _render_memory_sync():
 
                     if imported_count > 0:
                         # Show success notification
-                        st.toast(f"🎉 Successfully imported {imported_count} memories!", icon="✅")
+                        st.toast(
+                            f"🎉 Successfully imported {imported_count} memories!",
+                            icon="✅",
+                        )
                         time.sleep(2.0)  # 2 second delay
                         st.rerun()
                     else:
@@ -658,14 +758,22 @@ def _render_memory_settings():
     memory_helper = StreamlitMemoryHelper(agent)
 
     # Clear all memories button
-    if st.button("🗑️ Clear All Memories", type="primary", help="Delete all memories from local SQLite and LightRAG graph"):
+    if st.button(
+        "🗑️ Clear All Memories",
+        type="primary",
+        help="Delete all memories from local SQLite and LightRAG graph",
+    ):
         st.session_state["show_clear_all_confirmation"] = True
 
     # Show confirmation dialog if button was clicked
     if st.session_state.get("show_clear_all_confirmation", False):
         with st.expander("⚠️ Confirm Clear All Memories", expanded=True):
-            st.error("**This will permanently delete ALL memories from both local and graph storage!**")
-            st.write("This action cannot be undone. All user memories will be permanently removed.")
+            st.error(
+                "**This will permanently delete ALL memories from both local and graph storage!**"
+            )
+            st.write(
+                "This action cannot be undone. All user memories will be permanently removed."
+            )
 
             col_confirm1, col_confirm2 = st.columns([3, 1])
 
@@ -673,7 +781,7 @@ def _render_memory_settings():
                 confirmation_text = st.text_input(
                     "Type 'DELETE ALL' to confirm:",
                     key="confirm_clear_all_text",
-                    placeholder="DELETE ALL"
+                    placeholder="DELETE ALL",
                 )
 
             with col_confirm2:
@@ -682,21 +790,27 @@ def _render_memory_settings():
                         st.toast("Clearing all memories...", icon="🗑️")
                         time.sleep(2)
 
-                        with st.spinner("Deleting all memories from local and graph storage..."):
+                        with st.spinner(
+                            "Deleting all memories from local and graph storage..."
+                        ):
                             success, message = memory_helper.clear_memories()
 
                             # Clear confirmation state
                             st.session_state["show_clear_all_confirmation"] = False
 
                             if success:
-                                st.toast("All memories cleared successfully!", icon="✅")
+                                st.toast(
+                                    "All memories cleared successfully!", icon="✅"
+                                )
                                 # Clear the agent cache to ensure fresh data on next load
                                 st.cache_resource.clear()
                                 st.success(message)
                                 time.sleep(2)
                                 st.rerun()
                             else:
-                                st.toast(f"Failed to clear memories: {message}", icon="❌")
+                                st.toast(
+                                    f"Failed to clear memories: {message}", icon="❌"
+                                )
                                 st.error(message)
                     else:
                         st.error("Please type 'DELETE ALL' to confirm")

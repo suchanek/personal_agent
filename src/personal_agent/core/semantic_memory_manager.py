@@ -826,7 +826,7 @@ class SemanticMemoryManager:
         similarity_threshold: float = 0.3,
         search_topics: bool = True,
         topic_boost: float = 0.5,
-    ) -> List[Tuple[UserMemory, float]]:
+    ) -> List[Tuple[EnhancedUserMemory, float]]:
         """
         Search memories using semantic similarity and topic matching with enhanced query expansion.
 
@@ -874,32 +874,22 @@ class SemanticMemoryManager:
 
             # LATENCY DEBUG: Time memory conversion
             convert_start = time.perf_counter()
-            user_memories = []
+            enhanced_memories = []
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        # Check if this is an enhanced memory (has enhanced fields)
-                        if (
-                            "confidence" in row.memory
-                            or "is_proxy" in row.memory
-                            or "proxy_agent" in row.memory
-                        ):
-                            # Deserialize as EnhancedUserMemory then extract base
-                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
-                            user_memory = enhanced_memory.to_user_memory()
-                        else:
-                            # Regular UserMemory
-                            user_memory = UserMemory.from_dict(row.memory)
-                        user_memories.append(user_memory)
+                        # Always return EnhancedUserMemory
+                        enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                        enhanced_memories.append(enhanced_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(
-                            "Failed to convert memory row to UserMemory: %s", e
+                            "Failed to convert memory row to EnhancedUserMemory: %s", e
                         )
             convert_time = time.perf_counter() - convert_start
             logger.debug(
                 "🔍 MEMORY LATENCY: Memory conversion took %.3f seconds (%d memories)",
                 convert_time,
-                len(user_memories),
+                len(enhanced_memories),
             )
 
             # LATENCY DEBUG: Time similarity calculations
@@ -907,7 +897,7 @@ class SemanticMemoryManager:
             results = []
             query_lower = query.lower().strip()
 
-            for memory in user_memories:
+            for memory in enhanced_memories:
                 max_similarity = 0.0
                 best_query = query
 
@@ -980,7 +970,7 @@ class SemanticMemoryManager:
             logger.debug(
                 "🔍 MEMORY LATENCY: Similarity calculations took %.3f seconds (%d memories processed)",
                 similarity_time,
-                len(user_memories),
+                len(enhanced_memories),
             )
 
             # LATENCY DEBUG: Time sorting
@@ -1013,7 +1003,7 @@ class SemanticMemoryManager:
         user_id: str = None,
         topics: Optional[List[str]] = None,
         limit: Optional[int] = None,
-    ) -> List[UserMemory]:
+    ) -> List[EnhancedUserMemory]:
         """
         Get memories filtered by a list of topics, without similarity search.
 
@@ -1021,7 +1011,7 @@ class SemanticMemoryManager:
         :param user_id: User ID to search within
         :param topics: Optional list of topics to filter by. If None, returns all memories.
         :param limit: Maximum number of results to return
-        :return: List of UserMemory objects matching the topics.
+        :return: List of EnhancedUserMemory objects matching the topics.
         """
         # Get current user ID if not provided
         if user_id is None:
@@ -1031,36 +1021,26 @@ class SemanticMemoryManager:
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id, sort="desc")
 
-            user_memories = []
+            enhanced_memories = []
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        # Check if this is an enhanced memory (has enhanced fields)
-                        if (
-                            "confidence" in row.memory
-                            or "is_proxy" in row.memory
-                            or "proxy_agent" in row.memory
-                        ):
-                            # Deserialize as EnhancedUserMemory then extract base
-                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
-                            user_memory = enhanced_memory.to_user_memory()
-                        else:
-                            # Regular UserMemory
-                            user_memory = UserMemory.from_dict(row.memory)
-                        user_memories.append(user_memory)
+                        # Always return EnhancedUserMemory
+                        enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                        enhanced_memories.append(enhanced_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(
-                            "Failed to convert memory row to UserMemory: %s", e
+                            "Failed to convert memory row to EnhancedUserMemory: %s", e
                         )
 
             if not topics:
                 # If no topics are specified, return all memories up to the limit
-                return user_memories[:limit]
+                return enhanced_memories[:limit]
 
             # Filter memories by the given topics
             filtered_memories = []
             topic_set = {t.lower() for t in topics}
-            for memory in user_memories:
+            for memory in enhanced_memories:
                 if memory.topics and any(t.lower() in topic_set for t in memory.topics):
                     filtered_memories.append(memory)
 
@@ -1163,13 +1143,15 @@ class SemanticMemoryManager:
 
         return max_score
 
-    def get_all_memories(self, db: MemoryDb, user_id: str = None) -> List[UserMemory]:
+    def get_all_memories(
+        self, db: MemoryDb, user_id: str = None
+    ) -> List[EnhancedUserMemory]:
         """
         Get all memories for a user.
 
         :param db: Memory database instance
         :param user_id: User ID to retrieve memories for
-        :return: List of UserMemory objects
+        :return: List of EnhancedUserMemory objects
         """
         # Get current user ID if not provided
         if user_id is None:
@@ -1179,32 +1161,22 @@ class SemanticMemoryManager:
             # Get all memories for the user
             memory_rows = db.read_memories(user_id=user_id, sort="desc")
 
-            user_memories = []
+            enhanced_memories = []
             for row in memory_rows:
                 if row.user_id == user_id and row.memory:
                     try:
-                        # Check if this is an enhanced memory (has enhanced fields)
-                        if (
-                            "confidence" in row.memory
-                            or "is_proxy" in row.memory
-                            or "proxy_agent" in row.memory
-                        ):
-                            # Deserialize as EnhancedUserMemory then extract base
-                            enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
-                            user_memory = enhanced_memory.to_user_memory()
-                        else:
-                            # Regular UserMemory
-                            user_memory = UserMemory.from_dict(row.memory)
-                        user_memories.append(user_memory)
+                        # Always return EnhancedUserMemory
+                        enhanced_memory = EnhancedUserMemory.from_dict(row.memory)
+                        enhanced_memories.append(enhanced_memory)
                     except (ValueError, KeyError, TypeError) as e:
                         logger.warning(
-                            "Failed to convert memory row to UserMemory: %s", e
+                            "Failed to convert memory row to EnhancedUserMemory: %s", e
                         )
 
             logger.info(
-                "Retrieved %d memories for user %s", len(user_memories), user_id
+                "Retrieved %d memories for user %s", len(enhanced_memories), user_id
             )
-            return user_memories
+            return enhanced_memories
 
         except Exception as e:
             logger.error("Error retrieving all memories: %s", e)

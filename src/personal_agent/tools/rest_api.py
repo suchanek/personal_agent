@@ -461,6 +461,9 @@ class PersonalAgentRestAPI:
                             "topics": getattr(memory, "topics", []),
                             "last_updated": getattr(memory, "last_updated", None),
                             "input": getattr(memory, "input", None),
+                            "confidence": getattr(memory, "confidence", 1.0),
+                            "is_proxy": getattr(memory, "is_proxy", False),
+                            "proxy_agent": getattr(memory, "proxy_agent", None),
                         }
                     )
 
@@ -507,6 +510,9 @@ class PersonalAgentRestAPI:
                             "topics": getattr(memory, "topics", []),
                             "last_updated": getattr(memory, "last_updated", None),
                             "input": getattr(memory, "input", None),
+                            "confidence": getattr(memory, "confidence", 1.0),
+                            "is_proxy": getattr(memory, "is_proxy", False),
+                            "proxy_agent": getattr(memory, "proxy_agent", None),
                         }
                     )
 
@@ -745,6 +751,7 @@ class PersonalAgentRestAPI:
 
                 # Get current system user from global configuration
                 from ..config.user_id_mgr import get_current_user_id
+
                 current_user = get_current_user_id()
 
                 # Get agent from global state
@@ -752,7 +759,9 @@ class PersonalAgentRestAPI:
                 if not agent:
                     return jsonify({"error": "Agent not available"}), 503
 
-                logger.info(f"Chat request via API for user '{current_user}': {message[:50]}...")
+                logger.info(
+                    f"Chat request via API for user '{current_user}': {message[:50]}..."
+                )
 
                 # Run the agent with the message
                 try:
@@ -776,9 +785,7 @@ class PersonalAgentRestAPI:
                     else:
                         response_text = str(response)
 
-                    logger.info(
-                        f"Chat response via API: {response_text[:100]}..."
-                    )
+                    logger.info(f"Chat response via API: {response_text[:100]}...")
 
                     return jsonify(
                         {

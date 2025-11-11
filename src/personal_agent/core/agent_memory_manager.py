@@ -1167,6 +1167,21 @@ class AgentMemoryManager:
                 if hasattr(memory, "topics") and memory.topics:
                     result += f"   Topics: {', '.join(memory.topics)}\n"
 
+                # Add confidence indicator
+                if hasattr(memory, "confidence"):
+                    conf_percent = int(memory.confidence * 100)
+                    conf_emoji = (
+                        "🟢"
+                        if memory.confidence >= 0.8
+                        else "🟡" if memory.confidence >= 0.5 else "🔴"
+                    )
+                    result += f"   Confidence: {conf_emoji} {conf_percent}%\n"
+
+                # Add proxy indicator
+                if hasattr(memory, "is_proxy") and memory.is_proxy:
+                    proxy_name = getattr(memory, "proxy_agent", "Unknown")
+                    result += f"   🤖 Proxy Memory (Agent: {proxy_name})\n"
+
                 # Add timestamp if available
                 if hasattr(memory, "timestamp") and memory.timestamp:
                     # Convert timestamp to readable format
@@ -1220,9 +1235,25 @@ class AgentMemoryManager:
             result = f"📝 MEMORY LIST ({len(memories)} total):\n\n"
 
             for i, memory in enumerate(sorted_memories, 1):
-                # Just show the memory content, omit topics and other metadata
+                # Show the memory content with enhanced fields
                 memory_preview = memory.memory
-                result += f"{i}. {memory_preview}\n"
+
+                # Build enhanced info string
+                enhanced_info = []
+
+                # Add confidence if < 1.0
+                if hasattr(memory, "confidence") and memory.confidence < 1.0:
+                    conf_percent = int(memory.confidence * 100)
+                    enhanced_info.append(f"{conf_percent}% conf")
+
+                # Add proxy indicator
+                if hasattr(memory, "is_proxy") and memory.is_proxy:
+                    proxy_name = getattr(memory, "proxy_agent", "Unknown")
+                    enhanced_info.append(f"🤖 {proxy_name}")
+
+                # Format the line
+                enhanced_str = f" ({', '.join(enhanced_info)})" if enhanced_info else ""
+                result += f"{i}. {memory_preview}{enhanced_str}\n"
 
             logger.info(
                 "Listed all %d memories for user %s in simplified format (performance optimized)",
