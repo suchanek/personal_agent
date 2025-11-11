@@ -12,7 +12,7 @@
 ### Removed
 - **Unused Ollama Template Files**: Removed obsolete `setup/start_ollama.sh` template file that was not referenced by the installation process, eliminating configuration confusion. The install script generates the startup script directly via heredoc as the single source of truth.
 
-## [v0.8.75] - 2025-10-20
+## [v0.8.74] - 2025-10-20
 
 ### Added
 - **Enhanced User Profile Model**: Extended the `User` dataclass with `gender` (validated against "Male", "Female", "N/A") and `npc` (boolean) fields, enabling richer user profiles and support for bot users. These fields are fully integrated across the entire stack including serialization, persistence, and UI components.
