@@ -595,18 +595,48 @@ def render_memory_tab():
         if search_results:
             st.subheader(f"🔍 Search Results for: '{search_query.strip()}'")
             for i, (memory, score) in enumerate(search_results, 1):
+                # Get enhanced fields
+                confidence = getattr(memory, "confidence", 1.0)
+                is_proxy = getattr(memory, "is_proxy", False)
+                proxy_agent = getattr(memory, "proxy_agent", None)
+
+                # Build title with enhanced indicators
+                if confidence >= 0.8:
+                    conf_emoji = "🟢"
+                elif confidence >= 0.6:
+                    conf_emoji = "🟡"
+                elif confidence >= 0.4:
+                    conf_emoji = "🟠"
+                else:
+                    conf_emoji = "🔴"
+
+                proxy_indicator = (
+                    f" | 🤖 {proxy_agent}"
+                    if is_proxy and proxy_agent
+                    else " | 🤖 Proxy" if is_proxy else " | 👤 User"
+                )
+
                 with st.expander(
-                    f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}..."
+                    f"Result {i} (Score: {score:.3f}): {memory.memory[:50]}... | {conf_emoji} {int(confidence * 100)}%{proxy_indicator}"
                 ):
                     st.write(f"**Memory:** {memory.memory}")
                     st.write(f"**Similarity Score:** {score:.3f}")
+                    st.write(f"**{conf_emoji} Confidence:** {int(confidence * 100)}%")
+
+                    if is_proxy:
+                        st.write(
+                            f"**🤖 Proxy Memory** (Agent: {proxy_agent or 'Unknown'})"
+                        )
+                    else:
+                        st.write(f"**👤 User Memory**")
+
                     topics = getattr(memory, "topics", [])
                     if topics:
-                        st.write(f"**Topics:** {', '.join(topics)}")
+                        st.write(f"**🏷️ Topics:** {', '.join(topics)}")
                     st.write(
-                        f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                        f"**🕒 Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                     )
-                    st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
+                    st.write(f"**🆔 Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
 
                     # Memory deletion with confirmation (simplified approach like dashboard)
                     delete_key = f"delete_search_{memory.memory_id}"
@@ -803,16 +833,49 @@ def render_memory_tab():
                 f"Displaying {len(filtered_memories)} of {len(raw_memories)} total memories"
             )
             for memory in filtered_memories:
-                with st.expander(f"Memory: {memory.memory[:50]}..."):
+                # Get enhanced fields
+                confidence = getattr(memory, "confidence", 1.0)
+                is_proxy = getattr(memory, "is_proxy", False)
+                proxy_agent = getattr(memory, "proxy_agent", None)
+
+                # Build title with enhanced indicators
+                if confidence >= 0.8:
+                    conf_emoji = "🟢"
+                elif confidence >= 0.6:
+                    conf_emoji = "🟡"
+                elif confidence >= 0.4:
+                    conf_emoji = "🟠"
+                else:
+                    conf_emoji = "🔴"
+
+                proxy_str = (
+                    f" | 🤖 {proxy_agent}"
+                    if is_proxy and proxy_agent
+                    else " | 🤖 Proxy" if is_proxy else " | 👤 User"
+                )
+
+                with st.expander(
+                    f"Memory: {memory.memory[:50]}... | {conf_emoji} {int(confidence * 100)}%{proxy_str}"
+                ):
                     st.write(f"**Content:** {memory.memory}")
-                    st.write(f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
+                    st.write(f"**🆔 Memory ID:** {getattr(memory, 'memory_id', 'N/A')}")
                     st.write(
-                        f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                        f"**🕒 Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                     )
-                    st.write(f"**Input:** {getattr(memory, 'input', 'N/A')}")
+                    st.write(f"**📝 Input:** {getattr(memory, 'input', 'N/A')}")
+
+                    st.write(f"**{conf_emoji} Confidence:** {int(confidence * 100)}%")
+
+                    if is_proxy:
+                        st.write(
+                            f"**🤖 Proxy Memory** (Agent: {proxy_agent or 'Unknown'})"
+                        )
+                    else:
+                        st.write(f"**👤 User Memory**")
+
                     topics = getattr(memory, "topics", [])
                     if topics:
-                        st.write(f"**Topics:** {', '.join(topics)}")
+                        st.write(f"**🏷️ Topics:** {', '.join(topics)}")
 
                     # Memory deletion with confirmation (simplified approach like dashboard)
                     delete_key = f"delete_browse_{memory.memory_id}"

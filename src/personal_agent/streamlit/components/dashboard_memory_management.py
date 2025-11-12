@@ -216,7 +216,7 @@ def _render_memory_explorer():
                 last_updated = getattr(memory, "last_updated", "N/A")
                 topics = getattr(memory, "topics", [])
 
-                # Enhanced fields
+                # Enhanced fields (with fallback defaults)
                 confidence = getattr(memory, "confidence", 1.0)
                 is_proxy = getattr(memory, "is_proxy", False)
                 proxy_agent = getattr(memory, "proxy_agent", None)
@@ -227,28 +227,35 @@ def _render_memory_explorer():
 
                     with col1:
                         # Build display string with enhanced fields
-                        topics_str = f" | Topics: {', '.join(topics)}" if topics else ""
+                        topics_str = f" | 🏷️ {', '.join(topics)}" if topics else ""
 
-                        # Add confidence indicator (only if not 1.0)
+                        # Add confidence indicator with emoji
                         if confidence < 1.0:
-                            conf_emoji = (
-                                "🟡"
-                                if confidence >= 0.7
-                                else "🟠" if confidence >= 0.4 else "🔴"
+                            # Use color-coded emojis for confidence levels
+                            if confidence >= 0.8:
+                                conf_emoji = "🟢"  # High confidence
+                            elif confidence >= 0.6:
+                                conf_emoji = "🟡"  # Medium confidence
+                            elif confidence >= 0.4:
+                                conf_emoji = "🟠"  # Low confidence
+                            else:
+                                conf_emoji = "🔴"  # Very low confidence
+                            confidence_str = (
+                                f" | {conf_emoji} Conf: {int(confidence * 100)}%"
                             )
-                            confidence_str = f" | {conf_emoji} {int(confidence * 100)}%"
                         else:
-                            confidence_str = ""
+                            confidence_str = (
+                                " | 🟢 Conf: 100%"  # Always show confidence
+                            )
 
-                        # Add proxy indicator
-                        proxy_str = (
-                            f" | 🤖 {proxy_agent}"
-                            if is_proxy and proxy_agent
-                            else " | 🤖 Proxy" if is_proxy else ""
-                        )
+                        # Add proxy indicator with agent name
+                        if is_proxy:
+                            proxy_str = f" | 🤖 Proxy: {proxy_agent or 'Unknown'}"
+                        else:
+                            proxy_str = " | 👤 User"
 
                         st.write(
-                            f"**{memory_id}:** {memory_content[:100]}{'...' if len(memory_content) > 100 else ''} | Updated: {last_updated}{topics_str}{confidence_str}{proxy_str}"
+                            f"**{memory_id}:** {memory_content[:100]}{'...' if len(memory_content) > 100 else ''} | 🕒 {last_updated}{topics_str}{confidence_str}{proxy_str}"
                         )
 
                     with col2:
@@ -438,21 +445,28 @@ def _render_memory_search():
 
                     # Display search results
                     for i, (memory, score) in enumerate(search_results, 1):
-                        # Get enhanced fields
+                        # Get enhanced fields (with fallback defaults)
                         confidence = getattr(memory, "confidence", 1.0)
                         is_proxy = getattr(memory, "is_proxy", False)
                         proxy_agent = getattr(memory, "proxy_agent", None)
 
                         # Build title with confidence and proxy indicators
-                        conf_indicator = (
-                            f" | {int(confidence * 100)}% conf"
-                            if confidence < 1.0
-                            else ""
-                        )
+                        # Use color-coded emojis for confidence levels
+                        if confidence >= 0.8:
+                            conf_emoji = "🟢"  # High confidence
+                        elif confidence >= 0.6:
+                            conf_emoji = "🟡"  # Medium confidence
+                        elif confidence >= 0.4:
+                            conf_emoji = "🟠"  # Low confidence
+                        else:
+                            conf_emoji = "🔴"  # Very low confidence
+
+                        conf_indicator = f" | {conf_emoji} {int(confidence * 100)}%"
+
                         proxy_indicator = (
                             f" | 🤖 {proxy_agent}"
                             if is_proxy and proxy_agent
-                            else " | 🤖 Proxy" if is_proxy else ""
+                            else " | 🤖 Proxy" if is_proxy else " | 👤 User"
                         )
 
                         with st.expander(
@@ -460,19 +474,27 @@ def _render_memory_search():
                         ):
                             st.write(f"**Memory:** {memory.memory}")
                             st.write(f"**Similarity Score:** {score:.3f}")
-                            st.write(f"**Confidence:** {int(confidence * 100)}%")
+
+                            # Enhanced fields with emojis
+                            st.write(
+                                f"**{conf_emoji} Confidence:** {int(confidence * 100)}%"
+                            )
+
                             if is_proxy:
                                 st.write(
                                     f"**🤖 Proxy Memory** (Agent: {proxy_agent or 'Unknown'})"
                                 )
+                            else:
+                                st.write(f"**👤 User Memory**")
+
                             topics = getattr(memory, "topics", [])
                             if topics:
-                                st.write(f"**Topics:** {', '.join(topics)}")
+                                st.write(f"**🏷️ Topics:** {', '.join(topics)}")
                             st.write(
-                                f"**Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
+                                f"**🕒 Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                             )
                             st.write(
-                                f"**Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
+                                f"**🆔 Memory ID:** {getattr(memory, 'memory_id', 'N/A')}"
                             )
 
                             # Delete button for search results
@@ -601,7 +623,7 @@ def _render_memory_sync():
                 mime_type = "text/plain"
 
                 if export_type == "JSON":
-                    # Export as JSON
+                    # Export as JSON with all enhanced fields
                     export_data = []
                     for memory in all_memories:
                         export_data.append(
@@ -612,6 +634,9 @@ def _render_memory_sync():
                                     getattr(memory, "last_updated", "N/A")
                                 ),
                                 "topics": getattr(memory, "topics", []),
+                                "confidence": getattr(memory, "confidence", 1.0),
+                                "is_proxy": getattr(memory, "is_proxy", False),
+                                "proxy_agent": getattr(memory, "proxy_agent", None),
                             }
                         )
 
@@ -619,17 +644,27 @@ def _render_memory_sync():
                     mime_type = "application/json"
 
                 elif export_type == "CSV":
-                    # Export as CSV
+                    # Export as CSV with all enhanced fields
                     import csv
                     import io
 
                     output = io.StringIO()
                     writer = csv.writer(output)
 
-                    # Write header
-                    writer.writerow(["id", "content", "last_updated", "topics"])
+                    # Write header with enhanced fields
+                    writer.writerow(
+                        [
+                            "id",
+                            "content",
+                            "last_updated",
+                            "topics",
+                            "confidence",
+                            "is_proxy",
+                            "proxy_agent",
+                        ]
+                    )
 
-                    # Write rows
+                    # Write rows with enhanced fields
                     for memory in all_memories:
                         writer.writerow(
                             [
@@ -637,6 +672,9 @@ def _render_memory_sync():
                                 getattr(memory, "memory", str(memory)),
                                 str(getattr(memory, "last_updated", "N/A")),
                                 ", ".join(getattr(memory, "topics", [])),
+                                getattr(memory, "confidence", 1.0),
+                                getattr(memory, "is_proxy", False),
+                                getattr(memory, "proxy_agent", ""),
                             ]
                         )
 
@@ -669,7 +707,7 @@ def _render_memory_sync():
                     imported_count = 0
 
                     if uploaded_file.name.endswith(".json"):
-                        # Import from JSON
+                        # Import from JSON with enhanced fields
                         memories = json.loads(file_content)
                         for memory_data in memories:
                             try:
@@ -682,11 +720,18 @@ def _render_memory_sync():
                                         if t.strip()
                                     ]
 
+                                # Extract enhanced fields (with defaults)
+                                confidence = memory_data.get("confidence", 1.0)
+                                is_proxy = memory_data.get("is_proxy", False)
+                                proxy_agent = memory_data.get("proxy_agent", None)
+
+                                # Note: add_memory method would need to accept these enhanced fields
+                                # For now, we'll add the memory with standard fields
                                 success, message, memory_id, _ = (
                                     memory_helper.add_memory(
                                         memory_text=content_text,
                                         topics=topics,
-                                        input_text="Imported memory",
+                                        input_text=f"Imported memory (confidence: {confidence}, proxy: {is_proxy})",
                                     )
                                 )
 
@@ -697,7 +742,7 @@ def _render_memory_sync():
                                 st.warning(f"Error importing memory: {e}")
 
                     elif uploaded_file.name.endswith(".csv"):
-                        # Import from CSV
+                        # Import from CSV with enhanced fields
                         import csv
                         import io
 
@@ -712,11 +757,24 @@ def _render_memory_sync():
                                     if t.strip()
                                 ]
 
+                                # Extract enhanced fields from CSV (with defaults)
+                                confidence = float(row.get("confidence", 1.0))
+                                is_proxy = row.get("is_proxy", "False").lower() in [
+                                    "true",
+                                    "1",
+                                    "yes",
+                                ]
+                                proxy_agent = row.get("proxy_agent", None)
+                                if proxy_agent == "":
+                                    proxy_agent = None
+
+                                # Note: add_memory method would need to accept these enhanced fields
+                                # For now, we'll add the memory with standard fields
                                 success, message, memory_id, _ = (
                                     memory_helper.add_memory(
                                         memory_text=content_text,
                                         topics=topics,
-                                        input_text="Imported memory",
+                                        input_text=f"Imported memory (confidence: {confidence}, proxy: {is_proxy})",
                                     )
                                 )
 
