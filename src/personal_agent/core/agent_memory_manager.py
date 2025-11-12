@@ -1145,10 +1145,10 @@ class AgentMemoryManager:
             return f"❌ Error retrieving all memories: {str(e)}"
 
     async def get_memory_stats(self) -> str:
-        """Get memory statistics.
+        """Get memory statistics including confidence scores and proxy attribution.
 
         Returns:
-            str: Formatted string with memory statistics
+            str: Formatted string with comprehensive memory statistics
         """
         try:
             # Direct call to SemanticMemoryManager.get_all_memories()
@@ -1177,6 +1177,43 @@ class AgentMemoryManager:
             total_length = sum(len(memory.memory) for memory in memories)
             avg_length = total_length / total_memories if total_memories > 0 else 0
 
+            # Calculate confidence statistics
+            confidence_scores = []
+            high_confidence_count = 0  # >= 0.8
+            medium_confidence_count = 0  # 0.5-0.79
+            low_confidence_count = 0  # < 0.5
+
+            for memory in memories:
+                if hasattr(memory, "confidence") and memory.confidence is not None:
+                    confidence_scores.append(memory.confidence)
+                    if memory.confidence >= 0.8:
+                        high_confidence_count += 1
+                    elif memory.confidence >= 0.5:
+                        medium_confidence_count += 1
+                    else:
+                        low_confidence_count += 1
+
+            avg_confidence = (
+                sum(confidence_scores) / len(confidence_scores)
+                if confidence_scores
+                else None
+            )
+
+            # Count proxy vs user memories
+            proxy_count = 0
+            user_count = 0
+            proxy_agents = {}
+
+            for memory in memories:
+                if hasattr(memory, "is_proxy") and memory.is_proxy:
+                    proxy_count += 1
+                    if hasattr(memory, "proxy_agent") and memory.proxy_agent:
+                        proxy_agents[memory.proxy_agent] = (
+                            proxy_agents.get(memory.proxy_agent, 0) + 1
+                        )
+                else:
+                    user_count += 1
+
             # Get oldest and newest memory timestamps
             timestamps = [
                 memory.timestamp for memory in memories if hasattr(memory, "timestamp")
@@ -1186,16 +1223,52 @@ class AgentMemoryManager:
 
             # Format results
             result = f"📊 MEMORY STATISTICS\n\n"
-            result += f"Total memories: {total_memories}\n"
-            result += f"Average memory length: {avg_length:.1f} characters\n"
+            result += f"📝 Total memories: {total_memories}\n"
+            result += f"📏 Average memory length: {avg_length:.1f} characters\n"
 
+            # Confidence statistics
+            if avg_confidence is not None:
+                conf_percent = int(avg_confidence * 100)
+                conf_emoji = (
+                    "🟢"
+                    if avg_confidence >= 0.8
+                    else (
+                        "🟡"
+                        if avg_confidence >= 0.6
+                        else "🟠" if avg_confidence >= 0.4 else "🔴"
+                    )
+                )
+                result += f"\n💯 Confidence Statistics:\n"
+                result += f"   {conf_emoji} Average confidence: {conf_percent}%\n"
+                result += (
+                    f"   🟢 High confidence (≥80%): {high_confidence_count} memories\n"
+                )
+                result += f"   🟡 Medium confidence (50-79%): {medium_confidence_count} memories\n"
+                result += (
+                    f"   🔴 Low confidence (<50%): {low_confidence_count} memories\n"
+                )
+
+            # Attribution statistics
+            if proxy_count > 0 or user_count > 0:
+                result += f"\n👤 Attribution:\n"
+                result += f"   👤 User memories: {user_count}\n"
+                result += f"   🤖 Proxy memories: {proxy_count}\n"
+
+                if proxy_agents:
+                    result += f"   \n   Proxy agents:\n"
+                    for agent, count in sorted(
+                        proxy_agents.items(), key=lambda x: x[1], reverse=True
+                    ):
+                        result += f"      • {agent}: {count} memories\n"
+
+            # Timestamp information
             if oldest_timestamp:
                 from datetime import datetime
 
                 oldest_date = datetime.fromtimestamp(oldest_timestamp).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
-                result += f"Oldest memory: {oldest_date}\n"
+                result += f"\n📅 Oldest memory: {oldest_date}\n"
 
             if newest_timestamp:
                 from datetime import datetime
@@ -1203,16 +1276,17 @@ class AgentMemoryManager:
                 newest_date = datetime.fromtimestamp(newest_timestamp).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
-                result += f"Newest memory: {newest_date}\n"
+                result += f"📅 Newest memory: {newest_date}\n"
 
+            # Topic statistics
             if sorted_topics:
-                result += f"\nTop topics:\n"
+                result += f"\n🏷️  Top topics:\n"
                 # Show top 10 topics
                 for topic, count in sorted_topics[:10]:
-                    result += f"- {topic}: {count} memories\n"
+                    result += f"   • {topic}: {count} memories\n"
 
                 if len(sorted_topics) > 10:
-                    result += f"... and {len(sorted_topics) - 10} more topics\n"
+                    result += f"   ... and {len(sorted_topics) - 10} more topics\n"
 
             logger.info("Generated memory statistics for user %s", self.user_id)
             return result
