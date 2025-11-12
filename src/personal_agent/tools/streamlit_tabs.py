@@ -862,7 +862,6 @@ def render_memory_tab():
                     st.write(
                         f"**🕒 Last Updated:** {getattr(memory, 'last_updated', 'N/A')}"
                     )
-                    st.write(f"**📝 Input:** {getattr(memory, 'input', 'N/A')}")
 
                     st.write(f"**{conf_emoji} Confidence:** {int(confidence * 100)}%")
 

@@ -4,6 +4,31 @@ A modern, production-ready personal AI assistant built with the Agno framework, 
 
 ## ✨ Latest Updates
 
+### Breaking Changes & Major Improvements (v0.8.76.dev - November 2025)
+
+#### 🧠 **Intelligent Memory Restatement with Proper Grammar**
+- **Dual Storage Strategy**: Revolutionary dual-format memory storage for optimal retrieval and graph accuracy
+  - **Local Storage (SQLite/LanceDB)**: Second-person format ("you love hiking") for natural, conversational retrieval
+  - **Graph Storage (LightRAG)**: Third-person format with user_id ("alice loves hiking") for accurate entity mapping
+  - **Automatic Conversion**: Seamless transformation between formats without user intervention
+  - **Zero Conversion Overhead**: Agents receive naturally-phrased memories, eliminating presentation translation
+
+- **Grammatically Correct Third-Person Conjugation**: 🆕 **CRITICAL FIX**
+  - **Intelligent Verb Handling**: Properly conjugates verbs to third-person singular (love→loves, go→goes, study→studies)
+  - **Irregular Verb Support**: Handles special cases (am→is, have→has, do→does) correctly
+  - **Past Tense Preservation**: Correctly leaves past tense unchanged (did, had, was)
+  - **Comprehensive Rules**: Implements proper English conjugation (-s, -es, consonant+y→ies)
+  - **Examples**:
+    - ✅ "I love programming" → Local: "you love programming" | Graph: "alice loves programming"
+    - ✅ "I study Python" → Local: "you study Python" | Graph: "alice studies Python"  
+    - ✅ "I did my homework" → Local: "you did your homework" | Graph: "alice did alice's homework"
+  - **No More Grammar Errors**: Eliminates awkward third-person statements like "alice love hiking"
+
+- **Enhanced Memory Fields**: Complete transparency with confidence tracking and proxy attribution
+  - **Confidence Scores**: Visual indicators (🟢🟡🟠🔴) for memory quality tracking
+  - **Memory by Proxy**: Agents can store memories on behalf of users with clear attribution (🤖 vs 👤)
+  - **Full Export/Import**: All enhanced fields preserved in JSON and CSV formats
+
 ### Recent Improvements (v0.8.73 - October 2025)
 
 #### 🚀 **Installation & Setup**

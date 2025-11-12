@@ -126,8 +126,15 @@ class AgentMemoryManager:
             )
 
         try:
-            # Restate the user fact from first-person to third-person
-            restated_content = self.restate_user_fact(content)
+            # DUAL STORAGE STRATEGY:
+            # - Local storage: second-person ("you have") for natural retrieval
+            # - Graph storage: third-person ("{user_id} has") for entity mapping
+
+            # Restate for local storage (first-person → second-person)
+            local_content = self.restate_to_second_person(content)
+
+            # Restate for graph storage (first-person → third-person with user_id)
+            graph_content = self.restate_user_fact(content)
 
             # SIMPLIFIED TOPIC HANDLING: Handle the common cases simply
             if topics is None:
@@ -172,9 +179,9 @@ class AgentMemoryManager:
                     # Default to 1.0 if no user or cognitive state
                     effective_confidence = 1.0
 
-            # 1. Store in local SQLite memory system
+            # 1. Store in local SQLite memory system (second-person for natural retrieval)
             local_result = self.agno_memory.memory_manager.add_memory(
-                memory_text=restated_content,
+                memory_text=local_content,  # Use second-person version
                 db=self.agno_memory.db,
                 user_id=self.user_id,
                 topics=topics,
@@ -192,19 +199,21 @@ class AgentMemoryManager:
 
             # Local storage succeeded
             logger.info(
-                "Stored in local memory: %s... (ID: %s)",
-                content[:50],
+                "Stored in local memory (second-person): %s... (ID: %s)",
+                local_content[:50],
                 local_result.memory_id,
             )
 
-            # 2. Store in LightRAG graph memory system
+            # 2. Store in LightRAG graph memory system (third-person for entity mapping)
             graph_success = False
             graph_message = ""
 
             try:
-                # Store in graph memory
+                # Store in graph memory using third-person version
                 graph_result = await self.store_graph_memory(
-                    restated_content, local_result.topics, local_result.memory_id
+                    graph_content,  # Use third-person version with user_id
+                    local_result.topics,
+                    local_result.memory_id,
                 )
                 logger.info("Graph memory result: %s", graph_result)
                 if "✅" in graph_result:
@@ -253,33 +262,163 @@ class AgentMemoryManager:
                 graph_success=False,
             )
 
+    def _conjugate_verb_third_person(self, verb: str) -> str:
+        """Conjugate a base verb to third-person singular.
+
+        Args:
+            verb: The base verb (e.g., "love", "go", "have")
+
+        Returns:
+            The third-person singular form (e.g., "loves", "goes", "has")
+        """
+        verb = verb.lower()
+
+        # Past tense verbs don't conjugate - return as is
+        past_tense_endings = ["ed", "id", "ad", "od", "ud"]
+        if any(verb.endswith(ending) for ending in past_tense_endings):
+            return verb
+
+        # Common past tense irregular verbs that don't change
+        past_tense_verbs = {
+            "was",
+            "were",
+            "had",
+            "did",
+            "went",
+            "came",
+            "saw",
+            "took",
+            "made",
+            "got",
+            "gave",
+            "found",
+            "told",
+            "said",
+            "felt",
+            "left",
+            "kept",
+            "held",
+            "met",
+            "sat",
+            "stood",
+            "began",
+            "ran",
+            "brought",
+            "thought",
+            "put",
+            "knew",
+            "became",
+        }
+        if verb in past_tense_verbs:
+            return verb
+
+        # Irregular present tense verbs
+        irregular_verbs = {
+            "am": "is",
+            "are": "is",
+            "have": "has",
+            "do": "does",
+            "go": "goes",
+            "be": "is",
+        }
+
+        if verb in irregular_verbs:
+            return irregular_verbs[verb]
+
+        # Regular verb conjugation rules for present tense
+        # Verbs ending in s, ss, sh, ch, x, z, o: add -es
+        if verb.endswith(("s", "ss", "sh", "ch", "x", "z", "o")):
+            return verb + "es"
+
+        # Verbs ending in consonant + y: change y to ies
+        if len(verb) >= 2 and verb[-1] == "y" and verb[-2] not in "aeiou":
+            return verb[:-1] + "ies"
+
+        # Default: add -s
+        return verb + "s"
+
     def restate_user_fact(self, content: str) -> str:
-        """Restate a user fact from first-person to third-person.
+        """Restate a user fact from first-person to third-person for graph storage.
 
         This method converts statements like "I have a PhD" to "{user_id} has a PhD"
-        to ensure correct entity mapping in the knowledge graph.
+        to ensure correct entity mapping in the knowledge graph (LightRAG).
+        Properly conjugates verbs to third-person singular form.
 
         Args:
             content: The original fact from the user
 
         Returns:
-            The restated fact
+            The restated fact in third-person with user_id
         """
         # Ensure user_id is a safe string for replacement
         user_id_str = str(self.user_id)
 
-        # Define regex patterns for pronoun and verb replacement
-        # Using word boundaries (\b) to avoid replacing parts of words like "mine" in "mining"
+        restated_content = content
+
+        # First pass: Handle "I <verb>" patterns with conjugation
+        # Do this BEFORE replacing possessives to avoid confusion
+        def conjugate_verb_match(match):
+            verb = match.group(1)
+            conjugated = self._conjugate_verb_third_person(verb)
+            return f"{user_id_str} {conjugated}"
+
+        # Match "I" followed by a verb (word starting with letter)
+        # This will handle: "I love", "I work", "I did", etc.
+        restated_content = re.sub(
+            r"\bI\s+([a-z]+)\b",
+            conjugate_verb_match,
+            restated_content,
+            flags=re.IGNORECASE,
+        )
+
+        # Second pass: Handle specific contractions and patterns
         patterns = [
-            (r"\bI am\b", f"{user_id_str} is"),
-            (r"\bI was\b", f"{user_id_str} was"),
-            (r"\bI have\b", f"{user_id_str} has"),
+            # Contractions (these may have already been partly handled above)
             (r"\bI'm\b", f"{user_id_str} is"),
             (r"\bI've\b", f"{user_id_str} has"),
-            (r"\bI\b", user_id_str),
+            (r"\bI'll\b", f"{user_id_str} will"),
+            (r"\bI'd\b", f"{user_id_str} would"),
+            # Possessives
             (r"\bmy\b", f"{user_id_str}'s"),
             (r"\bmine\b", f"{user_id_str}'s"),
             (r"\bmyself\b", user_id_str),
+        ]
+
+        for pattern, replacement in patterns:
+            restated_content = re.sub(
+                pattern, replacement, restated_content, flags=re.IGNORECASE
+            )
+
+        return restated_content
+
+    def restate_to_second_person(self, content: str) -> str:
+        """Restate a user fact from first-person to second-person for local storage.
+
+        This method converts statements like "I have a PhD" to "you have a PhD"
+        to provide natural retrieval without needing presentation conversion.
+
+        Args:
+            content: The original fact from the user
+
+        Returns:
+            The restated fact in second-person ("you")
+        """
+        # Define regex patterns for pronoun and verb replacement
+        # Using word boundaries (\b) to avoid replacing parts of words
+        patterns = [
+            (r"\bI am\b", "you are"),
+            (r"\bI was\b", "you were"),
+            (r"\bI have\b", "you have"),
+            (r"\bI had\b", "you had"),
+            (r"\bI'm\b", "you're"),
+            (r"\bI've\b", "you've"),
+            (r"\bI'll\b", "you'll"),
+            (r"\bI'd\b", "you'd"),
+            (r"\bI\b", "you"),
+            (r"\bmy\b", "your"),
+            (r"\bmine\b", "yours"),
+            (r"\bmyself\b", "yourself"),
+            (r"\bme\b", "you"),
         ]
 
         restated_content = content
