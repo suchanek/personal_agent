@@ -216,47 +216,13 @@ def main():
     st.sidebar.header("👤 Current User")
     
     try:
-        # Clear cached user info if a user switch is detected
+        # Track user changes for cache invalidation
         if "last_displayed_user" not in st.session_state:
             st.session_state.last_displayed_user = None
             
-        current_user_id = None
-        
-        # Method 1: ALWAYS read current_user.json FIRST for most up-to-date info (this is what gets updated on switch)
-        try:
-            import json
-            from pathlib import Path
-            current_user_file = Path.home() / ".persagent" / "current_user.json"
-            if current_user_file.exists():
-                with open(current_user_file) as f:
-                    user_data = json.load(f)
-                    current_user_id = user_data.get("user_id", "Unknown")
-        except Exception:
-            pass
-            
-        # Method 2: Try direct user_id_mgr import
-        if not current_user_id or current_user_id == "Unknown":
-            try:
-                from personal_agent.config.user_id_mgr import get_userid
-                current_user_id = get_userid()
-            except ImportError:
-                pass
-        
-        # Method 3: Try agent status system
-        if not current_user_id or current_user_id == "Unknown":
-            try:
-                from personal_agent.streamlit.utils.agent_utils import check_agent_status
-                agent = get_agent_instance()
-                if agent:
-                    status = check_agent_status(agent)
-                    current_user_id = status.get("user_id", "Unknown")
-            except Exception:
-                pass
-                
-        # Method 4: Final fallback to environment variable
-        if not current_user_id or current_user_id == "Unknown":
-            import os
-            current_user_id = os.getenv("USER_ID", "Unknown")
+        # Get current user ID from the single source of truth
+        from personal_agent.config.user_id_mgr import get_userid
+        current_user_id = get_userid()
         
         # Display current user with refresh detection
         if current_user_id != st.session_state.last_displayed_user:
@@ -293,7 +259,6 @@ def main():
     except Exception as e:
         # Final fallback to environment variable
         import os
-
         user_id = os.getenv("USER_ID", "Unknown")
         st.sidebar.info(f"**{user_id}**")
         st.sidebar.caption(f"⚠️ User detection error: {str(e)}")
