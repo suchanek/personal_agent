@@ -167,9 +167,9 @@ The system implements a mandatory **ephemeral agent pattern** for all MCP tool i
 
 The system supports multiple model providers through a unified interface:
 
-- **Ollama Integration**: Primary local LLM provider supporting models like llama3.1:8b, qwen3:8b, and qwen2.5:7b-instruct. Ollama runs as a centralized LaunchAgent service (user-independent) for system-wide availability across all users.
-- **LMStudio Integration**: Specialized support for MLX-optimized models on Apple Silicon (e.g., qwen3-4b-mlx), treated as OpenAI-compatible endpoints
-- **OpenAI-Compatible Interface**: Unified API interface that allows seamless switching between Ollama and LMStudio models
+- **Ollama Integration**: Primary local LLM provider currently anchored on the Unsloth Qwen3 4B instruct build (`hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K`), with additional GGUF models swappable through configuration. Ollama runs as a centralized LaunchAgent service (user-independent) for system-wide availability across all users.
+- **LMStudio Integration**: Specialized support for MLX-optimized models on Apple Silicon (baseline `qwen3-4b-instruct-2507-mlx`), treated as OpenAI-compatible endpoints
+- **OpenAI-Compatible Interface**: Unified API interface that allows seamless switching between Ollama and LMStudio models, with `gpt-4.1-mini` as the current default when OpenAI is selected
 - **Dynamic Model Switching**: Support for runtime model changes through the web interface without system restart
 
 ### 2.8. Backend Services

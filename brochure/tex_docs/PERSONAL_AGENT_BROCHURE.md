@@ -223,21 +223,20 @@ While you enjoy simplicity, sophisticated technology works behind the scenes:
 
 The system lets you choose the AI model that fits your needs:
 
-**Local AI (Recommended - 100% Private):**
+- **Local AI (Recommended - 100% Private):**
 - **Ollama**: Free, private local AI
-  - Primary: Qwen 3 (4B) or Unsloth variants - Best balance of speed and capability
-  - Alternative: Qwen 3 (8B) - More capable, slower responses
-  - **Note**: LLaMA models show inconsistent results with complex tasks
+  - Primary: `hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K` (current production baseline)
+  - Alternative: Other Qwen variants (e.g., Qwen 3 8B) when you need more headroom
   - Response time: 2-5 seconds (varies by query complexity)
   - No cost, no API, complete privacy
 
 - **LM Studio**: Alternative option
+  - Runs the MLX-native `qwen3-4b-instruct-2507-mlx` baseline by default
   - Can be faster, but less predictable
-  - Still evaluating for production use
   - Visual model management
 
 **Cloud AI (Optional - When You Need Maximum Power):**
-- **OpenAI**: GPT-4o-mini or GPT-4
+- **OpenAI**: gpt-4.1-mini or GPT-4
   - **Trade-off**: Better capability, but data leaves your device
   - **Cost**: Pay-per-use via API credits (can add up)
   - Use case: Complex analysis when privacy is less critical
@@ -680,7 +679,7 @@ A: Absolutely! The system works completely offline with no internet connection r
 A: Yes, the system supports multiple users with complete data isolation between them.
 
 **Q: Which AI model should I use?**
-A: Start with Qwen 3 (4B) or the Unsloth variant via Ollama - it's the best balance of capability and speed, completely free and private. You can switch to the 8B model or OpenAI anytime if needed.
+A: Start with the Unsloth Qwen3-4B instruct build (`hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K`) via Ollama or the MLX equivalent in LM Studio—both strike the best balance of speed and capability while keeping data local. You can switch to larger Qwen variants or the OpenAI `gpt-4.1-mini` endpoint anytime if you need extra capacity.
 
 ### About Mobile Access
 

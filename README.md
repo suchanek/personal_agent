@@ -611,18 +611,17 @@ The agent supports multiple model providers with dynamic switching:
     - Response time: 2-5 seconds
   - **Qwen3 8B** (`qwen3:8b`) - More capable, slower responses
   - **Qwen3 1.7B** (`qwen3:1.7b`) - Ultra-fast for simple queries
-  - Note: LLaMA models show inconsistent results with complex tasks
 
 - **LM Studio** (Alternative local option):
-  - Support for GGUF models with visual management
-  - Faster inference on some models
-  - Still evaluating for production use
-  - Set `MODEL_PROVIDER=lm-studio` in `.env`
+    - Ships with the MLX-native `qwen3-4b-instruct-2507-mlx` baseline
+    - Support for additional GGUF/MLX models with visual management
+    - Faster inference on some workloads, still under evaluation for production
+    - Set `MODEL_PROVIDER=lm-studio` in `.env`
 
 **Cloud AI (Optional - When You Need Maximum Power):**
 
 - **OpenAI** (`MODEL_PROVIDER=openai`):
-  - GPT-4o-mini or GPT-4 for complex analysis
+    - Defaults to `gpt-4.1-mini` (upgrade to GPT-4 when needed)
   - Trade-off: Better capability, but data leaves your device
   - Cost: Pay-per-use via API credits
   - Response time: 3-8 seconds typically
