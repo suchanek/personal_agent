@@ -198,3 +198,7 @@ node_modules/
 # AI-specific documentation files (personal notes)
 WARP.md
 GEMINI.md
+CLAUDE.md
+
+# VS Code workspace files (personal settings)
+personal_agent.code-workspace
