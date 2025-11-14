@@ -202,3 +202,6 @@ CLAUDE.md
 
 # VS Code workspace files (personal settings)
 personal_agent.code-workspace
+
+# Generated scripts (created during installation)
+ollama-service.sh
