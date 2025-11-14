@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# User LaunchAgent environment
+export HOME="${HOME:-/Users/$(whoami)}"
+export USER="${USER:-$(whoami)}"
+export LOGNAME="${LOGNAME:-$(whoami)}"
+export PATH="/usr/local/bin:/opt/homebrew/bin:${PATH}"
+
+# Ollama model storage location - configured during installation
+export OLLAMA_MODELS="__OLLAMA_MODELS_DIR__"
+
+# Ollama configuration - optimized for __SYSTEM_RAM__GB RAM
+export OLLAMA_HOST="0.0.0.0:11434"
+export OLLAMA_ORIGINS="*"
+export OLLAMA_MAX_LOADED_MODELS="__MAX_LOADED_MODELS__"
+export OLLAMA_NUM_PARALLEL="8"
+export OLLAMA_MAX_QUEUE="512"
+export OLLAMA_KEEP_ALIVE="30m"
+export OLLAMA_DEBUG="1"
+export OLLAMA_FLASH_ATTENTION="1"
+# KV Cache Type: __KV_CACHE_TYPE__ - optimized for __SYSTEM_RAM__GB systems
+export OLLAMA_KV_CACHE_TYPE="__KV_CACHE_TYPE__"
+export OLLAMA_CONTEXT_LENGTH="12232"
+
+# Ensure model directory exists
+mkdir -p "$OLLAMA_MODELS"
+
+LOG_DIR="${HOME}/Library/Logs/ollama"
+OUT_LOG="${LOG_DIR}/ollama.out.log"
+ERR_LOG="${LOG_DIR}/ollama.err.log"
+mkdir -p "$LOG_DIR"
+
+echo "[$(date '+%F %T')] start_ollama.sh: USER=${USER} HOST=${OLLAMA_HOST} MODELS=${OLLAMA_MODELS}" >> "$OUT_LOG" 2>&1
+
+env | grep '^OLLAMA_' | tee -a "$LOG_DIR/ollama.env"
+
+exec /usr/local/bin/ollama serve >> "$OUT_LOG" 2>> "$ERR_LOG"

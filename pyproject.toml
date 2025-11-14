@@ -275,6 +275,31 @@ cmd = "python examples/personal_agent_team_demo.py"
 help = "Run MCP tools example"
 cmd = "python examples/mcp_tools_examples.py"
 
+# === Ollama Service Management ===
+[tool.poe.tasks.ollama-status]
+help = "Check Ollama service status"
+cmd = "./ollama-service.sh status"
+
+[tool.poe.tasks.ollama-start]
+help = "Start Ollama service"
+cmd = "./ollama-service.sh start"
+
+[tool.poe.tasks.ollama-stop]
+help = "Stop Ollama service"
+cmd = "./ollama-service.sh stop"
+
+[tool.poe.tasks.ollama-restart]
+help = "Restart Ollama service"
+cmd = "./ollama-service.sh restart"
+
+[tool.poe.tasks.ollama-models]
+help = "List available Ollama models"
+cmd = "./ollama-service.sh models"
+
+[tool.poe.tasks.ollama-logs]
+help = "View Ollama output logs"
+cmd = "./ollama-service.sh logs"
+
 # === Quick Start Tasks ===
 [tool.poe.tasks.quick-start]
 help = "Quick start for new users"

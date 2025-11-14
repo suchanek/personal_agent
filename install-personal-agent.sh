@@ -33,6 +33,10 @@ fi
 # Dry-run mode flag
 DRY_RUN=false
 
+# Ollama configuration (will be auto-detected or can be overridden)
+OLLAMA_MODELS_DIR=""
+OLLAMA_KV_CACHE_TYPE=""
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -40,9 +44,17 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=true
             shift
             ;;
+        --ollama-models-dir=*)
+            OLLAMA_MODELS_DIR="${1#*=}"
+            shift
+            ;;
+        --ollama-kv-cache=*)
+            OLLAMA_KV_CACHE_TYPE="${1#*=}"
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: sudo $0 [--dry-run]"
+            echo "Usage: sudo $0 [--dry-run] [--ollama-models-dir=PATH] [--ollama-kv-cache=TYPE]"
             exit 1
             ;;
     esac
@@ -95,6 +107,72 @@ run_cmd() {
     else
         "$@"
     fi
+}
+
+################################################################################
+# Detection Functions
+################################################################################
+
+detect_ollama_models_directory() {
+    log "Configuring Ollama models directory..."
+    
+    # Priority 1: Command-line argument (override)
+    if [[ -n "${OLLAMA_MODELS_DIR}" ]]; then
+        log "Using models directory from command line: ${OLLAMA_MODELS_DIR}"
+        return 0
+    fi
+    
+    # Priority 2: Check existing ollama plist if it exists (preserve existing setup)
+    local existing_plist="${AGENT_HOME}/Library/LaunchAgents/local.ollama.plist"
+    if [[ -f "${existing_plist}" ]]; then
+        local plist_models=$(grep -A1 "OLLAMA_MODELS" "${existing_plist}" | tail -1 | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+        if [[ -n "${plist_models}" ]]; then
+            OLLAMA_MODELS_DIR="${plist_models}"
+            log "Preserving existing models directory from plist: ${OLLAMA_MODELS_DIR}"
+            return 0
+        fi
+    fi
+    
+    # Priority 3: Default location for new installations
+    OLLAMA_MODELS_DIR="/Users/Shared/personal_agent_data/ollama"
+    log "Using default models directory: ${OLLAMA_MODELS_DIR}"
+}
+
+detect_system_ram() {
+    log "Detecting system RAM and optimizing Ollama configuration..."
+    
+    # Get total RAM in GB
+    local total_ram_bytes=$(sysctl -n hw.memsize)
+    local ram_gb=$((total_ram_bytes / 1024 / 1024 / 1024))
+    
+    log "Detected ${ram_gb}GB system RAM"
+    
+    # Set defaults if not overridden by command line
+    if [[ -z "${OLLAMA_KV_CACHE_TYPE}" ]]; then
+        if [[ ${ram_gb} -le 16 ]]; then
+            OLLAMA_KV_CACHE_TYPE="q4_0"
+            OLLAMA_MAX_LOADED_MODELS="2"
+            log "RAM-optimized for 16GB: q4_0 cache, max 2 models"
+        elif [[ ${ram_gb} -le 24 ]]; then
+            OLLAMA_KV_CACHE_TYPE="q6_0"
+            OLLAMA_MAX_LOADED_MODELS="3"
+            log "RAM-optimized for 24GB: q6_0 cache, max 3 models"
+        elif [[ ${ram_gb} -le 32 ]]; then
+            OLLAMA_KV_CACHE_TYPE="q8_0"
+            OLLAMA_MAX_LOADED_MODELS="4"
+            log "RAM-optimized for 32GB: q8_0 cache, max 4 models"
+        else
+            OLLAMA_KV_CACHE_TYPE="f16"
+            OLLAMA_MAX_LOADED_MODELS="5"
+            log "RAM-optimized for 48GB+: f16 cache, max 5 models"
+        fi
+    else
+        # Use command-line override
+        OLLAMA_MAX_LOADED_MODELS="3"  # Conservative default
+        log "Using command-line KV cache type: ${OLLAMA_KV_CACHE_TYPE}"
+    fi
+    
+    export SYSTEM_RAM_GB="${ram_gb}"
 }
 
 ################################################################################
@@ -405,7 +483,7 @@ install_ollama() {
 
     # Create symlink for CLI access
     log "Creating symlink for ollama CLI..."
-    local ollama_cli="/Applications/Ollama.app/Contents/MacOS/ollama"
+    local ollama_cli="/Applications/Ollama.app/Contents/Resources/ollama"
     local symlink_path="/usr/local/bin/ollama"
 
     if [[ -f "${ollama_cli}" ]]; then
@@ -420,7 +498,11 @@ install_ollama() {
             ln -s "${ollama_cli}" "${symlink_path}"
             log_success "Symlink created: ${symlink_path} -> ${ollama_cli}"
         else
-            log "[WOULD CREATE] symlink: ${symlink_path} -> ${ollama_cli}"
+            if [[ -L "${symlink_path}" ]]; then
+                log "[EXISTS] symlink: ${symlink_path}"
+            else
+                log "[WOULD CREATE] symlink: ${symlink_path} -> ${ollama_cli}"
+            fi
         fi
     else
         log_warning "Ollama CLI not found at ${ollama_cli}"
@@ -472,12 +554,36 @@ pull_ollama_models() {
     local total_models=${#models[@]}
     local current=0
 
+    # Function to check if model exists in models directory
+    check_model_in_directory() {
+        local model_name="$1"
+        # Extract base model name (before colon)
+        local base_name="${model_name%%:*}"
+        # Replace / with _ for huggingface models
+        base_name="${base_name//\//_}"
+        
+        # Check if model directory exists in OLLAMA_MODELS_DIR
+        if [[ -d "${OLLAMA_MODELS_DIR}/manifests/registry.ollama.ai/library/${base_name}" ]] || \
+           [[ -d "${OLLAMA_MODELS_DIR}/manifests/registry.ollama.ai/${base_name}" ]] || \
+           [[ -d "${OLLAMA_MODELS_DIR}/manifests/${base_name}" ]]; then
+            return 0
+        fi
+        return 1
+    }
+
     for model in "${models[@]}"; do
         ((current++))
         echo -e "${BLUE}[Model ${current}/${total_models}]${NC} Checking: ${CYAN}${model}${NC}"
         
-        # Check if model already exists (with timeout protection)
+        # Try to check via ollama list first (if running), then fall back to directory check
+        local model_exists=false
         if timeout 5 sudo -u "${AGENT_USER}" /usr/local/bin/ollama list 2>/dev/null | grep -q "^${model%%:*}"; then
+            model_exists=true
+        elif check_model_in_directory "${model}"; then
+            model_exists=true
+        fi
+        
+        if $model_exists; then
             log_success "Model already exists: ${model}"
             ((skipped_count++))
         else
@@ -514,6 +620,10 @@ pull_ollama_models() {
 setup_ollama_service() {
     log "Setting up Ollama as user LaunchAgent (runs when ${AGENT_USER} is logged in)..."
 
+    # Run detection if not already done
+    detect_ollama_models_directory
+    detect_system_ram
+
     # First, stop any running Ollama services to prevent conflicts
     if pgrep -f "Ollama.app" > /dev/null; then
         log "Stopping Ollama.app to prevent conflicts with LaunchAgent service..."
@@ -537,70 +647,47 @@ setup_ollama_service() {
     fi
 
     local startup_script="${AGENT_HOME}/.local/bin/start_ollama.sh"
-    local plist_file="${AGENT_HOME}/Library/LaunchAgents/local.ollama.agent.plist"
-    local setup_dir="${INSTALL_DIR}/setup"
+    local plist_file="${AGENT_HOME}/Library/LaunchAgents/local.ollama.plist"
+    local template_dir="${INSTALL_DIR}/setup"
 
     # Create directory for startup script
     if ! $DRY_RUN; then
         mkdir -p "${AGENT_HOME}/.local/bin"
         mkdir -p "${AGENT_HOME}/Library/LaunchAgents"
+        mkdir -p "${AGENT_HOME}/Library/Logs/ollama"
     else
-        log "[WOULD CREATE] ${AGENT_HOME}/.local/bin"
-        log "[WOULD CREATE] ${AGENT_HOME}/Library/LaunchAgents"
+        if [[ -d "${AGENT_HOME}/.local/bin" ]]; then
+            log "[EXISTS] ${AGENT_HOME}/.local/bin"
+        else
+            log "[WOULD CREATE] ${AGENT_HOME}/.local/bin"
+        fi
+        if [[ -d "${AGENT_HOME}/Library/LaunchAgents" ]]; then
+            log "[EXISTS] ${AGENT_HOME}/Library/LaunchAgents"
+        else
+            log "[WOULD CREATE] ${AGENT_HOME}/Library/LaunchAgents"
+        fi
     fi
 
-    # Create the startup script
+    # Create the startup script from template
     if ! $DRY_RUN; then
-        log "Creating Ollama startup script at ${startup_script}..."
-        cat > "${startup_script}" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-# User LaunchAgent environment
-export HOME="${HOME:-/Users/$(whoami)}"
-export USER="${USER:-$(whoami)}"
-export LOGNAME="${LOGNAME:-$(whoami)}"
-export PATH="/usr/local/bin:/opt/homebrew/bin:${PATH}"
-
-# Ollama model storage location
-export OLLAMA_MODELS="/Users/Shared/personal_agent_data/ollama"
-
-# Ollama configuration
-export OLLAMA_HOST="0.0.0.0:11434"
-export OLLAMA_ORIGINS="*"
-export OLLAMA_MAX_LOADED_MODELS="3"
-export OLLAMA_NUM_PARALLEL="8"
-export OLLAMA_MAX_QUEUE="512"
-export OLLAMA_KEEP_ALIVE="30m"
-export OLLAMA_DEBUG="1"
-export OLLAMA_FLASH_ATTENTION="1"
-# KV Cache Type: q8_0 (8-bit quantized) optimized for 24GB systems
-# - Uses ~50% less memory than f16 (~3.5GB vs 7GB per model)
-# - Allows safe operation with 3 models on 24GB RAM (10.5GB vs 21GB)
-# - Minimal quality degradation compared to f16
-# - Alternative: f16 for systems with 32GB+ RAM
-export OLLAMA_KV_CACHE_TYPE="q8_0"
-export OLLAMA_CONTEXT_LENGTH="12232"
-
-# Ensure model directory exists
-mkdir -p "$OLLAMA_MODELS"
-
-LOG_DIR="${HOME}/.local/log/ollama"
-OUT_LOG="${LOG_DIR}/ollama.out.log"
-ERR_LOG="${LOG_DIR}/ollama.err.log"
-mkdir -p "$LOG_DIR" "${HOME}/.cache" "${HOME}/.config" "${HOME}/.local/share"
-
-echo "[$(date '+%F %T')] start_ollama.sh: USER=${USER} HOST=${OLLAMA_HOST} MODELS=${OLLAMA_MODELS}" >>"$OUT_LOG" 2>&1
-
-env | grep '^OLLAMA_' | tee "$LOG_DIR/ollama.env"
-
-exec /usr/local/bin/ollama serve >>"$OUT_LOG" 2>>"$ERR_LOG"
-EOF
+        log "Creating Ollama startup script from template..."
+        sed -e "s|__OLLAMA_MODELS_DIR__|${OLLAMA_MODELS_DIR}|g" \
+            -e "s|__SYSTEM_RAM__|${SYSTEM_RAM_GB}|g" \
+            -e "s|__MAX_LOADED_MODELS__|${OLLAMA_MAX_LOADED_MODELS}|g" \
+            -e "s|__KV_CACHE_TYPE__|${OLLAMA_KV_CACHE_TYPE}|g" \
+            "${template_dir}/start_ollama.sh.template" > "${startup_script}"
+        
         chmod +x "${startup_script}"
         chown "${AGENT_USER}:staff" "${startup_script}"
-        log_success "Startup script created"
+        log_success "Startup script created at ${startup_script}"
+        log "  Models: ${OLLAMA_MODELS_DIR}"
+        log "  RAM optimization: ${OLLAMA_KV_CACHE_TYPE} cache, max ${OLLAMA_MAX_LOADED_MODELS} models"
     else
-        log "[WOULD CREATE] ${startup_script}"
+        if [[ -f "${startup_script}" ]]; then
+            log "[EXISTS] ${startup_script}"
+        else
+            log "[WOULD CREATE] ${startup_script} from template"
+        fi
     fi
 
     # Create the plist file
@@ -612,7 +699,7 @@ EOF
 <plist version="1.0">
   <dict>
     <key>Label</key>
-    <string>local.ollama.agent</string>
+    <string>local.ollama</string>
     <key>ProgramArguments</key>
     <array>
       <string>${startup_script}</string>
@@ -622,13 +709,13 @@ EOF
       <key>PATH</key>
       <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
       <key>OLLAMA_MODELS</key>
-      <string>/Users/Shared/personal_agent_data/ollama</string>
+      <string>${OLLAMA_MODELS_DIR}</string>
       <key>OLLAMA_HOST</key>
       <string>0.0.0.0:11434</string>
       <key>OLLAMA_ORIGINS</key>
       <string>*</string>
       <key>OLLAMA_MAX_LOADED_MODELS</key>
-      <string>3</string>
+      <string>${OLLAMA_MAX_LOADED_MODELS}</string>
       <key>OLLAMA_NUM_PARALLEL</key>
       <string>8</string>
       <key>OLLAMA_MAX_QUEUE</key>
@@ -636,58 +723,182 @@ EOF
       <key>OLLAMA_KEEP_ALIVE</key>
       <string>30m</string>
       <key>OLLAMA_KV_CACHE_TYPE</key>
-      <string>q8_0</string>
+      <string>${OLLAMA_KV_CACHE_TYPE}</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>${AGENT_HOME}/.local/log/ollama/ollama.out.log</string>
+    <string>${AGENT_HOME}/Library/Logs/ollama/ollama.out.log</string>
     <key>StandardErrorPath</key>
-    <string>${AGENT_HOME}/.local/log/ollama/ollama.err.log</string>
+    <string>${AGENT_HOME}/Library/Logs/ollama/ollama.err.log</string>
   </dict>
 </plist>
 EOF
         chmod 644 "${plist_file}"
         chown "${AGENT_USER}:staff" "${plist_file}"
+        # Remove extended attributes that can cause I/O errors
+        xattr -c "${plist_file}" 2>/dev/null || true
         log_success "LaunchAgent plist created"
     else
-        log "[WOULD CREATE] ${plist_file}"
+        if [[ -f "${plist_file}" ]]; then
+            log "[EXISTS] ${plist_file}"
+        else
+            log "[WOULD CREATE] ${plist_file}"
+        fi
     fi
 
-    # Create log directory
+    # Create models directory if it doesn't exist
     if ! $DRY_RUN; then
-        mkdir -p "${AGENT_HOME}/.local/log/ollama"
-        chown -R "${AGENT_USER}:staff" "${AGENT_HOME}/.local/log/ollama"
-        chmod 755 "${AGENT_HOME}/.local/log/ollama"
-        
-        # Create shared Ollama models directory
-        mkdir -p "/Users/Shared/personal_agent_data/ollama"
-        chmod 777 "/Users/Shared/personal_agent_data/ollama"
-        log_success "Created shared Ollama models directory: /Users/Shared/personal_agent_data/ollama"
+        mkdir -p "${OLLAMA_MODELS_DIR}"
+        chmod 755 "${OLLAMA_MODELS_DIR}"
+        log_success "Created/verified models directory: ${OLLAMA_MODELS_DIR}"
+        log "  To use a different location, run installer with: --ollama-models-dir=/your/path"
     else
-        log "[WOULD CREATE] ${AGENT_HOME}/.local/log/ollama directory"
-        log "[WOULD CREATE] /Users/Shared/personal_agent_data/ollama directory"
+        if [[ -d "${OLLAMA_MODELS_DIR}" ]]; then
+            log "[EXISTS] ${OLLAMA_MODELS_DIR}"
+        else
+            log "[WOULD CREATE] ${OLLAMA_MODELS_DIR} directory"
+        fi
     fi
 
-    # Load the user LaunchAgent service
+    # Try to load the user LaunchAgent service
     if ! $DRY_RUN; then
         log "Loading Ollama LaunchAgent service for user ${AGENT_USER}..."
-        sudo -u "${AGENT_USER}" launchctl load "${plist_file}" 2>/dev/null || true
         
-        # Give it a moment to start
-        log "Waiting for Ollama service to initialize..."
-        sleep 5
-        
-        # Check if it's running
-        if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama.agent"; then
-            log_success "Ollama LaunchAgent service loaded successfully"
+        # Try bootstrap first (modern method)
+        if sudo -u "${AGENT_USER}" launchctl bootstrap "gui/$(id -u ${AGENT_USER})" "${plist_file}" 2>/dev/null; then
+            log_success "Ollama LaunchAgent loaded via bootstrap"
+            OLLAMA_SERVICE_METHOD="LaunchAgent"
+        # Fallback to load (older method)
+        elif sudo -u "${AGENT_USER}" launchctl load "${plist_file}" 2>/dev/null; then
+            log_success "Ollama LaunchAgent loaded via load"
+            OLLAMA_SERVICE_METHOD="LaunchAgent"
         else
-            log_warning "Ollama LaunchAgent may not have started properly"
+            log_warning "LaunchAgent load failed - will create Login Item app as fallback"
+            OLLAMA_SERVICE_METHOD="LoginItem"
+        fi
+        
+        # Give it a moment to start if successful
+        if [[ "${OLLAMA_SERVICE_METHOD}" == "LaunchAgent" ]]; then
+            sleep 5
+            if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama"; then
+                log_success "Ollama LaunchAgent service is running"
+            else
+                log_warning "LaunchAgent loaded but not running - will use Login Item"
+                OLLAMA_SERVICE_METHOD="LoginItem"
+            fi
         fi
     else
         log "[WOULD LOAD] LaunchAgent service for user ${AGENT_USER}"
+        OLLAMA_SERVICE_METHOD="LaunchAgent"
+    fi
+}
+
+################################################################################
+# Setup Ollama Management Tools
+################################################################################
+
+setup_ollama_management() {
+    log "Setting up Ollama management tools..."
+    
+    local template_dir="${INSTALL_DIR}/setup"
+    local ollama_service_script="${INSTALL_DIR}/ollama-service.sh"
+    local create_app_script="${INSTALL_DIR}/create-ollama-login-app.sh"
+    
+    # Create ollama-service.sh from template
+    if ! $DRY_RUN; then
+        log "Creating ollama-service.sh management script..."
+        sed -e "s|__OLLAMA_MODELS_DIR__|${OLLAMA_MODELS_DIR}|g" \
+            -e "s|__KV_CACHE_TYPE__|${OLLAMA_KV_CACHE_TYPE}|g" \
+            -e "s|__MAX_LOADED_MODELS__|${OLLAMA_MAX_LOADED_MODELS}|g" \
+            "${template_dir}/ollama-service.sh.template" > "${ollama_service_script}"
+        
+        chmod +x "${ollama_service_script}"
+        chown "${AGENT_USER}:staff" "${ollama_service_script}"
+        log_success "Created ${ollama_service_script}"
+    else
+        if [[ -f "${ollama_service_script}" ]]; then
+            log "[EXISTS] ${ollama_service_script}"
+        else
+            log "[WOULD CREATE] ${ollama_service_script} from template"
+        fi
+    fi
+    
+    # Create create-ollama-login-app.sh from template
+    if ! $DRY_RUN; then
+        log "Creating login app generator script..."
+        cp "${template_dir}/create-ollama-login-app.sh.template" "${create_app_script}"
+        chmod +x "${create_app_script}"
+        chown "${AGENT_USER}:staff" "${create_app_script}"
+        log_success "Created ${create_app_script}"
+    else
+        if [[ -f "${create_app_script}" ]]; then
+            log "[EXISTS] ${create_app_script}"
+        else
+            log "[WOULD CREATE] ${create_app_script}"
+        fi
+    fi
+    
+    # If LaunchAgent method failed, create the StartOllama.app now
+    if [[ "${OLLAMA_SERVICE_METHOD:-}" == "LoginItem" ]] && ! $DRY_RUN; then
+        log "Creating StartOllama.app as fallback auto-start method..."
+        sudo -u "${AGENT_USER}" bash "${create_app_script}"
+        log_success "StartOllama.app created - add to Login Items for auto-start"
+    fi
+    
+    # Add poe tasks to pyproject.toml if not already present
+    if ! $DRY_RUN; then
+        local pyproject="${INSTALL_DIR}/pyproject.toml"
+        if [[ -f "${pyproject}" ]] && ! grep -q "ollama-status" "${pyproject}"; then
+            log "Adding ollama management tasks to pyproject.toml..."
+            
+            # Find the line with "# === Quick Start Tasks ===" and insert before it
+            local insert_line=$(grep -n "# === Quick Start Tasks ===" "${pyproject}" | cut -d: -f1)
+            if [[ -n "${insert_line}" ]]; then
+                # Create temp file with new tasks
+                head -n $((insert_line - 1)) "${pyproject}" > "${pyproject}.tmp"
+                cat >> "${pyproject}.tmp" <<'EOFTASKS'
+# === Ollama Service Management ===
+[tool.poe.tasks.ollama-status]
+help = "Check Ollama service status"
+cmd = "./ollama-service.sh status"
+
+[tool.poe.tasks.ollama-start]
+help = "Start Ollama service"
+cmd = "./ollama-service.sh start"
+
+[tool.poe.tasks.ollama-stop]
+help = "Stop Ollama service"
+cmd = "./ollama-service.sh stop"
+
+[tool.poe.tasks.ollama-restart]
+help = "Restart Ollama service"
+cmd = "./ollama-service.sh restart"
+
+[tool.poe.tasks.ollama-models]
+help = "List available Ollama models"
+cmd = "./ollama-service.sh models"
+
+[tool.poe.tasks.ollama-logs]
+help = "View Ollama output logs"
+cmd = "./ollama-service.sh logs"
+
+EOFTASKS
+                tail -n +${insert_line} "${pyproject}" >> "${pyproject}.tmp"
+                mv "${pyproject}.tmp" "${pyproject}"
+                chown "${AGENT_USER}:staff" "${pyproject}"
+                log_success "Added poe tasks for Ollama management"
+            fi
+        fi
+    else
+        local pyproject="${INSTALL_DIR}/pyproject.toml"
+        if [[ -f "${pyproject}" ]] && ! grep -q "ollama-status" "${pyproject}"; then
+            log "[WOULD ADD] poe tasks to pyproject.toml"
+        else
+            log "[SKIP] poe tasks already in pyproject.toml"
+        fi
     fi
 }
 
@@ -696,25 +907,29 @@ EOF
 ################################################################################
 
 pull_lightrag_images() {
-    log "Checking and pulling LightRAG Docker images..."
+    log "Checking LightRAG Docker images..."
 
     local image="egsuchanek/lightrag_pagent:latest"
 
-    # Check if image already exists
+    # Check if image already exists locally
     if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
-        log_success "Docker image already exists: ${image}"
-    else
-        if ! $DRY_RUN; then
-            log "Pulling Docker image: ${image}..."
-            if docker pull "${image}"; then
-                log_success "LightRAG image pulled successfully"
-            else
-                log_error "Failed to pull LightRAG image"
-                return 1
-            fi
+        log_success "Docker image already exists locally: ${image}"
+        return 0
+    fi
+
+    # Try to pull the image, but don't fail if authentication is required
+    if ! $DRY_RUN; then
+        log "Attempting to pull Docker image: ${image}..."
+        if docker pull "${image}" 2>/dev/null; then
+            log_success "LightRAG image pulled successfully"
         else
-            log "[WOULD PULL] Docker image: ${image}"
+            log_warning "Could not pull Docker image (may require docker login)"
+            log "Image will be pulled automatically when starting containers with docker-compose"
+            log "If you have Docker Hub credentials, you can login with: docker login"
         fi
+    else
+        log "[WOULD ATTEMPT] Docker pull: ${image}"
+        log "[NOTE] Image will be pulled by docker-compose if not present"
     fi
 }
 
@@ -748,9 +963,31 @@ setup_lightrag_directories() {
         log "  - ${lightrag_server_dir}"
         log "  - ${lightrag_memory_dir}"
     else
-        log "[WOULD CREATE] ${lightrag_server_dir}"
-        log "[WOULD CREATE] ${lightrag_memory_dir}"
-        log "[WOULD COPY] configuration templates from repo if available"
+        # Check if directories exist in dry-run mode
+        if [[ -d "${lightrag_server_dir}" ]]; then
+            log "[EXISTS] ${lightrag_server_dir}"
+        else
+            log "[WOULD CREATE] ${lightrag_server_dir}"
+        fi
+        
+        if [[ -d "${lightrag_memory_dir}" ]]; then
+            log "[EXISTS] ${lightrag_memory_dir}"
+        else
+            log "[WOULD CREATE] ${lightrag_memory_dir}"
+        fi
+        
+        # Check if copy would happen
+        if [[ -d "${INSTALL_DIR}/lightrag_server" && ! "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
+            log "[WOULD COPY] LightRAG server configuration templates"
+        elif [[ -d "${lightrag_server_dir}" && "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
+            log "[SKIP] LightRAG server templates (directory not empty)"
+        fi
+        
+        if [[ -d "${INSTALL_DIR}/lightrag_memory_server" && ! "$(ls -A "${lightrag_memory_dir}" 2>/dev/null)" ]]; then
+            log "[WOULD COPY] LightRAG memory server configuration templates"
+        elif [[ -d "${lightrag_memory_dir}" && "$(ls -A "${lightrag_memory_dir}" 2>/dev/null)" ]]; then
+            log "[SKIP] LightRAG memory server templates (directory not empty)"
+        fi
     fi
 }
 
@@ -771,16 +1008,31 @@ setup_repository() {
     log_success "Using repository directory: ${INSTALL_DIR}"
 
     if ! $DRY_RUN; then
-        log "Creating virtual environment 'persagent' with uv (Python 3.12)..."
-        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed --prompt persagent"
+        # Check if .venv already exists
+        if [[ -d "${INSTALL_DIR}/.venv" ]]; then
+            log "Virtual environment already exists at ${INSTALL_DIR}/.venv"
+            log_success "Skipping venv creation"
+        else
+            log "Creating virtual environment 'persagent' with uv (Python 3.12)..."
+            sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed --prompt persagent"
+            log_success "Virtual environment created"
+        fi
 
         log "Installing dependencies with Poetry..."
         sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
 
         log_success "Dependencies installed"
     else
-        log "[WOULD CREATE] virtual environment 'persagent' with uv (Python 3.12) in ${INSTALL_DIR}"
-        log "[WOULD INSTALL] dependencies with Poetry in ${INSTALL_DIR}"
+        if [[ -d "${INSTALL_DIR}/.venv" ]]; then
+            log "[EXISTS] virtual environment in ${INSTALL_DIR}/.venv"
+        else
+            log "[WOULD CREATE] virtual environment 'persagent' with uv (Python 3.12) in ${INSTALL_DIR}"
+        fi
+        if [[ -f "${INSTALL_DIR}/poetry.lock" ]]; then
+            log "[SKIP] Poetry dependencies (already installed)"
+        else
+            log "[WOULD INSTALL] dependencies with Poetry in ${INSTALL_DIR}"
+        fi
     fi
 }
 
@@ -912,11 +1164,40 @@ health_checks() {
         log_warning "Docker: Not running (may need manual start)"
     fi
 
-    # Check Ollama LaunchAgent
-    if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama.agent"; then
-        log_success "Ollama LaunchAgent: OK"
+    # Check Ollama symlink
+    if [[ -L "/usr/local/bin/ollama" ]]; then
+        local symlink_target=$(readlink "/usr/local/bin/ollama")
+        if [[ "${symlink_target}" == *"Resources/ollama" ]]; then
+            log_success "Ollama symlink: OK (${symlink_target})"
+        else
+            log_warning "Ollama symlink: Incorrect path (${symlink_target})"
+        fi
     else
-        log_warning "Ollama LaunchAgent: Not running"
+        log_warning "Ollama symlink: Missing"
+    fi
+
+    # Check Ollama service
+    if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama"; then
+        log_success "Ollama LaunchAgent: Running"
+    elif [[ -f "${AGENT_HOME}/Applications/StartOllama.app/Contents/MacOS/StartOllama" ]]; then
+        log_success "Ollama Login Item app: Created (add to Login Items)"
+    else
+        log_warning "Ollama service: Not configured"
+    fi
+
+    # Check Ollama models directory
+    if [[ -d "${OLLAMA_MODELS_DIR}" ]]; then
+        log_success "Ollama models directory: OK (${OLLAMA_MODELS_DIR})"
+    else
+        log_warning "Ollama models directory: Not found (${OLLAMA_MODELS_DIR})"
+    fi
+
+    # Check Ollama API (if running)
+    if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
+        local version=$(curl -s http://localhost:11434/api/version | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+        log_success "Ollama API: Responding (version ${version})"
+    else
+        log_warning "Ollama API: Not responding (service may not be started yet)"
     fi
 
     # Check install directory
@@ -928,7 +1209,7 @@ health_checks() {
     fi
 
     if $all_ok; then
-        log_success "All health checks passed!"
+        log_success "All critical health checks passed!"
     else
         log_warning "Some health checks failed, please review above"
     fi
@@ -974,15 +1255,32 @@ print_instructions() {
         echo ""
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
-        echo -e "${YELLOW}Important Notes:${NC}"
+        echo -e "${YELLOW}Ollama Configuration (${SYSTEM_RAM_GB}GB RAM):${NC}"
         echo ""
-        echo "• Ollama is running as a user LaunchAgent service"
-        echo "  The service starts automatically when ${AGENT_USER} logs in"
-        echo "  Check status: launchctl list | grep local.ollama.agent"
-        echo "  View logs: tail -f ${AGENT_HOME}/.local/log/ollama/ollama.out.log"
-        echo "  Manage service: launchctl [load|unload] ${AGENT_HOME}/Library/LaunchAgents/local.ollama.agent.plist"
+        echo "• Models Directory: ${OLLAMA_MODELS_DIR}"
+        echo "• KV Cache Type: ${OLLAMA_KV_CACHE_TYPE} (optimized for ${SYSTEM_RAM_GB}GB RAM)"
+        echo "• Max Loaded Models: ${OLLAMA_MAX_LOADED_MODELS}"
+        echo "• Host: 0.0.0.0:11434"
         echo ""
-        echo "• The service will NOT run when ${AGENT_USER} is not logged in"
+        if [[ "${OLLAMA_SERVICE_METHOD:-}" == "LaunchAgent" ]]; then
+            echo "• Auto-start: LaunchAgent (starts when you log in)"
+            echo "  Check status: poe ollama-status"
+            echo "  View logs: poe ollama-logs"
+            echo "  Manage: launchctl [load|unload] ${AGENT_HOME}/Library/LaunchAgents/local.ollama.plist"
+        else
+            echo "• Auto-start: Login Item app created"
+            echo "  Add ~/Applications/StartOllama.app to Login Items:"
+            echo "  System Settings > General > Login Items > Click '+' > Select StartOllama.app"
+            echo "  Or run: osascript -e 'tell application \"System Events\" to make login item at end with properties {path:\"${AGENT_HOME}/Applications/StartOllama.app\", hidden:false}'"
+        fi
+        echo ""
+        echo "• Management commands:"
+        echo "  poe ollama-status    # Check if running"
+        echo "  poe ollama-start     # Start service"
+        echo "  poe ollama-stop      # Stop service"
+        echo "  poe ollama-restart   # Restart service"
+        echo "  poe ollama-models    # List models"
+        echo "  poe ollama-logs      # View logs"
         echo ""
     fi
     echo "Installation log saved to: ${LOG_FILE}"
@@ -1023,6 +1321,7 @@ main() {
     setup_repository
     configure_environment
     setup_ollama_service
+    setup_ollama_management
     pull_ollama_models
     pull_lightrag_images
     setup_lightrag_directories
