@@ -42,7 +42,9 @@ class UserManager:
             self.data_dir = data_dir
             self.storage_backend = storage_backend
 
-        self.registry = UserRegistry(self.data_dir, self.storage_backend)
+        # UserRegistry manages the shared user registry file and uses its own defaults
+        # (PERSAG_ROOT for the registry location, not user-specific paths)
+        self.registry = UserRegistry()
         # LightRAGManager now uses PERSAG_HOME internally, project_root parameter is deprecated
         self.lightrag_manager = LightRAGManager(project_root)
 
@@ -87,7 +89,7 @@ class UserManager:
         address: str = None,
         birth_date: str = None,
         delta_year: int = None,
-        cognitive_state: int = 50,
+        cognitive_state: int = 100,
         gender: str = "N/A",
         npc: bool = False,
     ) -> Dict[str, Any]:
@@ -119,7 +121,8 @@ class UserManager:
                 user_name = user_id
 
             # Add user to registry with extended fields
-            if self.registry.add_user(
+            # add_user now returns the normalized user_id or None
+            normalized_user_id = self.registry.add_user(
                 user_id,
                 user_name,
                 user_type,
@@ -131,11 +134,14 @@ class UserManager:
                 cognitive_state,
                 gender,
                 npc,
-            ):
+            )
+
+            if normalized_user_id:
                 return {
                     "success": True,
-                    "message": f"User '{user_id}' created successfully",
-                    "user_id": user_id,
+                    "message": f"User '{user_name}' created successfully",
+                    "user_id": normalized_user_id,  # Return normalized user_id
+                    "user_name": user_name,
                 }
             else:
                 return {"success": False, "error": f"User '{user_id}' already exists"}

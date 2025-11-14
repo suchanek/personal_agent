@@ -411,7 +411,7 @@ class User:
             completed_fields += 1
         if self.delta_year is not None:
             completed_fields += 1
-        # cognitive_state always has a value (default 50)
+        # cognitive_state always has a value (default 100)
         completed_fields += 1
         # gender always has a value (default "N/A")
         completed_fields += 1

@@ -482,17 +482,24 @@ class DockerUserSync:
                 docker_env.get("AGNO_STORAGE_DIR"),
             )
 
+            # Start the service without --wait to prevent hanging
             result = subprocess.run(
-                ["docker-compose", "-f", compose_file, "up", "-d", "--wait"],
+                ["docker-compose", "-f", compose_file, "up", "-d"],
                 cwd=server_dir,
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=120,  # Longer timeout for startup
+                timeout=60,  # Reasonable timeout for docker-compose up -d
                 env=docker_env,  # Pass the environment variables
             )
             logger.info("Started Docker service in %s", server_dir)
             logger.debug("Docker compose up output: %s", result.stdout)
+
+            # Brief wait for container to initialize (non-blocking)
+            import time
+
+            time.sleep(2)
+
             return True
         except subprocess.TimeoutExpired:
             logger.error("Timeout starting Docker service in %s", server_dir)

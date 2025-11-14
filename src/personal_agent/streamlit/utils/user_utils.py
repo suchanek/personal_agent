@@ -70,12 +70,13 @@ def create_new_user(
     address: str = None,
     birth_date: str = None,
     delta_year: int = None,
-    cognitive_state: int = 50,
+    cognitive_state: int = 100,
     gender: str = "N/A",
     npc: bool = False,
 ) -> Dict[str, Any]:
     """
     Create a new user in the system with extended profile information.
+    Also creates the necessary directory structure for the user.
 
     Args:
         user_id: Unique identifier for the user
@@ -95,8 +96,9 @@ def create_new_user(
         Dictionary containing result information
     """
     try:
+        # Step 1: Create the user in the registry
         user_manager = get_user_manager()
-        return user_manager.create_user(
+        result = user_manager.create_user(
             user_id,
             user_name,
             user_type,
@@ -109,6 +111,75 @@ def create_new_user(
             gender,
             npc,
         )
+
+        # Step 2: If user creation successful, create directory structure
+        if result.get("success"):
+            try:
+                from personal_agent.config.user_id_mgr import (
+                    refresh_user_dependent_settings,
+                )
+
+                # IMPORTANT: Use the normalized user_id returned from create_user
+                # This ensures directories match the normalized ID (e.g., "eric.suchanek")
+                normalized_user_id = result.get("user_id", user_id)
+
+                # Get settings for the new user with normalized ID
+                settings = refresh_user_dependent_settings(user_id=normalized_user_id)
+
+                # Get the base storage path for the new user
+                base_path = settings.get("AGNO_STORAGE_DIR", "")
+
+                # Create expected directories
+                expected_dirs = []
+                if base_path:
+                    expected_dirs = [
+                        base_path,  # Main user directory
+                        f"{base_path}/knowledge",
+                        f"{base_path}/rag_storage",
+                        f"{base_path}/inputs",
+                        f"{base_path}/memory_rag_storage",
+                        f"{base_path}/memory_inputs",
+                    ]
+                else:
+                    # Fallback to settings paths
+                    expected_dirs = [
+                        settings.get("AGNO_STORAGE_DIR"),
+                        settings.get("AGNO_KNOWLEDGE_DIR"),
+                        settings.get("LIGHTRAG_STORAGE_DIR"),
+                        settings.get("LIGHTRAG_INPUTS_DIR"),
+                        settings.get("LIGHTRAG_MEMORY_STORAGE_DIR"),
+                        settings.get("LIGHTRAG_MEMORY_INPUTS_DIR"),
+                    ]
+
+                # Create directories
+                directories_created = []
+                for dir_path in expected_dirs:
+                    if dir_path:
+                        try:
+                            Path(dir_path).mkdir(parents=True, exist_ok=True)
+                            directories_created.append(dir_path)
+                        except Exception as e:
+                            # Log but don't fail - directory creation is best-effort
+                            import logging
+
+                            logging.warning(
+                                f"Could not create directory {dir_path}: {e}"
+                            )
+
+                # Add directory info to result
+                result["directories_created"] = directories_created
+                result["message"] = (
+                    f"{result.get('message', 'User created')}. Created {len(directories_created)} directories."
+                )
+
+            except Exception as dir_error:
+                # Directory creation failed, but user was created - add warning
+                result["warning"] = (
+                    f"User created but directory creation had issues: {dir_error}"
+                )
+
+        return result
+
     except Exception as e:
         st.error(f"Error creating user: {str(e)}")
         return {"success": False, "error": str(e)}

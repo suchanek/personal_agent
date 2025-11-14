@@ -94,14 +94,16 @@ class UserRegistry:
         Initialize the user registry.
 
         Args:
-            data_dir: Data directory path (defaults to config persag_home)
+            data_dir: Data directory path (defaults to config persag_root - the shared data directory)
             storage_backend: Storage backend (defaults to config storage_backend)
         """
         # Get configuration from global config manager
         config = get_config()
 
         if data_dir is None:
-            data_dir = config.persag_home
+            # Use persag_root (shared data directory) instead of persag_home (user config directory)
+            # The user registry is shared across all users and belongs in the data directory
+            data_dir = config.persag_root
         if storage_backend is None:
             storage_backend = config.storage_backend
 
@@ -142,16 +144,23 @@ class UserRegistry:
         address: str = None,
         birth_date: str = None,
         delta_year: int = None,
-        cognitive_state: int = 50,
+        cognitive_state: int = 100,
         gender: str = "N/A",
         npc: bool = False,
-    ) -> bool:
+    ) -> Optional[str]:
         """
         Add a new user to the registry.
 
+        user_id is normalized to lowercase and used for:
+        - Unique identification
+        - Directory/file paths
+        - Case-insensitive login
+
+        user_name is the display name (preserves case, spaces allowed)
+
         Args:
-            user_id: Unique user identifier
-            user_name: Display name for the user (defaults to user_id)
+            user_id: Unique user identifier (will be normalized to lowercase)
+            user_name: Display name for the user (defaults to title-cased user_id)
             user_type: User type (Standard, Admin, Guest)
             email: User's email address
             phone: User's phone number
@@ -163,23 +172,45 @@ class UserRegistry:
             npc: Whether user is an NPC (Non-Player Character)
 
         Returns:
-            True if user was added, False if user already exists
+            Normalized user_id if user was added, None if user already exists
         """
         if not user_id:
             raise ValueError("user_id cannot be empty")
 
+        # Normalize user_id to lowercase for consistency
+        user_id = user_id.lower().strip()
+
+        # Replace spaces with dots for filesystem compatibility
+        user_id = user_id.replace(" ", ".")
+
+        # Validate user_id format (alphanumeric, dots, underscores, hyphens only)
+        import re
+
+        if not re.match(r"^[a-z0-9._-]+$", user_id):
+            raise ValueError(
+                "user_id can only contain lowercase letters, numbers, dots, underscores, and hyphens"
+            )
+
         registry = self._load_registry()
 
-        # Check if user already exists
+        # Check if user already exists (case-insensitive)
+        user_id_lower = user_id.lower()
         for user in registry["users"]:
-            if user["user_id"] == user_id:
-                return False
+            if user["user_id"].lower() == user_id_lower:
+                return None
+
+        # Generate user_name from user_id if not provided
+        if not user_name:
+            # Convert "paula.smith" to "Paula Smith"
+            user_name = (
+                user_id.replace(".", " ").replace("_", " ").replace("-", " ").title()
+            )
 
         # Create new user with dataclass
         try:
             new_user = User(
-                user_id=user_id,
-                user_name=user_name or user_id,
+                user_id=user_id,  # Already normalized to lowercase
+                user_name=user_name,
                 user_type=user_type,
                 email=email,
                 phone=phone,
@@ -193,10 +224,10 @@ class UserRegistry:
 
             registry["users"].append(new_user.to_dict())
             self._save_registry(registry)
-            return True
+            return user_id  # Return the normalized user_id
 
         except ValueError as e:
-            raise ValueError(f"Invalid user data: {str(e)}")
+            raise ValueError(f"Invalid user data: {str(e)}") from e
 
     def get_all_users(self) -> List[Dict[str, Any]]:
         """
@@ -212,15 +243,18 @@ class UserRegistry:
         """
         Get a specific user from the registry.
 
+        Performs case-insensitive lookup to handle variations like "Paula" vs "paula".
+
         Args:
-            user_id: User identifier
+            user_id: User identifier (case-insensitive)
 
         Returns:
             User dictionary or None if not found
         """
         registry = self._load_registry()
+        user_id_lower = user_id.lower()
         for user in registry["users"]:
-            if user["user_id"] == user_id:
+            if user["user_id"].lower() == user_id_lower:
                 return user
         return None
 
@@ -228,8 +262,10 @@ class UserRegistry:
         """
         Remove a user from the registry.
 
+        Performs case-insensitive lookup to handle variations like "Paula" vs "paula".
+
         Args:
-            user_id: User identifier
+            user_id: User identifier (case-insensitive)
 
         Returns:
             True if user was removed, False if user not found
@@ -237,8 +273,11 @@ class UserRegistry:
         registry = self._load_registry()
         original_count = len(registry["users"])
 
+        user_id_lower = user_id.lower()
         registry["users"] = [
-            user for user in registry["users"] if user["user_id"] != user_id
+            user
+            for user in registry["users"]
+            if user["user_id"].lower() != user_id_lower
         ]
 
         if len(registry["users"]) < original_count:
@@ -342,7 +381,7 @@ class UserRegistry:
             return True
         else:
             # Auto-register current user
-            return self.add_user(current_user_id, current_user_id, "Admin")
+            return bool(self.add_user(current_user_id, current_user_id, "Admin"))
 
     def get_user_object(self, user_id: str) -> Optional[User]:
         """

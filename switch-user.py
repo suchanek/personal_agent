@@ -28,6 +28,16 @@ from typing import Any, Dict
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from personal_agent.config import PERSAG_HOME
+from personal_agent.config.user_id_mgr import (
+    get_current_user_id,
+    load_user_from_file,
+    refresh_user_dependent_settings,
+)
+
+# Ensure the USER_ID context is initialized using the canonical loader
+load_user_from_file()
+
 
 # Colors for output
 class Colors:
@@ -96,11 +106,6 @@ def validate_user_id(user_id: str) -> bool:
 def get_current_user_info() -> Dict[str, Any]:
     """Get information about the current user."""
     try:
-        from personal_agent.config import (
-            get_current_user_id,
-            refresh_user_dependent_settings,
-        )
-
         current_user_id = get_current_user_id()
         current_settings = refresh_user_dependent_settings()
 
@@ -112,8 +117,12 @@ def get_current_user_info() -> Dict[str, Any]:
 
 def create_user_if_needed(
     user_id: str, user_name: str = None, user_type: str = "Standard"
-) -> bool:
-    """Create a user if they don't exist."""
+) -> tuple:
+    """Create a user if they don't exist.
+
+    Returns:
+        Tuple of (success: bool, normalized_user_id: str)
+    """
     try:
         from personal_agent.core.user_manager import UserManager
 
@@ -123,7 +132,8 @@ def create_user_if_needed(
         existing_user = user_manager.get_user(user_id)
         if existing_user:
             print_info(f"User '{user_id}' already exists")
-            return True
+            # Return the existing user's normalized ID
+            return True, existing_user.get("user_id", user_id)
 
         # Create new user
         print_step("CREATE", f"Creating new user '{user_id}'")
@@ -134,29 +144,33 @@ def create_user_if_needed(
         result = user_manager.create_user(user_id, user_name, user_type)
 
         if result["success"]:
+            # Get the normalized user_id from the result
+            normalized_user_id = result.get("user_id", user_id)
+            user_display_name = result.get("user_name", user_name)
             print_success(
-                f"Created user '{user_id}' with name '{user_name}' (type: {user_type})"
+                f"Created user '{normalized_user_id}' with name '{user_display_name}' (type: {user_type})"
             )
-            return True
+            return True, normalized_user_id
         else:
             error_msg = result.get("error", result.get("message", "Unknown error"))
             print_error(f"Failed to create user: {error_msg}")
-            return False
+            return False, user_id
 
     except Exception as e:
         print_error(f"Error creating user: {e}")
-        return False
+        return False, user_id
 
 
-def switch_user_context(user_id: str, restart_services: bool = True, restart_system: bool = True) -> bool:
+def switch_user_context(
+    user_id: str, restart_services: bool = True, restart_system: bool = True
+) -> bool:
     """Switch the user context and refresh all settings."""
     try:
-        from personal_agent.config import DATA_DIR, PERSAG_HOME
-        from personal_agent.core.user_manager import UserManager
         from personal_agent.core.docker_integration import (
             ensure_docker_user_consistency,
             stop_lightrag_services,
         )
+        from personal_agent.core.user_manager import UserManager
 
         # Shut down services before switching user to ensure a clean restart
         if restart_services:
@@ -168,9 +182,10 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
                 # This is a warning because services might already be stopped
                 print_warning(f"Could not stop all LightRAG services: {message}")
 
-        user_manager = UserManager(data_dir=DATA_DIR, project_root=PERSAG_HOME)
+        # UserManager will use config defaults for registry location (PERSAG_ROOT)
+        user_manager = UserManager()
 
-        print_step("SWITCH", f"Switching to user '{user_id} using {PERSAG_HOME}'")
+        print_step("SWITCH", f"Switching to user '{user_id}'")
 
         # Perform the user switch
         result = user_manager.switch_user(
@@ -222,13 +237,28 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
                 try:
                     # Import required modules for system restart
                     from personal_agent.tools.global_state import get_global_state
-                    from personal_agent.tools.streamlit_agent_manager import initialize_agent, initialize_team
-                    from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                    from personal_agent.tools.streamlit_agent_manager import (
+                        initialize_agent,
+                        initialize_team,
+                    )
+                    from personal_agent.tools.streamlit_helpers import (
+                        StreamlitKnowledgeHelper,
+                        StreamlitMemoryHelper,
+                    )
 
                     global_state = get_global_state()
                     current_agent_mode = global_state.get("agent_mode", "single")
-                    current_model = global_state.get("llm_model", os.getenv("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"))
-                    current_ollama_url = global_state.get("ollama_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+                    current_model = global_state.get(
+                        "llm_model",
+                        os.getenv(
+                            "LLM_MODEL",
+                            "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
+                        ),
+                    )
+                    current_ollama_url = global_state.get(
+                        "ollama_url",
+                        os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                    )
 
                     # Clear global state for clean restart
                     global_state.clear()
@@ -239,7 +269,9 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
 
                     if current_agent_mode == "team":
                         try:
-                            team = initialize_team(current_model, current_ollama_url, recreate=True)
+                            team = initialize_team(
+                                current_model, current_ollama_url, recreate=True
+                            )
                             if team:
                                 global_state.set("agent_mode", "team")
                                 global_state.set("team", team)
@@ -248,23 +280,35 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
 
                                 if hasattr(team, "members") and team.members:
                                     knowledge_agent = team.members[0]
-                                    memory_helper = StreamlitMemoryHelper(knowledge_agent)
-                                    knowledge_helper_obj = StreamlitKnowledgeHelper(knowledge_agent)
+                                    memory_helper = StreamlitMemoryHelper(
+                                        knowledge_agent
+                                    )
+                                    knowledge_helper_obj = StreamlitKnowledgeHelper(
+                                        knowledge_agent
+                                    )
                                     global_state.set("memory_helper", memory_helper)
-                                    global_state.set("knowledge_helper", knowledge_helper_obj)
+                                    global_state.set(
+                                        "knowledge_helper", knowledge_helper_obj
+                                    )
 
                                 restart_success = True
-                                restart_message = "System restarted successfully in team mode"
+                                restart_message = (
+                                    "System restarted successfully in team mode"
+                                )
                                 print_success(restart_message)
                             else:
-                                restart_message = "Failed to initialize team during restart"
+                                restart_message = (
+                                    "Failed to initialize team during restart"
+                                )
                                 print_error(restart_message)
                         except Exception as e:
                             restart_message = f"Error restarting team: {str(e)}"
                             print_error(restart_message)
                     else:
                         try:
-                            agent = initialize_agent(current_model, current_ollama_url, recreate=True)
+                            agent = initialize_agent(
+                                current_model, current_ollama_url, recreate=True
+                            )
                             if agent:
                                 global_state.set("agent_mode", "single")
                                 global_state.set("agent", agent)
@@ -274,13 +318,19 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
                                 memory_helper = StreamlitMemoryHelper(agent)
                                 knowledge_helper_obj = StreamlitKnowledgeHelper(agent)
                                 global_state.set("memory_helper", memory_helper)
-                                global_state.set("knowledge_helper", knowledge_helper_obj)
+                                global_state.set(
+                                    "knowledge_helper", knowledge_helper_obj
+                                )
 
                                 restart_success = True
-                                restart_message = "System restarted successfully in single agent mode"
+                                restart_message = (
+                                    "System restarted successfully in single agent mode"
+                                )
                                 print_success(restart_message)
                             else:
-                                restart_message = "Failed to initialize agent during restart"
+                                restart_message = (
+                                    "Failed to initialize agent during restart"
+                                )
                                 print_error(restart_message)
                         except Exception as e:
                             restart_message = f"Error restarting agent: {str(e)}"
@@ -291,15 +341,17 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
                         "restart_success": restart_success,
                         "restart_message": restart_message,
                         "agent_mode": current_agent_mode,
-                        "model": current_model
+                        "model": current_model,
                     }
 
                 except Exception as restart_error:
-                    print_error(f"Error during system restart after user switch: {restart_error}")
+                    print_error(
+                        f"Error during system restart after user switch: {restart_error}"
+                    )
                     system_restart_result = {
                         "restart_performed": True,
                         "restart_success": False,
-                        "restart_message": str(restart_error)
+                        "restart_message": str(restart_error),
                     }
 
             # Display system restart results
@@ -307,7 +359,9 @@ def switch_user_context(user_id: str, restart_services: bool = True, restart_sys
                 if system_restart_result["restart_success"]:
                     print_info("System restart completed successfully")
                 else:
-                    print_warning(f"System restart had issues: {system_restart_result['restart_message']}")
+                    print_warning(
+                        f"System restart had issues: {system_restart_result['restart_message']}"
+                    )
 
             # Display warnings if any
             if result.get("warnings"):
@@ -351,9 +405,6 @@ def create_user_directories(user_id: str) -> bool:
 
             # Get the agent's storage directories
             directories_created = []
-
-            # Check if directories were created by examining the agent's configuration
-            from personal_agent.config import refresh_user_dependent_settings
 
             # Refresh settings to get the correct paths for the new user
             settings = refresh_user_dependent_settings(user_id=user_id)
@@ -430,7 +481,6 @@ def create_user_directories(user_id: str) -> bool:
 def display_user_status(user_id: str):
     """Display the current status of the user."""
     try:
-        from personal_agent.config import get_current_user_id
         from personal_agent.core.user_manager import UserManager
 
         print_header(f"User Status: {user_id}")
@@ -549,35 +599,40 @@ Examples:
         return
 
     # Step 1: Create user if needed
-    if not create_user_if_needed(args.user_id, args.user_name, args.user_type):
+    success, normalized_user_id = create_user_if_needed(
+        args.user_id, args.user_name, args.user_type
+    )
+    if not success:
         print_error("Failed to create user")
         sys.exit(1)
 
-    # Step 2: Create user directories
-    if not create_user_directories(args.user_id):
+    print_info(f"Using normalized user ID: {normalized_user_id}")
+
+    # Step 2: Create user directories using normalized user_id
+    if not create_user_directories(normalized_user_id):
         print_warning("Some user directories could not be created")
 
     # If create-only mode, stop here
     if args.create_only:
-        print_success(f"User '{args.user_id}' created successfully")
+        print_success(f"User '{normalized_user_id}' created successfully")
         return
 
-    # Step 3: Switch user context
+    # Step 3: Switch user context using normalized user_id
     restart_services = not args.no_restart
     restart_system = not args.no_system_restart
-    if not switch_user_context(args.user_id, restart_services, restart_system):
+    if not switch_user_context(normalized_user_id, restart_services, restart_system):
         print_error("Failed to switch user context")
         sys.exit(1)
 
     # Step 4: Display final status
     print_header("Switch Complete")
-    display_user_status(args.user_id)
+    display_user_status(normalized_user_id)
 
     print(
-        f"\n{Colors.GREEN}{Colors.BOLD}🎉 Successfully switched to user '{args.user_id}'!{Colors.NC}"
+        f"\n{Colors.GREEN}{Colors.BOLD}🎉 Successfully switched to user '{normalized_user_id}'!{Colors.NC}"
     )
     print(
-        f"{Colors.CYAN}You can now use the Personal Agent system as '{args.user_id}'.{Colors.NC}"
+        f"{Colors.CYAN}You can now use the Personal Agent system as '{normalized_user_id}'.{Colors.NC}"
     )
 
     if restart_services:
