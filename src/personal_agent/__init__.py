@@ -82,7 +82,7 @@ from .utils.pag_logging import (
 )
 
 # Package version (matches pyproject.toml)
-__version__ = "0.8.74dev"  # Defined once to avoid duplication
+__version__ = "0.8.76dev"  # Defined once to avoid duplication
 
 # Setup package and module-level logging
 # Configure logging for the package

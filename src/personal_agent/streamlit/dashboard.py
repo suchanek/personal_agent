@@ -132,6 +132,16 @@ def main():
 
     # Initialize session state
     initialize_session_state()
+    
+    # Check if a user switch just completed and auto-refresh
+    if st.session_state.get("user_switch_success", False):
+        # Clear the user manager cache to force fresh data
+        try:
+            from personal_agent.streamlit.utils.user_utils import get_user_manager
+            get_user_manager.clear()
+        except Exception:
+            pass
+        # The flag will be cleared when sidebar displays the success message
 
     # Apply theme
     apply_custom_theme()
@@ -204,36 +214,81 @@ def main():
 
     # Display current user prominently near the top
     st.sidebar.header("👤 Current User")
+    
     try:
-        from personal_agent.streamlit.utils.agent_utils import check_agent_status
-        from personal_agent.streamlit.utils.user_utils import get_user_details
-
-        agent = get_agent_instance()
-        if agent:
-            status = check_agent_status(agent)
-            user_id = status.get("user_id", "Unknown")
-        else:
-            # Fallback to direct user_id_mgr import if no agent
+        # Clear cached user info if a user switch is detected
+        if "last_displayed_user" not in st.session_state:
+            st.session_state.last_displayed_user = None
+            
+        current_user_id = None
+        
+        # Method 1: ALWAYS read current_user.json FIRST for most up-to-date info (this is what gets updated on switch)
+        try:
+            import json
+            from pathlib import Path
+            current_user_file = Path.home() / ".persagent" / "current_user.json"
+            if current_user_file.exists():
+                with open(current_user_file) as f:
+                    user_data = json.load(f)
+                    current_user_id = user_data.get("user_id", "Unknown")
+        except Exception:
+            pass
+            
+        # Method 2: Try direct user_id_mgr import
+        if not current_user_id or current_user_id == "Unknown":
             try:
                 from personal_agent.config.user_id_mgr import get_userid
-
-                user_id = get_userid()
+                current_user_id = get_userid()
             except ImportError:
-                # Final fallback to environment variable
-                import os
-
-                user_id = os.getenv("USER_ID", "Unknown")
+                pass
+        
+        # Method 3: Try agent status system
+        if not current_user_id or current_user_id == "Unknown":
+            try:
+                from personal_agent.streamlit.utils.agent_utils import check_agent_status
+                agent = get_agent_instance()
+                if agent:
+                    status = check_agent_status(agent)
+                    current_user_id = status.get("user_id", "Unknown")
+            except Exception:
+                pass
+                
+        # Method 4: Final fallback to environment variable
+        if not current_user_id or current_user_id == "Unknown":
+            import os
+            current_user_id = os.getenv("USER_ID", "Unknown")
+        
+        # Display current user with refresh detection
+        if current_user_id != st.session_state.last_displayed_user:
+            # User has changed, clear any cached user manager
+            try:
+                from personal_agent.streamlit.utils.user_utils import get_user_manager
+                get_user_manager.clear()
+            except Exception:
+                pass
+            st.session_state.last_displayed_user = current_user_id
 
         # Get user details to show the display name
-        if user_id != "Unknown":
-            user_details = get_user_details(user_id)
+        if current_user_id != "Unknown":
+            from personal_agent.streamlit.utils.user_utils import get_user_details
+            user_details = get_user_details(current_user_id)
             if user_details and user_details.get("user_name"):
                 display_name = user_details["user_name"]
-                st.sidebar.info(f"**{display_name}** ({user_id})")
+                # Display with refresh indicator if user recently switched
+                if st.session_state.get('user_switch_success', False):
+                    st.sidebar.success(f"✅ **{display_name}** ({current_user_id})")
+                    # Clear the success flag after displaying
+                    st.session_state.user_switch_success = False
+                else:
+                    st.sidebar.info(f"**{display_name}** ({current_user_id})")
             else:
-                st.sidebar.info(f"**{user_id}**")
+                if st.session_state.get('user_switch_success', False):
+                    st.sidebar.success(f"✅ **{current_user_id}**")
+                    st.session_state.user_switch_success = False
+                else:
+                    st.sidebar.info(f"**{current_user_id}**")
         else:
-            st.sidebar.info(f"**{user_id}**")
+            st.sidebar.info(f"**{current_user_id}**")
 
     except Exception as e:
         # Final fallback to environment variable
@@ -278,6 +333,23 @@ def main():
     # System control buttons at the bottom of the sidebar
     st.sidebar.markdown("---")
     st.sidebar.header("🚨 System Control")
+    
+    # Add refresh button above power off
+    if st.sidebar.button("🔄 Refresh Dashboard", use_container_width=True, help="Refresh current user and system status", key="sidebar_refresh_btn"):
+        # Clear all cached data
+        try:
+            from personal_agent.streamlit.utils.user_utils import get_user_manager
+            get_user_manager.clear()
+        except Exception:
+            pass
+        
+        # Clear session state flags
+        if "last_displayed_user" in st.session_state:
+            del st.session_state.last_displayed_user
+        if "user_switch_success" in st.session_state:
+            del st.session_state.user_switch_success
+            
+        st.rerun()
 
     # Power off button
     if st.sidebar.button(

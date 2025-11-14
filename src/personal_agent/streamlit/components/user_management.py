@@ -766,6 +766,10 @@ def _render_switch_user():
 
                                             get_user_manager.clear()
 
+                                            # Set success flag for sidebar refresh
+                                            st.session_state.user_switch_success = True
+                                            st.session_state.last_displayed_user = None  # Force sidebar refresh
+
                                             # Success message with refresh suggestion
                                             st.success(
                                                 "🎉 **Switch Complete!** Refreshing page in 3 seconds..."
@@ -1048,6 +1052,14 @@ def _render_delete_user():
                                     )
                                     if confirmation_key in st.session_state:
                                         del st.session_state[confirmation_key]
+                                    
+                                    # Clear form-related session state
+                                    if "delete_user_form" in st.session_state:
+                                        del st.session_state["delete_user_form"]
+                                    
+                                    # Reset selected user in delete form
+                                    if "delete_selected_user" in st.session_state:
+                                        st.session_state["delete_selected_user"] = ""
 
                                     st.success("🔄 User list refreshed successfully!")
                                     # Force a rerun to refresh the entire component and user list
