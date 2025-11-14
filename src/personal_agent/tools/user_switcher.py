@@ -95,7 +95,9 @@ def validate_user_id(user_id: str) -> bool:
         return False
 
     # Allow dots and spaces for full names like "Eric Suchanek"
-    cleaned = user_id.replace("_", "").replace("-", "").replace(".", "").replace(" ", "")
+    cleaned = (
+        user_id.replace("_", "").replace("-", "").replace(".", "").replace(" ", "")
+    )
     if not cleaned.isalnum():
         print_error(
             "User ID can only contain letters, numbers, spaces, dots, hyphens, and underscores"
@@ -118,7 +120,10 @@ def get_current_user_info() -> Dict[str, Any]:
 
 
 def create_user_if_needed(
-    user_id: str, user_name: str = None, user_type: str = "Standard", auto_confirm: bool = False
+    user_id: str,
+    user_name: str = None,
+    user_type: str = "Standard",
+    auto_confirm: bool = False,
 ) -> tuple:
     """Create a user if they don't exist.
 
@@ -147,13 +152,17 @@ def create_user_if_needed(
         if not auto_confirm:
             if not user_name:
                 user_name = user_id.replace("_", " ").replace("-", " ").title()
-            
+
             print_warning(f"User '{user_id}' does not exist.")
             print_info(f"  User Name: {user_name}")
             print_info(f"  User Type: {user_type}")
-            
-            response = input(f"\n{Colors.YELLOW}Create this user? [y/N]: {Colors.NC}").strip().lower()
-            if response not in ['y', 'yes']:
+
+            response = (
+                input(f"\n{Colors.YELLOW}Create this user? [y/N]: {Colors.NC}")
+                .strip()
+                .lower()
+            )
+            if response not in ["y", "yes"]:
                 print_info("User creation cancelled")
                 return False, user_id
 
@@ -411,6 +420,7 @@ def switch_user_context(
 def create_user_directories(user_id: str) -> bool:
     """Create necessary directories for the user."""
     try:
+        from personal_agent.config.runtime_config import get_config
         from personal_agent.core.agno_agent import AgnoPersonalAgent
 
         print_step("SETUP", f"Creating directories for user '{user_id}'")
@@ -418,6 +428,13 @@ def create_user_directories(user_id: str) -> bool:
         # Temporarily set the USER_ID environment variable
         original_user_id = os.getenv("USER_ID")
         os.environ["USER_ID"] = user_id
+
+        # CRITICAL: Update the config singleton with the new user_id
+        # This ensures all storage paths are calculated correctly for the new user
+        config = get_config()
+        config.set_user_id(
+            user_id, persist=False
+        )  # Don't persist yet, that's done in switch_user_context
 
         try:
             # Initialize AgnoPersonalAgent with the new user ID to ensure proper directory creation
@@ -489,9 +506,10 @@ def create_user_directories(user_id: str) -> bool:
             return True
 
         finally:
-            # Restore original USER_ID
+            # Restore original USER_ID in both environment and config
             if original_user_id:
                 os.environ["USER_ID"] = original_user_id
+                config.set_user_id(original_user_id, persist=False)
 
     except Exception as e:
         print_error(f"Error creating user directories: {e}")
@@ -593,7 +611,8 @@ Examples:
     )
 
     parser.add_argument(
-        "-y", "--yes",
+        "-y",
+        "--yes",
         action="store_true",
         help="Automatically confirm user creation without prompting",
     )

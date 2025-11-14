@@ -48,6 +48,9 @@ Key Features
     - Memory-knowledge synchronization status monitoring.
     - Comprehensive error handling and logging.
     - Session state management for a persistent user experience.
+    - REST API integration on port 8001 with custom endpoints:
+        * Standard endpoints: /api/v1/memory/*, /api/v1/knowledge/*, /api/v1/users/*, /api/v1/chat
+        * Custom /api/v1/paga/restart endpoint for system reinitialization
 
 Architecture
 -----------
@@ -118,33 +121,29 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent import __version__
-from personal_agent.config import (
-    get_current_user_id,
-)
+from personal_agent.config import get_current_user_id
 from personal_agent.config.runtime_config import get_config
 from personal_agent.tools.global_state import update_global_state_from_streamlit
 from personal_agent.tools.rest_api import start_rest_api
 from personal_agent.tools.streamlit_config import (
-    args,
-    config as streamlit_config,
     DEBUG_FLAG,
     EFFECTIVE_OLLAMA_URL,
     RECREATE_FLAG,
     SINGLE_FLAG,
+    args,
 )
+from personal_agent.tools.streamlit_config import config as streamlit_config
 from personal_agent.tools.streamlit_session import (
     SESSION_KEY_MESSAGES,
     initialize_session_state,
 )
 from personal_agent.tools.streamlit_tabs import (
     render_chat_tab,
-    render_memory_tab,
     render_knowledge_tab,
+    render_memory_tab,
     render_sidebar,
 )
-from personal_agent.tools.streamlit_ui_components import (
-    apply_custom_theme,
-)
+from personal_agent.tools.streamlit_ui_components import apply_custom_theme
 
 # Apply dashboard-style layout but keep original page title/icon
 st.set_page_config(
@@ -153,8 +152,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-USER_ID = get_current_user_id()
 
 
 def add_paga_restart_endpoint(api_server):
@@ -167,9 +164,10 @@ def add_paga_restart_endpoint(api_server):
     4. Ensures Docker service consistency
     5. Updates global state with new configuration
     """
-    from flask import jsonify, request
-    from datetime import datetime
     import tempfile
+    from datetime import datetime
+
+    from flask import jsonify, request
 
     @api_server.app.route("/api/v1/paga/restart", methods=["POST"])
     def restart_paga_system():
@@ -182,17 +180,19 @@ def add_paga_restart_endpoint(api_server):
             restart_lightrag = data.get("restart_lightrag", True)  # Default to True
 
             # Create restart marker file to trigger page refresh
-            marker_file = os.path.join(tempfile.gettempdir(), "personal_agent_restart_marker")
+            marker_file = os.path.join(
+                tempfile.gettempdir(), "personal_agent_restart_marker"
+            )
             with open(marker_file, "w") as f:
                 f.write(str(time.time()))
 
             # Import required modules
-            from personal_agent.tools.global_state import get_global_state
             from personal_agent.config.user_id_mgr import get_userid
             from personal_agent.core.docker_integration import (
-                stop_lightrag_services,
                 ensure_docker_user_consistency,
+                stop_lightrag_services,
             )
+            from personal_agent.tools.global_state import get_global_state
 
             # Get current user
             current_user = get_userid()
@@ -206,17 +206,33 @@ def add_paga_restart_endpoint(api_server):
                     if success:
                         logger.info("LightRAG services stopped successfully.")
                     else:
-                        logger.warning(f"Could not stop all LightRAG services: {message}")
+                        logger.warning(
+                            f"Could not stop all LightRAG services: {message}"
+                        )
                 except Exception as e:
                     logger.warning(f"Error stopping LightRAG services: {e}")
 
             # Step 2: Get current configuration from global state (matches switch-user.py line 228-231)
             global_state = get_global_state()
-            current_mode = global_state.get("agent_mode", st.session_state.get("agent_mode", "team"))
-            current_model = global_state.get("llm_model", st.session_state.get("current_model", os.getenv("LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0")))
-            current_ollama_url = global_state.get("ollama_url", st.session_state.get("ollama_url", EFFECTIVE_OLLAMA_URL))
+            current_mode = global_state.get(
+                "agent_mode", st.session_state.get("agent_mode", "team")
+            )
+            current_model = global_state.get(
+                "llm_model",
+                st.session_state.get(
+                    "current_model",
+                    os.getenv(
+                        "LLM_MODEL", "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0"
+                    ),
+                ),
+            )
+            current_ollama_url = global_state.get(
+                "ollama_url", st.session_state.get("ollama_url", EFFECTIVE_OLLAMA_URL)
+            )
 
-            logger.info(f"Restart configuration: mode={current_mode}, model={current_model}")
+            logger.info(
+                f"Restart configuration: mode={current_mode}, model={current_model}"
+            )
 
             # Step 3: Clear global state for clean restart (matches switch-user.py line 234)
             logger.info("Clearing global state for clean restart...")
@@ -229,8 +245,15 @@ def add_paga_restart_endpoint(api_server):
 
             try:
                 # Import required modules
-                from personal_agent.tools.streamlit_agent_manager import initialize_team, initialize_agent, create_team_wrapper
-                from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper, StreamlitKnowledgeHelper
+                from personal_agent.tools.streamlit_agent_manager import (
+                    create_team_wrapper,
+                    initialize_agent,
+                    initialize_team,
+                )
+                from personal_agent.tools.streamlit_helpers import (
+                    StreamlitKnowledgeHelper,
+                    StreamlitMemoryHelper,
+                )
 
                 if current_mode == "team":
                     logger.info("Reinitializing team with recreate=True...")
@@ -307,7 +330,9 @@ def add_paga_restart_endpoint(api_server):
                         global_state.set("knowledge_helper", knowledge_helper)
 
                         success = True
-                        message = "Agent reinitialized successfully in single agent mode"
+                        message = (
+                            "Agent reinitialized successfully in single agent mode"
+                        )
                         logger.info(message)
                     else:
                         message = "Failed to reinitialize agent"
@@ -319,6 +344,7 @@ def add_paga_restart_endpoint(api_server):
                 logger.error(message)
                 restart_errors.append(message)
                 import traceback
+
                 logger.error(f"Traceback: {traceback.format_exc()}")
 
             # Step 5: Ensure Docker service consistency (matches switch-user.py line 207-216)
@@ -331,7 +357,7 @@ def add_paga_restart_endpoint(api_server):
                     )
                     docker_result = {
                         "success": docker_success,
-                        "message": docker_message
+                        "message": docker_message,
                     }
                     if docker_success:
                         logger.info("Docker services synchronized successfully.")
@@ -341,10 +367,7 @@ def add_paga_restart_endpoint(api_server):
                 except Exception as e:
                     error_msg = f"Error ensuring Docker consistency: {str(e)}"
                     logger.error(error_msg)
-                    docker_result = {
-                        "success": False,
-                        "message": error_msg
-                    }
+                    docker_result = {"success": False, "message": error_msg}
                     restart_errors.append(error_msg)
 
             # Build response (matches switch-user.py structure)
@@ -355,7 +378,7 @@ def add_paga_restart_endpoint(api_server):
                     "mode": current_mode,
                     "model": current_model,
                     "timestamp": datetime.now().isoformat(),
-                    "user_id": current_user
+                    "user_id": current_user,
                 }
 
                 # Include Docker restart results
@@ -372,7 +395,7 @@ def add_paga_restart_endpoint(api_server):
                     "success": "False",
                     "error": message,
                     "errors": restart_errors,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
                 # Include Docker results even on failure
@@ -384,20 +407,26 @@ def add_paga_restart_endpoint(api_server):
         except Exception as e:
             logger.error(f"Error during PAGA system restart via API: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
-            return jsonify({
-                "success": "False",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }), 500
+            return (
+                jsonify(
+                    {
+                        "success": "False",
+                        "error": str(e),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
+                500,
+            )
 
     logger.info("Added custom /api/v1/paga/restart endpoint")
 
 
 def check_restart_marker_and_refresh():
     """Check for restart marker file and trigger page refresh if found."""
-    import tempfile
     import os
+    import tempfile
     import time
 
     marker_file = os.path.join(tempfile.gettempdir(), "personal_agent_restart_marker")
@@ -438,17 +467,17 @@ def main():
 
     # Update global state with current session state for REST API access
     update_global_state_from_streamlit(st.session_state)
-    
+
     # Initialize REST API server AFTER session state is fully initialized
     if "rest_api_server" not in st.session_state:
         try:
             # Start the REST API server with access to Streamlit session state
             api_server = start_rest_api(st.session_state, port=8001, host="0.0.0.0")
             st.session_state["rest_api_server"] = api_server
-            
+
             # Add custom restart endpoint for paga_streamlit_agno
             add_paga_restart_endpoint(api_server)
-            
+
             logger.info("REST API server initialized and started on port 8001")
         except Exception as e:
             logger.error(f"Failed to start REST API server: {e}")
@@ -574,7 +603,23 @@ def main():
         return
 
     # Sidebar navigation (replaces top-level tabs)
-    st.sidebar.title(f"🧠 {USER_ID}'s Personal Agent")
+    # Get user display name for sidebar (call dynamically, not static)
+    current_user_id = get_current_user_id()
+    try:
+        from personal_agent.core.user_manager import UserManager
+
+        user_manager = UserManager()
+        user_details = user_manager.get_user_details(current_user_id)
+        user_display_name = (
+            user_details.get("user_name", current_user_id)
+            if user_details
+            else current_user_id
+        )
+    except Exception as e:
+        logger.warning(f"Could not get user display name: {e}")
+        user_display_name = current_user_id
+
+    st.sidebar.title(f"🧠 {user_display_name}'s Personal Agent")
     selected_tab = st.sidebar.radio(
         "Navigation",
         ["💬 Chat", "🧠 Memory Manager", "📚 Knowledge Base"],

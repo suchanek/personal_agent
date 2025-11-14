@@ -27,9 +27,12 @@ Endpoints:
     - GET /api/v1/users - List all users
     - POST /api/v1/users/switch - Switch to a different user (includes system restart)
         Parameters:
-        - user_id (required): User ID to switch to
-        - restart_containers (optional, default: true): Restart Docker containers
-        - restart_system (optional, default: true): Restart agent/team system
+        - user_id (required): User ID or full name to switch to
+        - user_name (optional): Display name for new users
+        - user_type (optional): Standard/Admin/Guest (default: Standard)
+        - auto_confirm (optional): Auto-create new users without confirmation (default: true)
+        - restart_containers (optional): Restart Docker containers (default: true)
+        - restart_system (optional): Restart agent/team system (default: true)
 
     Chat:
     - POST /api/v1/chat - Send a message to the agent and get a response
@@ -40,6 +43,10 @@ Endpoints:
     System:
     - GET /api/v1/health - Health check (main agent server only, port 8001)
     - GET /api/v1/status - System status
+    - POST /api/v1/system/restart - Restart agent/team system
+        Parameters:
+        - restart_lightrag (optional): Restart LightRAG services (default: true)
+    - GET /api/v1/discovery - Service discovery endpoint
 
     Note: The health check endpoint is only available on the main agent server
           (paga_streamlit_agno.py on port 8001). The dashboard's REST API
@@ -56,9 +63,19 @@ Usage:
       -H "Content-Type: application/json" \
       -d '{"url": "https://example.com", "title": "Example"}'
 
+    # Switch user (creates if doesn't exist)
+    curl -X POST http://localhost:8001/api/v1/users/switch \
+      -H "Content-Type: application/json" \
+      -d '{"user_id": "alice.smith", "restart_containers": true, "restart_system": true}'
+
+    # Restart system
+    curl -X POST http://localhost:8001/api/v1/system/restart \
+      -H "Content-Type: application/json" \
+      -d '{"restart_lightrag": true}'
+
 Author: Personal Agent Development Team
-Version: v1.0.0
-Last Revision: 2025-01-24
+Version: v0.8.76
+Last Revision: 2025-11-14 13:44:19
 """
 
 import asyncio
@@ -834,7 +851,39 @@ class PersonalAgentRestAPI:
 
         @self.app.route("/api/v1/users/switch", methods=["POST"])
         def switch_user():
+            """
+            Switch to a different user (creates user if doesn't exist).
+
+            Uses the user_switcher module for complete user switching logic including:
+            - User validation
+            - User creation (if needed)
+            - Directory setup
+            - LightRAG service management
+            - System restart (agent/team reinitialization)
+
+            Request Body:
+                user_id: str (required) - User ID or full name to switch to
+                user_name: str (optional) - Display name for new users (defaults to formatted user_id)
+                user_type: str (optional) - Standard/Admin/Guest (default: Standard)
+                auto_confirm: bool (optional) - Auto-create new users without confirmation (default: True for API)
+                restart_containers: bool (optional) - Restart Docker services (default: True)
+                restart_system: bool (optional) - Restart agent/team (default: True)
+
+            Returns:
+                {
+                    "success": "True",
+                    "user_id": "normalized.userid",
+                    "user_name": "Display Name",
+                    "created_new_user": bool,
+                    "actions_performed": [...],
+                    "config_refresh": {...},
+                    "system_restart": {...},
+                    "warnings": [...]
+                }
+            """
             try:
+                from datetime import datetime
+
                 data = request.get_json()
                 if not data:
                     return jsonify({"error": "No JSON data provided"}), 400
@@ -843,200 +892,173 @@ class PersonalAgentRestAPI:
                 if not user_id:
                     return jsonify({"error": "user_id is required"}), 400
 
+                # Extract optional parameters
+                user_name = data.get("user_name")
+                user_type = data.get("user_type", "Standard")
+                auto_confirm = data.get(
+                    "auto_confirm", True
+                )  # Default True for API calls
                 restart_containers = data.get("restart_containers", True)
-                restart_system = data.get(
-                    "restart_system", True
-                )  # New parameter to control system restart
+                restart_system = data.get("restart_system", True)
 
-                # Import user utilities
-                from ..streamlit.utils.user_utils import switch_user
+                logger.info(f"User switch requested via API: {user_id}")
+                logger.info(
+                    f"  Parameters: user_type={user_type}, auto_confirm={auto_confirm}"
+                )
+                logger.info(
+                    f"  restart_containers={restart_containers}, restart_system={restart_system}"
+                )
 
-                # Switch to the specified user
-                result = switch_user(user_id, restart_containers=restart_containers)
+                # Import user_switcher module functions
+                from .user_switcher import (
+                    create_user_directories,
+                    create_user_if_needed,
+                    switch_user_context,
+                    validate_user_id,
+                )
 
-                if result.get("success", False):
-                    logger.info(f"Successfully switched to user via API: {user_id}")
-
-                    # After successful user switch, perform system restart if requested
-                    system_restart_result = None
-                    if restart_system:
-                        logger.info(
-                            f"Performing system restart after user switch to {user_id}"
-                        )
-                        try:
-                            # Create restart marker file to trigger page refresh in Streamlit apps
-                            import tempfile
-
-                            marker_file = os.path.join(
-                                tempfile.gettempdir(), "personal_agent_restart_marker"
-                            )
-                            with open(marker_file, "w") as f:
-                                f.write(str(time.time()))
-
-                            # Call the system restart logic directly
-                            global_state = get_global_state()
-                            current_agent_mode = global_state.get(
-                                "agent_mode", "single"
-                            )
-                            current_model = global_state.get(
-                                "llm_model",
-                                os.getenv(
-                                    "LLM_MODEL",
-                                    "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:q8_0",
-                                ),
-                            )
-                            current_ollama_url = global_state.get(
-                                "ollama_url",
-                                os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-                            )
-
-                            # Clear global state
-                            global_state.clear()
-
-                            # Reinitialize based on agent mode
-                            restart_success = False
-                            restart_message = ""
-
-                            if current_agent_mode == "team":
-                                try:
-                                    from .streamlit_agent_manager import initialize_team
-
-                                    # Note: initialize_team() now uses get_config() for all settings
-                                    team = initialize_team(recreate=True)
-                                    if team:
-                                        global_state.set("agent_mode", "team")
-                                        global_state.set("team", team)
-                                        global_state.set("llm_model", current_model)
-                                        global_state.set(
-                                            "ollama_url", current_ollama_url
-                                        )
-
-                                        from .streamlit_helpers import (
-                                            StreamlitKnowledgeHelper,
-                                            StreamlitMemoryHelper,
-                                        )
-
-                                        if hasattr(team, "members") and team.members:
-                                            knowledge_agent = team.members[0]
-                                            memory_helper = StreamlitMemoryHelper(
-                                                knowledge_agent
-                                            )
-                                            knowledge_helper_obj = (
-                                                StreamlitKnowledgeHelper(
-                                                    knowledge_agent
-                                                )
-                                            )
-                                            global_state.set(
-                                                "memory_helper", memory_helper
-                                            )
-                                            global_state.set(
-                                                "knowledge_helper", knowledge_helper_obj
-                                            )
-
-                                        restart_success = True
-                                        restart_message = (
-                                            "System restarted successfully in team mode"
-                                        )
-                                        logger.info(restart_message)
-                                    else:
-                                        restart_message = (
-                                            "Failed to initialize team during restart"
-                                        )
-                                        logger.error(restart_message)
-                                except Exception as e:
-                                    restart_message = f"Error restarting team: {str(e)}"
-                                    logger.error(restart_message)
-                            else:
-                                try:
-                                    from .streamlit_agent_manager import (
-                                        initialize_agent,
-                                    )
-
-                                    # Note: initialize_agent() now uses get_config() for all settings
-                                    agent = initialize_agent(recreate=True)
-                                    if agent:
-                                        global_state.set("agent_mode", "single")
-                                        global_state.set("agent", agent)
-                                        global_state.set("llm_model", current_model)
-                                        global_state.set(
-                                            "ollama_url", current_ollama_url
-                                        )
-
-                                        from .streamlit_helpers import (
-                                            StreamlitKnowledgeHelper,
-                                            StreamlitMemoryHelper,
-                                        )
-
-                                        memory_helper = StreamlitMemoryHelper(agent)
-                                        knowledge_helper_obj = StreamlitKnowledgeHelper(
-                                            agent
-                                        )
-                                        global_state.set("memory_helper", memory_helper)
-                                        global_state.set(
-                                            "knowledge_helper", knowledge_helper_obj
-                                        )
-
-                                        restart_success = True
-                                        restart_message = "System restarted successfully in single agent mode"
-                                        logger.info(restart_message)
-                                    else:
-                                        restart_message = (
-                                            "Failed to initialize agent during restart"
-                                        )
-                                        logger.error(restart_message)
-                                except Exception as e:
-                                    restart_message = (
-                                        f"Error restarting agent: {str(e)}"
-                                    )
-                                    logger.error(restart_message)
-
-                            system_restart_result = {
-                                "restart_performed": True,
-                                "restart_success": restart_success,
-                                "restart_message": restart_message,
-                                "agent_mode": current_agent_mode,
-                                "model": current_model,
-                            }
-
-                        except Exception as restart_error:
-                            logger.error(
-                                f"Error during system restart after user switch: {restart_error}"
-                            )
-                            system_restart_result = {
-                                "restart_performed": True,
-                                "restart_success": False,
-                                "restart_message": str(restart_error),
-                            }
-
-                    response_data = {
-                        "success": "True",
-                        "message": result.get("message", "User switched successfully"),
-                        "user_id": user_id,
-                        "restart_containers": restart_containers,
-                        "restart_system": restart_system,
-                    }
-
-                    if system_restart_result:
-                        response_data["system_restart"] = system_restart_result
-
-                    return jsonify(response_data)
-                else:
-                    logger.warning(
-                        f"Failed to switch user via API: {result.get('error', 'Unknown error')}"
-                    )
+                # Step 1: Validate user ID
+                if not validate_user_id(user_id):
                     return (
                         jsonify(
                             {
                                 "success": "False",
-                                "error": result.get("error", "Failed to switch user"),
+                                "error": "Invalid user_id format. Must be at least 2 characters and contain only letters, numbers, spaces, dots, hyphens, and underscores.",
                             }
                         ),
                         400,
                     )
 
+                # Step 2: Create user if needed
+                logger.info(f"Creating user if needed: {user_id}")
+                success, normalized_user_id = create_user_if_needed(
+                    user_id=user_id,
+                    user_name=user_name,
+                    user_type=user_type,
+                    auto_confirm=auto_confirm,
+                )
+
+                if not success:
+                    return (
+                        jsonify(
+                            {
+                                "success": "False",
+                                "error": "Failed to create user or user creation was cancelled",
+                            }
+                        ),
+                        400,
+                    )
+
+                created_new_user = (normalized_user_id != user_id) or success
+                logger.info(
+                    f"User ready (normalized: {normalized_user_id}, new: {created_new_user})"
+                )
+
+                # Step 3: Create user directories
+                logger.info(f"Creating directories for user: {normalized_user_id}")
+                if not create_user_directories(normalized_user_id):
+                    logger.warning("Some user directories could not be created")
+
+                # Step 4: Switch user context (includes service restart)
+                logger.info(f"Switching user context to: {normalized_user_id}")
+                if not switch_user_context(
+                    user_id=normalized_user_id,
+                    restart_services=restart_containers,
+                    restart_system=restart_system,
+                ):
+                    return (
+                        jsonify(
+                            {
+                                "success": "False",
+                                "error": "Failed to switch user context",
+                            }
+                        ),
+                        500,
+                    )
+
+                # Step 5: Create restart marker file to trigger page refresh in Streamlit apps
+                if restart_system:
+                    try:
+                        import tempfile
+
+                        marker_file = os.path.join(
+                            tempfile.gettempdir(), "personal_agent_restart_marker"
+                        )
+                        with open(marker_file, "w") as f:
+                            f.write(str(time.time()))
+                        logger.info("Created restart marker file for Streamlit refresh")
+                    except Exception as e:
+                        logger.warning(f"Could not create restart marker file: {e}")
+
+                # Step 6: Get user details for response
+                from ..core.user_manager import UserManager
+
+                user_manager = UserManager()
+                user_details = user_manager.get_user_details(normalized_user_id)
+
+                # Build response
+                response_data = {
+                    "success": "True",
+                    "message": f"Successfully switched to user '{normalized_user_id}'",
+                    "user_id": normalized_user_id,
+                    "user_name": (
+                        user_details.get("user_name", normalized_user_id)
+                        if user_details
+                        else normalized_user_id
+                    ),
+                    "created_new_user": created_new_user,
+                    "timestamp": datetime.now().isoformat(),
+                    "actions_performed": [
+                        "User validation completed",
+                        (
+                            "User created"
+                            if created_new_user
+                            else "Existing user verified"
+                        ),
+                        "User directories created/verified",
+                        "User context switched",
+                    ],
+                }
+
+                if restart_containers:
+                    response_data["actions_performed"].append(
+                        "Docker services restarted"
+                    )
+
+                if restart_system:
+                    response_data["actions_performed"].append(
+                        "Agent/team system restarted"
+                    )
+
+                # Add user details if available
+                if user_details:
+                    response_data["user_details"] = {
+                        "user_id": user_details.get("user_id"),
+                        "user_name": user_details.get("user_name"),
+                        "user_type": user_details.get("user_type"),
+                        "created_at": user_details.get("created_at"),
+                    }
+
+                logger.info(
+                    f"Successfully switched to user '{normalized_user_id}' via API"
+                )
+                return jsonify(response_data)
+
             except Exception as e:
                 logger.error(f"Error switching user via API: {e}")
-                return jsonify({"success": "False", "error": str(e)}), 500
+                import traceback
+
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return (
+                    jsonify(
+                        {
+                            "success": "False",
+                            "error": str(e),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    ),
+                    500,
+                )
 
         # Discovery endpoint for finding the actual API port
         @self.app.route("/api/v1/discovery", methods=["GET"])
