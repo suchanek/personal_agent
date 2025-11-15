@@ -1,6 +1,9 @@
 # Changelog
 
-## [v0.8.76.dev] - 2025-11-14
+## [v0.8.76.dev] - 2025-11-15
+
+### Changed
+- **Granite 3.1 LLM Standardization for LightRAG Servers**: Migrated LightRAG servers to use IBM Granite 3.1 models with full Apache 2.0 licensing across all sizes. Knowledge server now uses `granite3.1-dense:8b` (5.0GB) for robust document processing, while memory server uses `granite3.1-dense:2b` (1.6GB) for lightweight memory relationship extraction. Reduced context windows from 128K to 32K (32,768 tokens) to support concurrent multi-instance deployment on 24GB RAM systems. Personal agent inference continues using proven `qwen3:4b` for tool-calling capabilities. This hybrid strategy provides licensing compliance for RAG workloads while maintaining established inference performance. Updated installer to pull both Granite models (for RAG) and Qwen3 models (for inference/team mode). Total RAG infrastructure footprint: ~9-11GB, leaving ~13-15GB available for agent operations on 24GB systems. See [GRANITE_LLM_STANDARDIZATION_SUMMARY.md](./refs/GRANITE_LLM_STANDARDIZATION_SUMMARY.md) for complete licensing analysis, performance considerations, and deployment strategy.
 
 ### Fixed
 - **LightRAG Docker Service Startup**: Fixed critical "too many colons" error that prevented LightRAG containers from starting. Removed `build:` sections from docker-compose files that were triggering package installations during startup, producing output that corrupted volume mount parsing. Updated both knowledge server (port 9621) and memory server (port 9622) to use pre-built images from Docker Hub (`egsuchanek/lightrag_pagent:latest`). Corrected healthcheck port for memory server to use exposed port 9622 instead of internal port 9621. See [INSTALLER_IDEMPOTENCY_AND_DOCKER_FIXES.md](./refs/INSTALLER_IDEMPOTENCY_AND_DOCKER_FIXES.md) for complete technical details.

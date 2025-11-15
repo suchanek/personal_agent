@@ -548,7 +548,7 @@ pull_ollama_models() {
     log "Checking and pulling Ollama models..."
     echo ""
 
-    local models=("qwen3:8b" "qwen3:1.7b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text" "granite3.1-dense:2b" "granite3.1-moe:1b")
+    local models=("granite3.1-dense:8b" "granite3.1-dense:2b" "qwen3:4b" "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K" "nomic-embed-text")
     local pulled_count=0
     local skipped_count=0
     local total_models=${#models[@]}
