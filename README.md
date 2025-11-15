@@ -191,7 +191,7 @@ Follow the on-screen instructions to complete setup:
 1. **Start LightRAG Services**:
    ```bash
    cd ~/repos/personal_agent
-   ./smart-restart-lightrag.sh
+   ./restart-lightrag.sh
    ```
 
 2. **Launch the Agent**:
@@ -274,7 +274,7 @@ If you prefer manual installation or need to troubleshoot:
 7. **Start LightRAG Services**
 
     ```bash
-    ./smart-restart-lightrag.sh
+    ./restart-lightrag.sh
     ```
 
 8. **Launch the Agent**
@@ -383,7 +383,7 @@ team                           # Command-line interface (multi-agent team)
 dashboard                      # System management dashboard with REST API
 
 # System utilities
-./smart-restart-lightrag.sh    # Restart LightRAG services
+./restart-lightrag.sh          # Restart LightRAG services
 ./switch-ollama.sh             # Manage Ollama server connections
 install-mcp-servers            # Install MCP servers
 test-mcp-servers              # Test MCP server availability
@@ -703,7 +703,7 @@ curl http://localhost:11434/api/tags
 
 ```bash
 # Restart LightRAG services
-./smart-restart-lightrag.sh
+./restart-lightrag.sh
 
 # Check service status
 docker ps | grep lightrag

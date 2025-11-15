@@ -231,7 +231,7 @@ pipeline_status = await manager.get_pipeline_status()
 curl http://localhost:9621/health
 
 # Restart LightRAG server
-./smart-restart-lightrag.sh
+./restart-lightrag.sh
 ```
 
 ### Storage Issues

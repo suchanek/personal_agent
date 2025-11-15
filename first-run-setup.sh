@@ -72,7 +72,12 @@ echo ""
 
 # Check if user already configured
 if [[ -f "$USER_ID_FILE" ]]; then
-    EXISTING_USER=$(cat "$USER_ID_FILE")
+    # Extract just the user ID value from USER_ID="value" format
+    EXISTING_USER=$(grep -E '^USER_ID=' "$USER_ID_FILE" | cut -d'"' -f2)
+    if [[ -z "$EXISTING_USER" ]]; then
+        # Fallback: try reading the whole file in case it's just the user ID
+        EXISTING_USER=$(cat "$USER_ID_FILE")
+    fi
     log_warning "User already configured: ${EXISTING_USER}"
     echo ""
     read -p "Do you want to create a different user? (y/N): " create_new
@@ -100,7 +105,8 @@ echo -e "${BLUE}Creating your user profile...${NC}"
 echo ""
 
 # Get user's full name
-default_name=$(id -F 2>/dev/null || whoami)
+# Default to "Personal Agent" for NPC setup
+default_name="Personal Agent"
 read -p "Your full name (e.g., 'John Smith') [${default_name}]: " user_name
 user_name=${user_name:-$default_name}
 
@@ -156,11 +162,21 @@ fi
 log_info "Activating virtual environment..."
 source "${SCRIPT_DIR}/.venv/bin/activate"
 
-# Build switch-user command
-SWITCH_CMD="python ${SCRIPT_DIR}/switch-user.py \"${user_id}\" --user-name \"${user_name}\""
+# Build switch-user command with create-only flag
+# Note: switch-user.py uses --create-only to create a user without switching services
+SWITCH_CMD="python ${SCRIPT_DIR}/switch-user.py \"${user_id}\" --user-name \"${user_name}\" --create-only -y"
+
+# Add birth year if provided
 [[ -n "$birth_year" ]] && SWITCH_CMD="${SWITCH_CMD} --birth-year ${birth_year}"
+
+# Add gender if not N/A
 [[ "$gender" != "N/A" ]] && SWITCH_CMD="${SWITCH_CMD} --gender \"${gender}\""
-SWITCH_CMD="${SWITCH_CMD} --create-if-missing"
+
+# Automatically set NPC flag for personal.agent user
+if [[ "$user_id" == "personal.agent" ]]; then
+    SWITCH_CMD="${SWITCH_CMD} --npc"
+    log_info "Setting NPC flag for Personal Agent user"
+fi
 
 # Create user
 log_info "Creating user profile..."
@@ -174,11 +190,11 @@ fi
 # Restart LightRAG services
 echo ""
 log_info "Starting LightRAG services..."
-if "${SCRIPT_DIR}/smart-restart-lightrag.sh"; then
+if "${SCRIPT_DIR}/restart-lightrag.sh"; then
     log_success "LightRAG services started successfully"
 else
     log_warning "Failed to start LightRAG services automatically"
-    log_info "You can start them manually with: ./smart-restart-lightrag.sh"
+    log_info "You can start them manually with: ./restart-lightrag.sh"
 fi
 
 # Final instructions

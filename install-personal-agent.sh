@@ -497,10 +497,14 @@ install_ollama() {
             fi
 
             # Remove existing symlink if present
-            rm -f "${symlink_path}"
+            if [[ -L "${symlink_path}" ]]; then
+                log "Removing existing symlink..."
+                sudo rm -f "${symlink_path}"
+            fi
 
-            # Create new symlink
-            ln -s "${ollama_cli}" "${symlink_path}"
+            # Create new symlink (always use sudo for /usr/local/bin)
+            log "Creating symlink (may require sudo)..."
+            sudo ln -s "${ollama_cli}" "${symlink_path}"
             log_success "Symlink created: ${symlink_path} -> ${ollama_cli}"
         else
             if [[ -L "${symlink_path}" ]]; then

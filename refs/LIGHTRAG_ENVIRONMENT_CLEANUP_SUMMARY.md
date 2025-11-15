@@ -76,9 +76,9 @@ EMBEDDING_MODEL=qwen3-embedding:4b
 
 ## Configuration Analysis
 
-### smart-restart-lightrag.sh Script Behavior
+### restart-lightrag.sh Script Behavior
 
-The `smart-restart-lightrag.sh` script **correctly pulls configurations from `~/.persag`** as designed:
+The `restart-lightrag.sh` script **correctly pulls configurations from `~/.persag`** as designed:
 
 ```bash
 # Script Configuration (Correct)

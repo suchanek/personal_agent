@@ -350,7 +350,7 @@ sudo -E bash install-personal-agent.sh
 ### Docker Service Verification
 ```bash
 # Verify services start correctly
-./smart-restart-lightrag.sh
+./restart-lightrag.sh
 
 # Check container health
 docker ps
@@ -382,8 +382,7 @@ curl http://localhost:9622/health
    - `pull_lightrag_images()`
 
 ### Service Management
-1. `restart-lightrag.sh` (working correctly with fixed configs)
-2. `smart-restart-lightrag.sh` (intelligent Docker service management)
+1. `restart-lightrag.sh` (intelligent Docker service management)
 
 ## Impact Assessment
 
@@ -451,7 +450,7 @@ curl http://localhost:9622/health
 - `OLLAMA_SETUP.md` - Ollama service configuration guide
 - `CHANGELOG.md` - Project version history
 - `install-personal-agent.sh` - Main installer script
-- `smart-restart-lightrag.sh` - Docker service management
+- `restart-lightrag.sh` - Docker service management
 
 ## Conclusion
 

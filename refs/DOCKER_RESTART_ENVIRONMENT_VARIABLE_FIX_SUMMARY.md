@@ -62,7 +62,7 @@ export AGNO_STORAGE_DIR="/Users/Shared/personal_agent_data/agno/eric"
 
 **Executed Smart Restart with Environment Variables:**
 ```bash
-USER_ID="eric" AGNO_STORAGE_DIR="/Users/Shared/personal_agent_data/agno/eric" ./smart-restart-lightrag.sh
+USER_ID="eric" AGNO_STORAGE_DIR="/Users/Shared/personal_agent_data/agno/eric" ./restart-lightrag.sh
 ```
 
 **Results:**

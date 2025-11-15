@@ -58,7 +58,7 @@ These scenarios mirror the brochure stories (Sarah, Michael, Johnson family) and
 2. **Install & Bootstrap**:
    - `poetry install`
    - First agent run auto-creates `~/.persag` with Docker configs and user registry.
-3. **Start LightRAG Services**: `./smart-restart-lightrag.sh` (uses user-scoped configs; prevents port collisions).
+3. **Start LightRAG Services**: `./restart-lightrag.sh` (uses user-scoped configs; prevents port collisions).
 4. **Manage Users**:
    - `python switch-user.py <user>` or Streamlit dashboard.
    - Each user gets isolated storage (`$PERSAG_ROOT/agno/<user_id>/`).
@@ -125,7 +125,7 @@ Use this quick checklist before merging architectural or product changes:
 | Install dependencies | `poetry install` |
 | Run dashboard (Streamlit + REST) | `poetry run paga_streamlit` |
 | CLI agent | `poetry run paga_cli [--recreate]` |
-| Restart LightRAG services | `./smart-restart-lightrag.sh` |
+| Restart LightRAG services | `./restart-lightrag.sh` |
 | Switch user | `python switch-user.py <user_id>` |
 | Run full tests | `poe test-all` |
 | Memory repair scripts | `python scripts/clear_all_memories.py --no-confirm` (clean slate) |

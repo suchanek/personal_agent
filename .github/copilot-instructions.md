@@ -109,7 +109,7 @@ INSTRUCTION_LEVEL=CONCISE              # Instruction sophistication level
 
 ### LightRAG Services
 - **Issue**: Knowledge/memory operations failing
-- **Solution**: Run `./smart-restart-lightrag.sh` to restart Docker services
+- **Solution**: Run `./restart-lightrag.sh` to restart Docker services
 
 ### Ollama Connection
 - **Issue**: Model loading failures
@@ -125,7 +125,7 @@ INSTRUCTION_LEVEL=CONCISE              # Instruction sophistication level
 
 ### "Port Already Allocated" Docker Issues
 - **Issue**: Docker containers fail to start after user switching
-- **Solution**: Use `./smart-restart-lightrag.sh` which prevents port conflicts with intelligent cleanup
+- **Solution**: Use `./restart-lightrag.sh` which prevents port conflicts with intelligent cleanup
 
 ## File Structure Patterns
 
@@ -154,7 +154,7 @@ MCP servers are defined in `src/personal_agent/config/mcp_servers.py` and dynami
 LightRAG services run in containers with user synchronization:
 - Knowledge server: port 9621
 - Memory server: port 9622
-- Management: `./smart-restart-lightrag.sh`
+- Management: `./restart-lightrag.sh`
 
 ## Configuration Locations
 
@@ -179,6 +179,6 @@ $PERSAG_ROOT/agno/<user_id>/
 - `src/personal_agent/config/user_id_mgr.py`: User ID and path management
 - `src/personal_agent/core/user_manager.py`: Multi-user orchestration
 - `switch-user.py`: CLI user switching script
-- `smart-restart-lightrag.sh`: Docker service management
+- `restart-lightrag.sh`: Docker service management
 
 This architecture enables both single-agent and multi-agent team modes through a unified interface while maintaining data isolation and comprehensive memory capabilities.

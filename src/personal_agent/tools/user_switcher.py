@@ -123,6 +123,9 @@ def create_user_if_needed(
     user_id: str,
     user_name: str = None,
     user_type: str = "Standard",
+    birth_year: int = None,
+    gender: str = None,
+    npc: bool = False,
     auto_confirm: bool = False,
 ) -> tuple:
     """Create a user if they don't exist.
@@ -131,6 +134,9 @@ def create_user_if_needed(
         user_id: User ID or full name for the new user
         user_name: Display name (defaults to formatted user_id)
         user_type: User type (Standard, Admin, Guest)
+        birth_year: Birth year for the user (optional)
+        gender: Gender for the user (Male, Female, or N/A)
+        npc: Whether this is an NPC/bot user
         auto_confirm: Skip confirmation prompt for new user creation
 
     Returns:
@@ -156,6 +162,12 @@ def create_user_if_needed(
             print_warning(f"User '{user_id}' does not exist.")
             print_info(f"  User Name: {user_name}")
             print_info(f"  User Type: {user_type}")
+            if birth_year:
+                print_info(f"  Birth Year: {birth_year}")
+            if gender:
+                print_info(f"  Gender: {gender}")
+            if npc:
+                print_info(f"  NPC: Yes")
 
             response = (
                 input(f"\n{Colors.YELLOW}Create this user? [y/N]: {Colors.NC}")
@@ -172,7 +184,23 @@ def create_user_if_needed(
         if not user_name:
             user_name = user_id.replace("_", " ").replace("-", " ").title()
 
-        result = user_manager.create_user(user_id, user_name, user_type)
+        # Convert birth_year to birth_date if provided
+        birth_date = None
+        if birth_year:
+            birth_date = f"{birth_year}-01-01"  # Use January 1st of the birth year
+
+        # Default gender to "N/A" if not provided
+        if not gender:
+            gender = "N/A"
+
+        result = user_manager.create_user(
+            user_id=user_id,
+            user_name=user_name,
+            user_type=user_type,
+            birth_date=birth_date,
+            gender=gender,
+            npc=npc,
+        )
 
         if result["success"]:
             # Get the normalized user_id from the result
@@ -589,6 +617,24 @@ Examples:
     )
 
     parser.add_argument(
+        "--birth-year",
+        type=int,
+        help="Birth year for new users (e.g., 1990)",
+    )
+
+    parser.add_argument(
+        "--gender",
+        choices=["Male", "Female", "N/A"],
+        help="Gender for new users (Male, Female, or N/A)",
+    )
+
+    parser.add_argument(
+        "--npc",
+        action="store_true",
+        help="Mark user as NPC (Non-Player Character) for bot/knowledge consolidation users",
+    )
+
+    parser.add_argument(
         "--no-restart",
         action="store_true",
         help="Don't restart LightRAG services after switching",
@@ -645,7 +691,13 @@ Examples:
 
     # Step 1: Create user if needed
     success, normalized_user_id = create_user_if_needed(
-        args.user_id, args.user_name, args.user_type, auto_confirm=args.yes
+        args.user_id,
+        args.user_name,
+        args.user_type,
+        birth_year=getattr(args, 'birth_year', None),
+        gender=getattr(args, 'gender', None),
+        npc=getattr(args, 'npc', False),
+        auto_confirm=args.yes,
     )
     if not success:
         print_error("Failed to create user")

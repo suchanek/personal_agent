@@ -272,11 +272,11 @@ The dynamic USER_ID system enables proper Docker container management:
 4. **Configuration Sync**: Container environment matches current user settings
 
 ### Integration with Smart Restart Scripts
-The existing smart restart functionality (`smart-restart-lightrag.sh`) now works seamlessly with the dynamic USER_ID system:
+The existing smart restart functionality (`restart-lightrag.sh`) now works seamlessly with the dynamic USER_ID system:
 
 ```bash
 # The restart script can now properly handle user switching
-./smart-restart-lightrag.sh
+./restart-lightrag.sh
 # Containers restart with correct user context automatically
 ```
 
