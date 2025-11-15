@@ -304,6 +304,23 @@ cmd = "./ollama-service.sh models"
 help = "View Ollama output logs"
 cmd = "./ollama-service.sh logs"
 
+# === User Registry Management ===
+[tool.poe.tasks.registry-status]
+help = "Show user registry status"
+cmd = "python registry-manager.py --status"
+
+[tool.poe.tasks.registry-discover]
+help = "Discover users from filesystem"
+cmd = "python registry-manager.py --discover"
+
+[tool.poe.tasks.registry-rebuild]
+help = "Rebuild registry from filesystem + existing data"
+cmd = "python registry-manager.py --rebuild"
+
+[tool.poe.tasks.registry-rebuild-dry]
+help = "Preview registry rebuild (dry run)"
+cmd = "python registry-manager.py --rebuild --dry-run"
+
 # === Quick Start Tasks ===
 [tool.poe.tasks.quick-start]
 help = "Quick start for new users"

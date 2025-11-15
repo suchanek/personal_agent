@@ -70,6 +70,43 @@ echo -e "${CYAN}🚀 Personal Agent First-Run Setup${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# Check for existing users and auto-rebuild registry if needed
+PERSAG_ROOT="${PERSAG_ROOT:-/Users/Shared/personal_agent_data}"
+AGNO_DIR="${PERSAG_ROOT}/agno"
+REGISTRY_FILE="${PERSAGENT_DIR}/users_registry.json"
+
+if [[ -d "$AGNO_DIR" ]]; then
+    # Count existing user directories
+    EXISTING_USER_COUNT=$(find "$AGNO_DIR" -mindepth 1 -maxdepth 1 -type d ! -name ".*" | wc -l | tr -d ' ')
+    
+    if [[ "$EXISTING_USER_COUNT" -gt 0 ]]; then
+        log_info "Found ${EXISTING_USER_COUNT} existing user director(y/ies)"
+        
+        # Check if registry exists and has users
+        REGISTRY_USER_COUNT=0
+        if [[ -f "$REGISTRY_FILE" ]]; then
+            REGISTRY_USER_COUNT=$(python3 -c "import json; print(len(json.load(open('${REGISTRY_FILE}')).get('users', [])))" 2>/dev/null || echo "0")
+        fi
+        
+        # Auto-rebuild if registry is missing or empty but we have user directories
+        if [[ "$REGISTRY_USER_COUNT" -eq 0 ]]; then
+            log_warning "User directories exist but registry is empty/missing"
+            echo ""
+            read -p "Rebuild registry from existing users? (Y/n): " rebuild_choice
+            if [[ ! "$rebuild_choice" =~ ^[Nn]$ ]]; then
+                log_info "Rebuilding user registry..."
+                source "${SCRIPT_DIR}/.venv/bin/activate"
+                if python3 -c "from personal_agent.tools.registry_manager import rebuild_registry; rebuild_registry()" 2>/dev/null; then
+                    log_success "Registry rebuilt successfully"
+                else
+                    log_warning "Failed to rebuild registry automatically"
+                    log_info "You can rebuild manually with: poe registry-rebuild"
+                fi
+            fi
+        fi
+    fi
+fi
+
 # Check if user already configured
 if [[ -f "$USER_ID_FILE" ]]; then
     # Extract just the user ID value from USER_ID="value" format

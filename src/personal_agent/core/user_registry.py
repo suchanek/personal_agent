@@ -455,3 +455,164 @@ class UserRegistry:
             "updated_fields": [],
             "errors": [f"User '{user_id}' not found"],
         }
+
+    def discover_filesystem_users(self, data_root: str = None) -> List[Dict[str, Any]]:
+        """
+        Discover users from filesystem (agno directory structure).
+
+        Scans the agno directory for user folders and returns basic info
+        inferred from directory structure and metadata.
+
+        Args:
+            data_root: Root data directory (defaults to config persag_root)
+
+        Returns:
+            List of discovered user dictionaries with inferred metadata
+        """
+        config = get_config()
+        data_root = data_root or config.persag_root
+        agno_dir = Path(data_root) / "agno"
+
+        if not agno_dir.exists():
+            return []
+
+        discovered = []
+        for user_dir in agno_dir.iterdir():
+            if user_dir.is_dir() and user_dir.name not in [".", ".."]:
+                user_id = user_dir.name
+                # Convert user_id to user_name (charlie.brown → Charlie Brown)
+                user_name = user_id.replace(".", " ").replace("_", " ").title()
+
+                # Get directory creation time
+                stat_info = user_dir.stat()
+                created_at = datetime.fromtimestamp(stat_info.st_ctime).isoformat()
+                last_seen = datetime.fromtimestamp(stat_info.st_mtime).isoformat()
+
+                discovered.append(
+                    {
+                        "user_id": user_id,
+                        "user_name": user_name,
+                        "user_type": "Standard",
+                        "created_at": created_at,
+                        "last_seen": last_seen,
+                        "source": "filesystem",
+                    }
+                )
+
+        return discovered
+
+    def rebuild_registry(
+        self, merge_existing: bool = True, dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Rebuild user registry by merging existing registry data with filesystem discovery.
+
+        This intelligent recovery method:
+        1. Loads existing registry data (if available and valid)
+        2. Scans filesystem for user directories
+        3. Merges both sources, preserving known profile data
+        4. Identifies orphaned users (in registry but no filesystem dir)
+        5. Identifies new users (filesystem dir but not in registry)
+
+        Args:
+            merge_existing: If True, merge with existing registry; if False, rebuild from scratch
+            dry_run: If True, return results without modifying registry
+
+        Returns:
+            Dictionary with rebuild results:
+            {
+                'success': bool,
+                'preserved_users': List[str],  # Users with existing profile data
+                'discovered_users': List[str], # Users discovered from filesystem
+                'orphaned_users': List[str],   # Users in registry but no filesystem dir
+                'total_users': int,
+                'registry_backup': str,        # Path to backup file (if created)
+            }
+        """
+        results = {
+            "success": False,
+            "preserved_users": [],
+            "discovered_users": [],
+            "orphaned_users": [],
+            "total_users": 0,
+            "registry_backup": None,
+        }
+
+        # Step 1: Load existing registry data
+        existing_users = {}
+        if merge_existing:
+            try:
+                registry = self._load_registry()
+                for user_data in registry.get("users", []):
+                    user_id = user_data.get("user_id")
+                    if user_id:
+                        existing_users[user_id] = user_data
+            except Exception:
+                # If registry is corrupted, continue with empty existing_users
+                pass
+
+        # Step 2: Discover users from filesystem
+        filesystem_users = self.discover_filesystem_users()
+        filesystem_user_ids = {u["user_id"] for u in filesystem_users}
+
+        # Step 3: Create backup if we have existing data
+        if existing_users and not dry_run:
+            backup_path = str(self.registry_file) + f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            try:
+                import shutil
+
+                shutil.copy2(self.registry_file, backup_path)
+                results["registry_backup"] = backup_path
+            except Exception:
+                pass
+
+        # Step 4: Build merged user list
+        merged_users = []
+        seen_user_ids = set()
+
+        # First, add users from existing registry that have filesystem presence
+        for user_id, user_data in existing_users.items():
+            if user_id in filesystem_user_ids:
+                # User exists in both - preserve full profile data
+                merged_users.append(user_data)
+                seen_user_ids.add(user_id)
+                results["preserved_users"].append(user_id)
+            else:
+                # User in registry but no filesystem directory - orphaned
+                results["orphaned_users"].append(user_id)
+
+        # Second, add newly discovered users from filesystem
+        for fs_user in filesystem_users:
+            user_id = fs_user["user_id"]
+            if user_id not in seen_user_ids:
+                # New user discovered from filesystem
+                try:
+                    new_user = User(
+                        user_id=user_id,
+                        user_name=fs_user["user_name"],
+                        user_type=fs_user.get("user_type", "Standard"),
+                        created_at=fs_user.get("created_at"),
+                        last_seen=fs_user.get("last_seen"),
+                    )
+                    merged_users.append(new_user.to_dict())
+                    seen_user_ids.add(user_id)
+                    results["discovered_users"].append(user_id)
+                except Exception:
+                    # Skip invalid user data
+                    continue
+
+        results["total_users"] = len(merged_users)
+
+        # Step 5: Save merged registry (unless dry_run)
+        if not dry_run:
+            try:
+                new_registry = {"users": merged_users}
+                self._save_registry(new_registry)
+                results["success"] = True
+            except Exception as e:
+                results["error"] = str(e)
+                results["success"] = False
+        else:
+            results["success"] = True  # Dry run succeeded
+
+        return results
