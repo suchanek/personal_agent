@@ -7,7 +7,8 @@ Simple wrapper to call the user_switcher module.
 Usage:
     ./switch-user.py "Eric Suchanek"
     ./switch-user.py alice.smith --no-restart
-    ./switch-user.py "Charlie Brown" --user-type Admin
+    ./switch-user.py "Charlie Brown" --user-type Admin --cognitive-state 85
+    ./switch-user.py --list
 """
 
 import sys

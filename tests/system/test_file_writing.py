@@ -17,11 +17,10 @@ from personal_agent.utils import add_src_to_path
 add_src_to_path()
 
 try:
-    from personal_agent import (
-        ROOT_DIR,
-        USE_MCP,
+    from personal_agent import mcp_client
+    from personal_agent.config import ROOT_DIR, USE_MCP
+    from personal_agent.tools.filesystem import (
         create_and_save_file,
-        mcp_client,
         mcp_read_file,
         mcp_write_file,
     )

@@ -69,6 +69,7 @@ qwen-agent = {extras = ["code-interpreter"], version = "^0.0.29"}
 ddgs = "^9.5.5"
 pdoc = "^15.0.4"
 huggingface-hub = "^0.35.3"
+pylint = "^4.0.3"
 
 [tool.poetry.scripts]
 personal-agent-langchain = "src.personal_agent.main:main"
@@ -99,6 +100,9 @@ poethepoet = "^0.36.0"
 
 # Poe the Poet task configuration
 [tool.poe.tasks]
+[tool.poe.tasks.status]
+help = "Display current user status"
+cmd = "python switch-user.py --status"
 
 # === Core Application Tasks ===
 [tool.poe.tasks.serve]
@@ -246,17 +250,33 @@ sequence = [
 ]
 
 # === Environment Management ===
+
 [tool.poe.tasks.switch-user]
-help = "Switch or manage user configurations"
+help = "Switch or create user configurations"
 cmd = "python switch-user.py"
 args = [
-    {name = "user_id", positional = true, help = "User ID to switch to"},
-    {name = "user_name", options = ["--user-name"], help = "Display name for new users"},
-    {name = "user_type", options = ["--user-type"], help = "User type for new users"},
-    {name = "no_restart", options = ["--no-restart"], type = "boolean", help = "Don't restart LightRAG services"},
-    {name = "status", options = ["--status"], type = "boolean", help = "Display user status"},
-    {name = "create_only", options = ["--create-only"], type = "boolean", help = "Only create the user"}
+  {name = "user_id", positional = true, help = "User ID to switch to"},
+  {name = "user_name", options = ["--user-name"], help = "Display name for new users"},
+  {name = "user_type", options = ["--user-type"], help = "User type for new users"},
+  {name = "birth_date", options = ["--birth-date"], help = "Birth date in YYYY-MM-DD format"},
+  {name = "gender", options = ["--gender"], help = "Gender (Male, Female, or N/A)"},
+  {name = "cognitive_state", options = ["--cognitive-state"], type = "integer", help = "Cognitive state (0-100, default: 100)"},
+  {name = "npc", options = ["--npc"], type = "boolean", help = "Mark as NPC/bot user"},
+  {name = "no_restart", options = ["--no-restart"], type = "boolean", help = "Don't restart LightRAG services"},
+  {name = "no_system_restart", options = ["--no-system-restart"], type = "boolean", help = "Don't restart the agent/team system"},
+  {name = "status", options = ["--status"], type = "boolean", help = "Display user status"},
+  {name = "create_only", options = ["--create-only"], type = "boolean", help = "Only create the user"},
+  {name = "list", options = ["--list"], type = "boolean", help = "Display all users"},
+  {name = "yes", options = ["-y", "--yes"], type = "boolean", help = "Auto-confirm user creation"}
 ]
+
+[tool.poe.tasks.switch-user-status]
+help = "Display current user status"
+cmd = "python switch-user.py --status"
+
+[tool.poe.tasks.list-users]
+help = "Display all users in the system"
+cmd = "python switch-user.py --list"
 
 [tool.poe.tasks.setup]
 help = "Run first-time user profile setup (interactive)"

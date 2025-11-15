@@ -1,53 +1,326 @@
-# Tests Directory
+# Personal Agent Test Suite Organization
 
-This directory contains all test scripts for the Personal Agent project. All test files have been organized here with proper import paths.
+This document describes the organization of the Personal Agent test suite and how to run tests effectively.
+
+## Overview
+
+The test suite has been reorganized into logical subdirectories based on system components. This makes it easier to:
+- Find tests related to specific features
+- Run tests for particular components independently
+- Understand test coverage at a glance
+- Onboard new developers
+
+**Total Test Files**: ~110 organized tests + 28 archived fix tests
+
+## Directory Structure
+
+```
+tests/
+├── core/                    # Critical core managers (5 tests)
+├── system/                  # System integration tests (49 tests)
+├── memory/                  # Memory system tests (28 tests)
+├── knowledge/               # Knowledge base tests (13 tests)
+├── team/                    # Team coordination tests (7 tests)
+├── user/                    # User management tests (6 tests)
+├── tools/                   # Tools & MCP integration (9 tests)
+├── ui/                      # Streamlit/UI tests (4 tests)
+├── config/                  # Configuration tests (2 tests)
+├── archived/                # Historical/temporary tests
+│   ├── fixes/              # Fix tests from development iterations (28)
+│   └── README.md           # Documentation for archived tests
+└── conftest.py             # Shared pytest fixtures
+```
+
+## Component Tests
+
+### Core Managers (5 tests)
+**Location**: `tests/core/`
+
+Tests for the critical foundational manager classes:
+- `test_agent_memory_manager.py` - Memory manager unit/async tests
+- `test_agent_knowledge_manager.py` - Knowledge manager tests
+- `test_agent_tool_manager.py` - Tool registration and management
+- `test_agent_instruction_manager.py` - Instruction level management
+- `test_agent_model_manager.py` - Model provider management
+
+**Why they matter**: These managers are fundamental to system operation. All other components depend on them.
+
+**Run with**: `pytest tests/core/ -v`
+
+### Memory System (28 tests)
+**Location**: `tests/memory/`
+
+Comprehensive tests for the dual-memory architecture:
+- Memory manager operations (storage, retrieval, search)
+- Semantic deduplication and fact restatement
+- LightRAG integration and graph memory
+- Dual storage synchronization
+- Memory interfaces and utilities
+
+**Coverage**:
+- Local SQLite memory operations
+- LanceDB vector search
+- LightRAG graph memory
+- Memory priority and topics
+- Comprehensive search across 52+ diverse memory samples
+
+**Run with**: `pytest tests/memory/ -v`
+
+### Knowledge Base (13 tests)
+**Location**: `tests/knowledge/`
+
+Tests for knowledge management:
+- Agent knowledge manager
+- Knowledge coordinator (routing between local and graph)
+- Combined knowledge base operations
+- Knowledge search and retrieval
+- Knowledge graph relationships
+- Tools integration
+
+**Run with**: `pytest tests/knowledge/ -v`
+
+### Team Coordination (7 tests)
+**Location**: `tests/team/`
+
+Tests for multi-agent team functionality:
+- Team creation and management
+- Instruction level coordination
+- Agent member management
+- Team memory and state
+- Reasoning team workflows
+
+**Run with**: `pytest tests/team/ -v`
+
+### User Management (6 tests)
+**Location**: `tests/user/`
+
+Tests for multi-user support:
+- User ID propagation across system
+- User context switching
+- User endpoints and REST API
+- Persistent user context
+- User profile management
+
+**Run with**: `pytest tests/user/ -v`
+
+### Tools & MCP Integration (9 tests)
+**Location**: `tests/tools/`
+
+Tests for tool system and MCP servers:
+- MCP server availability
+- Tool registration and discovery
+- Tool call detection and execution
+- Tool parameter handling
+- External tools integration
+
+**Run with**: `pytest tests/tools/ -v`
+
+### Streamlit UI (4 tests)
+**Location**: `tests/ui/`
+
+Tests for Streamlit web interface:
+- UI component integration
+- Interface workflows
+- Streamlit memory operations
+- Dashboard functionality
+
+**Run with**: `pytest tests/ui/ -v`
+
+### Configuration (2 tests)
+**Location**: `tests/config/`
+
+Tests for system configuration:
+- Environment variable handling
+- Config extraction
+- Path management
+- Filesystem operations
+
+**Run with**: `pytest tests/config/ -v`
+
+### System Integration (49 tests)
+**Location**: `tests/system/`
+
+Broader integration tests that span multiple components:
+- Agent initialization and workflow
+- Docker integration
+- REST API endpoints
+- End-to-end scenarios
+- Error handling and edge cases
+- Streaming and responses
+
+**Run with**: `pytest tests/system/ -v`
 
 ## Running Tests
 
 ### Run All Tests
 ```bash
-# From project root
-python tests/run_all_tests.py
-
-# Or make it executable and run directly
-./tests/run_all_tests.py
+pytest tests/ -v
 ```
 
-### Run Individual Tests
+### Run Specific Component Tests
 ```bash
-# From project root
-python tests/test_context_detection.py
-python tests/test_agent_with_working_finance.py
-python tests/test_agno_agent_user_id.py
-# ... etc
+# Run only core manager tests
+pytest tests/core/ -v
+
+# Run only memory tests
+pytest tests/memory/ -v
+
+# Run only team tests
+pytest tests/team/ -v
 ```
 
-## Test Categories
+### Run Tests by Marker
+Tests are marked with pytest markers for flexible filtering:
 
-### Core Agent Tests
-- `test_agno_agent_user_id.py` - Tests user ID handling in AgnoPersonalAgent
-- `test_agent_with_working_finance.py` - Tests agent with YFinance tools
-- `test_context_detection.py` - Tests dynamic model context size detection
+```bash
+# Run all critical tests (core managers)
+pytest -m core -v
 
-### Tool Tests
-- `test_tools_direct.py` - Comprehensive direct testing of all tool classes
-- `test_tools_simple.py` - Simple comprehensive test for Personal Agent tools
-- `test_tool_call_detection.py` - Tests tool call detection in AgnoPersonalAgent
+# Run only integration tests
+pytest -m integration -v
 
-### Integration Tests
-- `test_knowledge_tools_integration.py` - Tests KnowledgeTools integration with memory
-- `test_streamlit_integration.py` - Tests Streamlit integration with SemanticMemoryManager
+# Run all except slow tests
+pytest -m "not slow" -v
+```
 
-### Debug and Analysis Scripts
-- `debug_yfinance_tools.py` - Debug script for YFinance tools
-- `fix_yfinance_401.py` - Fix for YFinance 401 errors
-- `analyze_knowledge_tools.py` - Analysis of KnowledgeTools from agno.tools.knowledge
-- `similarity_analysis.py` - Analysis of similarity calculations
-- `quick_knowledge_test.py` - Quick test for knowledge search functionality
+### Run with Coverage
+```bash
+pytest tests/ --cov=src/personal_agent --cov-report=html
+```
 
-### Test Runners
-- `run_all_tests.py` - Runs all tests in the directory
-- `run_knowledge_integration_test.py` - Specific runner for knowledge integration tests
+### Run in Parallel
+```bash
+pytest tests/ -n auto  # Requires pytest-xdist
+```
+
+### Run Specific Test File
+```bash
+pytest tests/memory/test_semantic_memory_manager.py -v
+```
+
+### Run Specific Test Function
+```bash
+pytest tests/memory/test_semantic_memory_manager.py::test_memory_search -v
+```
+
+## CI/CD Integration
+
+The test suite is organized to support efficient CI/CD:
+
+1. **Fast feedback**: Run `tests/core/` first (5 tests, <1 min)
+2. **Component tests**: Run each component directory in parallel
+3. **Integration tests**: Run `tests/system/` for full integration
+4. **Coverage**: Generate reports on successful runs
+
+## Adding New Tests
+
+When writing new tests:
+
+1. **Identify the component**: Which system does it test (memory, knowledge, etc)?
+2. **Place in correct directory**: Add to `tests/component/test_*.py`
+3. **Use appropriate markers**: Apply `@pytest.mark.component` where relevant
+4. **Follow naming conventions**: `test_feature_scenario.py`
+5. **Add docstrings**: Describe what the test validates
+
+Example:
+```python
+# tests/memory/test_new_memory_feature.py
+"""Tests for the new memory feature."""
+
+import pytest
+
+@pytest.mark.memory
+def test_memory_feature_basic():
+    """Validate basic memory feature functionality."""
+    # Test code here
+    pass
+```
+
+## Test Organization Principles
+
+1. **Cohesion**: Tests for a component are grouped together
+2. **Naming**: Clear, descriptive file and function names
+3. **Independence**: Tests can run in any order
+4. **Speed**: Fast tests in root directories, slower in subdirectories
+5. **Documentation**: Each test file has a docstring explaining its purpose
+
+## Archived Tests
+
+**Location**: `tests/archived/`
+
+The `fixes/` subdirectory contains 28 temporary tests that were created during bug fixes:
+- These are not run in regular test suites
+- They are preserved for historical reference
+- Each is documented with the issue/PR it addresses
+- They can be deleted once corresponding issues are marked as resolved
+
+See `tests/archived/fixes/README.md` for details.
+
+## Common Test Patterns
+
+### Testing Async Functions
+```python
+@pytest.mark.asyncio
+async def test_async_memory_operation():
+    result = await memory_manager.get_memory(user_id)
+    assert result is not None
+```
+
+### Testing with Fixtures
+```python
+def test_with_agent(agent):  # Uses conftest.py fixture
+    response = agent.run("test query")
+    assert response is not None
+```
+
+### Testing Memory Operations
+```python
+def test_memory_search(user_id):
+    manager.add_memory("I like coffee", user_id=user_id)
+    results = manager.search_memories("coffee", user_id=user_id)
+    assert len(results) > 0
+```
+
+## Troubleshooting
+
+### Tests not found
+Make sure pytest is discovering tests in subdirectories:
+```bash
+pytest --collect-only tests/
+```
+
+### Import errors
+Ensure the package is installed in editable mode:
+```bash
+pip install -e .
+```
+
+### Async test issues
+Install pytest-asyncio:
+```bash
+pip install pytest-asyncio
+```
+
+### Missing fixtures
+Check that `conftest.py` exists in the tests directory and defines necessary fixtures.
+
+## Performance Notes
+
+- **Fast tests**: `tests/core/` - <1 minute
+- **Medium tests**: `tests/memory/`, `tests/knowledge/` - 2-5 minutes
+- **Slow tests**: `tests/system/` - 5+ minutes (Docker integration)
+- **Total suite**: ~15-20 minutes
+
+For rapid development, run only the component you're working on.
+
+## Future Improvements
+
+- [ ] Add pytest markers for test classification
+- [ ] Set up parallel test execution in CI/CD
+- [ ] Add performance benchmarks
+- [ ] Increase coverage to 80%+
+- [ ] Document test data/fixtures
+- [ ] Add integration test scenarios
 
 ## Import Path Changes
 
