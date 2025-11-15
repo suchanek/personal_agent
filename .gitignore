@@ -205,3 +205,4 @@ personal_agent.code-workspace
 
 # Generated scripts (created during installation)
 ollama-service.sh
+docs/
