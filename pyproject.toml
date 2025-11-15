@@ -258,6 +258,10 @@ args = [
     {name = "create_only", options = ["--create-only"], type = "boolean", help = "Only create the user"}
 ]
 
+[tool.poe.tasks.setup]
+help = "Run first-time user profile setup (interactive)"
+shell = "./first-run-setup.sh"
+
 [tool.poe.tasks.switch-ollama]
 help = "Switch Ollama configuration"
 shell = "./switch-ollama.sh"

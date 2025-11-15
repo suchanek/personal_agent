@@ -4,19 +4,19 @@
 # Personal Agent Installer for macOS
 #
 # This script installs and configures the Personal AI Agent system on macOS.
-# It must be run as root or with sudo, and will install for the current user.
+# Run as your normal user - sudo will only be used when needed for file ownership.
 #
 # Usage:
-#   sudo ./install-personal-agent.sh           # Full installation
-#   sudo ./install-personal-agent.sh --dry-run # Test without making changes
+#   ./install-personal-agent.sh           # Full installation
+#   ./install-personal-agent.sh --dry-run # Test without making changes
 ################################################################################
 
 set -e  # Exit on error
 set -u  # Exit on undefined variable
 
 # Configuration
-AGENT_USER="${SUDO_USER:-$(logname 2>/dev/null || whoami)}"
-AGENT_HOME="/Users/${AGENT_USER}"
+AGENT_USER="$(whoami)"
+AGENT_HOME="${HOME}"
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Use script's directory as install dir
 DATA_DIR="${AGENT_HOME}/.persagent"
 LOG_FILE="${AGENT_HOME}/install.log"  # Log in home directory
@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: sudo $0 [--dry-run] [--ollama-models-dir=PATH] [--ollama-kv-cache=TYPE]"
+            echo "Usage: $0 [--dry-run] [--ollama-models-dir=PATH] [--ollama-kv-cache=TYPE]"
             exit 1
             ;;
     esac
@@ -182,12 +182,6 @@ detect_system_ram() {
 preflight_checks() {
     log "Running pre-flight checks..."
 
-    # Check if running as root
-    if [[ $EUID -ne 0 ]]; then
-        log_error "This script must be run as root (use sudo)"
-        exit 1
-    fi
-
     # Check if macOS
     if [[ "$(uname)" != "Darwin" ]]; then
         log_error "This script is for macOS only"
@@ -295,11 +289,11 @@ install_python() {
     local brew_env="HOMEBREW_CACHE=${AGENT_HOME}/Library/Caches/Homebrew"
 
     if ! $DRY_RUN; then
-        if sudo -u "${AGENT_USER}" bash -c "${brew_env} /opt/homebrew/bin/brew list python@3.12" &>/dev/null; then
+        if bash -c "${brew_env} /opt/homebrew/bin/brew list python@3.12" &>/dev/null; then
             log_success "Python 3.12 already installed"
         else
             log "Installing Python 3.12..."
-            sudo -u "${AGENT_USER}" bash -c "${brew_env} /opt/homebrew/bin/brew install python@3.12"
+            bash -c "${brew_env} /opt/homebrew/bin/brew install python@3.12"
             log_success "Python 3.12 installed"
         fi
     else
@@ -325,13 +319,13 @@ install_uv() {
     log "Checking uv installation..."
 
     if ! $DRY_RUN; then
-        if sudo -u "${AGENT_USER}" bash -c 'command -v uv' &>/dev/null; then
+        if command -v uv &>/dev/null; then
             log_success "uv already installed"
             return 0
         fi
 
         log "Installing uv..."
-        sudo -u "${AGENT_USER}" bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+        bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
         log_success "uv installed successfully"
     else
         log "[WOULD CHECK] if uv is installed"
@@ -356,7 +350,7 @@ install_poetry() {
     log "Checking Poetry installation..."
 
     if ! $DRY_RUN; then
-        if sudo -u "${AGENT_USER}" bash -c 'command -v poetry' &>/dev/null; then
+        if command -v poetry &>/dev/null; then
             log_success "Poetry already installed"
             return 0
         fi
@@ -364,7 +358,7 @@ install_poetry() {
         log "Installing Poetry with Homebrew Python 3.12..."
         # Use Homebrew Python 3.12 explicitly to avoid Command Line Tools Python
         # that doesn't support symlinks in venvs
-        sudo -u "${AGENT_USER}" bash -c 'export POETRY_HOME="$HOME/.local/share/pypoetry" && curl -sSL https://install.python-poetry.org | /opt/homebrew/opt/python@3.12/bin/python3.12 -'
+        bash -c 'export POETRY_HOME="$HOME/.local/share/pypoetry" && curl -sSL https://install.python-poetry.org | /opt/homebrew/opt/python@3.12/bin/python3.12 -'
         log_success "Poetry installed successfully"
     else
         log "[WOULD CHECK] if Poetry is installed"
@@ -394,7 +388,7 @@ install_docker() {
         if ! $DRY_RUN; then
             log "Installing Docker Desktop..."
             local brew_env="HOMEBREW_CACHE=${AGENT_HOME}/Library/Caches/Homebrew"
-            sudo -u "${AGENT_USER}" bash -c "${brew_env} /opt/homebrew/bin/brew install --cask docker"
+            bash -c "${brew_env} /opt/homebrew/bin/brew install --cask docker"
             log_success "Docker Desktop installed"
         else
             log "[WOULD INSTALL] Docker Desktop via Homebrew"
@@ -405,7 +399,7 @@ install_docker() {
     if ! pgrep -f "Docker.app" > /dev/null; then
         if ! $DRY_RUN; then
             log "Starting Docker Desktop..."
-            sudo -u "${AGENT_USER}" open -a Docker
+            open -a Docker
             log "Waiting for Docker to start (this may take a minute)..."
             sleep 30
 
@@ -531,9 +525,9 @@ install_lm_studio() {
     fi
 
     # Check if available via brew
-    if sudo -u "${AGENT_USER}" /opt/homebrew/bin/brew search --cask lm-studio | grep -q "lm-studio"; then
+    if /opt/homebrew/bin/brew search --cask lm-studio | grep -q "lm-studio"; then
         log "Installing LM Studio..."
-        sudo -u "${AGENT_USER}" /opt/homebrew/bin/brew install --cask lm-studio
+        /opt/homebrew/bin/brew install --cask lm-studio
         log_success "LM Studio installed"
     else
         log_warning "LM Studio not available via Homebrew. Please install manually from https://lmstudio.ai/"
@@ -577,7 +571,7 @@ pull_ollama_models() {
         
         # Try to check via ollama list first (if running), then fall back to directory check
         local model_exists=false
-        if timeout 5 sudo -u "${AGENT_USER}" /usr/local/bin/ollama list 2>/dev/null | grep -q "^${model%%:*}"; then
+        if timeout 5 /usr/local/bin/ollama list 2>/dev/null | grep -q "^${model%%:*}"; then
             model_exists=true
         elif check_model_in_directory "${model}"; then
             model_exists=true
@@ -592,7 +586,7 @@ pull_ollama_models() {
                 echo -e "${YELLOW}   This may take several minutes depending on model size...${NC}"
                 
                 # Run ollama pull with output visible
-                if sudo -u "${AGENT_USER}" /usr/local/bin/ollama pull "${model}"; then
+                if /usr/local/bin/ollama pull "${model}"; then
                     log_success "Successfully pulled: ${model}"
                     ((pulled_count++))
                 else
@@ -628,7 +622,7 @@ setup_ollama_service() {
     if pgrep -f "Ollama.app" > /dev/null; then
         log "Stopping Ollama.app to prevent conflicts with LaunchAgent service..."
         if ! $DRY_RUN; then
-            sudo -u "${AGENT_USER}" pkill -f "Ollama.app" 2>/dev/null || true
+            pkill -f "Ollama.app" 2>/dev/null || true
             sleep 2
         else
             log "[WOULD STOP] Ollama.app"
@@ -678,7 +672,6 @@ setup_ollama_service() {
             "${template_dir}/start_ollama.sh.template" > "${startup_script}"
         
         chmod +x "${startup_script}"
-        chown "${AGENT_USER}:staff" "${startup_script}"
         log_success "Startup script created at ${startup_script}"
         log "  Models: ${OLLAMA_MODELS_DIR}"
         log "  RAM optimization: ${OLLAMA_KV_CACHE_TYPE} cache, max ${OLLAMA_MAX_LOADED_MODELS} models"
@@ -737,7 +730,6 @@ setup_ollama_service() {
 </plist>
 EOF
         chmod 644 "${plist_file}"
-        chown "${AGENT_USER}:staff" "${plist_file}"
         # Remove extended attributes that can cause I/O errors
         xattr -c "${plist_file}" 2>/dev/null || true
         log_success "LaunchAgent plist created"
@@ -768,11 +760,11 @@ EOF
         log "Loading Ollama LaunchAgent service for user ${AGENT_USER}..."
         
         # Try bootstrap first (modern method)
-        if sudo -u "${AGENT_USER}" launchctl bootstrap "gui/$(id -u ${AGENT_USER})" "${plist_file}" 2>/dev/null; then
+        if launchctl bootstrap "gui/$(id -u ${AGENT_USER})" "${plist_file}" 2>/dev/null; then
             log_success "Ollama LaunchAgent loaded via bootstrap"
             OLLAMA_SERVICE_METHOD="LaunchAgent"
         # Fallback to load (older method)
-        elif sudo -u "${AGENT_USER}" launchctl load "${plist_file}" 2>/dev/null; then
+        elif launchctl load "${plist_file}" 2>/dev/null; then
             log_success "Ollama LaunchAgent loaded via load"
             OLLAMA_SERVICE_METHOD="LaunchAgent"
         else
@@ -783,7 +775,7 @@ EOF
         # Give it a moment to start if successful
         if [[ "${OLLAMA_SERVICE_METHOD}" == "LaunchAgent" ]]; then
             sleep 5
-            if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama"; then
+            if launchctl list | grep -q "local.ollama"; then
                 log_success "Ollama LaunchAgent service is running"
             else
                 log_warning "LaunchAgent loaded but not running - will use Login Item"
@@ -816,7 +808,6 @@ setup_ollama_management() {
             "${template_dir}/ollama-service.sh.template" > "${ollama_service_script}"
         
         chmod +x "${ollama_service_script}"
-        chown "${AGENT_USER}:staff" "${ollama_service_script}"
         log_success "Created ${ollama_service_script}"
     else
         if [[ -f "${ollama_service_script}" ]]; then
@@ -831,7 +822,6 @@ setup_ollama_management() {
         log "Creating login app generator script..."
         cp "${template_dir}/create-ollama-login-app.sh.template" "${create_app_script}"
         chmod +x "${create_app_script}"
-        chown "${AGENT_USER}:staff" "${create_app_script}"
         log_success "Created ${create_app_script}"
     else
         if [[ -f "${create_app_script}" ]]; then
@@ -844,7 +834,7 @@ setup_ollama_management() {
     # If LaunchAgent method failed, create the StartOllama.app now
     if [[ "${OLLAMA_SERVICE_METHOD:-}" == "LoginItem" ]] && ! $DRY_RUN; then
         log "Creating StartOllama.app as fallback auto-start method..."
-        sudo -u "${AGENT_USER}" bash "${create_app_script}"
+        bash "${create_app_script}"
         log_success "StartOllama.app created - add to Login Items for auto-start"
     fi
     
@@ -888,7 +878,6 @@ cmd = "./ollama-service.sh logs"
 EOFTASKS
                 tail -n +${insert_line} "${pyproject}" >> "${pyproject}.tmp"
                 mv "${pyproject}.tmp" "${pyproject}"
-                chown "${AGENT_USER}:staff" "${pyproject}"
                 log_success "Added poe tasks for Ollama management"
             fi
         fi
@@ -949,18 +938,15 @@ setup_lightrag_directories() {
         mkdir -p "${lightrag_memory_dir}"
         
         # Set proper ownership to agent user
-        chown -R "${AGENT_USER}:staff" "${DATA_DIR}"
 
         # Copy template configurations from repo if they exist and directories are empty
         if [[ -d "${INSTALL_DIR}/lightrag_server" && ! "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
             cp -r "${INSTALL_DIR}/lightrag_server/"* "${lightrag_server_dir}/"
-            chown -R "${AGENT_USER}:staff" "${lightrag_server_dir}"
             log_success "Copied LightRAG server configuration template"
         fi
 
         if [[ -d "${INSTALL_DIR}/lightrag_memory_server" && ! "$(ls -A "${lightrag_memory_dir}" 2>/dev/null)" ]]; then
             cp -r "${INSTALL_DIR}/lightrag_memory_server/"* "${lightrag_memory_dir}/"
-            chown -R "${AGENT_USER}:staff" "${lightrag_memory_dir}"
             log_success "Copied LightRAG memory server configuration template"
         fi
 
@@ -1019,12 +1005,12 @@ setup_repository() {
             log_success "Skipping venv creation"
         else
             log "Creating virtual environment 'persagent' with uv (Python 3.12)..."
-            sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed --prompt persagent"
+            bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && uv venv .venv --python /opt/homebrew/opt/python@3.12/bin/python3.12 --seed --prompt persagent"
             log_success "Virtual environment created"
         fi
 
         log "Installing dependencies with Poetry..."
-        sudo -u "${AGENT_USER}" bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
+        bash -c "source '${PROFILE_FILE}' 2>/dev/null || true; cd '${INSTALL_DIR}' && poetry install"
 
         log_success "Dependencies installed"
     else
@@ -1108,11 +1094,9 @@ EOF
 
     # Set proper permissions
     chmod 600 "${env_file}"
-    chown "${AGENT_USER}:staff" "${env_file}"
 
     # Create data directory with proper ownership
     mkdir -p "${DATA_DIR}"
-    chown -R "${AGENT_USER}:staff" "${DATA_DIR}"
 
     log_success "Environment configured"
 }
@@ -1141,7 +1125,7 @@ health_checks() {
     local all_ok=true
 
     # Check Homebrew
-    if sudo -u "${AGENT_USER}" /opt/homebrew/bin/brew --version &>/dev/null; then
+    if /opt/homebrew/bin/brew --version &>/dev/null; then
         log_success "Homebrew: OK"
     else
         log_error "Homebrew: FAILED"
@@ -1149,7 +1133,7 @@ health_checks() {
     fi
 
     # Check Python
-    if sudo -u "${AGENT_USER}" /opt/homebrew/opt/python@3.12/bin/python3.12 --version &>/dev/null; then
+    if /opt/homebrew/opt/python@3.12/bin/python3.12 --version &>/dev/null; then
         log_success "Python 3.12: OK"
     else
         log_error "Python 3.12: FAILED"
@@ -1157,7 +1141,7 @@ health_checks() {
     fi
 
     # Check Poetry
-    if sudo -u "${AGENT_USER}" bash -c "source ${PROFILE_FILE} && poetry --version" &>/dev/null; then
+    if bash -c "source ${PROFILE_FILE} && poetry --version" &>/dev/null; then
         log_success "Poetry: OK"
     else
         log_error "Poetry: FAILED"
@@ -1184,7 +1168,7 @@ health_checks() {
     fi
 
     # Check Ollama service
-    if sudo -u "${AGENT_USER}" launchctl list | grep -q "local.ollama"; then
+    if launchctl list | grep -q "local.ollama"; then
         log_success "Ollama LaunchAgent: Running"
     elif [[ -f "${AGENT_HOME}/Applications/StartOllama.app/Contents/MacOS/StartOllama" ]]; then
         log_success "Ollama Login Item app: Created (add to Login Items)"
@@ -1236,7 +1220,7 @@ print_instructions() {
         echo "This was a dry-run. No changes were made to your system."
         echo ""
         echo "To perform the actual installation, run:"
-        echo "   sudo ./install-personal-agent.sh"
+        echo "   ./install-personal-agent.sh"
         echo ""
     else
         echo -e "${GREEN}Personal Agent Installation Complete!${NC}"
@@ -1244,20 +1228,26 @@ print_instructions() {
         echo ""
         echo "Next Steps:"
         echo ""
-        echo "1. Log out and log back in as ${AGENT_USER}, or reload your shell:"
+        echo "1. Run first-time setup to create your user profile:"
+        echo "   cd ${INSTALL_DIR}"
+        echo "   ./first-run-setup.sh"
+        echo ""
+        echo "   OR manually activate and start:"
+        echo ""
+        echo "2. Log out and log back in as ${AGENT_USER}, or reload your shell:"
         echo "   source ${PROFILE_FILE}"
         echo ""
-        echo "2. Navigate to the repository:"
+        echo "3. Navigate to the repository:"
         echo "   cd ${INSTALL_DIR}"
         echo ""
-        echo "3. Start LightRAG services:"
-        echo "   ./smart-restart-lightrag.sh"
+        echo "4. Activate the virtual environment:"
+        echo "   source .venv/bin/activate"
         echo ""
-        echo "4. Start the Personal Agent:"
+        echo "5. Start the Personal Agent:"
         echo "   poe serve-persag              # Web interface"
         echo "   poe cli                       # Command-line interface"
         echo ""
-        echo "5. Optional: Configure API keys in:"
+        echo "6. Optional: Configure API keys in:"
         echo "   ${INSTALL_DIR}/.env"
         echo ""
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
