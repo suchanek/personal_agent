@@ -453,6 +453,18 @@ def main():
     # Check for restart marker and refresh if needed
     check_restart_marker_and_refresh()
 
+    # Lazy initialization: Create default user if none exists
+    userid_file = os.path.expanduser("~/.persagent/env.userid")
+    if not os.path.exists(userid_file):
+        default_user = os.getenv("USER", "user")
+        logger.warning(f"No user configured, creating default: {default_user}")
+        os.makedirs(os.path.dirname(userid_file), exist_ok=True)
+        with open(userid_file, "w") as f:
+            f.write(default_user)
+        st.warning(
+            f"⚠️ Created default user '{default_user}'. Please run `./first-run-setup.sh` or customize in Profile Management."
+        )
+
     # Get and log current configuration
     config = get_config()
     logger.info(f"🔧 Starting with configuration: {config}")
