@@ -191,8 +191,6 @@ cookbook/
 examples/mcp_agent/tmp/
 
 poetry.lock
-
-
 node_modules/
 
 # AI-specific documentation files (personal notes)
@@ -205,5 +203,4 @@ personal_agent.code-workspace
 
 # Generated scripts (created during installation)
 ollama-service.sh
-docs/
 docs/

@@ -38,20 +38,35 @@ class AgentInstructionManager:
         enable_mcp: bool,
         mcp_servers: Dict[str, Any],
     ):
-        """Initialize the instruction manager.
+        """Initialize the instruction manager with validated instruction level.
 
         Args:
-            instruction_level: The sophistication level for agent instructions
+            instruction_level: The sophistication level for agent instructions (must be InstructionLevel enum)
             user_id: User identifier for memory operations
             enable_memory: Whether memory is enabled
             enable_mcp: Whether MCP is enabled
             mcp_servers: Dictionary of MCP server configurations
+
+        Raises:
+            TypeError: If instruction_level is not InstructionLevel enum
         """
+        # Validate instruction level type
+        if not isinstance(instruction_level, InstructionLevel):
+            raise TypeError(
+                f"instruction_level must be InstructionLevel enum, "
+                f"got {type(instruction_level).__name__}. "
+                f"Value: {instruction_level}"
+            )
+
         self.instruction_level = instruction_level
         self.user_id = user_id
         self.enable_memory = enable_memory
         self.enable_mcp = enable_mcp
         self.mcp_servers = mcp_servers
+
+        logger.debug(
+            "Initialized AgentInstructionManager with level=%s", instruction_level.name
+        )
 
     def create_instructions(self) -> str:
         """Create complete instructions based on the sophistication level."""

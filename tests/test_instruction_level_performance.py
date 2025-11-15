@@ -53,7 +53,7 @@ MODELS_TO_TEST = [LLM_MODEL]  # Use the current configured model
 INSTRUCTION_LEVELS = list(InstructionLevel)
 
 
-async def test_agent_with_level(
+async def _test_agent_with_level(
     instruction_level: InstructionLevel,
     question: str,
     model_name: str = LLM_MODEL,
@@ -166,7 +166,7 @@ async def run_instruction_level_comparison():
                 f"\n[bold blue]--- Testing {level.name} (No Memory) ---[/bold blue]"
             )
 
-            response, response_time, success = await test_agent_with_level(
+            response, response_time, success = await _test_agent_with_level(
                 instruction_level=level,
                 question=question,
                 model_name=LLM_MODEL,
@@ -230,7 +230,7 @@ async def run_instruction_level_comparison():
                 f"\n[bold blue]--- Testing {level.name} (With Memory) ---[/bold blue]"
             )
 
-            response, response_time, success = await test_agent_with_level(
+            response, response_time, success = await _test_agent_with_level(
                 instruction_level=level,
                 question=question,
                 model_name=LLM_MODEL,

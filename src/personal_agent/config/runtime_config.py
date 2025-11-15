@@ -43,6 +43,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Import InstructionLevel enum for type safety
+try:
+    from personal_agent.core.agent_instruction_manager import InstructionLevel
+except ImportError:
+    # Fallback if circular import - will be resolved on first access
+    InstructionLevel = None  # type: ignore
+
 
 # Provider-specific default models
 PROVIDER_DEFAULT_MODELS = {
@@ -681,25 +688,49 @@ class PersonalAgentConfig:
             return self._home_dir
 
     @property
-    def instruction_level(self) -> str:
-        """Get the instruction level."""
-        with self._config_lock:
-            return self._instruction_level
+    def instruction_level(self) -> "InstructionLevel":
+        """Get instruction level as enum.
 
-    def set_instruction_level(self, level: str):
-        """Set the instruction level.
+        Returns:
+            InstructionLevel: The configured instruction level
 
-        :param level: Instruction level (MINIMAL, CONCISE, STANDARD, EXPLICIT, EXPERIMENTAL)
+        Raises:
+            ValueError: If instruction level string is invalid
         """
-        valid_levels = ("MINIMAL", "CONCISE", "STANDARD", "EXPLICIT", "EXPERIMENTAL")
-        if level.upper() not in valid_levels:
-            raise ValueError(
-                f"Invalid instruction level: {level}. Must be one of {valid_levels}"
+        # Lazy import to avoid circular dependency
+        from personal_agent.core.agent_instruction_manager import InstructionLevel as IL
+
+        with self._config_lock:
+            level_str = self._instruction_level
+            try:
+                return IL[level_str]
+            except KeyError:
+                logger.warning(
+                    "Invalid instruction level '%s', defaulting to CONCISE", level_str
+                )
+                return IL.CONCISE
+
+    def set_instruction_level(self, level: "InstructionLevel"):
+        """Set the instruction level from InstructionLevel enum.
+
+        :param level: Instruction level as InstructionLevel enum
+        :raises TypeError: If value is not InstructionLevel enum
+        """
+        # Lazy import to avoid circular dependency
+        from personal_agent.core.agent_instruction_manager import InstructionLevel as IL
+
+        # Enforce enum type only
+        if not isinstance(level, IL):
+            raise TypeError(
+                f"instruction_level must be InstructionLevel enum, "
+                f"got {type(level).__name__}: {level}"
             )
+
+        level_str = level.name
 
         with self._config_lock:
             old_value = self._instruction_level
-            self._instruction_level = level.upper()
+            self._instruction_level = level_str
             os.environ["INSTRUCTION_LEVEL"] = self._instruction_level
             logger.info(
                 "Instruction level changed: %s -> %s",

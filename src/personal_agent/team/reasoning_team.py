@@ -119,6 +119,9 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 
+from personal_agent.core.agent_instruction_manager import InstructionLevel
+from personal_agent.team.team_instructions import TeamAgentInstructions
+
 # Import your personal agent components
 try:
     # Try relative imports first (when used as a module)
@@ -518,10 +521,13 @@ Conclusion about {topic}."""
             return error_msg
 
 
-def create_writer_agent(debug: bool = False) -> Agent:
+def create_writer_agent(
+    debug: bool = False, instruction_level: InstructionLevel = InstructionLevel.CONCISE
+) -> Agent:
     """Create a specialized writing agent.
 
     :param debug: Enable debug mode
+    :param instruction_level: Instruction sophistication level
     :return: Configured writing agent
     """
     writing_tools = WritingTools()
@@ -531,14 +537,9 @@ def create_writer_agent(debug: bool = False) -> Agent:
         model=AgentModelManager.create_model_from_config(),
         debug_mode=debug,
         tools=[writing_tools],  # Use the instance, not the class
-        instructions=[
-            "You are a versatile writer who can create content on any topic.",
-            "When given a topic, write engaging and informative content in the requested format and style.",
-            "If you receive mathematical expressions or calculations from the calculator agent, convert them into clear written text.",
-            "Ensure your writing is clear, accurate and tailored to the specific request.",
-            "Maintain a natural, engaging tone while being factually precise.",
-            "Write something that would be good enough to be published in a newspaper like the New York Times.",
-        ],
+        instructions=TeamAgentInstructions.get_writer_agent_instructions(
+            instruction_level
+        ),
         markdown=True,
         show_tool_calls=False,  # CRITICAL: Always show tool calls to ensure execution
         add_name_to_instructions=True,
@@ -547,10 +548,13 @@ def create_writer_agent(debug: bool = False) -> Agent:
     return agent
 
 
-def create_image_agent(debug: bool = False) -> Agent:
+def create_image_agent(
+    debug: bool = False, instruction_level: InstructionLevel = InstructionLevel.CONCISE
+) -> Agent:
     """Create a specialized image creation agent using DALL-E with enhanced error handling.
 
     :param debug: Enable debug mode
+    :param instruction_level: Instruction sophistication level
     :return: Configured image creation agent
     """
     agent = Agent(
@@ -561,12 +565,9 @@ def create_image_agent(debug: bool = False) -> Agent:
         tools=[
             DalleTools(model="dall-e-3", size="1792x1024", quality="hd", style="vivid"),
         ],
-        instructions=[
-            "You are an AI image creation specialist.",
-            "Your **only** task is to call the `create_image` tool using the user's description.",
-            "Your entire response **MUST** be only the direct, raw, unmodified output from the `create_image` tool.",
-            "**CRITICAL:** Do NOT add any text, thoughts, comments, or any other formatting. Your response must be ONLY the tool's output.",
-        ],
+        instructions=TeamAgentInstructions.get_image_agent_instructions(
+            instruction_level
+        ),
         markdown=True,
         show_tool_calls=False,  # Enable tool call display for better debugging
         add_name_to_instructions=True,
@@ -578,11 +579,13 @@ def create_image_agent(debug: bool = False) -> Agent:
     return agent
 
 
-def create_agents(debug: bool = False):
+def create_agents(
+    debug: bool = False, instruction_level: InstructionLevel = InstructionLevel.CONCISE
+):
     """Create all agents with the correct remote/local configuration.
 
-    Args:
-        debug: Enable debug mode
+    :param debug: Enable debug mode
+    :param instruction_level: Instruction sophistication level for all agents
     """
     model = AgentModelManager.create_model_from_config()
 
@@ -592,9 +595,9 @@ def create_agents(debug: bool = False):
         role="Search the web for information",
         model=model,
         tools=[DuckDuckGoTools()],
-        instructions=[
-            "Search the web for information based on the input. Always include sources"
-        ],
+        instructions=TeamAgentInstructions.get_web_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
@@ -605,10 +608,9 @@ def create_agents(debug: bool = False):
         role="Execute system commands and shell operations",
         model=model,
         tools=[PersonalAgentSystemTools(shell_command=True)],
-        instructions=[
-            "You are a system agent that can execute shell commands safely.",
-            "Provide clear output and error messages from command execution.",
-        ],
+        instructions=TeamAgentInstructions.get_system_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
@@ -626,7 +628,9 @@ def create_agents(debug: bool = False):
                 company_news=True,
             ),
         ],
-        instructions=["Use tables to display data."],
+        instructions=TeamAgentInstructions.get_finance_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
@@ -638,20 +642,18 @@ def create_agents(debug: bool = False):
         model=model,
         description="You are an AI agent that search PubMed for medical information.",
         tools=[PubmedTools()],
-        instructions=[
-            "You are a medical agent that can answer questions about medical topics.",
-            "Search PubMed for medical information and write about it.",
-            "Use tables to display data.",
-        ],
+        instructions=TeamAgentInstructions.get_medical_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
 
     # Writer agent using Ollama
-    writer_agent = create_writer_agent(debug=debug)
+    writer_agent = create_writer_agent(debug=debug, instruction_level=instruction_level)
 
     # Image agent using DALL-E
-    image_agent = create_image_agent(debug=debug)
+    image_agent = create_image_agent(debug=debug, instruction_level=instruction_level)
 
     # Calculator agent using Ollama
     calculator_agent = Agent(
@@ -670,6 +672,9 @@ def create_agents(debug: bool = False):
                 square_root=True,
             ),
         ],
+        instructions=TeamAgentInstructions.get_calculator_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
@@ -688,7 +693,9 @@ def create_agents(debug: bool = False):
                 run_code=True,
             ),
         ],
-        instructions=dedent(_code_instructions),
+        instructions=TeamAgentInstructions.get_python_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
@@ -705,7 +712,9 @@ def create_agents(debug: bool = False):
                 search_files=True,
             )
         ],
-        instructions=dedent(_file_instructions),
+        instructions=TeamAgentInstructions.get_file_agent_instructions(
+            instruction_level
+        ),
         show_tool_calls=False,
         debug_mode=debug,
     )
@@ -1153,7 +1162,7 @@ async def main(
     use_remote: bool = False,
     query: Optional[str] = None,
     recreate: bool = False,
-    instruction_level: str = "STANDARD",
+    instruction_level: InstructionLevel = InstructionLevel.STANDARD,
     single: bool = False,
 ):
     """Main function to run the team with an enhanced CLI interface."""
@@ -1467,6 +1476,15 @@ def cli_main():
     )
     args = parser.parse_args()
 
+    # Convert string instruction level to enum
+    try:
+        instruction_level_enum = InstructionLevel[args.instruction_level.upper()]
+    except KeyError:
+        valid_levels = [e.name for e in InstructionLevel]
+        print(f"Error: Invalid instruction level '{args.instruction_level}'.")
+        print(f"Valid options: {', '.join(valid_levels)}")
+        return
+
     # Update configuration based on command-line arguments
     if args.provider != config.provider:
         config.set_provider(args.provider, auto_set_model=True)
@@ -1482,7 +1500,7 @@ def cli_main():
             use_remote=args.remote,
             query=args.query,
             recreate=args.recreate,
-            instruction_level=args.instruction_level,
+            instruction_level=instruction_level_enum,
             single=args.single,
         )
     )

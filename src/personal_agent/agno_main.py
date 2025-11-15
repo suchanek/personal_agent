@@ -16,6 +16,7 @@ from rich.console import Console
 
 # Import core components
 from .cli import run_agno_cli
+from .core.agent_instruction_manager import InstructionLevel
 from .core.agno_agent import AgnoPersonalAgent
 from .core.agno_initialization import initialize_agno_system
 
@@ -28,7 +29,7 @@ async def run_agno_cli_wrapper(
     query: str = None,  # noqa: ARG001
     use_remote_ollama: bool = False,
     recreate: bool = False,
-    instruction_level: str = None,
+    instruction_level: Optional[InstructionLevel] = None,
 ):
     """
     Wrapper function to initialize system and run CLI.
@@ -78,12 +79,23 @@ def cli_main():
     )
     args = parser.parse_args()
 
+    # Convert string instruction level to enum if provided
+    instruction_level_enum = None
+    if args.instruction_level:
+        try:
+            instruction_level_enum = InstructionLevel[args.instruction_level.upper()]
+        except KeyError:
+            valid_levels = [e.name for e in InstructionLevel]
+            print(f"Error: Invalid instruction level '{args.instruction_level}'.")
+            print(f"Valid options: {', '.join(valid_levels)}")
+            return
+
     print("Starting Personal AI Agent in CLI mode...")
     asyncio.run(
         run_agno_cli_wrapper(
             use_remote_ollama=args.remote,
             recreate=args.recreate,
-            instruction_level=args.instruction_level,
+            instruction_level=instruction_level_enum,
         )
     )
 

@@ -18,14 +18,14 @@ from .agno_agent import AgnoPersonalAgent
 async def initialize_agno_system(
     use_remote_ollama: bool = False,
     recreate: bool = False,
-    instruction_level: Optional[str] = None,
+    instruction_level: Optional[InstructionLevel] = None,
 ) -> Tuple[AgnoPersonalAgent, str]:
     """
     Initialize all system components for agno framework.
 
     :param use_remote_ollama: Whether to use the remote Ollama server instead of local
     :param recreate: Whether to recreate the knowledge base
-    :param instruction_level: Instruction level override (None uses config default)
+    :param instruction_level: Instruction level override (None uses config default). Must be InstructionLevel enum
     :return: Tuple of (agno_agent, ollama_url)
     """
     from ..utils.pag_logging import configure_all_rich_logging
@@ -71,21 +71,20 @@ async def initialize_agno_system(
     # Create agno agent with native storage
     logger.info("Creating agno agent with native storage...")
 
-    # Use provided instruction level or fall back to config default
-    effective_instruction_level = (
-        instruction_level if instruction_level is not None else config.instruction_level
-    )
+    # Determine instruction level - use parameter if provided, otherwise config default
+    if instruction_level is not None:
+        # Validate it's the right type
+        if not isinstance(instruction_level, InstructionLevel):
+            raise TypeError(
+                f"instruction_level must be InstructionLevel enum, "
+                f"got {type(instruction_level).__name__}"
+            )
+        instruction_level_enum = instruction_level
+    else:
+        # Get from config (config property returns InstructionLevel enum)
+        instruction_level_enum = config.instruction_level
 
-    # Convert string instruction level to enum
-    try:
-        instruction_level_enum = InstructionLevel[effective_instruction_level.upper()]
-        logger.info("Using instruction level: %s", instruction_level_enum.name)
-    except KeyError:
-        logger.warning(
-            "Invalid instruction level '%s', defaulting to STANDARD",
-            effective_instruction_level,
-        )
-        instruction_level_enum = InstructionLevel.STANDARD
+    logger.info("Using instruction level: %s", instruction_level_enum.name)
 
     # Create the AgnoPersonalAgent
     agno_agent = await create_agno_agent(
