@@ -947,15 +947,20 @@ setup_lightrag_directories() {
         # Create the directories if they don't exist
         mkdir -p "${lightrag_server_dir}"
         mkdir -p "${lightrag_memory_dir}"
+        
+        # Set proper ownership to agent user
+        chown -R "${AGENT_USER}:staff" "${DATA_DIR}"
 
         # Copy template configurations from repo if they exist and directories are empty
         if [[ -d "${INSTALL_DIR}/lightrag_server" && ! "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
             cp -r "${INSTALL_DIR}/lightrag_server/"* "${lightrag_server_dir}/"
+            chown -R "${AGENT_USER}:staff" "${lightrag_server_dir}"
             log_success "Copied LightRAG server configuration template"
         fi
 
         if [[ -d "${INSTALL_DIR}/lightrag_memory_server" && ! "$(ls -A "${lightrag_memory_dir}" 2>/dev/null)" ]]; then
             cp -r "${INSTALL_DIR}/lightrag_memory_server/"* "${lightrag_memory_dir}/"
+            chown -R "${AGENT_USER}:staff" "${lightrag_memory_dir}"
             log_success "Copied LightRAG memory server configuration template"
         fi
 
@@ -1103,9 +1108,11 @@ EOF
 
     # Set proper permissions
     chmod 600 "${env_file}"
+    chown "${AGENT_USER}:staff" "${env_file}"
 
-    # Create data directory
+    # Create data directory with proper ownership
     mkdir -p "${DATA_DIR}"
+    chown -R "${AGENT_USER}:staff" "${DATA_DIR}"
 
     log_success "Environment configured"
 }
