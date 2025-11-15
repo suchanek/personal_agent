@@ -300,7 +300,7 @@ def main():
     st.sidebar.header("🚨 System Control")
     
     # Add refresh button above power off
-    if st.sidebar.button("🔄 Refresh Dashboard", use_container_width=True, help="Refresh current user and system status", key="sidebar_refresh_btn"):
+    if st.sidebar.button("🔄 Refresh Dashboard", width="stretch", help="Refresh current user and system status", key="sidebar_refresh_btn"):
         # Clear all cached data
         try:
             from personal_agent.streamlit.utils.user_utils import get_user_manager
@@ -321,7 +321,7 @@ def main():
         "🔴 Power Off System",
         key="sidebar_power_off_btn",
         type="primary",
-        use_container_width=True,
+        width="stretch",
     ):
         # Show confirmation dialog
         st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = True
@@ -345,7 +345,7 @@ def main():
             if st.button(
                 "❌ Cancel Shutdown",
                 key="wide_cancel_power_off",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = False
                 st.rerun()
@@ -355,7 +355,7 @@ def main():
                 "🔴 CONFIRM SHUTDOWN",
                 key="wide_confirm_power_off",
                 type="primary",
-                use_container_width=True,
+                width="stretch",
             ):
                 # Clear confirmation state
                 st.session_state[SESSION_KEY_SHOW_POWER_OFF_CONFIRMATION] = False
