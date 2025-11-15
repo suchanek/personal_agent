@@ -4,7 +4,9 @@
 # Personal Agent Installer for macOS
 #
 # This script installs and configures the Personal AI Agent system on macOS.
-# Run as your normal user - sudo will only be used when needed for file ownership.
+# Run as your normal user. Sudo may be requested for:
+#   - Creating /usr/local/bin (if it doesn't exist)
+#   - Cleaning up old system LaunchDaemons
 #
 # Usage:
 #   ./install-personal-agent.sh           # Full installation
@@ -227,10 +229,9 @@ install_homebrew() {
             log_success "${AGENT_USER} already in admin group"
         fi
 
-        # Ensure proper group permissions on Homebrew
+        # Ensure proper group permissions on Homebrew (user already owns it)
         if ! $DRY_RUN; then
             chmod -R g+w /opt/homebrew 2>/dev/null || true
-            chgrp -R admin /opt/homebrew 2>/dev/null || true
         else
             log "[WOULD SET] group permissions on /opt/homebrew"
         fi
@@ -255,12 +256,11 @@ install_homebrew() {
         # Install Homebrew with non-interactive mode
         NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-        # Set proper group ownership
-        chgrp -R admin /opt/homebrew
-        chmod -R g+w /opt/homebrew
+        # Homebrew installer handles ownership; just ensure group write permissions
+        chmod -R g+w /opt/homebrew 2>/dev/null || true
 
-        # Add agent user to admin group
-        dseditgroup -o edit -a "${AGENT_USER}" -t user admin
+        # Add agent user to admin group (may require password)
+        dseditgroup -o edit -a "${AGENT_USER}" -t user admin 2>/dev/null || log_warning "Could not add user to admin group (may already be member)"
 
         # Add Homebrew to PATH for the agent user
         if ! grep -q "brew shellenv" "${PROFILE_FILE}"; then
@@ -483,7 +483,18 @@ install_ollama() {
     if [[ -f "${ollama_cli}" ]]; then
         if ! $DRY_RUN; then
             # Create /usr/local/bin if it doesn't exist
-            mkdir -p /usr/local/bin
+            # On macOS, /usr/local is typically root-owned but /usr/local/bin should be user-writable
+            if [[ ! -d /usr/local/bin ]]; then
+                log "Creating /usr/local/bin (may require sudo)..."
+                if [[ -w /usr/local ]]; then
+                    # /usr/local is writable, create bin directory as user
+                    mkdir -p /usr/local/bin
+                else
+                    # Need sudo to create in root-owned /usr/local
+                    sudo mkdir -p /usr/local/bin
+                    sudo chown "${AGENT_USER}:staff" /usr/local/bin
+                fi
+            fi
 
             # Remove existing symlink if present
             rm -f "${symlink_path}"
@@ -633,8 +644,8 @@ setup_ollama_service() {
     if launchctl list | grep -q "com.personalagent.ollama"; then
         log "Removing old system-wide Ollama LaunchDaemon..."
         if ! $DRY_RUN; then
-            launchctl unload /Library/LaunchDaemons/local.ollama.system.plist 2>/dev/null || true
-            rm -f /Library/LaunchDaemons/local.ollama.system.plist
+            sudo launchctl unload /Library/LaunchDaemons/local.ollama.system.plist 2>/dev/null || true
+            sudo rm -f /Library/LaunchDaemons/local.ollama.system.plist
         else
             log "[WOULD REMOVE] old system-wide LaunchDaemon"
         fi
