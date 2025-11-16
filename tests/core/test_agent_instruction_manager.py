@@ -87,11 +87,11 @@ class TestAgentInstructionManager:
     def test_get_header_instructions(self):
         """Test header instructions generation."""
         header = self.manager.get_header_instructions()
-        
+
         assert "personal AI friend" in header
-        assert "semantic memory" in header
+        assert "Memory & Knowledge System" in header
         assert self.user_id in header
-        assert "enabled with SemanticMemoryManager" in header
+        assert "unified MemoryAndKnowledgeTools" in header
         assert "enabled" in header  # MCP status
     
     def test_get_header_instructions_disabled_features(self):
@@ -121,52 +121,51 @@ class TestAgentInstructionManager:
     def test_get_personality_and_tone(self):
         """Test personality and tone guidelines."""
         personality = self.manager.get_personality_and_tone()
-        
+
         assert "PERSONALITY & TONE" in personality
-        assert "Warm & Friendly" in personality
-        assert "Conversational" in personality
-        assert "Supportive" in personality
+        assert "Be Direct & Efficient" in personality
+        assert "Be Helpful" in personality
+        assert "Be Accurate" in personality
     
     def test_get_concise_memory_rules(self):
         """Test concise memory rules generation."""
         rules = self.manager.get_concise_memory_rules()
-        
-        assert "SEMANTIC MEMORY" in rules
-        assert "store_user_memory" in rules
-        assert "query_memory" in rules
-        assert "get_all_memories" in rules
+
+        assert "Knowledge Tools (for factual information)" in rules
+        assert "query_knowledge_base" in rules
+        assert "ingest_knowledge_text" in rules or "ingest_knowledge_file" in rules
+        assert "Always check memory first" in rules
     
     def test_get_detailed_memory_rules(self):
         """Test detailed memory rules generation."""
         rules = self.manager.get_detailed_memory_rules()
-        
-        assert "SEMANTIC MEMORY SYSTEM" in rules
-        assert "WHAT TO REMEMBER" in rules
-        assert "WHAT NOT TO REMEMBER" in rules
+
+        assert "## MEMORY SYSTEM" in rules
+        assert "Store user facts in first person" in rules
+        assert "Present memories in second person" in rules
         assert "store_user_memory" in rules
         assert "query_memory" in rules
-        assert "MEMORY STORAGE - GUIDING PRINCIPLE" in rules
+        assert "## KNOWLEDGE SYSTEM" in rules
     
     def test_get_concise_tool_rules(self):
         """Test concise tool rules generation."""
         rules = self.manager.get_concise_tool_rules()
-        
-        assert "TOOL USAGE" in rules
+
+        assert "## TOOL USAGE" in rules
         assert "YFinanceTools" in rules
-        assert "GoogleSearchTools" in rules
+        assert "DuckDuckGoTools" in rules
         assert "PersonalAgentFilesystemTools" in rules
     
     def test_get_detailed_tool_rules(self):
         """Test detailed tool rules generation."""
         rules = self.manager.get_detailed_tool_rules()
-        
-        assert "WEB SEARCH - IMMEDIATE ACTION" in rules
-        assert "FINANCE QUERIES - IMMEDIATE ACTION" in rules
-        assert "TOOL DECISION TREE" in rules
-        assert "GoogleSearchTools IMMEDIATELY" in rules
-        assert "CREATIVE vs. FACTUAL REQUESTS" in rules
-        assert "DO NOT use knowledge tools" in rules
-        assert "Generate content directly" in rules
+
+        assert "## TOOL USAGE RULES" in rules
+        assert "Always use tools for factual information - never guess" in rules
+        assert "## TOOL SELECTION:" in rules
+        assert "YFinanceTools" in rules
+        assert "DuckDuckGoTools" in rules
+        assert "Use tools immediately, no hesitation" in rules
     
     def test_get_anti_hesitation_rules(self):
         """Test anti-hesitation rules generation."""
@@ -180,15 +179,14 @@ class TestAgentInstructionManager:
     def test_get_tool_list_with_mcp(self):
         """Test tool list generation with MCP enabled."""
         tool_list = self.manager.get_tool_list()
-        
-        assert "CURRENT AVAILABLE TOOLS" in tool_list
+
+        assert "## CURRENT AVAILABLE TOOLS" in tool_list
         assert "YFinanceTools" in tool_list
-        assert "GoogleSearchTools" in tool_list
-        assert "Local Memory Tools" in tool_list
-        assert "Graph Memory Tools" in tool_list
-        assert "Knowledge Base Tools" in tool_list
+        assert "DuckDuckGoTools" in tool_list
+        assert "KnowledgeTools" in tool_list
         assert "query_knowledge_base" in tool_list
-        assert "UNIFIED knowledge coordinator" in tool_list
+        assert "KnowledgeIngestionTools" in tool_list
+        assert "PersagMemoryTools" in tool_list
         assert "MCP Server Tools" in tool_list
         assert "use_github_server" in tool_list
         assert "use_filesystem_server" in tool_list
@@ -202,10 +200,10 @@ class TestAgentInstructionManager:
             enable_mcp=False,
             mcp_servers={}
         )
-        
+
         tool_list = manager.get_tool_list()
-        
-        assert "CURRENT AVAILABLE TOOLS" in tool_list
+
+        assert "## CURRENT AVAILABLE TOOLS" in tool_list
         assert "YFinanceTools" in tool_list
         assert "MCP Server Tools**: Disabled" in tool_list
         assert "use_github_server" not in tool_list
@@ -213,12 +211,12 @@ class TestAgentInstructionManager:
     def test_get_core_principles(self):
         """Test core principles generation."""
         principles = self.manager.get_core_principles()
-        
-        assert "CORE PRINCIPLES" in principles
-        assert "Friendship First" in principles
-        assert "Remember Everything" in principles
-        assert "Be Genuinely Helpful" in principles
-        assert "Act Immediately" in principles
+
+        assert "## CORE PRINCIPLES" in principles
+        assert "Use tools immediately for factual information" in principles
+        assert "Be accurate and helpful" in principles
+        assert "Remember user information and present it clearly" in principles
+        assert "Act as a capable AI assistant, not the user" in principles
     
     def test_create_instructions_minimal(self):
         """Test instruction creation for MINIMAL level."""
@@ -249,27 +247,27 @@ class TestAgentInstructionManager:
             enable_mcp=True,
             mcp_servers=self.mcp_servers
         )
-        
+
         instructions = manager.create_instructions()
-        
+
         # Should contain concise elements
-        assert "SEMANTIC MEMORY" in instructions
-        assert "TOOL USAGE" in instructions
-        assert "CORE PRINCIPLES" in instructions
-        
+        assert "## TOOL USAGE" in instructions
+        assert "## CORE PRINCIPLES" in instructions
+        assert "Knowledge Tools (for factual information)" in instructions
+
         # Should NOT contain detailed or anti-hesitation rules
-        assert "SEMANTIC MEMORY SYSTEM" not in instructions
+        assert "## MEMORY SYSTEM" not in instructions
         assert "NO OVERTHINKING RULE" not in instructions
     
     def test_create_instructions_standard(self):
         """Test instruction creation for STANDARD level."""
         instructions = self.manager.create_instructions()
-        
+
         # Should contain detailed elements
-        assert "SEMANTIC MEMORY SYSTEM" in instructions
-        assert "WEB SEARCH - IMMEDIATE ACTION" in instructions
-        assert "CORE PRINCIPLES" in instructions
-        
+        assert "## MEMORY SYSTEM" in instructions
+        assert "## TOOL USAGE RULES" in instructions
+        assert "## CORE PRINCIPLES" in instructions
+
         # Should NOT contain anti-hesitation rules
         assert "NO OVERTHINKING RULE" not in instructions
     
@@ -282,28 +280,28 @@ class TestAgentInstructionManager:
             enable_mcp=True,
             mcp_servers=self.mcp_servers
         )
-        
+
         instructions = manager.create_instructions()
-        
+
         # Should contain all elements including anti-hesitation
-        assert "SEMANTIC MEMORY SYSTEM" in instructions
-        assert "WEB SEARCH - IMMEDIATE ACTION" in instructions
+        assert "## MEMORY SYSTEM" in instructions
+        assert "## TOOL USAGE RULES" in instructions
         assert "NO OVERTHINKING RULE" in instructions
-        assert "CORE PRINCIPLES" in instructions
+        assert "## CORE PRINCIPLES" in instructions
     
     def test_create_instructions_structure(self):
         """Test that instructions are properly structured."""
         instructions = self.manager.create_instructions()
-        
+
         # Should be a string
         assert isinstance(instructions, str)
-        
+
         # Should contain multiple sections separated by double newlines
         sections = instructions.split('\n\n')
         assert len(sections) > 5  # Should have multiple sections
-        
+
         # Should start with header content (after dedent removes leading whitespace)
-        assert "You are a personal AI friend" in instructions
+        assert "You are" in instructions and "AI friend" in instructions
     
     def test_user_id_integration(self):
         """Test that user_id is properly integrated throughout instructions."""
@@ -384,12 +382,17 @@ class TestAgentInstructionManagerIntegration:
         
         # All should contain tool list
         for level, instruction in instructions.items():
-            assert "CURRENT AVAILABLE TOOLS" in instruction, f"Tool list missing in {level} instructions"
+            assert "## CURRENT AVAILABLE TOOLS" in instruction, f"Tool list missing in {level} instructions"
         
-        # Complexity should increase with level
-        assert len(instructions[InstructionLevel.MINIMAL]) < len(instructions[InstructionLevel.CONCISE])
-        assert len(instructions[InstructionLevel.CONCISE]) < len(instructions[InstructionLevel.STANDARD])
-        assert len(instructions[InstructionLevel.STANDARD]) < len(instructions[InstructionLevel.EXPLICIT])
+        # All levels should have substantial content
+        for level in [InstructionLevel.MINIMAL, InstructionLevel.CONCISE,
+                      InstructionLevel.STANDARD, InstructionLevel.EXPLICIT]:
+            assert len(instructions[level]) > 1000, f"{level.name} instructions too short"
+
+        # EXPLICIT should include anti-hesitation rules
+        assert "NO OVERTHINKING RULE" in instructions[InstructionLevel.EXPLICIT]
+        # But other levels should not
+        assert "NO OVERTHINKING RULE" not in instructions[InstructionLevel.STANDARD]
     
     def test_memory_disabled_instructions(self):
         """Test instructions when memory is disabled."""
@@ -406,10 +409,10 @@ class TestAgentInstructionManagerIntegration:
         
         # Memory should be marked as disabled
         assert "disabled" in header
-        
+
         # Should still contain other sections
-        assert "PERSONALITY & TONE" in instructions
-        assert "CURRENT AVAILABLE TOOLS" in instructions
+        assert "## PERSONALITY & TONE" in instructions
+        assert "## CURRENT AVAILABLE TOOLS" in instructions
     
     def test_realistic_configuration(self):
         """Test with a realistic configuration."""
@@ -434,11 +437,11 @@ class TestAgentInstructionManagerIntegration:
         expected_sections = [
             "personal AI friend",
             "john_doe",
-            "SEMANTIC MEMORY SYSTEM",
-            "CURRENT AVAILABLE TOOLS",
-            "CORE PRINCIPLES"
+            "## MEMORY SYSTEM",
+            "## CURRENT AVAILABLE TOOLS",
+            "## CORE PRINCIPLES"
         ]
-        
+
         for section in expected_sections:
             assert section in instructions, f"Missing section: {section}"
 

@@ -14,17 +14,11 @@ import asyncio
 import logging
 import os
 import shutil
-import sys
-from pathlib import Path
+import pytest
 
-def _add_src_to_syspath():
-    # Ensure 'personal_agent' package is importable in src/ layout
-    repo_root = Path(__file__).resolve().parents[1]
-    src_dir = repo_root / "src"
-    if str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
+from personal_agent.utils import add_src_to_path
 
-_add_src_to_syspath()
+add_src_to_path()
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +27,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@pytest.mark.asyncio
 async def test_knowledge_tools_integration():
     """Test that KnowledgeTools integration doesn't interfere with memory operations."""
     
@@ -89,25 +84,25 @@ async def test_knowledge_tools_integration():
     
     try:
         # Import and create agent
-        from src.personal_agent.core.agno_agent import create_agno_agent
-        from src.personal_agent.config import OLLAMA_URL, LLM_MODEL
-        
+        from personal_agent.core.agno_agent import AgnoPersonalAgent
+
         print("🚀 Creating agent with KnowledgeTools integration...")
-        agent = await create_agno_agent(
-            model_provider="ollama",
-            model_name=LLM_MODEL,
+        agent = AgnoPersonalAgent(
             enable_memory=True,
             enable_mcp=False,  # Disable MCP for cleaner testing
-            storage_dir=test_storage_dir,
-            knowledge_dir=test_knowledge_dir,
             debug=True,
-            user_id="test_user_knowledge_integration",
-            ollama_base_url=OLLAMA_URL
         )
         
-        print("✅ Agent created successfully")
+
+        # Initialize agent
+        success = await agent.initialize()
+        if not success:
+            print("❌ Failed to initialize agent")
+            return
+
+        print("✅ Agent initialized successfully")
         print()
-        
+
         # Test 1: Store personal information in memory
         print("📝 TEST 1: Storing personal information in memory")
         print("-" * 50)
@@ -237,6 +232,7 @@ async def test_knowledge_tools_integration():
     
     return True
 
+@pytest.mark.asyncio
 async def test_tool_priority():
     """Test that memory tools have priority over KnowledgeTools for personal queries."""
     

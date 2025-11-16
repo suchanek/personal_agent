@@ -64,6 +64,9 @@ from .user_id_mgr import (
     refresh_user_dependent_settings,
 )
 
+# Get the current USER_ID
+USER_ID = get_userid()
+
 
 # Create a simple get_settings function for compatibility
 def get_settings():
@@ -101,6 +104,7 @@ __all__ = [
     "BASE_DIR",
     "DATA_DIR",
     "USER_DATA_DIR",
+    "USER_ID",
     "HOME_DIR",
     "PERSAG_HOME",
     "PERSAG_ROOT",

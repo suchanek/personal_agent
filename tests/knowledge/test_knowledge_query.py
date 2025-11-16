@@ -3,37 +3,28 @@
 
 import asyncio
 import logging
-import sys
-from pathlib import Path
+import pytest
 
-def _add_src_to_syspath():
-    # Ensure 'personal_agent' package is importable in src/ layout
-    repo_root = Path(__file__).resolve().parents[1]
-    src_dir = repo_root / "src"
-    if str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
+from personal_agent.utils import add_src_to_path
 
-_add_src_to_syspath()
+add_src_to_path()
 
-from src.personal_agent.config import LLM_MODEL
-from src.personal_agent.core.agno_agent import AgnoPersonalAgent
+from personal_agent.config import LLM_MODEL
+from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.asyncio
 async def test_knowledge_query():
     """Test querying the agent about its knowledge base contents."""
     print("🔄 Initializing Agno Personal Agent...")
 
     agent = AgnoPersonalAgent(
-        model_provider="ollama",
-        model_name=LLM_MODEL,
         enable_memory=True,
         enable_mcp=False,  # Disable MCP for focused knowledge testing
-        storage_dir="./data/agno",
-        knowledge_dir="./data/knowledge",
         debug=True,  # Enable debug to see tool calls
     )
 

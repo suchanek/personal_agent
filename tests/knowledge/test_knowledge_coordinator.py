@@ -8,27 +8,21 @@ local semantic search and LightRAG based on mode parameters and query analysis.
 
 import asyncio
 import logging
-import sys
-from pathlib import Path
+import pytest
 
-def _add_src_to_syspath():
-    # Ensure 'personal_agent' package is importable in src/ layout
-    repo_root = Path(__file__).resolve().parents[1]
-    src_dir = repo_root / "src"
-    if str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
+from personal_agent.utils import add_src_to_path, setup_logging
 
-_add_src_to_syspath()
+add_src_to_path()
 
 from personal_agent.core.knowledge_coordinator import create_knowledge_coordinator
 from personal_agent.core.agno_storage import create_agno_storage, create_combined_knowledge_base
-from personal_agent.config.settings import LIGHTRAG_URL, AGNO_STORAGE_DIR, AGNO_KNOWLEDGE_DIR, USER_ID
-from personal_agent.utils import setup_logging
+from personal_agent.config import LIGHTRAG_URL, AGNO_STORAGE_DIR, AGNO_KNOWLEDGE_DIR, USER_ID
 
 # Configure logging
 logger = setup_logging(__name__, level=logging.INFO)
 
 
+@pytest.mark.asyncio
 async def test_knowledge_coordinator():
     """Test the Knowledge Coordinator functionality."""
     print("🧪 Testing Knowledge Coordinator Implementation")
@@ -182,6 +176,7 @@ async def test_knowledge_coordinator():
     return results, stats
 
 
+@pytest.mark.asyncio
 async def test_routing_logic():
     """Test the routing logic specifically."""
     print("\n🧭 Testing Routing Logic")

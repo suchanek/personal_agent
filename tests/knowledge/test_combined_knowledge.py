@@ -4,6 +4,8 @@
 import asyncio
 import logging
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -16,13 +18,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.asyncio
 async def test_combined_knowledge():
     """Test the combined knowledge base implementation."""
     print("🔄 Testing Combined Knowledge Base Implementation...")
 
     agent = AgnoPersonalAgent(
-        model_provider="ollama",
-        model_name=LLM_MODEL,
         enable_memory=True,
         enable_mcp=False,  # Disable MCP for cleaner output
         debug=True,  # Enable debug to see tool calls

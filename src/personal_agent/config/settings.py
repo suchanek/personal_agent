@@ -151,6 +151,10 @@ STORAGE_BACKEND = get_env_var("STORAGE_BACKEND", "agno")  # "weaviate" or "agno"
 
 
 # Import user-specific functions
+from .user_id_mgr import get_userid
+
+# Get current user ID
+USER_ID = get_userid()
 
 # Get initial storage paths (these will be dynamic)
 _storage_paths = get_user_storage_paths()
