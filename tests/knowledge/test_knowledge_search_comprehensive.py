@@ -1,62 +1,51 @@
-#!/usr/bin/env python3
-"""Test script to verify knowledge base search functionality (comprehensive)."""
+"""Test knowledge base search functionality (comprehensive)."""
 
-import asyncio
 import logging
+
 import pytest
 
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
 
-from personal_agent.config import DATA_DIR, LLM_MODEL
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio
 async def test_knowledge_search_comprehensive():
     """Test knowledge base search functionality comprehensively."""
-    print("🔄 Testing Knowledge Base Search (Comprehensive)...")
-    print(f"📁 DATA_DIR: {DATA_DIR}")
-    print(f"🤖 LLM_MODEL: {LLM_MODEL}")
-    print()
+    logger.info("Testing Knowledge Base Search (Comprehensive)...")
 
     # Initialize agent
-    print("🚀 Initializing AgnoPersonalAgent...")
+    logger.info("Initializing AgnoPersonalAgent...")
     agent = AgnoPersonalAgent(
         enable_memory=True,
         enable_mcp=False,
-        debug=True,  # Enable debug to see tool calls
+        debug=False,
     )
 
     success = await agent.initialize()
-    if not success:
-        print("❌ Failed to initialize agent")
-        return False
+    assert success, "Failed to initialize agent"
 
-    print("✅ Agent initialized successfully")
-    print()
+    logger.info("Agent initialized successfully")
 
     # Test direct knowledge base search
     if agent.agno_knowledge:
-        print("🔍 Testing direct knowledge base search...")
+        logger.info("Testing direct knowledge base search...")
         try:
             # Test direct search on knowledge base
             search_results = await agent.agno_knowledge.asearch("Eric", limit=3)
-            print(f"Direct search results for 'Eric': {len(search_results)} results")
+            logger.info("Direct search results for 'Eric': %d results", len(search_results))
             for i, result in enumerate(search_results, 1):
-                print(f"  {i}. {result.content[:100]}...")
-            print()
-        except Exception as e:
-            print(f"❌ Direct search failed: {e}")
-            print()
+                logger.info("  %d. %s...", i, result.content[:100])
+        except (RuntimeError, ValueError, AttributeError) as e:
+            logger.error("Direct search failed: %s", e)
 
     # Test agent queries that should trigger knowledge search
-    print("💬 Testing agent queries with knowledge search...")
+    logger.info("Testing agent queries with knowledge search...")
 
     test_queries = [
         "What is my name?",
@@ -68,25 +57,11 @@ async def test_knowledge_search_comprehensive():
     ]
 
     for i, query in enumerate(test_queries, 1):
-        print(f"\n🔍 Query {i}: {query}")
-        print("-" * 60)
+        logger.info("Query %d: %s", i, query)
 
-        try:
-            response = await agent.run(query)
-            print(f"Response: {response}")
-            print("-" * 60)
-        except Exception as e:
-            print(f"❌ Query failed: {e}")
-            print("-" * 60)
+        response = await agent.run(query, stream=False)
+        assert response is not None, f"Query {i} returned None"
+        assert isinstance(response, str), f"Query {i} response is not a string"
+        logger.info("Response: %s...", response[:100])
 
-    print("\n✅ Knowledge search test completed")
-    return True
-
-
-async def main():
-    """Run the test asynchronously."""
-    await test_knowledge_search_comprehensive()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    logger.info("Knowledge search test completed")
