@@ -50,19 +50,19 @@ async def store_user_memory(
     confidence: float = 1.0,
     is_proxy: bool = False,
     proxy_agent: str = None,
+    input_text: str = None,
 ) -> MemoryStorageResult:
     """Store information as a user memory in both local SQLite and LightRAG graph systems.
 
-    Args:
-        agent: Personal agent instance with memory capabilities
-        content: The information to store as a memory
-        topics: Optional list of topics/categories for the memory (None = auto-classify)
-        confidence: Confidence score for the memory (0.0-1.0)
-        is_proxy: Whether this memory was created by a proxy agent
-        proxy_agent: Name of the proxy agent that created this memory
+    :param agent: Personal agent instance with memory capabilities
+    :param content: The information to store as a memory
+    :param topics: Optional list of topics/categories for the memory (None = auto-classify)
+    :param confidence: Confidence score for the memory (0.0-1.0)
+    :param is_proxy: Whether this memory was created by a proxy agent
+    :param proxy_agent: Name of the proxy agent that created this memory
+    :param input_text: Optional input text describing the source/context of the memory
 
-    Returns:
-        MemoryStorageResult: Structured result with detailed status information
+    :return: MemoryStorageResult: Structured result with detailed status information
     """
     await agent._ensure_initialized()
     # Pass the user_details for delta_year timestamp adjustment
@@ -79,13 +79,19 @@ async def store_user_memory(
         elif hasattr(user_data, "get_memory_timestamp"):
             user_obj = user_data
 
+    kwargs = {
+        "confidence": confidence,
+        "is_proxy": is_proxy,
+        "proxy_agent": proxy_agent,
+    }
+    if input_text is not None:
+        kwargs["input_text"] = input_text
+
     return await agent.memory_manager.store_user_memory(
         content,
         topics,
         user=user_obj,
-        confidence=confidence,
-        is_proxy=is_proxy,
-        proxy_agent=proxy_agent,
+        **kwargs,
     )
 
 

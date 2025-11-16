@@ -46,6 +46,7 @@ Author:
 
 import asyncio
 import logging
+from typing import List, Optional
 
 import streamlit as st
 
@@ -64,10 +65,17 @@ class StreamlitMemoryHelper:
     """Simplified StreamlitMemoryHelper using the new agent memory function interfaces."""
 
     def __init__(self, agent):
+        """Initialize the StreamlitMemoryHelper.
+
+        :param agent: The agent instance with memory capabilities
+        """
         self.agent = agent
 
     def _ensure_agent_available(self):
-        """Ensure agent is available and has basic memory access."""
+        """Ensure agent is available and has basic memory access.
+
+        :return: Tuple of (available: bool, message: str) indicating status
+        """
         if not self.agent:
             return False, "Agent not available"
 
@@ -101,7 +109,9 @@ class StreamlitMemoryHelper:
 
             # Ensure agent is initialized first
             if hasattr(self.agent, "_ensure_initialized"):
-                self._run_async(self.agent._ensure_initialized())
+                self._run_async(
+                    self.agent._ensure_initialized()
+                )  # pylint: disable=protected-access
 
             # Access the memory manager directly for raw memory objects
             if (
@@ -151,7 +161,9 @@ class StreamlitMemoryHelper:
 
             # Ensure agent is initialized first
             if hasattr(self.agent, "_ensure_initialized"):
-                self._run_async(self.agent._ensure_initialized())
+                self._run_async(
+                    self.agent._ensure_initialized()
+                )  # pylint: disable=protected-access
 
             # Access the memory manager directly for raw memory objects
             if (
@@ -219,21 +231,21 @@ class StreamlitMemoryHelper:
     def add_memory(
         self,
         memory_text: str,
-        topics: list = None,
-        input_text: str = None,
+        topics: Optional[List[str]] = None,
+        input_text: Optional[str] = None,
         confidence: float = 1.0,
         is_proxy: bool = False,
-        proxy_agent: str = None,
+        proxy_agent: Optional[str] = None,
     ):
         """Add a memory using the standalone memory function.
 
-        Args:
-            memory_text: The memory content to store
-            topics: Optional list of topics/categories
-            input_text: Optional input text (deprecated parameter, kept for compatibility)
-            confidence: Confidence score for the memory (0.0-1.0)
-            is_proxy: Whether this memory was created by a proxy agent
-            proxy_agent: Name of the proxy agent that created this memory
+        :param memory_text: The memory content to store
+        :param topics: Optional list of topics/categories
+        :param input_text: Optional input text describing the source/context
+        :param confidence: Confidence score for the memory (0.0-1.0)
+        :param is_proxy: Whether this memory was created by a proxy agent
+        :param proxy_agent: Name of the proxy agent that created this memory
+        :return: Tuple of (success: bool, message: str, memory_id: Optional[str], topics: Optional[List[str]])
         """
         available, message = self._ensure_agent_available()
         if not available:
@@ -243,15 +255,16 @@ class StreamlitMemoryHelper:
             from personal_agent.tools.memory_functions import store_user_memory
 
             # Use the standalone function with enhanced fields
+            kwargs = {
+                "confidence": confidence,
+                "is_proxy": is_proxy,
+            }
+            if input_text is not None:
+                kwargs["input_text"] = input_text
+            if proxy_agent is not None:
+                kwargs["proxy_agent"] = proxy_agent
             result = self._run_async(
-                store_user_memory(
-                    self.agent,
-                    memory_text,
-                    topics,
-                    confidence=confidence,
-                    is_proxy=is_proxy,
-                    proxy_agent=proxy_agent,
-                )
+                store_user_memory(self.agent, memory_text, topics, **kwargs)
             )
 
             # Handle MemoryStorageResult object
@@ -268,16 +281,15 @@ class StreamlitMemoryHelper:
                 return False, f"Unexpected result format: {result}", None, None
 
         except Exception as e:
-            return False, f"Error adding memory: {e}", None, None
+            return False, f"Error updating memory: {e}"
 
     def _run_async(self, coro):
         """Helper to run async functions, handling existing event loops."""
         try:
             # Try to get the current event loop
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # If we're in a running loop, we need to use a different approach
             import concurrent.futures
-            import threading
 
             # Create a new event loop in a separate thread
             def run_in_thread():
@@ -297,7 +309,10 @@ class StreamlitMemoryHelper:
             return asyncio.run(coro)
 
     def clear_memories(self):
-        """Clear all memories using the standalone memory function."""
+        """Clear all memories using the standalone memory function.
+
+        :return: Tuple of (success: bool, message: str) indicating operation result
+        """
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Clear memories not available: {message}"
@@ -318,7 +333,11 @@ class StreamlitMemoryHelper:
             return False, f"Error clearing memories: {e}"
 
     def get_memory_stats(self):
-        """Get memory statistics using the agent's memory system directly."""
+        """Get memory statistics using the agent's memory system directly.
+
+        :return: Dictionary with statistics including total_memories, recent_memories_24h,
+                 average_memory_length, and topic_distribution, or error dict
+        """
         available, message = self._ensure_agent_available()
         if not available:
             return {"error": f"Memory stats not available: {message}"}
@@ -326,7 +345,9 @@ class StreamlitMemoryHelper:
         try:
             # Ensure agent is initialized first
             if hasattr(self.agent, "_ensure_initialized"):
-                self._run_async(self.agent._ensure_initialized())
+                self._run_async(
+                    self.agent._ensure_initialized()
+                )  # pylint: disable=protected-access
 
             # Access the memory manager directly to get raw memory data
             memories = []
@@ -396,13 +417,19 @@ class StreamlitMemoryHelper:
             return {"error": f"Error getting memory stats: {e}"}
 
     def delete_memory(self, memory_id: str):
-        """Delete a memory using the agent's delete_memory function."""
+        """Delete a memory using the agent's delete_memory function.
+
+        This method deletes from both SQLite (local) and LightRAG (graph) systems.
+
+        :param memory_id: ID of the memory to delete
+        :return: Tuple of (success, message) where message includes status of both systems
+        """
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Memory deletion not available: {message}"
 
         try:
-            logger.info(f"🗑️ Deleting memory using agent.delete_memory(): {memory_id}")
+            logger.info("🗑️ Initiating dual-system memory deletion for: %s", memory_id)
 
             # Check if the function returns a coroutine or a direct result
             delete_func = self.agent.delete_memory
@@ -412,30 +439,118 @@ class StreamlitMemoryHelper:
                 # Function is already sync (like in TeamWrapper)
                 result = delete_func(memory_id)
 
-            # Parse the result string to determine success
+            # Parse the result string to determine success in both systems
             if isinstance(result, str):
-                if "✅" in result or "Successfully deleted" in result:
-                    logger.info(f"✅ Memory deletion successful: {result}")
-                    return True, result
+                # Analyze the deletion result
+                has_sqlite_success = (
+                    "Successfully deleted" in result and "SQLite" in result
+                )
+                has_graph_success = "Successfully deleted from graph" in result
+                has_graph_warning = "Could not delete from graph" in result
+                graph_not_configured = "Graph memory client not configured" in result
+                graph_not_found = "not found in LightRAG graph memory" in result
+
+                logger.debug(
+                    "📊 Deletion result analysis - "
+                    "SQLite: %s, "
+                    "Graph Success: %s, "
+                    "Graph Warning: %s, "
+                    "Graph Not Configured: %s, "
+                    "Graph Not Found: %s",
+                    has_sqlite_success,
+                    has_graph_success,
+                    has_graph_warning,
+                    graph_not_configured,
+                    graph_not_found,
+                )
+                logger.debug("Full result message: %s", result)
+
+                # Determine overall success
+                if has_sqlite_success:
+                    if has_graph_success:
+                        # Perfect: both systems deleted
+                        logger.info(
+                            "✅ FULL DELETE: Memory %s deleted from both "
+                            "SQLite and LightRAG graph systems",
+                            memory_id,
+                        )
+                        return True, result
+                    elif has_graph_warning:
+                        # Partial: SQLite ok, graph failed
+                        logger.warning(
+                            "⚠️  PARTIAL DELETE: Memory %s deleted from SQLite, "
+                            "but LightRAG deletion encountered an issue: %s",
+                            memory_id,
+                            result,
+                        )
+                        return (
+                            True,
+                            result,
+                        )  # Still return success since SQLite is cleaned
+                    elif graph_not_found:
+                        # Success: SQLite deleted, graph wasn't there (already clean)
+                        logger.info(
+                            "✅ CLEAN DELETE: Memory %s deleted from SQLite. "
+                            "Not found in LightRAG (already synced as clean)",
+                            memory_id,
+                        )
+                        return True, result
+                    elif graph_not_configured:
+                        # Success: SQLite deleted, LightRAG not configured
+                        logger.info(
+                            "✅ LOCAL DELETE: Memory %s deleted from SQLite. "
+                            "LightRAG not configured (graph sync disabled)",
+                            memory_id,
+                        )
+                        return True, result
+                    else:
+                        # Success: SQLite deleted, graph status unclear but not error
+                        logger.info(
+                            "✅ PARTIAL INFO: Memory %s deleted from SQLite. "
+                            "Graph status: %s",
+                            memory_id,
+                            result,
+                        )
+                        return True, result
                 else:
-                    logger.warning(f"❌ Memory deletion failed: {result}")
+                    # Failure: SQLite deletion failed
+                    logger.error(
+                        "❌ FAILED: Could not delete memory %s from SQLite. "
+                        "Result: %s",
+                        memory_id,
+                        result,
+                    )
                     return False, result
             else:
-                logger.error(f"Unexpected result type: {type(result)}")
-                return False, f"Unexpected result type: {type(result)}"
+                # Unexpected result type
+                logger.error(
+                    "❌ UNEXPECTED: delete_memory returned unexpected type: %s",
+                    type(result).__name__,
+                )
+                return False, f"Unexpected result type: {type(result).__name__}"
 
         except Exception as e:
-            logger.error(f"Exception in delete_memory: {e}", exc_info=True)
+            logger.error(
+                "❌ EXCEPTION: Error deleting memory %s: %s",
+                memory_id,
+                e,
+                exc_info=True,
+            )
             return False, f"Error deleting memory: {e}"
 
     def update_memory(
         self,
         memory_id: str,
         memory_text: str,
-        topics: list = None,
-        input_text: str = None,
+        topics: Optional[List[str]] = None,
     ):
-        """Update a memory using the agent's update_memory function."""
+        """Update a memory using the agent's update_memory function.
+
+        :param memory_id: ID of the memory to update
+        :param memory_text: New memory content
+        :param topics: Optional list of topics/categories
+        :return: Tuple of (success: bool, message: str) indicating operation result
+        """
         available, message = self._ensure_agent_available()
         if not available:
             return False, f"Memory update not available: {message}"
@@ -458,8 +573,15 @@ class StreamlitMemoryHelper:
         except Exception as e:
             return False, f"Error updating memory: {e}"
 
-    def sync_memory_to_graph(self, memory_text: str, topics: list = None):
-        """Sync a memory to the LightRAG graph system."""
+    def sync_memory_to_graph(
+        self, memory_text: str, topics: Optional[List[str]] = None
+    ):
+        """Sync a memory to the LightRAG graph system.
+
+        :param memory_text: The memory content to sync
+        :param topics: Optional list of topics/categories
+        :return: Tuple of (success: bool, message: str) indicating operation result
+        """
         # This functionality is now handled automatically by store_user_memory
         # which stores in both local SQLite and LightRAG graph systems
         try:
@@ -474,7 +596,11 @@ class StreamlitMemoryHelper:
             return False, f"Error syncing to graph: {e}"
 
     def get_memory_sync_status(self):
-        """Get memory sync status by checking both local and graph memory systems."""
+        """Get memory sync status by checking both local and graph memory systems.
+
+        :return: Dictionary with sync status including local_memory_count, graph_entity_count,
+                 sync_ratio, and status, or error dict
+        """
         available, message = self._ensure_agent_available()
         if not available:
             return {
@@ -488,7 +614,9 @@ class StreamlitMemoryHelper:
         try:
             # Ensure agent is initialized first
             if hasattr(self.agent, "_ensure_initialized"):
-                self._run_async(self.agent._ensure_initialized())
+                self._run_async(
+                    self.agent._ensure_initialized()
+                )  # pylint: disable=protected-access
 
             # Get local memory count
             local_memories = []
@@ -540,10 +668,10 @@ class StreamlitMemoryHelper:
                                     knowledge_agent.get_graph_entity_count()
                                 )
 
-                logger.debug(f"Retrieved graph entity count: {graph_entity_count}")
+                logger.debug("Retrieved graph entity count: %s", graph_entity_count)
 
             except Exception as e:
-                logger.warning(f"Error getting graph entity count: {e}")
+                logger.warning("Error getting graph entity count: %s", e)
                 graph_entity_count = 0
 
             # Calculate sync ratio
@@ -591,10 +719,9 @@ class StreamlitKnowledgeHelper:
         """Helper to run async functions, handling existing event loops."""
         try:
             # Try to get the current event loop
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # If we're in a running loop, we need to use a different approach
             import concurrent.futures
-            import threading
 
             # Create a new event loop in a separate thread
             def run_in_thread():
@@ -627,9 +754,11 @@ class StreamlitKnowledgeHelper:
                 logger.info(
                     "Agent not initialized, triggering lazy initialization for knowledge..."
                 )
-                self._run_async(self.agent._ensure_initialized())
+                self._run_async(
+                    self.agent._ensure_initialized()
+                )  # pylint: disable=protected-access
             except Exception as e:
-                logger.error(f"Failed to initialize agent: {e}")
+                logger.error("Failed to initialize agent: %s", e)
                 return None
         elif is_initialized:
             logger.info("Agent already initialized, skipping knowledge initialization")
@@ -644,7 +773,13 @@ class StreamlitKnowledgeHelper:
         """Dynamic property that always gets fresh knowledge manager."""
         return self._get_knowledge_manager()
 
-    def search_knowledge(self, query: str, limit: int = None):
+    def search_knowledge(self, query: str, limit: Optional[int] = None):
+        """Search the knowledge base for relevant documents.
+
+        :param query: Search query string
+        :param limit: Optional maximum number of documents to return
+        :return: List of matching documents
+        """
         km = self.knowledge_manager  # This will trigger initialization
         if not km:
             return []
@@ -655,6 +790,12 @@ class StreamlitKnowledgeHelper:
             return []
 
     def search_rag(self, query: str, params: dict):
+        """Search the LightRAG knowledge base using RAG (Retrieval-Augmented Generation).
+
+        :param query: Search query string
+        :param params: Additional parameters for the RAG query
+        :return: RAG search results or None if error
+        """
         # Check if agent exists and has the query method
         if not self.agent or not hasattr(self.agent, "query_lightrag_knowledge_direct"):
             st.error(
@@ -665,7 +806,9 @@ class StreamlitKnowledgeHelper:
         # Force agent initialization if needed
         try:
             if hasattr(self.agent, "_ensure_initialized"):
-                self._run_async(self.agent._ensure_initialized())
+                self._run_async(
+                    self.agent._ensure_initialized()
+                )  # pylint: disable=protected-access
         except Exception as e:
             st.error(f"Failed to initialize agent: {e}")
             return None

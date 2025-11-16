@@ -102,6 +102,7 @@ class AgentMemoryManager:
         confidence: float = 1.0,
         is_proxy: bool = False,
         proxy_agent: Optional[str] = None,
+        input_text: Optional[str] = None,
     ) -> MemoryStorageResult:
         """Store information as a user memory in BOTH local SQLite and LightRAG graph systems.
 
@@ -112,6 +113,7 @@ class AgentMemoryManager:
             confidence: Confidence score for the memory (0.0-1.0)
             is_proxy: Whether this memory was created by a proxy agent
             proxy_agent: Name of the proxy agent that created this memory
+            input_text: Optional input text describing the source/context (currently unused, for future use)
 
         Returns:
             MemoryStorageResult: Structured result with detailed status information

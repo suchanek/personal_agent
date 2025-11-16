@@ -8,10 +8,13 @@ Provides interface for:
 - Viewing user activity
 """
 
-import os
-from datetime import date, datetime
+# pylint: disable=line-too-long,broad-exception-caught
 
-import pandas as pd
+import os
+import time
+from datetime import datetime
+
+import requests
 import streamlit as st
 
 # Import project modules
@@ -21,7 +24,6 @@ from personal_agent.streamlit.utils.user_utils import (
     get_all_users,
     get_all_users_with_profiles,
     get_user_details,
-    get_user_profile_summary,
     update_cognitive_state,
     update_contact_info,
     update_user_profile,
@@ -131,7 +133,7 @@ def _render_user_overview():
                                 st.write("Profile Status: Error processing profile")
                             else:
                                 st.write("Profile Status: Not available")
-                        except Exception as e:
+                        except Exception:
                             st.write("Profile Status: Error processing memory")
                             # Optionally log the error for debugging
                             # st.caption(f"Debug: {str(e)}")
@@ -152,7 +154,7 @@ def _render_create_user():
     # Form for creating a new user
     with st.form("create_user_form"):
         st.write("**Basic Information**")
-        
+
         user_name = st.text_input("User Name", help="Display name for the user")
 
         user_id = st.text_input("User ID", help="Unique identifier for the user")
@@ -232,11 +234,11 @@ def _render_create_user():
                     user_id=user_id,
                     user_name=user_name or user_id,
                     user_type=user_type,
-                    email=email if email else None,
-                    phone=phone if phone else None,
-                    address=address if address else None,
-                    birth_date=birth_date.isoformat() if birth_date else None,
-                    delta_year=delta_year if delta_year is not None else None,
+                    email=email or "",
+                    phone=phone or "",
+                    address=address or "",
+                    birth_date=birth_date.isoformat() if birth_date else "",
+                    delta_year=delta_year if delta_year is not None else 0,
                     cognitive_state=cognitive_state,
                     gender=gender,
                     npc=npc,
@@ -254,7 +256,8 @@ def _render_create_user():
                         st.info("✅ User created with extended profile information")
                     else:
                         st.info(
-                            "ℹ️ User created with basic information. You can add profile details later in the Profile Management tab."
+                            "ℹ️ User created with basic information. "
+                            "You can add profile details later in the Profile Management tab."
                         )
                 else:
                     st.error(f"Failed to create user: {result['error']}")
@@ -333,16 +336,20 @@ def _render_profile_management():
                             st.metric("Profile Completion", f"{completion:.1f}%")
 
                             if profile_summary.get("missing_fields"):
-                                st.warning(
-                                    f"Missing fields: {', '.join(profile_summary['missing_fields'])}"
-                                )
+                                missing = ", ".join(profile_summary["missing_fields"])
+                                st.warning(f"Missing fields: {missing}")
 
                     # Profile update forms
                     st.subheader("Update Profile")
 
                     # Create tabs for different profile sections
                     profile_tabs = st.tabs(
-                        ["� Basic Info", "�📞 Contact Info", "📅 Personal Info", "🧠 Cognitive State"]
+                        [
+                            "� Basic Info",
+                            "�📞 Contact Info",
+                            "📅 Personal Info",
+                            "🧠 Cognitive State",
+                        ]
                     )
 
                     with profile_tabs[0]:
@@ -356,14 +363,17 @@ def _render_profile_management():
                                 help="Display name for the user",
                             )
 
-                            new_user_id = st.text_input(
+                            st.text_input(
                                 "User ID",
                                 value=user_details.get("user_id", ""),
                                 help="Unique identifier (changing this is not recommended)",
                                 disabled=True,  # Make read-only for safety
                             )
 
-                            st.info("ℹ️ User ID cannot be changed after creation for data consistency.")
+                            st.info(
+                                "ℹ️ User ID cannot be changed after "
+                                "creation for data consistency."
+                            )
 
                             basic_info_submitted = st.form_submit_button(
                                 "Update User Name"
@@ -375,13 +385,13 @@ def _render_profile_management():
                                     # or update_contact_info as a fallback
                                     result = update_user_profile(
                                         selected_user,
-                                        user_name=new_user_name if new_user_name else None,
+                                        user_name=(
+                                            new_user_name if new_user_name else None
+                                        ),
                                     )
 
                                     if result["success"]:
-                                        st.success(
-                                            "User name updated successfully!"
-                                        )
+                                        st.success("User name updated successfully!")
                                         if result.get("updated_fields"):
                                             st.info(
                                                 f"Updated fields: {', '.join(result['updated_fields'])}"
@@ -426,9 +436,9 @@ def _render_profile_management():
                                 try:
                                     result = update_contact_info(
                                         selected_user,
-                                        email=new_email if new_email else None,
-                                        phone=new_phone if new_phone else None,
-                                        address=new_address if new_address else None,
+                                        email=new_email or "",
+                                        phone=new_phone or "",
+                                        address=new_address or "",
                                     )
 
                                     if result["success"]:
@@ -461,7 +471,7 @@ def _render_profile_management():
                                     current_date = datetime.fromisoformat(
                                         current_birth_date
                                     ).date()
-                                except:
+                                except ValueError:
                                     current_date = None
                             else:
                                 current_date = None
@@ -471,7 +481,8 @@ def _render_profile_management():
                                 value=current_date,
                                 min_value=datetime.min.date(),
                                 max_value=datetime.max.date(),
-                                help="User's birth date (YYYY-MM-DD format) - supports dates from year 1 to year 9999",
+                                help="Birth date (YYYY-MM-DD format). "
+                                "Supports years 1 to 9999.",
                             )
 
                             # Delta Year
@@ -483,7 +494,8 @@ def _render_profile_management():
                                 value=(
                                     int(current_delta_year) if current_delta_year else 0
                                 ),
-                                help="Years from birth when writing memories (e.g., 6 for writing as 6-year-old)",
+                                help="Years from birth when writing memories "
+                                "(e.g., 6 for writing as 6-year-old)",
                             )
 
                             # Show calculated memory year if both fields are set
@@ -504,7 +516,8 @@ def _render_profile_management():
                             new_npc = st.checkbox(
                                 "NPC (Bot User)",
                                 value=user_details.get("npc", False),
-                                help="Mark this user as an NPC (Non-Player Character) for knowledge consolidation",
+                                help="Mark as NPC (Non-Player Character) "
+                                "for knowledge consolidation",
                             )
 
                             personal_submitted = st.form_submit_button(
@@ -518,12 +531,12 @@ def _render_profile_management():
                                         birth_date=(
                                             new_birth_date.isoformat()
                                             if new_birth_date
-                                            else None
+                                            else ""
                                         ),
                                         delta_year=(
                                             new_delta_year
                                             if new_delta_year is not None
-                                            else None
+                                            else 0
                                         ),
                                         gender=new_gender,
                                         npc=new_npc,
@@ -677,7 +690,9 @@ def _render_switch_user():
                         col1, col2 = st.columns(2)
                         with col1:
                             st.write("**User Details:**")
-                            st.write(f"• User Name: {user_details.get('user_name', 'N/A')}")
+                            st.write(
+                                f"• User Name: {user_details.get('user_name', 'N/A')}"
+                            )
                             st.write(f"• User ID: {user_details.get('user_id', 'N/A')}")
                             st.write(f"• Type: {user_details.get('user_type', 'N/A')}")
 
@@ -714,7 +729,6 @@ def _render_switch_user():
                                 f"Switching to user '{selected_user}'... Please wait."
                             ):
                                 try:
-                                    import requests
 
                                     # Call the enhanced REST API endpoint
                                     # Port 8001 is used by paga_streamlit_agno
@@ -755,9 +769,15 @@ def _render_switch_user():
                                             if result.get("user_details"):
                                                 details = result["user_details"]
                                                 st.info("**User Information:**")
-                                                st.write(f"• User Name: {details.get('user_name', 'N/A')}")
-                                                st.write(f"• User ID: {details.get('user_id', 'N/A')}")
-                                                st.write(f"• Type: {details.get('user_type', 'N/A')}")
+                                                st.write(
+                                                    f"• User Name: {details.get('user_name', 'N/A')}"
+                                                )
+                                                st.write(
+                                                    f"• User ID: {details.get('user_id', 'N/A')}"
+                                                )
+                                                st.write(
+                                                    f"• Type: {details.get('user_type', 'N/A')}"
+                                                )
 
                                             # Clear cached user manager to refresh user list
                                             from personal_agent.streamlit.utils.user_utils import (
@@ -768,15 +788,18 @@ def _render_switch_user():
 
                                             # Set success flag for sidebar refresh
                                             st.session_state.user_switch_success = True
-                                            st.session_state.last_displayed_user = None  # Force sidebar refresh
+                                            st.session_state.last_displayed_user = (
+                                                None  # Force sidebar refresh
+                                            )
 
                                             # Success message with refresh suggestion
                                             st.success(
                                                 "🎉 **Switch Complete!** Refreshing page in 3 seconds..."
                                             )
-                                            
+
                                             # Auto-refresh after successful switch
                                             import time
+
                                             time.sleep(3)
                                             st.rerun()
                                         else:
@@ -795,7 +818,7 @@ def _render_switch_user():
                                                 "error", "No details available"
                                             )
                                             st.error(f"Error details: {error_detail}")
-                                        except:
+                                        except Exception:
                                             pass
 
                                 except requests.exceptions.RequestException as e:
@@ -834,7 +857,7 @@ def _render_switch_user():
 
 
 def _render_delete_user():
-    """Interface for deleting users."""
+    """Interface for deleting users - inline confirmation flow like memory deletion."""
     st.subheader("Delete User")
     st.warning("⚠️ **Warning**: User deletion is permanent and cannot be undone!")
 
@@ -847,134 +870,237 @@ def _render_delete_user():
             # Get current user to prevent self-deletion
             current_user_id = os.getenv("USER_ID", "Unknown")
 
-            # Form for deleting user
-            with st.form("delete_user_form"):
-                st.write("**Select User to Delete**")
+            # Initialize session state for delete flow
+            if "delete_user_selected" not in st.session_state:
+                st.session_state.delete_user_selected = ""
 
-                selected_user = st.selectbox(
-                    "User to Delete",
-                    [""] + user_ids,
-                    help="Choose the user you want to delete",
-                )
+            # User selection
+            st.write("**Select User to Delete**")
+            selected_user = st.selectbox(
+                "User to Delete",
+                [""] + user_ids,
+                index=(
+                    user_ids.index(st.session_state.delete_user_selected) + 1
+                    if st.session_state.delete_user_selected in user_ids
+                    else 0
+                ),
+                key="delete_user_selectbox",
+                help="Choose the user you want to delete",
+            )
 
-                if selected_user:
-                    # Show user details
-                    user_details = get_user_details(selected_user)
-                    if user_details:
-                        # Prevent current user deletion
-                        if selected_user == current_user_id:
-                            st.error("❌ **Cannot delete the currently active user!**")
-                            st.info(
-                                "💡 Switch to a different user first, then delete this user."
-                            )
-                        else:
-                            st.info("**User Details:**")
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.write(
-                                    f"**User ID:** {user_details.get('user_id', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**User Name:** {user_details.get('user_name', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**User Type:** {user_details.get('user_type', 'N/A')}"
-                                )
-                            with col2:
-                                st.write(
-                                    f"**Email:** {user_details.get('email', 'Not set')}"
-                                )
-                                st.write(
-                                    f"**Last Seen:** {user_details.get('last_seen', 'N/A')}"
-                                )
-                                st.write(
-                                    f"**Created:** {user_details.get('created_at', 'N/A')}"
-                                )
+            # Update session state when user changes
+            if selected_user != st.session_state.delete_user_selected:
+                st.session_state.delete_user_selected = selected_user
+                # Clear confirmation state when user changes
+                for key in list(st.session_state.keys()):
+                    if isinstance(key, str) and key.startswith("show_delete_confirm_"):
+                        del st.session_state[key]
 
-                st.write("**Deletion Options**")
-
-                # Deletion options
-                col1, col2 = st.columns(2)
-                with col1:
-                    delete_data = st.checkbox(
-                        "Delete User Data",
-                        value=True,
-                        help="Delete the user's persistent data directory",
-                    )
-
-                    backup_before_delete = st.checkbox(
-                        "Create Backup Before Deletion",
-                        value=True,
-                        help="Create a backup of user data before deletion",
-                    )
-
-                with col2:
-                    dry_run = st.checkbox(
-                        "Preview Mode (Dry Run)",
-                        value=False,
-                        help="Show what would be deleted without actually deleting",
-                    )
-
-                # Confirmation
-                st.write("**Confirmation**")
-                confirmation_text = ""  # Initialize to prevent undefined variable error
-                if selected_user and selected_user != current_user_id:
-                    # Use session state key that includes the selected user to reset when user changes
-                    confirmation_key = f"delete_confirmation_{selected_user}"
-                    confirmation_text = st.text_input(
-                        f"Type '{selected_user}' to confirm deletion:",
-                        key=confirmation_key,
-                        help="This is a safety measure to prevent accidental deletions",
-                    )
-
-                    # Show what will happen
-                    if dry_run:
+            if selected_user:
+                # Show user details
+                user_details = get_user_details(selected_user)
+                if user_details:
+                    # Prevent current user deletion
+                    if selected_user == current_user_id:
+                        st.error("❌ **Cannot delete the currently active user!**")
                         st.info(
-                            "🔍 **Preview Mode**: This will show what would be deleted without actually deleting anything."
+                            "💡 Switch to a different user first, then delete this user."
                         )
                     else:
-                        st.error(
-                            "🗑️ **This will permanently delete the user and cannot be undone!**"
-                        )
-                        if backup_before_delete:
-                            st.info("💾 A backup will be created before deletion.")
-                        if delete_data:
-                            st.warning(
-                                "📁 User's data directory will be permanently deleted."
+                        st.info("**User Details:**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(
+                                f"**User ID:** {user_details.get('user_id', 'N/A')}"
                             )
-                        else:
-                            st.info("📁 User's data directory will be preserved.")
-
-                # Submit button
-                submitted = st.form_submit_button(
-                    "🔍 Preview Deletion" if dry_run else "🗑️ Delete User",
-                    type="secondary" if dry_run else "primary",
-                )
-
-                if submitted:
-                    if not selected_user:
-                        st.error("❌ Please select a user to delete.")
-                    elif selected_user == current_user_id:
-                        st.error(
-                            "❌ Cannot delete the currently active user. Switch to a different user first."
-                        )
-                    elif not dry_run and confirmation_text != selected_user:
-                        st.error(
-                            f"❌ Please type '{selected_user}' exactly to confirm deletion."
-                        )
-                    else:
-                        try:
-                            # Perform deletion (or dry run)
-                            action_text = (
-                                "Previewing deletion" if dry_run else "Deleting user"
+                            st.write(
+                                f"**User Name:** {user_details.get('user_name', 'N/A')}"
                             )
-                            with st.spinner(f"{action_text} for '{selected_user}'..."):
-                                result = delete_user(
-                                    selected_user,
-                                    delete_data=delete_data,
-                                    backup_data=backup_before_delete,
-                                    dry_run=dry_run,
-                                )
+                            st.write(
+                                f"**User Type:** {user_details.get('user_type', 'N/A')}"
+                            )
+                        with col2:
+                            st.write(
+                                f"**Email:** {user_details.get('email', 'Not set')}"
+                            )
+                            st.write(
+                                f"**Last Seen:** {user_details.get('last_seen', 'N/A')}"
+                            )
+                            st.write(
+                                f"**Created:** {user_details.get('created_at', 'N/A')}"
+                            )
+
+                        st.divider()
+
+                        # Deletion options (outside form)
+                        st.write("**Deletion Options**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            delete_data = st.checkbox(
+                                "Delete User Data",
+                                value=True,
+                                key=f"delete_data_{selected_user}",
+                                help="Delete the user's persistent data directory",
+                            )
+
+                            backup_before_delete = st.checkbox(
+                                "Create Backup Before Deletion",
+                                value=True,
+                                key=f"backup_before_{selected_user}",
+                                help="Create a backup of user data before deletion",
+                            )
+
+                        with col2:
+                            dry_run = st.checkbox(
+                                "Preview Mode (Dry Run)",
+                                value=False,
+                                key=f"dry_run_{selected_user}",
+                                help="Show what would be deleted without actually deleting",
+                            )
+
+                        # Delete button
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            if st.button(
+                                "🔍 Preview Deletion" if dry_run else "🗑️ Delete User",
+                                key=f"delete_btn_{selected_user}",
+                                type="secondary" if dry_run else "primary",
+                                use_container_width=True,
+                            ):
+                                st.session_state[
+                                    f"show_delete_confirm_{selected_user}"
+                                ] = True
+
+                        # Show confirmation dialog if button was clicked
+                        if st.session_state.get(
+                            f"show_delete_confirm_{selected_user}", False
+                        ):
+                            with st.expander("⚠️ Confirm Deletion", expanded=True):
+                                if dry_run:
+                                    st.info(
+                                        f"🔍 **Preview Mode**: This will show what "
+                                        f"would be deleted for user '{selected_user}' "
+                                        f"without actually deleting."
+                                    )
+                                else:
+                                    st.error(
+                                        "🗑️ **This will permanently delete the user and cannot be undone!**"
+                                    )
+                                    if backup_before_delete:
+                                        st.info(
+                                            "💾 A backup will be created before deletion."
+                                        )
+                                    if delete_data:
+                                        st.warning(
+                                            "📁 User's data directory will be permanently deleted."
+                                        )
+                                    else:
+                                        st.info(
+                                            "📁 User's data directory will be preserved."
+                                        )
+
+                                col_confirm1, col_confirm2 = st.columns([3, 1])
+
+                                with col_confirm1:
+                                    confirmation_text = st.text_input(
+                                        f"Type '{selected_user}' to confirm:",
+                                        key=f"confirm_text_{selected_user}",
+                                        placeholder=selected_user,
+                                    )
+
+                                with col_confirm2:
+                                    if st.button(
+                                        "🔍 Preview" if dry_run else "Delete",
+                                        key=f"confirm_delete_{selected_user}",
+                                        type="secondary" if dry_run else "primary",
+                                    ):
+                                        if confirmation_text == selected_user:
+                                            action_text = (
+                                                "Previewing deletion"
+                                                if dry_run
+                                                else "Deleting user"
+                                            )
+                                            st.toast(
+                                                f"{action_text} for '{selected_user}'...",
+                                                icon="🗑️",
+                                            )
+                                            import time
+
+                                            time.sleep(1)
+
+                                            with st.spinner(
+                                                f"{action_text} for '{selected_user}'..."
+                                            ):
+                                                result = delete_user(
+                                                    selected_user,
+                                                    delete_data=delete_data,
+                                                    backup_data=backup_before_delete,
+                                                    dry_run=dry_run,
+                                                )
+
+                                                # Store deletion status in session state
+                                                st.session_state[
+                                                    f"deletion_status_{selected_user}"
+                                                ] = {
+                                                    "success": result["success"],
+                                                    "result": result,
+                                                    "dry_run": dry_run,
+                                                    "timestamp": time.time(),
+                                                }
+
+                                                # Clear confirmation state
+                                                st.session_state[
+                                                    f"show_delete_confirm_{selected_user}"
+                                                ] = False
+
+                                                if result["success"]:
+                                                    if dry_run:
+                                                        st.toast(
+                                                            f"Preview completed for '{selected_user}'!",
+                                                            icon="🔍",
+                                                        )
+                                                    else:
+                                                        st.toast(
+                                                            f"User '{selected_user}' deleted successfully!",
+                                                            icon="✅",
+                                                        )
+                                                        # Clear cache and reset selection
+                                                        from personal_agent.streamlit.utils.user_utils import (
+                                                            get_user_manager,
+                                                        )
+
+                                                        get_user_manager.clear()
+                                                        st.session_state.delete_user_selected = (
+                                                            ""
+                                                        )
+                                                else:
+                                                    st.toast(
+                                                        f"Failed to delete user: {result.get('error', 'Unknown error')}",
+                                                        icon="❌",
+                                                    )
+
+                                                st.rerun()
+                                        else:
+                                            st.error(
+                                                f"Please type '{selected_user}' exactly to confirm."
+                                            )
+
+                                # Cancel button
+                                if st.button(
+                                    "Cancel", key=f"cancel_delete_{selected_user}"
+                                ):
+                                    st.session_state[
+                                        f"show_delete_confirm_{selected_user}"
+                                    ] = False
+                                    st.rerun()
+
+                        # Show deletion status results
+                        deletion_status = st.session_state.get(
+                            f"deletion_status_{selected_user}"
+                        )
+                        if deletion_status:
+                            result = deletion_status["result"]
+                            dry_run = deletion_status["dry_run"]
 
                             if result["success"]:
                                 if dry_run:
@@ -1037,38 +1163,9 @@ def _render_delete_user():
                                     st.info(
                                         "📁 **User data directory preserved** (can be manually deleted later)"
                                     )
-
-                                # Clear cached user manager to refresh user list
-                                if not dry_run:
-                                    from personal_agent.streamlit.utils.user_utils import (
-                                        get_user_manager,
-                                    )
-
-                                    get_user_manager.clear()
-
-                                    # Clear the confirmation text box after successful deletion
-                                    confirmation_key = (
-                                        f"delete_confirmation_{selected_user}"
-                                    )
-                                    if confirmation_key in st.session_state:
-                                        del st.session_state[confirmation_key]
-                                    
-                                    # Clear form-related session state
-                                    if "delete_user_form" in st.session_state:
-                                        del st.session_state["delete_user_form"]
-                                    
-                                    # Reset selected user in delete form
-                                    if "delete_selected_user" in st.session_state:
-                                        st.session_state["delete_selected_user"] = ""
-
-                                    st.success("🔄 User list refreshed successfully!")
-                                    # Force a rerun to refresh the entire component and user list
-                                    st.rerun()
-
                             else:
-                                action_text = "preview" if dry_run else "deletion"
                                 st.error(
-                                    f"❌ Failed to {action_text} user: {result.get('error', 'Unknown error')}"
+                                    f"❌ Failed to {'preview' if dry_run else 'delete'} user: {result.get('error', 'Unknown error')}"
                                 )
 
                                 # Show any partial results
@@ -1076,10 +1173,6 @@ def _render_delete_user():
                                     st.warning("⚠️ **Partial results:**")
                                     for partial_result in result["partial_results"]:
                                         st.write(f"• {partial_result}")
-
-                        except Exception as e:
-                            action_text = "preview" if dry_run else "deletion"
-                            st.error(f"❌ Error during user {action_text}: {str(e)}")
         else:
             st.info("ℹ️ No users available for deletion.")
 
@@ -1460,7 +1553,7 @@ def _render_list_backups():
                             st.write("**Actions:**")
                             # Quick restore button
                             if st.button(
-                                f"🔄 Quick Restore",
+                                "🔄 Quick Restore",
                                 key=f"restore_{backup['backup_name']}",
                                 help=f"Restore to original user ID: {backup['user_id']}",
                             ):
