@@ -15,6 +15,7 @@ Endpoints:
     - GET /api/v1/memory/search - Search existing memories
     - GET /api/v1/memory/list - List all memories
     - DELETE /api/v1/memory/{memory_id} - Delete specific memory
+    - DELETE /api/v1/memory/clear - Clear all memories (blocks until LightRAG pipeline completes)
     - GET /api/v1/memory/stats - Get memory statistics
 
     Knowledge:
@@ -566,6 +567,33 @@ class PersonalAgentRestAPI:
 
             except Exception as e:
                 logger.error(f"Error getting memory stats via API: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/v1/memory/clear", methods=["DELETE"])
+        def clear_all_memories():
+            try:
+                # Get memory helper
+                memory_helper = self._get_memory_helper()
+                if not memory_helper:
+                    return jsonify({"error": "Memory system not available"}), 503
+
+                # Clear all memories
+                success, message = memory_helper.clear_memories()
+
+                if success:
+                    logger.info("Successfully cleared all memories via API")
+                    return jsonify(
+                        {
+                            "success": "True",
+                            "message": message,
+                        }
+                    )
+                else:
+                    logger.warning(f"Failed to clear memories via API: {message}")
+                    return jsonify({"error": message}), 400
+
+            except Exception as e:
+                logger.error(f"Error clearing memories via API: {e}")
                 return jsonify({"error": str(e)}), 500
 
         # Knowledge endpoints

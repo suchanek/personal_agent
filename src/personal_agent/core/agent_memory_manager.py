@@ -581,13 +581,77 @@ class AgentMemoryManager:
             logger.error(f"Error checking entity existence for {entity_name}: {e}")
             return False
 
-    async def clear_all_memories(self) -> str:
+    async def _wait_for_pipeline_idle(
+        self, session: aiohttp.ClientSession, max_wait_seconds: int
+    ) -> bool:
+        """Wait for LightRAG pipeline to become idle after deletion.
+
+        Args:
+            session: Active aiohttp session to use for requests
+            max_wait_seconds: Maximum seconds to wait for pipeline to become idle
+
+        Returns:
+            bool: True if pipeline became idle, False if timed out
+        """
+        import asyncio
+        import time
+
+        start_time = time.time()
+        check_interval = 2  # Check every 2 seconds
+
+        logger.info(
+            "Waiting for LightRAG pipeline to complete deletion (max %d seconds)...",
+            max_wait_seconds,
+        )
+
+        while time.time() - start_time < max_wait_seconds:
+            try:
+                async with session.get(
+                    f"{self.lightrag_memory_url}/documents/pipeline_status", timeout=10
+                ) as resp:
+                    if resp.status == 200:
+                        pipeline_data = await resp.json()
+                        is_processing = pipeline_data.get("is_processing", False)
+                        queue_size = pipeline_data.get("queue_size", 0)
+
+                        if not is_processing and queue_size == 0:
+                            logger.info("Pipeline is idle - deletion complete")
+                            return True
+
+                        current_task = pipeline_data.get("current_task", "unknown")
+                        logger.debug(
+                            "Pipeline busy: processing=%s, queue=%d, task=%s",
+                            is_processing,
+                            queue_size,
+                            current_task,
+                        )
+                    else:
+                        logger.warning(
+                            "Could not check pipeline status: %d", resp.status
+                        )
+
+            except Exception as e:
+                logger.warning("Error checking pipeline status: %s", e)
+
+            # Wait before next check
+            await asyncio.sleep(check_interval)
+
+        logger.warning(
+            "Pipeline still busy after %d seconds - timing out", max_wait_seconds
+        )
+        return False
+
+    async def clear_all_memories(self, max_wait_seconds: int = 60) -> str:
         """Clear all memories from both SQLite and LightRAG systems.
 
         This method provides a complete reset of the dual memory system by:
         1. Clearing all memories from the local SQLite database
         2. Clearing all documents from the LightRAG memory server
-        3. Deleting the knowledge graph file
+        3. Waiting for the LightRAG pipeline to complete deletion
+        4. Deleting the knowledge graph file
+
+        Args:
+            max_wait_seconds: Maximum seconds to wait for pipeline completion (default: 60)
 
         Returns:
             str: Success or error message
@@ -650,12 +714,31 @@ class AgentMemoryManager:
                                 ) as del_resp:
                                     if del_resp.status == 200:
                                         logger.info(
-                                            "Cleared all memories from LightRAG (%d documents)",
+                                            "Deletion initiated for %d documents from LightRAG",
                                             len(doc_ids),
                                         )
-                                        results.append(
-                                            f"✅ Graph memory: All memories cleared successfully ({len(doc_ids)} documents)"
+
+                                        # Wait for pipeline to complete deletion
+                                        deletion_complete = await self._wait_for_pipeline_idle(
+                                            session, max_wait_seconds
                                         )
+
+                                        if deletion_complete:
+                                            logger.info(
+                                                "Cleared all memories from LightRAG (%d documents)",
+                                                len(doc_ids),
+                                            )
+                                            results.append(
+                                                f"✅ Graph memory: All memories cleared successfully ({len(doc_ids)} documents)"
+                                            )
+                                        else:
+                                            logger.warning(
+                                                "LightRAG deletion timed out after %d seconds",
+                                                max_wait_seconds,
+                                            )
+                                            results.append(
+                                                f"⚠️ Graph memory: Deletion initiated but timed out waiting for completion ({len(doc_ids)} documents)"
+                                            )
                                     else:
                                         error_text = await del_resp.text()
                                         logger.error(

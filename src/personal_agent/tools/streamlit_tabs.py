@@ -756,25 +756,27 @@ def render_memory_tab():
                 logger.debug(f"Could not retrieve user birth date: {e}")
 
             if memory_dates:
-                # Use user birth date as start date if available, otherwise use earliest memory date
-                if user_birth_date:
-                    default_start_date = user_birth_date
-                else:
-                    default_start_date = min(memory_dates)
+                # Always use the earliest memory date as start, and latest as end
+                # This ensures ALL memories are visible by default
+                default_start_date = min(memory_dates)
                 default_end_date = max(memory_dates)
+
+                # Extend end date to today if memories exist in the past
+                if default_end_date < datetime.now().date():
+                    default_end_date = datetime.now().date()
             else:
-                # Use user birth date if available, otherwise fallback to last 5 days
+                # No memory dates found - use a wide default range
+                # Start from user birth date if available, otherwise 1 year ago
                 if user_birth_date:
                     default_start_date = user_birth_date
-                    default_end_date = datetime.now().date()
                 else:
-                    # Fallback to last 5 days if no memories have dates and no birth date
-                    default_start_date = datetime.now().date() - timedelta(days=5)
-                    default_end_date = datetime.now().date()
+                    # Use 1 year ago as default to capture most memories
+                    default_start_date = datetime.now().date() - timedelta(days=365)
+                default_end_date = datetime.now().date()
 
         except Exception:
-            # Final fallback to last 5 days if there's an error
-            default_start_date = datetime.now().date() - timedelta(days=5)
+            # Final fallback to 1 year range if there's an error
+            default_start_date = datetime.now().date() - timedelta(days=365)
             default_end_date = datetime.now().date()
 
         date_range = st.date_input(
@@ -2035,6 +2037,7 @@ def render_sidebar():
             - `POST /api/v1/memory/store-url` - Store content from URL as memory
             - `GET /api/v1/memory/search?q=query` - Search memories
             - `GET /api/v1/memory/list` - List all memories
+            - `DELETE /api/v1/memory/clear` - Clear all memories (blocks until LightRAG pipeline completes)
             - `GET /api/v1/memory/stats` - Get memory statistics
 
             **Knowledge Endpoints:**
@@ -2053,6 +2056,9 @@ def render_sidebar():
             curl -X POST http://localhost:8001/api/v1/memory/store \\
               -H "Content-Type: application/json" \\
               -d '{"content": "I work at Google", "topics": ["work"]}'
+
+            # Clear all memories
+            curl -X DELETE http://localhost:8001/api/v1/memory/clear
 
             # Store knowledge from URL
             curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\
@@ -2099,6 +2105,7 @@ def render_sidebar():
             - `POST /api/v1/memory/store-url` - Store content from URL as memory
             - `GET /api/v1/memory/search?q=query` - Search memories
             - `GET /api/v1/memory/list` - List all memories
+            - `DELETE /api/v1/memory/clear` - Clear all memories (blocks until LightRAG pipeline completes)
             - `GET /api/v1/memory/stats` - Get memory statistics
 
             **Knowledge Endpoints:**
@@ -2117,6 +2124,9 @@ def render_sidebar():
             curl -X POST http://localhost:8001/api/v1/memory/store \\
               -H "Content-Type: application/json" \\
               -d '{"content": "I work at Google", "topics": ["work"]}'
+
+            # Clear all memories
+            curl -X DELETE http://localhost:8001/api/v1/memory/clear
 
             # Store knowledge from URL
             curl -X POST http://localhost:8001/api/v1/knowledge/store-url \\

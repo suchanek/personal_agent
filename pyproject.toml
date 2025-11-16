@@ -207,9 +207,9 @@ args = [
   { name = "category", options = ["-c", "--category"], help = "Fact category" }
 ]
 
-[tool.poe.tasks.memory-clean]
+[tool.poe.tasks.memory-clear]
 help = "Clean memory system"
-script = "src.personal_agent.tools.memory_cleaner:main"
+cmd = "python -m src.personal_agent.tools.memory_cleaner:main"
 
 [tool.poe.tasks.restart-lightrag]
 help = "Smart restart LightRAG server"
@@ -288,9 +288,6 @@ help = "Switch Ollama configuration"
 shell = "./switch-ollama.sh"
 
 # === Examples and Demos ===
-[tool.poe.tasks.demo-memory]
-help = "Run memory system demo"
-cmd = "python examples/15_memory_demo.py"
 
 [tool.poe.tasks.demo-team]
 help = "Run team demo"
@@ -345,11 +342,11 @@ cmd = "python registry-manager.py --rebuild --dry-run"
 # === Quick Start Tasks ===
 [tool.poe.tasks.quick-start]
 help = "Quick start for new users"
-sequence = ["mcp-setup", "demo-memory", "serve"]
+sequence = ["mcp-setup", "serve"]
 
 [tool.poe.tasks.full-demo]
 help = "Full system demonstration"
-sequence = ["mcp-setup", "demo-memory", "demo-team", "example-mcp"]
+sequence = ["mcp-setup", "demo-team", "example-mcp"]
 
 # === Documentation ===
 [tool.poe.tasks.docs]
