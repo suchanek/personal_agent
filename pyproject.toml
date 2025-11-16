@@ -209,7 +209,7 @@ args = [
 
 [tool.poe.tasks.memory-clear]
 help = "Clean memory system"
-cmd = "python -m src.personal_agent.tools.memory_cleaner:main"
+cmd = "python -m personal_agent.tools.memory_cleaner"
 
 [tool.poe.tasks.restart-lightrag]
 help = "Smart restart LightRAG server"
