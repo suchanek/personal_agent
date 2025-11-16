@@ -84,13 +84,18 @@ facts = [
     "Our Peanuts comic strip debuted on October 2, 1950 in seven U.S. newspapers.",
     "Charles M. Schulz created our world in Peanuts, which originated from his earlier strip called Li'l Folks.",
     "My signature zigzag pattern first appeared on my shirt on December 21, 1950.",
+    "Our first TV special, A Charlie Brown Christmas, premiered on December 9, 1965 and became an instant classic.",
+    "Our Peanuts strip was translated into 21 languages during Mr. Schulz's lifetime.",
+    "During my early years, I was more lighthearted and impish before becoming the dour defeatist everyone knows.",
+]
+
+# Problematic facts with heavy numerical/statistical content
+# These failed to encode in LightRAG - test individually after clearing memories
+problematic_facts = [
     "At its peak, our Peanuts strip ran in over 2,600 newspapers with a readership of 355 million people across 75 countries.",
     "The Peanuts comic strip was published for nearly 50 years with 17,897 strips in total.",
     "Charles M. Schulz drew every Peanuts strip himself, making it arguably the longest story ever told by one human being.",
     "The final Peanuts strip was published on February 13, 2000, the day after Mr. Schulz died.",
-    "Our first TV special, A Charlie Brown Christmas, premiered on December 9, 1965 and became an instant classic.",
-    "Our Peanuts strip was translated into 21 languages during Mr. Schulz's lifetime.",
-    "During my early years, I was more lighthearted and impish before becoming the dour defeatist everyone knows.",
 ]
 
 
@@ -123,12 +128,12 @@ def clear_memories():
 
 def main():
     # Clear all memories first (blocks until LightRAG pipeline completes)
-    if not clear_memories():
-        print("⚠️ Warning: Could not clear memories, continuing anyway...")
+    # if not clear_memories():
+    #    print("⚠️ Warning: Could not clear memories, continuing anyway...")
 
     print(f"\n📝 Injecting {len(facts)} Charlie Brown facts...\n")
 
-    for fact in facts[10:]:
+    for fact in facts:
         payload = {"content": fact, "topics": ["Peanuts", "Charlie Brown", "Friends"]}
         try:
             response = requests.post(MEMORY_STORE_URL, json=payload, timeout=10)
@@ -137,7 +142,7 @@ def main():
                     data = response.json()
                     if data.get("success") == "True":
                         print(
-                            f"Injected: {fact} | memory_id: {data.get('memory_id')} | message: {data.get('message')}"
+                            f"Injected: {fact} | memory_id: {data.get('memory_id')} | message: {data.get('message'):30}"
                         )
                     elif "error" in data:
                         print(f"Failed: {fact} | Error: {data['error']}")
