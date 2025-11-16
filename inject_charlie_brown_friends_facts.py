@@ -128,7 +128,7 @@ def main():
 
     print(f"\n📝 Injecting {len(facts)} Charlie Brown facts...\n")
 
-    for fact in facts[:10]:
+    for fact in facts:
         payload = {"content": fact, "topics": ["Peanuts", "Charlie Brown", "Friends"]}
         try:
             response = requests.post(MEMORY_STORE_URL, json=payload, timeout=10)
