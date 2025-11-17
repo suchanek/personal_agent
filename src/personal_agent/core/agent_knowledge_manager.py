@@ -1,8 +1,11 @@
 """
-Agent Knowledge Manager for the Personal AI Agent.
+Agent Fact Manager for the Personal AI Agent.
 
-This module provides a dedicated class for managing knowledge operations,
-extracted from the AgnoPersonalAgent class to improve modularity and maintainability.
+This module manages USER FACTS and PREFERENCES about the agent's user.
+It stores facts locally and optionally syncs them to the LightRAG Memory server (port 9622).
+
+IMPORTANT: Despite the historical name, this manages FACTS (not documents).
+For document ingestion, use KnowledgeTools with KnowledgeStorageManager.
 """
 
 import asyncio
@@ -19,13 +22,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AgentKnowledgeManager:
-    """Manages knowledge operations including storage, retrieval, and updates."""
-    
-    def __init__(self, user_id: str, storage_dir: str, 
-                 lightrag_url: Optional[str] = None, 
+class AgentFactManager:
+    """
+    Manages USER FACTS and PREFERENCES for the Personal AI Agent.
+
+    This class stores facts locally in JSON format and optionally syncs them
+    to the LightRAG Memory server (port 9622).
+
+    IMPORTANT: This manager handles FACTS about the user, NOT document ingestion.
+    For document/text/URL ingestion, use KnowledgeTools with KnowledgeStorageManager.
+
+    Sync Target: LightRAG Memory Server (port 9622), not Knowledge Server (port 9621)
+    """
+
+    def __init__(self, user_id: str, storage_dir: str,
+                 lightrag_url: Optional[str] = None,
                  lightrag_memory_url: Optional[str] = None):
-        """Initialize the knowledge manager.
+        """Initialize the fact manager.
         
         Args:
             user_id: User identifier for knowledge operations
@@ -397,14 +410,15 @@ class AgentKnowledgeManager:
             logger.error(f"Error clearing knowledge base: {e}")
             return False
             
-    async def sync_with_graph(self) -> str:
-        """Synchronize the local knowledge base with the graph database.
-        
-        This method syncs entities and relationships from the local knowledge base
-        to the LightRAG graph database.
-        
-        Returns:
-            Status message
+    async def sync_facts_to_memory(self) -> str:
+        """Synchronize local facts with the LightRAG Memory server (port 9622).
+
+        This method syncs entities and relationships from the local fact store
+        to the LightRAG Memory graph database.
+
+        Note: Renamed from sync_with_graph() for clarity about destination.
+
+        :return: Status message with sync results
         """
         if not self.lightrag_memory_url:
             return "Graph sync not available: LightRAG memory URL not configured"
@@ -590,20 +604,17 @@ class AgentKnowledgeManager:
             
     async def query_graph(self, query: str) -> Dict:
         """Query the graph database.
-        
-        Args:
-            query: Cypher query
-            
-        Returns:
-            Query results
+
+        :param query: Cypher query
+        :return: Query results
         """
         try:
             url = f"{self.lightrag_memory_url}/graph/query"
-            
+
             payload = {
                 "query": query
             }
-            
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=30) as resp:
                     if resp.status == 200:
@@ -615,3 +626,16 @@ class AgentKnowledgeManager:
         except Exception as e:
             logger.error(f"Error querying graph: {e}")
             return {"error": str(e)}
+
+    # Backward compatibility alias
+    async def sync_with_graph(self) -> str:
+        """
+        Deprecated: Use sync_facts_to_memory() instead.
+
+        This method is maintained for backward compatibility.
+        """
+        return await self.sync_facts_to_memory()
+
+
+# Backward compatibility alias
+AgentKnowledgeManager = AgentFactManager

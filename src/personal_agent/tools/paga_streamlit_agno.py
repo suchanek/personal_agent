@@ -117,8 +117,25 @@ import streamlit as st
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Robust sys.path handling that avoids issues with __file__ being unreliable after Streamlit reloads
+# Use a defensive approach: if we can already import personal_agent, don't modify sys.path
+try:
+    import personal_agent
+
+    # Successfully imported, no need to modify sys.path
+    logger.info("personal_agent module found, no sys.path modification needed.")
+except ImportError:
+    # If we can't import, try to add the src directory
+    try:
+        _current_file = Path(__file__).resolve()
+        # Validate the path to avoid using incorrect __file__ from module reloads
+        if "personal_agent" in str(_current_file):
+            _src_path = str(_current_file.parent.parent.parent)
+            if _src_path not in sys.path:
+                sys.path.insert(0, _src_path)
+    except Exception:
+        # If anything fails, just skip it - the imports below will handle it
+        pass
 
 from personal_agent import __version__
 from personal_agent.config import get_current_user_id

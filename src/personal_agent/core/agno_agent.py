@@ -72,10 +72,7 @@ from rich.table import Table
 
 from ..config import get_mcp_servers
 from ..config.runtime_config import get_config
-from ..config.settings import (
-    LOG_LEVEL,
-    SHOW_SPLASH_SCREEN,
-)
+from ..config.settings import LOG_LEVEL, SHOW_SPLASH_SCREEN
 from ..tools.knowledge_tools import KnowledgeTools
 
 # PersagMemoryTools is no longer used - memory functions are now standalone
@@ -87,7 +84,7 @@ from ..tools.personal_agent_tools import (
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
-from .agent_knowledge_manager import AgentKnowledgeManager
+from .agent_knowledge_manager import AgentFactManager
 from .agent_memory_manager import AgentMemoryManager
 from .agent_model_manager import AgentModelManager
 from .agent_tool_manager import AgentToolManager
@@ -100,6 +97,7 @@ from .agno_storage import (
 )
 from .docker_integration import ensure_docker_user_consistency
 from .knowledge_coordinator import create_knowledge_coordinator
+from .knowledge_manager import KnowledgeStorageManager
 from .semantic_memory_manager import MemoryStorageResult, MemoryStorageStatus
 from .user_manager import UserManager
 
@@ -192,7 +190,10 @@ class AgnoPersonalAgent(Agent):
         self.model_manager: Optional[AgentModelManager] = None
         self.instruction_manager: Optional[AgentInstructionManager] = None
         self.memory_manager: Optional[AgentMemoryManager] = None
-        self.knowledge_manager: Optional[AgentKnowledgeManager] = None
+        # Fact manager: stores user facts/preferences, syncs to Memory (9622)
+        self.fact_manager: Optional[AgentFactManager] = None
+        # Storage manager: handles document storage operations for Knowledge (9621)
+        self.storage_manager: Optional[KnowledgeStorageManager] = None
         self.tool_manager: Optional[AgentToolManager] = None
 
         # Initialize separate tool classes
@@ -391,11 +392,19 @@ class AgnoPersonalAgent(Agent):
             # Initialize the memory manager with the created agno_memory
             self.memory_manager.initialize(self.agno_memory)
 
-            self.knowledge_manager = AgentKnowledgeManager(
+            # Initialize fact manager: stores user facts/preferences, syncs to Memory (9622)
+            self.fact_manager = AgentFactManager(
                 self.user_id,
                 self.storage_dir,
                 config.lightrag_url,  # Use central config
                 config.lightrag_memory_url,  # Use central config
+            )
+
+            # Initialize storage manager: handles document storage for Knowledge (9621)
+            self.storage_manager = KnowledgeStorageManager(
+                self.user_id,
+                self.knowledge_dir,
+                config.lightrag_url,  # Use central config
             )
 
             self.tool_manager = AgentToolManager(self.user_id, self.storage_dir)
@@ -403,7 +412,7 @@ class AgnoPersonalAgent(Agent):
             # 6. Create tool instances (CRITICAL: Must be done after managers)
             if self.enable_memory:
                 self.knowledge_tools = KnowledgeTools(
-                    self.knowledge_manager, self.agno_knowledge
+                    self.storage_manager, self.agno_knowledge
                 )
                 # PersagMemoryTools is no longer used - memory functions are now standalone
                 self.memory_tools = None
@@ -550,7 +559,9 @@ class AgnoPersonalAgent(Agent):
             add_thought_callback("🚀 Executing agent...")
 
         # Use the proper pattern: call super().arun() with stream parameter (async version)
-        run_result = await super().arun(query, user_id=self.user_id, stream=stream, **kwargs)
+        run_result = await super().arun(
+            query, user_id=self.user_id, stream=stream, **kwargs
+        )
 
         if stream:
             # Return the stream directly for proper RunResponse handling
@@ -1161,9 +1172,13 @@ class AgnoPersonalAgent(Agent):
                 self.memory_manager = None
                 logger.debug("Cleared memory manager reference")
 
-            if self.knowledge_manager:
-                self.knowledge_manager = None
-                logger.debug("Cleared knowledge manager reference")
+            if self.fact_manager:
+                self.fact_manager = None
+                logger.debug("Cleared fact manager reference")
+
+            if self.storage_manager:
+                self.storage_manager = None
+                logger.debug("Cleared storage manager reference")
 
             if self.tool_manager:
                 self.tool_manager = None
@@ -1204,7 +1219,8 @@ class AgnoPersonalAgent(Agent):
             self.model_manager = None
             self.instruction_manager = None
             self.memory_manager = None
-            self.knowledge_manager = None
+            self.fact_manager = None
+            self.storage_manager = None
             self.tool_manager = None
 
             logger.debug("Synchronous cleanup completed successfully")
@@ -1213,9 +1229,7 @@ class AgnoPersonalAgent(Agent):
             logger.warning("Error during synchronous cleanup: %s", e)
 
     @classmethod
-    async def create_with_init(
-        cls, **kwargs
-    ) -> "AgnoPersonalAgent":
+    async def create_with_init(cls, **kwargs) -> "AgnoPersonalAgent":
         """Create and fully initialize an AgnoPersonalAgent.
 
         This is an async factory method that creates the agent and immediately

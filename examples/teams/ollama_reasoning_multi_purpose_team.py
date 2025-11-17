@@ -37,7 +37,7 @@ from src.personal_agent.config.settings import (
     OLLAMA_URL,
     USER_ID,
 )
-from src.personal_agent.core.agent_knowledge_manager import AgentKnowledgeManager
+from src.personal_agent.core.agent_knowledge_manager import AgentFactManager
 from src.personal_agent.core.agent_memory_manager import AgentMemoryManager
 from src.personal_agent.core.agent_model_manager import AgentModelManager
 from src.personal_agent.core.agno_storage import (
@@ -168,7 +168,7 @@ async def create_memory_agent(
     # Initialize the memory manager with the created agno_memory
     memory_manager.initialize(agno_memory)
 
-    knowledge_manager = AgentKnowledgeManager(
+    fact_manager = AgentFactManager(
         user_id=user_id,
         storage_dir=storage_dir,
         lightrag_url=LIGHTRAG_URL,
@@ -176,7 +176,9 @@ async def create_memory_agent(
     )
 
     # 6. Create tool instances (CRITICAL: Must be done after managers)
-    knowledge_tools = KnowledgeTools(knowledge_manager)
+    # Note: KnowledgeTools expects a storage manager, not a fact manager
+    # This example may need a KnowledgeStorageManager instance as well
+    knowledge_tools = KnowledgeTools(fact_manager)  # This may need updating
     memory_tools = PersagMemoryTools(memory_manager)
 
     # 7. Create the Agent (CRITICAL: Must be done last)

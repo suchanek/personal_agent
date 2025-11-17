@@ -92,7 +92,7 @@ Usage Patterns:
 Integration:
     - LightRAG: Requires LightRAG server running at configured endpoint
     - Semantic: Uses local Agno knowledge base for vector operations
-    - Coordinates with KnowledgeManager and KnowledgeCoordinator
+    - Coordinates with KnowledgeStorageManager and KnowledgeCoordinator
     - Supports both synchronous and asynchronous operations
     - Provides comprehensive logging and error reporting
 
@@ -114,11 +114,11 @@ Dependencies:
 Example Usage:
     ```python
     from personal_agent.tools.knowledge_tools import KnowledgeTools
-    from personal_agent.core.knowledge_manager import KnowledgeManager
+    from personal_agent.core.knowledge_manager import KnowledgeStorageManager
 
     # Initialize the tools
-    km = KnowledgeManager()
-    tools = KnowledgeTools(km, agno_knowledge=agno_kb)
+    storage_mgr = KnowledgeStorageManager()
+    tools = KnowledgeTools(storage_mgr, agno_knowledge=agno_kb)
 
     # Ingest into LightRAG knowledge base
     result = tools.ingest_knowledge_file("research_paper.pdf", "AI Research")
@@ -159,7 +159,7 @@ from bs4 import BeautifulSoup
 
 from ..config import settings
 from ..core.knowledge_coordinator import create_knowledge_coordinator
-from ..core.knowledge_manager import KnowledgeManager
+from ..core.knowledge_manager import KnowledgeStorageManager
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -183,8 +183,13 @@ class KnowledgeTools(Toolkit):
 
     """
 
-    def __init__(self, knowledge_manager: KnowledgeManager, agno_knowledge=None):
-        self.knowledge_manager = knowledge_manager
+    def __init__(self, storage_manager: KnowledgeStorageManager, agno_knowledge=None):
+        """Initialize Knowledge Tools.
+
+        :param storage_manager: Storage manager for document operations (targets port 9621)
+        :param agno_knowledge: Agno semantic knowledge base instance
+        """
+        self.storage_manager = storage_manager
         self.agno_knowledge = agno_knowledge
 
         # Initialize knowledge coordinator for unified querying
@@ -261,35 +266,31 @@ class KnowledgeTools(Toolkit):
             if mime_type and mime_type not in supported_types:
                 logger.warning(f"File type {mime_type} may not be fully supported")
 
-            # Copy file to knowledge directory
-            # Use knowledge_manager's knowledge_dir instead of static settings
-            knowledge_dir = self.knowledge_manager.knowledge_dir
-            knowledge_dir.mkdir(parents=True, exist_ok=True)
-
             # Create unique filename to avoid conflicts
             timestamp = int(time.time())
             file_hash = hashlib.md5(f"{filename}_{timestamp}".encode()).hexdigest()[:8]
             base_name, ext = os.path.splitext(filename)
             unique_filename = f"{base_name}_{file_hash}{ext}"
 
-            dest_path = knowledge_dir / unique_filename
+            # Copy to knowledge directory for local reference
+            knowledge_dir = self.storage_manager.knowledge_dir
+            knowledge_dir.mkdir(parents=True, exist_ok=True)
+            knowledge_path = knowledge_dir / unique_filename
+            shutil.copy2(file_path, knowledge_path)
+            log_debug(f"Copied file to knowledge directory: {knowledge_path}")
 
-            # Copy the file
-            shutil.copy2(file_path, dest_path)
-            log_debug(f"Copied file to knowledge directory: {dest_path}")
-
-            # Upload to LightRAG server
+            # Upload to LightRAG server - the endpoint will handle saving to inputs directory
             upload_result = self._upload_to_lightrag(
-                dest_path, unique_filename, settings.LIGHTRAG_URL
+                Path(file_path), unique_filename, settings.LIGHTRAG_URL
             )
 
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge file: {filename}")
                 return f"✅ Successfully ingested '{filename}' into knowledge base. {upload_result}"
             else:
-                # Clean up the copied file if upload failed
+                # Clean up the local copy if upload failed
                 try:
-                    os.remove(dest_path)
+                    os.remove(knowledge_path)
                 except OSError:
                     pass
                 return f"❌ Failed to ingest '{filename}': {upload_result}"
@@ -326,11 +327,6 @@ class KnowledgeTools(Toolkit):
             if file_type not in allowed_types:
                 file_type = ".txt"  # Default to txt
 
-            # Create knowledge directory
-            # Use knowledge_manager's knowledge_dir instead of static settings
-            knowledge_dir = self.knowledge_manager.knowledge_dir
-            knowledge_dir.mkdir(parents=True, exist_ok=True)
-
             # Create unique filename
             timestamp = int(time.time())
             content_hash = hashlib.md5(
@@ -342,26 +338,34 @@ class KnowledgeTools(Toolkit):
             safe_title = safe_title.replace(" ", "_")[:50]  # Limit length
             filename = f"{safe_title}_{content_hash}{file_type}"
 
-            file_path = knowledge_dir / filename
+            # Ensure filename doesn't contain path separators to prevent security issues
+            filename = (
+                filename.replace(os.sep, "_").replace("/", "_").replace("\\", "_")
+            )
+
+            # Create file in knowledge directory for local reference
+            knowledge_dir = self.storage_manager.knowledge_dir
+            knowledge_dir.mkdir(parents=True, exist_ok=True)
+            knowledge_path = knowledge_dir / filename
 
             # Write content to file
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(knowledge_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
-            log_debug(f"Created knowledge file: {file_path}")
+            log_debug(f"Created knowledge file: {knowledge_path}")
 
-            # Upload to LightRAG server
+            # Upload to LightRAG server - the endpoint will handle saving to inputs directory
             upload_result = self._upload_to_lightrag(
-                file_path, filename, settings.LIGHTRAG_URL
+                knowledge_path, filename, settings.LIGHTRAG_URL
             )
 
             if "✅" in upload_result:
                 logger.info(f"Successfully ingested knowledge text: {title}")
                 return f"✅ Successfully ingested '{title}' into knowledge base. {upload_result}"
             else:
-                # Clean up the created file if upload failed
+                # Clean up the local copy if upload failed
                 try:
-                    os.remove(file_path)
+                    os.remove(knowledge_path)
                 except OSError:
                     pass
                 return f"❌ Failed to ingest '{title}': {upload_result}"
@@ -859,7 +863,7 @@ class KnowledgeTools(Toolkit):
 
             # Copy file to semantic knowledge directory
             # Use knowledge_manager's knowledge_dir instead of static settings
-            semantic_knowledge_dir = self.knowledge_manager.knowledge_dir
+            semantic_knowledge_dir = self.storage_manager.knowledge_dir
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename to avoid conflicts
@@ -945,7 +949,7 @@ class KnowledgeTools(Toolkit):
 
             # Create semantic knowledge directory
             # Use knowledge_manager's knowledge_dir instead of static settings
-            semantic_knowledge_dir = self.knowledge_manager.knowledge_dir
+            semantic_knowledge_dir = self.storage_manager.knowledge_dir
             semantic_knowledge_dir.mkdir(parents=True, exist_ok=True)
 
             # Create unique filename

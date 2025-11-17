@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.8.76.dev] - 2025-11-17
+
+### Fixed
+- **Knowledge Ingestion File Path Handling**: Fixed critical issue where knowledge facts appeared to upload successfully but never appeared in LightRAG for processing. The root cause was that files were being pre-written to the Docker-mounted `inputs/` directory before uploading, causing LightRAG to mark them as "duplicated" and skip processing. The fix involves writing files only to the local `knowledge/` directory (for local semantic indexing) and allowing the LightRAG `/documents/upload` endpoint to handle file storage to `inputs/` independently. This eliminates the "duplicate file" error and allows the LightRAG processing pipeline to trigger correctly. The architectural insight is that knowledge files are primary storage (needed locally for indexing) while memory uses temporary files (stored in SQLite, temp files only for syncing). Multiple sequential knowledge ingestions now work reliably without conflicts. See [KNOWLEDGE_INGESTION_FILE_PATH_FIX.md](./refs/KNOWLEDGE_INGESTION_FILE_PATH_FIX.md) for complete analysis.
+
 ## [v0.8.76.dev] - 2025-11-15
 
 ### Changed

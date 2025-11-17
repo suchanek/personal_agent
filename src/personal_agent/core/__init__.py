@@ -1,9 +1,16 @@
 """Core package for Personal Agent."""
 
 from .agent import create_agent_executor
-from .agent_knowledge_manager import AgentKnowledgeManager
+from .agent_knowledge_manager import (
+    AgentFactManager,
+    AgentKnowledgeManager,  # Backward compatibility alias
+)
 from .agent_memory_manager import AgentMemoryManager
 from .agent_model_manager import AgentModelManager
+from .knowledge_manager import (
+    KnowledgeStorageManager,
+    KnowledgeManager,  # Backward compatibility alias
+)
 from .agno_agent import create_simple_personal_agent, load_agent_knowledge
 from .agno_storage import (
     create_agno_memory,
@@ -72,9 +79,12 @@ __all__ = [
     "create_simple_personal_agent",
     "load_agent_knowledge",
     # Agent managers
-    "AgentKnowledgeManager",
+    "AgentFactManager",  # New name
+    "AgentKnowledgeManager",  # Backward compatibility
     "AgentMemoryManager",
     "AgentModelManager",
+    "KnowledgeStorageManager",  # New name
+    "KnowledgeManager",  # Backward compatibility
     # Legacy smolagents exports removed - no longer used
     # "create_smolagents_executor",
     # "create_smolagents_model",

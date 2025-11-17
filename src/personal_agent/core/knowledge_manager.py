@@ -1,8 +1,13 @@
 """
-Knowledge Manager for Personal Agent.
+Knowledge Storage Manager for Personal Agent.
 
-This module provides centralized management of knowledge ingestion, storage, and retrieval
-operations, coordinating between the local file system and LightRAG server.
+This module provides file system and LightRAG server operations for document storage.
+It handles server health monitoring, document management, and local file operations.
+
+IMPORTANT: This manager handles DOCUMENT STORAGE and SERVER OPERATIONS, not fact management.
+For user facts and preferences, use AgentFactManager.
+
+Manages: LightRAG Knowledge Server (port 9621) and local knowledge directory
 """
 
 import asyncio
@@ -21,8 +26,22 @@ from ..utils import setup_logging
 logger = setup_logging(__name__)
 
 
-class KnowledgeManager:
-    """Manages knowledge operations including ingestion, storage, and retrieval."""
+class KnowledgeStorageManager:
+    """
+    Manages document storage operations for the Personal AI Agent.
+
+    This class provides:
+    - LightRAG server health monitoring and status checks
+    - Local knowledge directory file management
+    - Document tracking and deletion
+    - Pipeline status monitoring
+
+    IMPORTANT: This handles STORAGE OPERATIONS, not content ingestion or fact management.
+    - For document ingestion: Use KnowledgeTools
+    - For user facts: Use AgentFactManager
+
+    Targets: LightRAG Knowledge Server (port 9621) and local file system
+    """
 
     def __init__(
         self,
@@ -30,12 +49,11 @@ class KnowledgeManager:
         knowledge_dir: Optional[str] = None,
         lightrag_url: Optional[str] = None,
     ):
-        """Initialize the knowledge manager.
+        """Initialize the knowledge storage manager.
 
-        Args:
-            user_id: User identifier for knowledge operations
-            knowledge_dir: Directory for knowledge files (defaults to AGNO_KNOWLEDGE_DIR)
-            lightrag_url: URL for LightRAG API (defaults to LIGHTRAG_URL)
+        :param user_id: User identifier for knowledge operations
+        :param knowledge_dir: Directory for knowledge files (defaults to AGNO_KNOWLEDGE_DIR)
+        :param lightrag_url: URL for LightRAG API (defaults to LIGHTRAG_URL)
         """
         self.user_id = user_id
         self.knowledge_dir = Path(knowledge_dir or settings.AGNO_KNOWLEDGE_DIR)
@@ -368,3 +386,7 @@ class KnowledgeManager:
         except Exception as e:
             logger.error(f"Error validating knowledge sync: {e}")
             return {"error": str(e)}
+
+
+# Backward compatibility alias
+KnowledgeManager = KnowledgeStorageManager
