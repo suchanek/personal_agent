@@ -2236,8 +2236,8 @@ def render_knowledge_tab():
                                     break
 
                             if knowledge_tools:
-                                # Use the ingest_knowledge_file method
-                                result = knowledge_tools.ingest_knowledge_file(
+                                # Use the unified ingest_file method (includes semantic KB recreation)
+                                result = knowledge_tools.ingest_file(
                                     file_path=tmp_file_path, title=uploaded_file.name
                                 )
                                 results.append(f"**{uploaded_file.name}**: {result}")
@@ -2333,8 +2333,8 @@ def render_knowledge_tab():
                             break
 
                     if knowledge_tools:
-                        # Use the ingest_knowledge_text method
-                        result = knowledge_tools.ingest_knowledge_text(
+                        # Use the unified ingest_text method (includes semantic KB recreation)
+                        result = knowledge_tools.ingest_text(
                             content=knowledge_content,
                             title=knowledge_title,
                             file_type=file_type,
@@ -2414,8 +2414,8 @@ def render_knowledge_tab():
                                 break
 
                         if knowledge_tools:
-                            # Use the ingest_knowledge_from_url method
-                            result = knowledge_tools.ingest_knowledge_from_url(
+                            # Use the unified ingest_url method (includes semantic KB recreation)
+                            result = knowledge_tools.ingest_url(
                                 url=knowledge_url,
                                 title=url_title if url_title else None,
                             )

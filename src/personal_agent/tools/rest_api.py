@@ -630,7 +630,7 @@ class PersonalAgentRestAPI:
                     return jsonify({"error": "Knowledge tools not available"}), 503
 
                 # Store knowledge using unified method
-                result = knowledge_tools.ingest_knowledge_text(
+                result = knowledge_tools.ingest_text(
                     content, title, file_type
                 )
 
@@ -682,7 +682,7 @@ class PersonalAgentRestAPI:
                     return jsonify({"error": "Knowledge tools not available"}), 503
 
                 # Store knowledge from URL using unified method
-                result = knowledge_tools.ingest_knowledge_from_url(url, title)
+                result = knowledge_tools.ingest_url(url, title)
 
                 if "✅" in result:
                     logger.info(
