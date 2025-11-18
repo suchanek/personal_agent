@@ -284,33 +284,43 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
         return f"""
             ## CRITICAL MEMORY SYSTEM RULES - APPLIES TO ALL INSTRUCTION LEVELS
 
+            **⚠️ CRITICAL PARAMETER RULES - DO NOT IGNORE:**
+            - list_all_memories() takes NO PARAMETERS. Call with empty parentheses: list_all_memories()
+            - get_all_memories() takes NO PARAMETERS. Call with empty parentheses: get_all_memories()
+            - ❌ NEVER: list_all_memories(query=...), list_all_memories(limit=...), list_all_memories(anything)
+            - ❌ NEVER: get_all_memories(query=...), get_all_memories(limit=...), get_all_memories(anything)
+            - ✅ ONLY use query_memory(query, limit) when searching for specific memories
+            - If you accidentally pass parameters to list_all_memories/get_all_memories, the call will FAIL
+
             **FUNCTION SELECTION RULES:**
-            - Use list_all_memories for: summaries, overviews, quick lists, counts, general requests
-            - Use get_all_memories for: detailed content, full information, when explicitly asked for details
-            - Default to list_all_memories unless user specifically requests detailed information
-            - Always prefer concise responses (list_all_memories) unless details explicitly requested
+            - Use list_all_memories() for: summaries, overviews, quick lists, counts, general requests
+            - Use get_all_memories() for: detailed content, full information, when explicitly asked for details
+            - Use query_memory(query, limit) for: searching/filtering for specific memories
+            - Default to list_all_memories() unless user specifically requests detailed information
+            - Always prefer concise responses (list_all_memories()) unless details explicitly requested
 
             **PERFORMANCE-CRITICAL TOOL SELECTION:**
-            - "what do you know about me" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list everything you know" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "show me all memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "tell me everything" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "what have I told you" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list all my information" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list all memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list all memories stored" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "memory summary" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "how many memories" → `list_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "show detailed memories" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "get full memory details" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "complete memory information" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - "list detailed memory info" → `get_all_memories()` RIGHT NOW (NO PARAMETERS!)
-            - **CRITICAL: USE list_all_memories() FOR GENERAL LISTING - ONLY use get_all_memories() when details explicitly requested**
+            - "what do you know about me" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "list everything you know" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "show me all memories" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "tell me everything" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "what have I told you" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "list all my information" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "list all memories" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "list all memories stored" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "memory summary" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "how many memories" → `list_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "show detailed memories" → `get_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "get full memory details" → `get_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "complete memory information" → `get_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - "list detailed memory info" → `get_all_memories()` RIGHT NOW (EMPTY PARENTHESES!)
+            - **CRITICAL: DO NOT ADD PARAMETERS TO list_all_memories() OR get_all_memories()**
 
             **PATTERN MATCHING GUIDELINES:**
-            - Keywords for list_all_memories: 'list', 'show', 'what memories', 'how many', 'summary', 'stored'
-            - Keywords for get_all_memories: 'detailed', 'full', 'complete', 'everything about', 'all details'
-            - When in doubt, choose list_all_memories (more efficient and user-friendly)
+            - Keywords for list_all_memories(): 'list', 'show', 'what memories', 'how many', 'summary', 'stored'
+            - Keywords for get_all_memories(): 'detailed', 'full', 'complete', 'everything about', 'all details'
+            - Keywords for query_memory(): 'about', 'remember', 'search', 'find', 'specific', 'do you know about'
+            - When in doubt, choose list_all_memories() (more efficient and user-friendly)
 
             **SPECIFIC SEARCH QUERIES:**
             - "do you remember..." → `query_memory(query="specific keywords")` RIGHT NOW

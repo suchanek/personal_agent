@@ -717,26 +717,78 @@ class AgnoPersonalAgent(Agent):
 
         return await query_memory(self, query, limit)
 
-    async def list_all_memories(self) -> str:
+    async def list_all_memories(self, **kwargs) -> str:
         """List all memories in a simple, user-friendly format.
 
-        This method delegates to the standalone memory function.
+        ⚠️ IMPORTANT: This tool takes NO parameters. Use list_all_memories() with no arguments.
+        Do NOT pass query, limit, or any other parameters to this function.
+
+        This method delegates to the standalone memory function and returns a simplified,
+        formatted list of all stored memories without detailed metadata.
+
+        **Usage:** list_all_memories()
+
+        **Do NOT use:** list_all_memories(query=...), list_all_memories(limit=...)
+
+        Use query_memory(query, limit) instead if you need to search for specific memories.
 
         Returns:
             str: Simplified list of all memories
+
+        Raises:
+            ValueError: If any parameters are passed to this function
         """
+        # Validate that no parameters were passed
+        if kwargs:
+            invalid_params = ", ".join(kwargs.keys())
+            raise ValueError(
+                f"❌ ERROR: list_all_memories() does NOT accept parameters.\n"
+                f"Invalid parameters passed: {invalid_params}\n"
+                f"✅ Correct usage: list_all_memories() with NO parameters\n"
+                f"❌ Wrong usage: list_all_memories(query=...), list_all_memories(limit=...)\n"
+                f"\n"
+                f"If you need to SEARCH for specific memories, use query_memory(query, limit) instead.\n"
+                f"If you need detailed information, use get_all_memories() instead."
+            )
+
         from ..tools.memory_functions import list_all_memories
 
         return await list_all_memories(self)
 
-    async def get_all_memories(self) -> str:
+    async def get_all_memories(self, **kwargs) -> str:
         """Get all user memories with full details.
 
-        This method delegates to the standalone memory function.
+        ⚠️ IMPORTANT: This tool takes NO parameters. Use get_all_memories() with no arguments.
+        Do NOT pass query, limit, or any other parameters to this function.
+
+        This method returns a detailed, formatted list of ALL stored memories with full metadata
+        including timestamps, topics, and memory IDs.
+
+        **Usage:** get_all_memories()
+
+        **Do NOT use:** get_all_memories(query=...), get_all_memories(limit=...)
+
+        Use query_memory(query, limit) instead if you need to search for specific memories.
 
         Returns:
-            str: Formatted string of all memories
+            str: Formatted string of all memories with detailed information
+
+        Raises:
+            ValueError: If any parameters are passed to this function
         """
+        # Validate that no parameters were passed
+        if kwargs:
+            invalid_params = ", ".join(kwargs.keys())
+            raise ValueError(
+                f"❌ ERROR: get_all_memories() does NOT accept parameters.\n"
+                f"Invalid parameters passed: {invalid_params}\n"
+                f"✅ Correct usage: get_all_memories() with NO parameters\n"
+                f"❌ Wrong usage: get_all_memories(query=...), get_all_memories(limit=...)\n"
+                f"\n"
+                f"If you need to SEARCH for specific memories, use query_memory(query, limit) instead.\n"
+                f"If you need a quick list, use list_all_memories() instead (faster)."
+            )
+
         from ..tools.memory_functions import get_all_memories
 
         return await get_all_memories(self)

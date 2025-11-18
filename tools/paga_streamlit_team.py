@@ -413,40 +413,79 @@ def render_chat_tab():
                     team = st.session_state[SESSION_KEY_TEAM]
 
                     if team:
-                        # Use the standard agno Team arun method (async)
-                        response_obj = asyncio.run(team.arun(prompt, user_id=USER_ID))
-                        response = (
-                            response_obj.content
-                            if hasattr(response_obj, "content")
-                            else str(response_obj)
+                        # OPTIMIZATION: Memory query fast path bypass
+                        # Detects memory-specific queries and bypasses full team LLM inference
+                        # Reduces response time from ~40sec to ~1sec for memory queries
+                        # Note: Keywords are very specific to avoid false positives
+                        memory_keywords = [
+                            "list all memories",
+                            "list my memories",
+                            "show all memories",
+                            "show my memories",
+                            "what memories",
+                            "list memories",
+                            "all memories",
+                            "my memories",
+                        ]
+                        prompt_lower = prompt.lower().strip()
+                        is_memory_query = any(
+                            keyword in prompt_lower for keyword in memory_keywords
+                        ) and (
+                            # Additional check: prompt should be primarily about memories
+                            # Not a compound query like "memories and weather"
+                            prompt_lower.count("and") < 2 and prompt_lower.count(",") < 2
                         )
 
-                        # Extract tool call information from response
-                        if hasattr(response_obj, "messages") and response_obj.messages:
-                            for message in response_obj.messages:
-                                if (
-                                    hasattr(message, "tool_calls")
-                                    and message.tool_calls
-                                ):
-                                    tool_calls_made += len(message.tool_calls)
-                                    for tool_call in message.tool_calls:
-                                        tool_info = {
-                                            "name": getattr(
-                                                tool_call, "name", "unknown"
-                                            ),
-                                            "arguments": getattr(
-                                                tool_call, "input", {}
-                                            ),
-                                            "status": "success",
-                                        }
-                                        tool_call_details.append(tool_info)
-                                        all_tools_used.append(tool_call)
+                        # DEBUG: Log whether fast path is being triggered
+                        if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
+                            with st.container():
+                                st.caption(f"🔍 Memory Query Detection: {is_memory_query} | Prompt: '{prompt[:50]}...'")
 
-                        # Display tool calls if any
-                        if all_tools_used:
-                            display_tool_calls(tool_calls_container, all_tools_used)
+                        if is_memory_query:
+                            # Fast path: Direct memory retrieval without LLM inference
+                            memory_helper = st.session_state[SESSION_KEY_MEMORY_HELPER]
+                            response = memory_helper.list_all_memories()
+                            # Mark as fast path for metrics
+                            response_type = "MemoryFastPath"
+                        else:
+                            # Normal path: Full team inference for complex queries
+                            response_obj = asyncio.run(
+                                team.arun(prompt, user_id=USER_ID)
+                            )
+                            response = (
+                                response_obj.content
+                                if hasattr(response_obj, "content")
+                                else str(response_obj)
+                            )
+                            response_type = "PersonalAgentTeam"
+
+                            # Extract tool call information from response
+                            if hasattr(response_obj, "messages") and response_obj.messages:
+                                for message in response_obj.messages:
+                                    if (
+                                        hasattr(message, "tool_calls")
+                                        and message.tool_calls
+                                    ):
+                                        tool_calls_made += len(message.tool_calls)
+                                        for tool_call in message.tool_calls:
+                                            tool_info = {
+                                                "name": getattr(
+                                                    tool_call, "name", "unknown"
+                                                ),
+                                                "arguments": getattr(
+                                                    tool_call, "input", {}
+                                                ),
+                                                "status": "success",
+                                            }
+                                            tool_call_details.append(tool_info)
+                                            all_tools_used.append(tool_call)
+
+                            # Display tool calls if any
+                            if all_tools_used:
+                                display_tool_calls(tool_calls_container, all_tools_used)
                     else:
                         response = "Team not initialized properly"
+                        response_type = "Error"
 
                     # Display the final response
                     resp_container.markdown(response)
@@ -488,7 +527,7 @@ def render_chat_tab():
                         "total_tokens": round(total_tokens),
                         "tool_calls": tool_calls_made,
                         "tool_call_details": tool_call_details,
-                        "response_type": "PersonalAgentTeam",
+                        "response_type": response_type,
                         "success": True,
                     }
                     st.session_state[SESSION_KEY_DEBUG_METRICS].append(debug_entry)
@@ -498,7 +537,7 @@ def render_chat_tab():
                     # Display debug info if enabled
                     if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
                         with st.expander("🔍 **Team Debug Info**", expanded=False):
-                            st.write(f"**Response Type:** PersonalAgentTeam")
+                            st.write(f"**Response Type:** {response_type}")
                             st.write(f"**Tool Calls Made:** {tool_calls_made}")
                             st.write(f"**Response Time:** {response_time:.3f}s")
                             st.write(f"**Total Tokens:** {total_tokens:.0f}")

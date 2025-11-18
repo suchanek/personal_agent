@@ -201,13 +201,19 @@ def render_chat_tab():
                                         member_model,
                                     )
 
-                            # Use the standard agno Team arun method (async)
-                            logger.info(
-                                "🔍 DIAGNOSTIC: Running team query: %s", prompt[:50]
+                            # Use unified query handler for intelligent routing
+                            logger.info("🔍 DIAGNOSTIC: Running query through unified handler: %s", prompt[:50])
+
+                            from personal_agent.tools.query_handler import QueryHandler
+
+                            handler = QueryHandler(team)
+                            unified_response = asyncio.run(
+                                handler.handle_query(prompt, user_id=USER_DATA_DIR)
                             )
-                            response_obj = asyncio.run(
-                                team.arun(prompt, user_id=USER_DATA_DIR)
-                            )
+
+                            # Extract response object with proper structure
+                            response_obj = unified_response
+                            response_type = unified_response.response_type.value
 
                             # DIAGNOSTIC: Log response structure
                             logger.info(

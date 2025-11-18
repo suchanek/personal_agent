@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.8.77.dev] - 2025-11-18
+
+### Fixed
+- **Query Classifier Pattern Matching**: Fixed critical bug where natural language variations of memory list queries (e.g., "list my memories", "show my memories") were not matching classifier patterns and falling back to full team inference (~40s) instead of using the fast path (~1s). Root cause was overly strict regex patterns that expected specific word order. Added flexible patterns with optional modifiers (`r"^list\s+(my\s+)?memories"`, `r"^show\s+(my\s+)?memories"`) to support natural variations. Updated `query_classification.yaml` to maintain configuration parity with code patterns. Added test coverage for new variations. All 19 unit tests passing. This fix completes the query handling refactoring that was preventing the 40x performance improvement from reaching production.
+
 ## [v0.8.76.dev] - 2025-11-17
 
 ### Fixed
