@@ -43,6 +43,101 @@ from personal_agent.tools.streamlit_ui_components import (
 logger = logging.getLogger(__name__)
 
 
+# ========== ATOMIC TRANSACTION SUPPORT FOR CONFIG AND SESSION STATE ==========
+
+
+class ConfigStateTransaction:
+    """Atomic transaction wrapper for config and session state updates.
+
+    Ensures both config and session state are updated together, or both are
+    rolled back if initialization fails. This prevents desynchronization
+    between the PersonalAgentConfig singleton and Streamlit session state.
+    """
+
+    def __init__(self):
+        """Initialize transaction with current state snapshots."""
+        from personal_agent.config.runtime_config import get_config
+
+        self.config = get_config()
+        self.config_snapshot = self.config.snapshot()
+        self.session_snapshot = {
+            SESSION_KEY_CURRENT_MODEL: st.session_state.get(SESSION_KEY_CURRENT_MODEL),
+            SESSION_KEY_CURRENT_OLLAMA_URL: st.session_state.get(
+                SESSION_KEY_CURRENT_OLLAMA_URL
+            ),
+            SESSION_KEY_AGENT_MODE: st.session_state.get(SESSION_KEY_AGENT_MODE),
+            SESSION_KEY_MESSAGES: st.session_state.get(SESSION_KEY_MESSAGES, []).copy(),
+        }
+        self.success = False
+
+    def apply_config_changes(self, provider: str = None, model: str = None):
+        """Apply configuration changes within the transaction.
+
+        :param provider: New provider (optional)
+        :param model: New model (optional)
+        """
+        if provider:
+            self.config.set_provider(provider, auto_set_model=False)
+            logger.info(f"📝 Transaction: Config provider changed to {provider}")
+
+        if model:
+            self.config.set_model(model)
+            logger.info(f"📝 Transaction: Config model changed to {model}")
+
+    def apply_session_changes(self, **kwargs):
+        """Apply session state changes within the transaction.
+
+        Example:
+            transaction.apply_session_changes(
+                current_model="qwen3-4b-instruct",
+                current_ollama_url="http://localhost:1234"
+            )
+        """
+        session_key_map = {
+            "current_model": SESSION_KEY_CURRENT_MODEL,
+            "current_ollama_url": SESSION_KEY_CURRENT_OLLAMA_URL,
+            "agent_mode": SESSION_KEY_AGENT_MODE,
+            "messages": SESSION_KEY_MESSAGES,
+        }
+
+        for key, value in kwargs.items():
+            if key in session_key_map:
+                st.session_state[session_key_map[key]] = value
+                logger.info(f"📝 Transaction: Session {key} = {value}")
+
+    def mark_success(self):
+        """Mark transaction as successfully completed."""
+        self.success = True
+        logger.info("✅ Transaction committed successfully")
+
+    def rollback(self):
+        """Rollback config and session state to pre-transaction state."""
+        if self.success:
+            logger.info("⏭️  Transaction already committed, skipping rollback")
+            return
+
+        logger.warning("⏮️  Rolling back transaction...")
+        logger.warning(f"  Current config before rollback: provider={self.config.provider}, model={self.config.model}")
+        logger.warning(f"  Snapshot to restore: provider={self.config_snapshot.provider}, model={self.config_snapshot.model}")
+
+        # Restore config
+        self.config.restore_from_snapshot(self.config_snapshot)
+        logger.warning(
+            f"  Config rolled back: provider={self.config_snapshot.provider}, model={self.config_snapshot.model}"
+        )
+        logger.warning(f"  Config after restore: provider={self.config.provider}, model={self.config.model}")
+
+        # Restore session state
+        for key, value in self.session_snapshot.items():
+            st.session_state[key] = value
+            logger.warning(f"  Session state rolled back: {key}={value}")
+
+        logger.warning("⏮️  Rollback completed - all state restored")
+
+
+# ========== END ATOMIC TRANSACTION SUPPORT ==========
+
+
 def render_chat_tab():
     """Render the chat tab interface."""
     # Dynamic title based on mode
@@ -1337,6 +1432,11 @@ def render_sidebar():
         # Apply provider change
         if selected_provider != current_provider:
             if st.button(f"🔄 Switch to {selected_provider.title()}", type="primary"):
+                msg = f"🔄 Provider switch button clicked: {current_provider} → {selected_provider}"
+                logger.info(msg)
+                print(f"[PROVIDER_SWITCH] {msg}", flush=True)
+                st.write(f"🔄 Switching to {selected_provider.title()}...")
+
                 with st.spinner(
                     f"Switching to {selected_provider.title()} provider..."
                 ):
@@ -1350,13 +1450,30 @@ def render_sidebar():
                     new_default_model = config.model
                     new_url = config.get_effective_base_url()
 
-                    logger.info(
-                        f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}, URL: {new_url}"
-                    )
+                    msg = f"🔄 Switched provider to {selected_provider}, default model: {new_default_model}, URL: {new_url}"
+                    logger.info(msg)
+                    print(f"[PROVIDER_SWITCH] {msg}", flush=True)
+
+                    # VERIFY the config actually changed
+                    actual_provider = os.getenv("PROVIDER", "UNKNOWN")
+                    actual_model = os.getenv("LLM_MODEL", "UNKNOWN")
+                    config_provider = config.provider
+                    config_model = config.model
+                    msg2 = f"[VERIFY] Config: provider={config_provider}, model={config_model} | Env: PROVIDER={actual_provider}, LLM_MODEL={actual_model}"
+                    logger.info(msg2)
+                    print(msg2, flush=True)
 
                     # Clear available models cache to force refresh
                     if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
                         del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
+
+                    # CRITICAL: Clear cached team/agent so they get re-initialized with new provider
+                    if SESSION_KEY_TEAM in st.session_state:
+                        del st.session_state[SESSION_KEY_TEAM]
+                        print("[PROVIDER_SWITCH] Cleared cached team object", flush=True)
+                    if SESSION_KEY_AGENT in st.session_state:
+                        del st.session_state[SESSION_KEY_AGENT]
+                        print("[PROVIDER_SWITCH] Cleared cached agent object", flush=True)
 
                     # Update session state to match config
                     st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
@@ -1444,6 +1561,17 @@ def render_sidebar():
                 )
 
                 if model_changed or url_changed or provider_changed:
+                    # START ATOMIC TRANSACTION
+                    msg = f"🔄 TRANSACTION START: model_changed={model_changed}, url_changed={url_changed}, provider_changed={provider_changed}"
+                    logger.info(msg)
+                    print(f"[TRANSACTION] {msg}", flush=True)
+                    st.write(f"🔄 Starting transaction...")
+
+                    transaction = ConfigStateTransaction()
+                    msg2 = f"📸 Transaction snapshot taken: provider={transaction.config_snapshot.provider}, model={transaction.config_snapshot.model}"
+                    logger.info(msg2)
+                    print(f"[TRANSACTION] {msg2}", flush=True)
+
                     # CRITICAL: If provider is changing, update URL FIRST before any initialization
                     if provider_changed:
                         st.warning(
@@ -1499,165 +1627,262 @@ def render_sidebar():
                             new_ollama_url,
                         )
 
-                        # Handle provider switching if needed
-                        if provider_changed:
-                            logger.info(
-                                "🔄 PROVIDER CHANGE DETECTED: Switching from %s to %s for model %s",
-                                current_provider,
-                                detected_provider,
-                                selected_model,
-                            )
-
-                            # Update provider and get appropriate URL
-                            from personal_agent.tools.streamlit_config import (
-                                args,
-                                update_provider_and_reinitialize,
-                            )
-
-                            success, message, suggested_url = (
-                                update_provider_and_reinitialize(
+                        try:
+                            # Handle provider switching if needed
+                            if provider_changed:
+                                logger.info(
+                                    "🔄 PROVIDER CHANGE DETECTED: Switching from %s to %s for model %s",
+                                    current_provider,
                                     detected_provider,
                                     selected_model,
-                                    use_remote=args.remote,
                                 )
-                            )
 
-                            if success:
-                                st.info(f"🔄 {message}")
-                                # Use the suggested URL if different from user input
-                                if suggested_url and suggested_url != new_ollama_url:
-                                    logger.info(
-                                        "📡 Using provider-appropriate URL: %s",
-                                        suggested_url,
-                                    )
-                                    new_ollama_url = suggested_url
+                                # Update provider config within transaction
+                                transaction.apply_config_changes(
+                                    provider=detected_provider, model=selected_model
+                                )
 
-                                # Clear available models cache to force re-fetch from new provider
-                                if SESSION_KEY_AVAILABLE_MODELS in st.session_state:
-                                    del st.session_state[SESSION_KEY_AVAILABLE_MODELS]
-                                    logger.info(
-                                        "🔄 Cleared model cache - user should re-fetch models for new provider"
+                                # Update provider and get appropriate URL
+                                from personal_agent.tools.streamlit_config import (
+                                    args,
+                                    update_provider_and_reinitialize,
+                                )
+
+                                success, message, suggested_url = (
+                                    update_provider_and_reinitialize(
+                                        detected_provider,
+                                        selected_model,
+                                        use_remote=args.remote,
                                     )
+                                )
+
+                                if success:
+                                    st.info(f"🔄 {message}")
+                                    # Use the suggested URL if different from user input
+                                    if (
+                                        suggested_url
+                                        and suggested_url != new_ollama_url
+                                    ):
+                                        logger.info(
+                                            "📡 Using provider-appropriate URL: %s",
+                                            suggested_url,
+                                        )
+                                        new_ollama_url = suggested_url
+
+                                    # Clear available models cache to force re-fetch from new provider
+                                    if (
+                                        SESSION_KEY_AVAILABLE_MODELS
+                                        in st.session_state
+                                    ):
+                                        del st.session_state[
+                                            SESSION_KEY_AVAILABLE_MODELS
+                                        ]
+                                        logger.info(
+                                            "🔄 Cleared model cache - user should re-fetch models for new provider"
+                                        )
+                                else:
+                                    st.error(f"❌ Provider switch failed: {message}")
+                                    transaction.rollback()
+                                    return  # Exit early on provider switch failure
                             else:
-                                st.error(f"❌ Provider switch failed: {message}")
-                                return  # Exit early on provider switch failure
+                                # Just model/URL change, no provider change
+                                transaction.apply_config_changes(model=selected_model)
 
-                        st.session_state[SESSION_KEY_CURRENT_MODEL] = selected_model
-                        st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = (
-                            new_ollama_url
-                        )
-
-                        if current_mode == "team":
-                            logger.info(
-                                "🤖 TEAM REINIT: Reinitializing team with new model %s",
-                                selected_model,
-                            )
-                            # Reinitialize team with detected provider
-                            # Note: initialize_team() now uses get_config() for all settings
-                            from personal_agent.tools.streamlit_agent_manager import (
-                                initialize_team,
+                            # Update session state within transaction
+                            transaction.apply_session_changes(
+                                current_model=selected_model,
+                                current_ollama_url=new_ollama_url,
                             )
 
-                            st.session_state[SESSION_KEY_TEAM] = initialize_team(
-                                recreate=False
-                            )
+                            if current_mode == "team":
+                                msg = f"🤖 TEAM REINIT: Reinitializing team with new model {selected_model}"
+                                logger.info(msg)
+                                print(f"[TEAM_INIT] {msg}", flush=True)
+                                st.write(f"🔄 {msg}...")
 
-                            # Update helper classes with new team - use knowledge agent directly
-                            team = st.session_state[SESSION_KEY_TEAM]
-                            if hasattr(team, "members") and team.members:
-                                knowledge_agent = team.members[
-                                    0
-                                ]  # First member is the knowledge agent
+                                logger.info(f"🤖 Config at init time: provider={transaction.config.provider}, model={transaction.config.model}")
+                                print(f"[TEAM_INIT] Config: provider={transaction.config.provider}, model={transaction.config.model}", flush=True)
+
+                                # Reinitialize team with detected provider
+                                # Note: initialize_team() now uses get_config() for all settings
+                                from personal_agent.tools.streamlit_agent_manager import (
+                                    initialize_team,
+                                )
+
+                                msg = "🤖 Calling initialize_team()..."
+                                logger.info(msg)
+                                print(f"[TEAM_INIT] {msg}", flush=True)
+                                team = initialize_team(recreate=False)
+                                msg = f"🤖 initialize_team() returned: {team is not None}"
+                                logger.info(msg)
+                                print(f"[TEAM_INIT] {msg}", flush=True)
+
+                                if not team:
+                                    msg = "❌ Team initialization failed, rolling back transaction"
+                                    logger.error(msg)
+                                    print(f"[TEAM_INIT] {msg}", flush=True)
+                                    st.write(f"⚠️ {msg}")
+
+                                    logger.warning(f"  Before rollback: provider={transaction.config.provider}, model={transaction.config.model}")
+                                    print(f"[ROLLBACK] Before: provider={transaction.config.provider}, model={transaction.config.model}", flush=True)
+
+                                    transaction.rollback()
+
+                                    logger.warning(f"  After rollback: provider={transaction.config.provider}, model={transaction.config.model}")
+                                    print(f"[ROLLBACK] After: provider={transaction.config.provider}, model={transaction.config.model}", flush=True)
+
+                                    st.error(
+                                        "❌ Failed to initialize team. Rolling back provider/model changes."
+                                    )
+                                    logger.info("🔄 Triggering rerun to display rolled-back state...")
+                                    print("[ROLLBACK] Calling st.rerun()...", flush=True)
+                                    st.rerun()
+
+                                st.session_state[SESSION_KEY_TEAM] = team
+
+                                # Update helper classes with new team - use knowledge agent directly
+                                if hasattr(team, "members") and team.members:
+                                    knowledge_agent = team.members[
+                                        0
+                                    ]  # First member is the knowledge agent
+                                    from personal_agent.tools.streamlit_helpers import (
+                                        StreamlitKnowledgeHelper,
+                                        StreamlitMemoryHelper,
+                                    )
+
+                                    st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                        StreamlitMemoryHelper(knowledge_agent)
+                                    )
+                                    st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                        StreamlitKnowledgeHelper(knowledge_agent)
+                                    )
+                                else:
+                                    # Fallback: create with team object
+                                    from personal_agent.tools.streamlit_helpers import (
+                                        StreamlitKnowledgeHelper,
+                                        StreamlitMemoryHelper,
+                                    )
+
+                                    st.session_state[SESSION_KEY_MEMORY_HELPER] = (
+                                        StreamlitMemoryHelper(team)
+                                    )
+                                    st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
+                                        StreamlitKnowledgeHelper(team)
+                                    )
+
+                                success_msg = f"Team updated to use model: {selected_model}"
+                                logger.info("✅ TEAM UPDATE COMPLETE: %s", success_msg)
+                            else:
+                                logger.info(
+                                    "🧠 AGENT REINIT: Reinitializing agent with new model %s",
+                                    selected_model,
+                                )
+                                logger.info(f"🧠 Config at init time: provider={transaction.config.provider}, model={transaction.config.model}")
+                                # Reinitialize single agent with detected provider
+                                # Note: initialize_agent() now uses get_config() for all settings
+                                from personal_agent.tools.streamlit_agent_manager import (
+                                    initialize_agent,
+                                )
+
+                                logger.info("🧠 Calling initialize_agent()...")
+                                agent = initialize_agent(recreate=False)
+                                logger.info(f"🧠 initialize_agent() returned: {agent is not None}")
+
+                                if not agent:
+                                    logger.error(
+                                        "❌ Agent initialization failed, rolling back transaction"
+                                    )
+                                    logger.warning(f"  Before rollback: provider={transaction.config.provider}, model={transaction.config.model}")
+                                    transaction.rollback()
+                                    logger.warning(f"  After rollback: provider={transaction.config.provider}, model={transaction.config.model}")
+                                    st.error(
+                                        "❌ Failed to initialize agent. Rolling back provider/model changes."
+                                    )
+                                    logger.info("🔄 Triggering rerun to display rolled-back state...")
+                                    st.rerun()
+
+                                st.session_state[SESSION_KEY_AGENT] = agent
+
+                                # Update helper classes with new agent
                                 from personal_agent.tools.streamlit_helpers import (
                                     StreamlitKnowledgeHelper,
                                     StreamlitMemoryHelper,
                                 )
 
                                 st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                    StreamlitMemoryHelper(knowledge_agent)
+                                    StreamlitMemoryHelper(agent)
                                 )
                                 st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                    StreamlitKnowledgeHelper(knowledge_agent)
+                                    StreamlitKnowledgeHelper(agent)
+                                )
+
+                                success_msg = (
+                                    f"Agent updated to use model: {selected_model}"
+                                )
+                                logger.info("✅ AGENT UPDATE COMPLETE: %s", success_msg)
+
+                            # Clear messages on successful reinitialization
+                            transaction.apply_session_changes(messages=[])
+
+                            # MARK TRANSACTION AS SUCCESSFUL (prevents rollback on rerun)
+                            transaction.mark_success()
+                            msg = f"✅ Transaction marked as successful: provider={transaction.config.provider}, model={transaction.config.model}"
+                            logger.info(msg)
+                            print(f"[TRANSACTION] {msg}", flush=True)
+                            st.write(f"✅ Transaction committed successfully!")
+
+                            # Enhanced success message with provider info
+                            final_provider = os.getenv("PROVIDER", "ollama")
+                            provider_display = (
+                                final_provider.upper()
+                                if final_provider == "ollama"
+                                else (
+                                    "LM Studio"
+                                    if final_provider == "lm-studio"
+                                    else final_provider.title()
+                                )
+                            )
+                            enhanced_msg = (
+                                f"✅ {success_msg} using {provider_display} provider"
+                            )
+                            if provider_changed:
+                                enhanced_msg += (
+                                    f" (auto-switched from {current_provider})"
+                                )
+                                st.success(enhanced_msg)
+                                st.info(
+                                    "💡 **Tip**: After switching providers, click 'Fetch Available Models' to see models available in the new provider"
                                 )
                             else:
-                                # Fallback: create with team object
-                                from personal_agent.tools.streamlit_helpers import (
-                                    StreamlitKnowledgeHelper,
-                                    StreamlitMemoryHelper,
-                                )
+                                st.success(enhanced_msg)
 
-                                st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                    StreamlitMemoryHelper(team)
-                                )
-                                st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                    StreamlitKnowledgeHelper(team)
-                                )
+                            st.rerun()
 
-                            success_msg = f"Team updated to use model: {selected_model}"
-                            logger.info("✅ TEAM UPDATE COMPLETE: %s", success_msg)
-                        else:
-                            logger.info(
-                                "🧠 AGENT REINIT: Reinitializing agent with new model %s",
-                                selected_model,
-                            )
-                            # Reinitialize single agent with detected provider
-                            # Note: initialize_agent() now uses get_config() for all settings
-                            from personal_agent.tools.streamlit_agent_manager import (
-                                initialize_agent,
-                            )
+                        except Exception as e:
+                            msg = f"❌ Exception during model/provider update: {str(e)}"
+                            logger.error(msg)
+                            logger.error(f"Traceback: {__import__('traceback').format_exc()}")
+                            print(f"[EXCEPTION] {msg}", flush=True)
 
-                            st.session_state[SESSION_KEY_AGENT] = initialize_agent(
-                                recreate=False
+                            # ROLLBACK TRANSACTION ON ANY EXCEPTION
+                            logger.warning("🔄 Rolling back transaction due to exception...")
+                            print("[ROLLBACK] Exception detected, rolling back...", flush=True)
+                            st.write("⚠️ Exception during initialization, rolling back...")
+
+                            transaction.rollback()
+
+                            msg = f"✅ Rollback complete: provider={transaction.config.provider}, model={transaction.config.model}"
+                            logger.warning(msg)
+                            print(f"[ROLLBACK] {msg}", flush=True)
+
+                            st.error(
+                                f"❌ Failed to update model/provider. Rolling back changes: {str(e)}"
                             )
 
-                            # Update helper classes with new agent
-                            from personal_agent.tools.streamlit_helpers import (
-                                StreamlitKnowledgeHelper,
-                                StreamlitMemoryHelper,
-                            )
-
-                            st.session_state[SESSION_KEY_MEMORY_HELPER] = (
-                                StreamlitMemoryHelper(
-                                    st.session_state[SESSION_KEY_AGENT]
-                                )
-                            )
-                            st.session_state[SESSION_KEY_KNOWLEDGE_HELPER] = (
-                                StreamlitKnowledgeHelper(
-                                    st.session_state[SESSION_KEY_AGENT]
-                                )
-                            )
-
-                            success_msg = (
-                                f"Agent updated to use model: {selected_model}"
-                            )
-                            logger.info("✅ AGENT UPDATE COMPLETE: %s", success_msg)
-
-                        st.session_state[SESSION_KEY_MESSAGES] = []
-
-                        # Enhanced success message with provider info
-                        final_provider = os.getenv("PROVIDER", "ollama")
-                        provider_display = (
-                            final_provider.upper()
-                            if final_provider == "ollama"
-                            else (
-                                "LM Studio"
-                                if final_provider == "lm-studio"
-                                else final_provider.title()
-                            )
-                        )
-                        enhanced_msg = (
-                            f"✅ {success_msg} using {provider_display} provider"
-                        )
-                        if provider_changed:
-                            enhanced_msg += f" (auto-switched from {current_provider})"
-                            st.success(enhanced_msg)
-                            st.info(
-                                "💡 **Tip**: After switching providers, click 'Fetch Available Models' to see models available in the new provider"
-                            )
-                        else:
-                            st.success(enhanced_msg)
-
-                        st.rerun()
+                            # CRITICAL: Rerun to reflect rolled-back state in UI
+                            logger.info("🔄 Triggering rerun to display rolled-back state...")
+                            print("[ROLLBACK] Calling st.rerun()...", flush=True)
+                            st.rerun()
                 else:
                     st.info("Model and URL are already current")
         else:

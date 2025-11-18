@@ -815,6 +815,38 @@ class PersonalAgentConfig:
                 extra=self._extra.copy(),
             )
 
+    def restore_from_snapshot(self, snapshot: ConfigSnapshot):
+        """Restore configuration from a snapshot.
+
+        This is used for rollback operations when initialization fails.
+
+        :param snapshot: ConfigSnapshot to restore from
+        """
+        with self._config_lock:
+            self._user_id = snapshot.user_id
+            self._provider = snapshot.provider
+            self._model = snapshot.model
+            self._debug_mode = snapshot.debug_mode
+            self._use_remote = snapshot.use_remote
+            self._use_mcp = snapshot.use_mcp
+            self._enable_memory = snapshot.enable_memory
+            self._agent_mode = snapshot.agent_mode
+            self._instruction_level = snapshot.instruction_level
+            self._extra = snapshot.extra.copy()
+
+            # Update environment variables
+            os.environ["PROVIDER"] = self._provider
+            os.environ["LLM_MODEL"] = self._model
+            os.environ["DEBUG"] = "true" if self._debug_mode else "false"
+            os.environ["USE_MCP"] = "true" if self._use_mcp else "false"
+            os.environ["ENABLE_MEMORY"] = "true" if self._enable_memory else "false"
+
+            logger.info(
+                "Configuration restored from snapshot: provider=%s, model=%s",
+                self._provider,
+                self._model,
+            )
+
     def to_dict(self) -> Dict[str, Any]:
         """Export configuration as a dictionary.
 

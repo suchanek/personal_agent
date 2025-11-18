@@ -31,15 +31,32 @@ async def initialize_agent_async(recreate: bool = False):
     """
     # The agent's provider, model, user_id, etc., are now read directly from
     # the get_config() singleton within the agent's constructor.
-    return await AgnoPersonalAgent.create_with_init(recreate=recreate)
+    from personal_agent.config.runtime_config import get_config
+
+    config = get_config()
+    logger.info(f"Initialize agent async: provider={config.provider}, model={config.model}")
+
+    agent = await AgnoPersonalAgent.create_with_init(recreate=recreate)
+    logger.info(f"Agent async creation returned: {agent is not None}")
+    return agent
 
 
 def initialize_agent(recreate: bool = False):
     """Sync wrapper for agent initialization."""
     # The UI or CLI is responsible for setting the config state before this is called.
     # For example: `get_config().set_model("new-model-name")`
-    logger.info("Initializing agent based on central configuration...")
-    return asyncio.run(initialize_agent_async(recreate=recreate))
+    from personal_agent.config.runtime_config import get_config
+
+    config = get_config()
+    logger.info(f"Initializing agent sync: provider={config.provider}, model={config.model}, recreate={recreate}")
+
+    try:
+        agent = asyncio.run(initialize_agent_async(recreate=recreate))
+        logger.info(f"Agent sync initialization returned: {agent is not None}")
+        return agent
+    except Exception as e:
+        logger.error(f"❌ Exception during agent initialization: {e}", exc_info=True)
+        raise
 
 
 def _run_async_team_init(coro):
@@ -75,8 +92,10 @@ def initialize_team(recreate: bool = False):
 
     try:
         from personal_agent.tools.streamlit_config import args
+        from personal_agent.config.runtime_config import get_config
 
-        logger.info("Initializing team based on central configuration...")
+        config = get_config()
+        logger.info(f"Initializing team based on central configuration: provider={config.provider}, model={config.model}")
 
         # The create_personal_agent_team function now reads directly from the
         # get_config() singleton, so we no longer need to pass model, provider, etc.
@@ -88,6 +107,7 @@ def initialize_team(recreate: bool = False):
 
         if not team or not hasattr(team, "members") or not team.members:
             logger.error("Team creation failed or resulted in an empty team.")
+            logger.error(f"Team object: {team}, hasattr members: {hasattr(team, 'members') if team else 'N/A'}")
             st.error("❌ Team creation failed.")
             return None
 

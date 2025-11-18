@@ -474,9 +474,6 @@ def main():
     initialize_session_state(RECREATE_FLAG, SINGLE_FLAG)
     apply_custom_theme()
 
-    # Update global state with current session state for REST API access
-    update_global_state_from_streamlit(st.session_state)
-
     # Initialize REST API server AFTER session state is fully initialized
     if "rest_api_server" not in st.session_state:
         try:
@@ -492,13 +489,16 @@ def main():
             logger.error(f"Failed to start REST API server: {e}")
             # Don't fail the entire app if REST API fails to start
             st.session_state["rest_api_server"] = None
-    else:
-        # Update the REST API server with current session state (in case it changed)
-        api_server = st.session_state.get("rest_api_server")
-        if api_server:
-            api_server.set_streamlit_session(st.session_state)
-        # Also update global state on every run
-        update_global_state_from_streamlit(st.session_state)
+
+    # CONTINUOUS STATE SYNC: Update global state on EVERY Streamlit rerun
+    # This ensures REST API always has current config, model, and system state
+    api_server = st.session_state.get("rest_api_server")
+    if api_server:
+        api_server.set_streamlit_session(st.session_state)
+    update_global_state_from_streamlit(st.session_state)
+    logger.debug(
+        "🔄 Global state synced: Updated REST API with current Streamlit state"
+    )
 
     # Add power button to actual top banner using custom HTML/CSS
     st.markdown(
