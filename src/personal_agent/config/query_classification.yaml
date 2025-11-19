@@ -1,0 +1,65 @@
+# Query Classification Configuration
+#
+# This configuration controls how queries are classified into intents.
+# Update these patterns to customize query classification behavior.
+#
+# Date: 2025-11-18
+# Version: 1.0
+
+# Memory List Query Patterns
+# Queries matching these patterns will use the fast path (direct memory retrieval)
+# without invoking full LLM inference
+memory_list_patterns:
+  # Basic list commands
+  - r"^list\s+(all\s+)?memories"          # "list memories", "list all memories"
+  - r"^list\s+(my\s+)?memories"           # "list memories", "list my memories"
+  - r"^show\s+(all\s+)?memories"          # "show memories", "show all memories"
+  - r"^show\s+(my\s+)?memories"           # "show memories", "show my memories"
+
+  # Query variations
+  - r"^what\s+memories"                   # "what memories"
+  - r"^my\s+memories"                     # "my memories"
+  - r"^all\s+my\s+memories"               # "all my memories"
+  - r"^memories\s+list"                   # "memories list"
+
+# Memory Search Query Patterns
+# Queries matching these patterns will use memory search fast path
+memory_search_patterns:
+  - r"do\s+you\s+remember"                # "do you remember"
+  - r"what\s+do\s+you\s+know\s+about"     # "what do you know about"
+  - r"search\s+memories"                  # "search memories"
+  - r"find\s+memories"                    # "find memories"
+
+# Compound Query Indicators
+# Queries containing these connectors are classified as general queries
+# even if they match memory patterns (they need full team reasoning)
+compound_connectors:
+  - " and "
+  - " but "
+  - " also "
+  - ", then "
+  - ", also "
+  - " plus "
+
+# Confidence Thresholds
+# Minimum confidence scores required to use fast paths
+confidence_thresholds:
+  memory_list_fast_path: 0.95      # 95% confidence required
+  memory_search_fast_path: 0.85    # 85% confidence required
+
+# Classifier Settings
+classifier_settings:
+  strict_mode: true                # If true, require high confidence for fast paths
+  max_pattern_length: 100          # Maximum pattern string length
+
+# Metrics Settings
+metrics_settings:
+  collect_metrics: true            # Enable metrics collection
+  max_records: 1000                # Keep last 1000 query records
+  window_for_stats: 60             # Statistics window in minutes
+
+# Logging
+logging:
+  query_classification: true       # Log query classification results
+  fast_path_decisions: true        # Log fast path routing decisions
+  metrics_updates: false           # Log metrics updates (verbose)

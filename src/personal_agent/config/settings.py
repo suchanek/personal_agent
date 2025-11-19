@@ -352,6 +352,17 @@ def get_package_version():
         return "unknown"
 
 
+# Utility: Load query classification config
+def get_query_classification_config():
+    import yaml
+
+    config_path = os.path.join(os.path.dirname(__file__), "query_classification.yaml")
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Query classification config not found: {config_path}")
+    with open(config_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
 if __name__ == "__main__":
     from personal_agent.tools.show_config import show_config
 

@@ -3,6 +3,15 @@
 ## [v0.8.77.dev] - 2025-11-18
 
 ### Fixed
+- **UI Provider State**: Fixed a state desynchronization bug in the Streamlit UI where switching LLM providers (e.g., from Ollama to LM Studio) would not reliably update the application's backend. The system now uses a dedicated session state variable (`SESSION_KEY_CURRENT_PROVIDER`) as the single source of truth for the active provider, ensuring that model lists and agent initializations are always in sync with the user's selection. See [ADR-100](./refs/adr/100-streamlit-provider-state-management.md) for details.
+- **Auto-Scanning Models**: Enhanced the provider switching mechanism to automatically scan and update the available models list when a new provider is selected. This eliminates the need for manual refreshes and ensures the model dropdown is always populated with the latest available models for the current provider, improving user experience and reducing configuration errors.
+
+### Added
+- **External Query Classification Config**: Moved query classification patterns from hard-coded lists into a new, external `query_classification.yaml` file. This allows for easier tuning and maintenance of the memory query "fast path" logic without requiring code changes.
+
+## [v0.8.77.dev] - 2025-11-18
+
+### Fixed
 - **Query Classifier Pattern Matching**: Fixed critical bug where natural language variations of memory list queries (e.g., "list my memories", "show my memories") were not matching classifier patterns and falling back to full team inference (~40s) instead of using the fast path (~1s). Root cause was overly strict regex patterns that expected specific word order. Added flexible patterns with optional modifiers (`r"^list\s+(my\s+)?memories"`, `r"^show\s+(my\s+)?memories"`) to support natural variations. Updated `query_classification.yaml` to maintain configuration parity with code patterns. Added test coverage for new variations. All 19 unit tests passing. This fix completes the query handling refactoring that was preventing the 40x performance improvement from reaching production.
 
 ## [v0.8.76.dev] - 2025-11-17

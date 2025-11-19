@@ -19,6 +19,7 @@ SESSION_KEY_AGENT = "agent"
 SESSION_KEY_TEAM = "team"
 SESSION_KEY_AGENT_MODE = "agent_mode"  # "single" or "team"
 SESSION_KEY_DARK_THEME = "dark_theme"
+SESSION_KEY_CURRENT_PROVIDER = "current_provider"  # "ollama", "lm-studio", "openai"
 SESSION_KEY_CURRENT_MODEL = "current_model"
 SESSION_KEY_CURRENT_OLLAMA_URL = "current_ollama_url"
 SESSION_KEY_AVAILABLE_MODELS = "available_models"
@@ -41,6 +42,9 @@ def initialize_session_state(RECREATE_FLAG: bool, SINGLE_FLAG: bool):
         StreamlitKnowledgeHelper,
         StreamlitMemoryHelper,
     )
+
+    if SESSION_KEY_CURRENT_PROVIDER not in st.session_state:
+        st.session_state[SESSION_KEY_CURRENT_PROVIDER] = config.provider
 
     if SESSION_KEY_CURRENT_OLLAMA_URL not in st.session_state:
         st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = config.get_effective_base_url()

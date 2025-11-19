@@ -25,6 +25,7 @@ from personal_agent.tools.streamlit_session import (
     SESSION_KEY_AVAILABLE_MODELS,
     SESSION_KEY_CURRENT_MODEL,
     SESSION_KEY_CURRENT_OLLAMA_URL,
+    SESSION_KEY_CURRENT_PROVIDER,
     SESSION_KEY_DARK_THEME,
     SESSION_KEY_DEBUG_METRICS,
     SESSION_KEY_KNOWLEDGE_HELPER,
@@ -41,6 +42,29 @@ from personal_agent.tools.streamlit_ui_components import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def fetch_available_models_if_needed():
+    """Fetch available models if not already cached."""
+    if SESSION_KEY_AVAILABLE_MODELS not in st.session_state:
+        try:
+            from personal_agent.tools.streamlit_config import get_available_models
+
+            current_provider = st.session_state.get(SESSION_KEY_CURRENT_PROVIDER, "ollama")
+            current_url = st.session_state.get(SESSION_KEY_CURRENT_OLLAMA_URL, "")
+
+            logger.info(f"Auto-fetching models for provider {current_provider} at startup")
+            available_models = get_available_models(current_url, provider=current_provider)
+
+            if available_models:
+                st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
+                logger.info(f"Auto-fetched {len(available_models)} models at startup")
+            else:
+                logger.warning("No models found during auto-fetch at startup")
+                st.session_state[SESSION_KEY_AVAILABLE_MODELS] = []
+        except Exception as e:
+            logger.error(f"Error auto-fetching models at startup: {e}")
+            st.session_state[SESSION_KEY_AVAILABLE_MODELS] = []
 
 
 # ========== ATOMIC TRANSACTION SUPPORT FOR CONFIG AND SESSION STATE ==========
@@ -89,11 +113,13 @@ class ConfigStateTransaction:
 
         Example:
             transaction.apply_session_changes(
+                current_provider="lm-studio",
                 current_model="qwen3-4b-instruct",
                 current_ollama_url="http://localhost:1234"
             )
         """
         session_key_map = {
+            "current_provider": SESSION_KEY_CURRENT_PROVIDER,
             "current_model": SESSION_KEY_CURRENT_MODEL,
             "current_ollama_url": SESSION_KEY_CURRENT_OLLAMA_URL,
             "agent_mode": SESSION_KEY_AGENT_MODE,
@@ -1211,49 +1237,44 @@ def render_knowledge_status(knowledge_helper):
                 key="rag_server_dropdown",
             )
 
-            # Check if location changed and show apply button
-            location_changed = (
-                rag_location != st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]
-            )
+            # Always show apply button for update
+            if st.button(
+                "🔄 Apply & Rescan", key="apply_rag_server", type="primary"
+            ):
+                # Update session state
+                st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = rag_location
 
-            if location_changed:
-                if st.button(
-                    "🔄 Apply & Rescan", key="apply_rag_server", type="primary"
+                # Determine the new RAG URL
+                if rag_location == "localhost":
+                    new_rag_url = "http://localhost:9621"
+                else:  # 100.100.248.61
+                    new_rag_url = "http://100.100.248.61:9621"
+
+                # Trigger rescan on the server
+                with st.spinner(
+                    f"Updating to {rag_location} and triggering rescan..."
                 ):
-                    # Update session state
-                    st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] = rag_location
+                    try:
+                        import requests
 
-                    # Determine the new RAG URL
-                    if rag_location == "localhost":
-                        new_rag_url = "http://localhost:9621"
-                    else:  # 100.100.248.61
-                        new_rag_url = "http://100.100.248.61:9621"
-
-                    # Trigger rescan on the new server
-                    with st.spinner(
-                        f"Switching to {rag_location} and triggering rescan..."
-                    ):
-                        try:
-                            import requests
-
-                            rescan_response = requests.post(
-                                f"{new_rag_url}/documents/scan", timeout=10
+                        rescan_response = requests.post(
+                            f"{new_rag_url}/documents/scan", timeout=10
+                        )
+                        if rescan_response.status_code == 200:
+                            st.success(
+                                f"✅ Updated to {rag_location} and rescan initiated!"
                             )
-                            if rescan_response.status_code == 200:
-                                st.success(
-                                    f"✅ Switched to {rag_location} and rescan initiated!"
-                                )
-                            else:
-                                st.warning(
-                                    f"⚠️ Switched to {rag_location} but rescan failed (status: {rescan_response.status_code})"
-                                )
-                        except requests.exceptions.RequestException as e:
-                            st.error(
-                                f"❌ Failed to connect to {rag_location}: {str(e)}"
+                        else:
+                            st.warning(
+                                f"⚠️ Updated to {rag_location} but rescan failed (status: {rescan_response.status_code})"
                             )
+                    except requests.exceptions.RequestException as e:
+                        st.error(
+                            f"❌ Failed to connect to {rag_location}: {str(e)}"
+                        )
 
-                    # Force a rerun to update the status display
-                    st.rerun()
+                # Force a rerun to update the status display
+                st.rerun()
 
             # Determine the RAG URL based on current session state
             if st.session_state[SESSION_KEY_RAG_SERVER_LOCATION] == "localhost":
@@ -1321,10 +1342,9 @@ def render_knowledge_status(knowledge_helper):
                 st.caption(f"Request failed: {str(e)}")
 
             # Show current server info
-            if not location_changed:
-                st.caption(
-                    f"Current: {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
-                )
+            st.caption(
+                f"Current: {st.session_state[SESSION_KEY_RAG_SERVER_LOCATION]}"
+            )
 
         # Add debug information in an expander if debug mode is enabled
         if st.session_state.get(SESSION_KEY_SHOW_DEBUG, False):
@@ -1375,6 +1395,9 @@ def render_knowledge_status(knowledge_helper):
 def render_sidebar():
     """Render the sidebar with configuration and control options."""
     with st.sidebar:
+        # Auto-fetch models if needed at startup
+        fetch_available_models_if_needed()
+
         # Theme selector at the very top
         st.header("🎨 Theme")
         dark_mode = st.toggle(
@@ -1387,9 +1410,9 @@ def render_sidebar():
 
         st.header("Provider Selection")
 
-        # Provider selector
+        # Provider selector - read from session state
         available_providers = ["ollama", "lm-studio", "openai"]
-        current_provider = os.getenv("PROVIDER", "ollama")
+        current_provider = st.session_state.get(SESSION_KEY_CURRENT_PROVIDER, "ollama")
 
         selected_provider = st.selectbox(
             "Select AI Provider:",
@@ -1482,17 +1505,37 @@ def render_sidebar():
                         print("[PROVIDER_SWITCH] Cleared cached agent object", flush=True)
 
                     # Update session state to match config
+                    st.session_state[SESSION_KEY_CURRENT_PROVIDER] = selected_provider
                     st.session_state[SESSION_KEY_CURRENT_MODEL] = new_default_model
                     st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_url
                     logger.info(
-                        f"🔄 Updated session state: model={new_default_model}, url={new_url}"
+                        f"🔄 Updated session state: provider={selected_provider}, model={new_default_model}, url={new_url}"
                     )
 
-                    st.success(
-                        f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}"
-                    )
+                    # Auto-fetch models for the new provider
+                    try:
+                        from personal_agent.tools.streamlit_config import get_available_models
+
+                        logger.info(f"Auto-fetching models for new provider {selected_provider}")
+                        available_models = get_available_models(new_url, provider=selected_provider)
+                        if available_models:
+                            st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
+                            logger.info(f"Auto-fetched {len(available_models)} models for provider {selected_provider}")
+                            st.success(
+                                f"✅ Switched to {selected_provider.title()} provider with default model: {new_default_model}. Found {len(available_models)} available models."
+                            )
+                        else:
+                            st.warning(
+                                f"⚠️ Switched to {selected_provider.title()} provider but no models found. Check your connection."
+                            )
+                    except Exception as e:
+                        logger.error(f"Error auto-fetching models after provider switch: {e}")
+                        st.warning(
+                            f"⚠️ Switched to {selected_provider.title()} provider but failed to fetch models: {str(e)}"
+                        )
+
                     st.info(
-                        "💡 **Tip**: Click 'Fetch Available Models' to see models available in the new provider, then select and apply a model to reinitialize the agent/team."
+                        "💡 **Tip**: Models have been auto-fetched. Select and apply a model from the list above to reinitialize the agent/team."
                     )
                     st.rerun()
 
@@ -1515,18 +1558,18 @@ def render_sidebar():
         new_ollama_url = st.text_input(
             "**Provider URL:**", value=st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL]
         )
-        if st.button("🔄 Fetch Available Models"):
+        if st.button("🔄 Refresh Available Models"):
             with st.spinner("Fetching models..."):
                 from personal_agent.tools.streamlit_config import get_available_models
 
-                current_provider = os.getenv("PROVIDER", "ollama")
+                current_provider = st.session_state.get(SESSION_KEY_CURRENT_PROVIDER, "ollama")
                 available_models = get_available_models(
                     new_ollama_url, provider=current_provider
                 )
                 if available_models:
                     st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
                     st.session_state[SESSION_KEY_CURRENT_OLLAMA_URL] = new_ollama_url
-                    st.success(f"Found {len(available_models)} models!")
+                    st.success(f"Refreshed! Found {len(available_models)} models!")
                 else:
                     st.error("No models found or connection failed")
 
@@ -1555,10 +1598,21 @@ def render_sidebar():
                     get_appropriate_base_url,
                 )
 
-                detected_provider = detect_provider_from_model_name(selected_model)
-                current_provider = os.getenv("PROVIDER", "ollama")
+                current_provider = st.session_state.get(SESSION_KEY_CURRENT_PROVIDER, "ollama")
 
-                provider_changed = detected_provider != current_provider
+                # Only detect provider change if the selected model is NOT in the current available models list
+                # This prevents switching providers when selecting a model that was fetched for the current provider
+                available_models = st.session_state.get(SESSION_KEY_AVAILABLE_MODELS, [])
+                model_in_current_provider = selected_model in available_models
+
+                if not model_in_current_provider:
+                    detected_provider = detect_provider_from_model_name(selected_model)
+                    provider_changed = detected_provider != current_provider
+                else:
+                    # Model is in current provider's list, so no provider change needed
+                    detected_provider = current_provider  # Set for consistency
+                    provider_changed = False
+
                 model_changed = (
                     selected_model != st.session_state[SESSION_KEY_CURRENT_MODEL]
                 )
@@ -1675,7 +1729,7 @@ def render_sidebar():
                                         )
                                         new_ollama_url = suggested_url
 
-                                    # Clear available models cache to force re-fetch from new provider
+                                    # Clear available models cache and auto-fetch for new provider
                                     if (
                                         SESSION_KEY_AVAILABLE_MODELS
                                         in st.session_state
@@ -1683,9 +1737,22 @@ def render_sidebar():
                                         del st.session_state[
                                             SESSION_KEY_AVAILABLE_MODELS
                                         ]
-                                        logger.info(
-                                            "🔄 Cleared model cache - user should re-fetch models for new provider"
-                                        )
+    
+                                    # Auto-fetch models for the new provider
+                                    try:
+                                        from personal_agent.tools.streamlit_config import get_available_models
+    
+                                        logger.info(f"Auto-fetching models for detected provider {detected_provider}")
+                                        available_models = get_available_models(new_ollama_url, provider=detected_provider)
+                                        if available_models:
+                                            st.session_state[SESSION_KEY_AVAILABLE_MODELS] = available_models
+                                            logger.info(f"Auto-fetched {len(available_models)} models for provider {detected_provider}")
+                                        else:
+                                            logger.warning(f"No models found for provider {detected_provider}")
+                                            st.session_state[SESSION_KEY_AVAILABLE_MODELS] = []
+                                    except Exception as e:
+                                        logger.error(f"Error auto-fetching models for provider {detected_provider}: {e}")
+                                        st.session_state[SESSION_KEY_AVAILABLE_MODELS] = []
                                 else:
                                     st.error(f"❌ Provider switch failed: {message}")
                                     transaction.rollback()
@@ -1695,7 +1762,9 @@ def render_sidebar():
                                 transaction.apply_config_changes(model=selected_model)
 
                             # Update session state within transaction
+                            # Use detected_provider to ensure session state matches actual provider
                             transaction.apply_session_changes(
+                                current_provider=detected_provider,
                                 current_model=selected_model,
                                 current_ollama_url=new_ollama_url,
                             )
