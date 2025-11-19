@@ -4,6 +4,38 @@ A modern, production-ready personal AI assistant built with the Agno framework, 
 
 ## ✨ Latest Updates
 
+### v0.9.0 Major Release (November 2025)
+
+#### 🚀 Performance & Reliability
+- **40x Faster Memory Queries**: Intelligent query classification routes common operations through fast-path patterns
+- **Atomic Configuration Management**: Prevents UI breakage with rollback on failed changes
+- **Centralized Configuration**: Thread-safe singleton eliminates race conditions
+
+#### 🔄 Multi-Provider LLM Support
+- Native support for Ollama, OpenAI, and LM Studio with dynamic switching
+- 70+ pre-configured model profiles with standardized parameters
+
+#### 🧠 Enhanced Memory System
+- **Memory Confidence Scoring**: Visual indicators (🟢🟡🟠🔴) for memory quality tracking
+- **Proxy Agent Tracking**: Distinguish user vs agent-generated memories
+- **Dual-Storage Restatement**: Grammatically correct third-person conversion
+
+#### 🌐 Production-Ready REST API
+- Comprehensive programmatic access to memory, knowledge, and system endpoints
+- Enhanced health checks and global state management
+
+#### 🔧 Operational Improvements
+- **Robust Ollama Service**: macOS launchd background service with automatic startup
+- **First-Run Setup**: Interactive user profile creation script
+- **Non-Interactive Installation**: CI/CD-ready automated installer
+- **Granite 3.1 Standardization**: Apache 2.0 licensed models for LightRAG servers
+
+#### 👥 User Management Enhancements
+- Case-insensitive user management with automatic normalization
+- Configuration directory rebranded to `~/.persagent`
+
+For detailed release notes, see [RELEASE_NOTES_v0.9.0.md](RELEASE_NOTES_v0.9.0.md).
+
 ### Breaking Changes & Major Improvements (v0.8.76.dev - November 2025)
 
 #### 🧠 **Intelligent Memory Restatement with Proper Grammar**
