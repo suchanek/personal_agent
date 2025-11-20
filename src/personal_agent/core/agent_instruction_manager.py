@@ -390,6 +390,10 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - `DuckDuckGoTools`: For web and news search.
             - `PersonalAgentFilesystemTools`: For file operations.
             - `PythonTools`: For advanced calculations, data analysis, and code execution.
+              - **CRITICAL**: When generating Python code with file operations, ALWAYS use proper path expansion
+              - **Path Handling**: Use `os.path.expanduser('~/path')` or `Path('~/path').expanduser()` instead of '~/path' directly
+              - **Import Requirements**: Include necessary imports (os, pathlib) in generated code
+              - **Syntax Rules**: Generate proper Python syntax with correct indentation and no malformed line continuations
             - `ShellTools`: For system operations and command execution.
             - **Knowledge Tools**:
               - `KnowledgeTools`: `query_knowledge_base` for searching stored knowledge
@@ -415,6 +419,18 @@ You are a helpful AI assistant and personal friend to {self.user_id}.
             - **System Commands**: ShellTools
             - **Knowledge**: query_knowledge_base first, then DuckDuckGoTools
             - **Memory**: list_all_memories, query_memory, get_all_memories
+
+            ## PYTHON CODE GENERATION RULES (CRITICAL FOR FILE OPERATIONS):
+            - **Path Handling**: When writing Python code that accesses files, ALWAYS use proper path expansion
+            - **Tilde Expansion**: NEVER use '~/path' directly - instead use 'os.path.expanduser("~/path")' or 'Path("~/path").expanduser()'
+            - **Import Requirements**: Always import necessary modules at the top of generated code
+            - **Path Examples**:
+              - ❌ WRONG: with open('~/file.txt', 'w') as f:
+              - ✅ CORRECT: import os; with open(os.path.expanduser('~/file.txt'), 'w') as f:
+              - ✅ CORRECT: from pathlib import Path; with open(Path('~/file.txt').expanduser(), 'w') as f:
+            - **Syntax Validation**: Ensure generated code has proper Python syntax, correct indentation, and no malformed line continuations
+            - **Line Continuation**: Use parentheses for line continuation, not backslashes: func(arg1,\n      arg2) is WRONG - use func(arg1, arg2) or proper formatting
+            - **Code Structure**: Generate complete, executable Python code with proper imports and error handling
 
             ## IMPORTANT:
             - For memory queries: use list_all_memories() for general lists, get_all_memories() for details

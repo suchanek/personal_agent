@@ -231,10 +231,18 @@ def render_chat_tab():
                             logger.info("🔍 DIAGNOSTIC: Running query through unified handler: %s", prompt[:50])
 
                             from personal_agent.tools.query_handler import QueryHandler
+                            from personal_agent.config import get_current_user_id
 
                             handler = QueryHandler(team)
+                            current_user_id = get_current_user_id()
+                            
+                            # Debug: Check classification
+                            classification = handler.classifier.classify(prompt)
+                            logger.info(f"🔍 QUERY CLASSIFICATION: intent={classification.intent.value}, confidence={classification.confidence:.2f}, reason={classification.reason}")
+                            print(f"🔍 QUERY CLASSIFICATION: intent={classification.intent.value}, confidence={classification.confidence:.2f}, reason={classification.reason}", flush=True)
+                            
                             unified_response = asyncio.run(
-                                handler.handle_query(prompt, user_id=USER_DATA_DIR)
+                                handler.handle_query(prompt, user_id=current_user_id)
                             )
 
                             # Extract response object with proper structure

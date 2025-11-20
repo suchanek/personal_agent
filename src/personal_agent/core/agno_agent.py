@@ -51,16 +51,13 @@ Last revision: 2025-08-14 20:09:59
 """
 
 import asyncio
-import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Union
+import importlib.metadata
+from pprint import pprint
 
 import aiohttp
 from agno.agent import Agent, RunResponse
-from agno.models.openai import OpenAIChat
-from agno.tools.calculator import CalculatorTools
-from agno.tools.dalle import DalleTools
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.pubmed import PubmedTools
 from agno.tools.python import PythonTools
@@ -79,7 +76,6 @@ from ..tools.knowledge_tools import KnowledgeTools
 # from ..tools.persag_memory_tools import PersagMemoryTools
 from ..tools.personal_agent_tools import (
     PersonalAgentFilesystemTools,
-    PersonalAgentSystemTools,
 )
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
@@ -93,12 +89,10 @@ from .agno_storage import (
     create_agno_storage,
     create_combined_knowledge_base,
     load_combined_knowledge_base,
-    load_lightrag_knowledge_base,
 )
-from .docker_integration import ensure_docker_user_consistency
 from .knowledge_coordinator import create_knowledge_coordinator
 from .knowledge_manager import KnowledgeStorageManager
-from .semantic_memory_manager import MemoryStorageResult, MemoryStorageStatus
+from .semantic_memory_manager import MemoryStorageResult
 from .user_manager import UserManager
 
 # Configure logging
@@ -245,7 +239,8 @@ class AgnoPersonalAgent(Agent):
         )
 
         logger.info(
-            "Created AgnoPersonalAgent with model=%s, memory=%s, user_id=%s (lazy initialization=%s)",
+            "Created AgnoPersonalAgent with model=%s, memory=%s, user_id=%s "
+            "(lazy initialization=%s)",
             f"{self.model_provider}:{self.model_name}",
             self.enable_memory,
             self.user_id,
@@ -259,7 +254,7 @@ class AgnoPersonalAgent(Agent):
             )
             try:
                 # Try to get the current event loop
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we're in a running loop, we can't use asyncio.run()
                 logger.warning(
                     "Event loop detected - agent will initialize on first use"
@@ -314,7 +309,7 @@ class AgnoPersonalAgent(Agent):
         try:
             await self._ensure_initialized()
             return True
-        except Exception as e:
+        except (RuntimeError, ValueError, ConnectionError) as e:
             logger.error("Failed to initialize AgnoPersonalAgent: %s", e, exc_info=True)
             return False
 
@@ -442,7 +437,7 @@ class AgnoPersonalAgent(Agent):
                         analyst_recommendations=True,
                     ),
                     PythonTools(
-                        base_dir="/tmp",
+                        base_dir=Path("/tmp"),
                         run_code=True,
                         list_files=True,
                         run_files=True,
@@ -454,7 +449,7 @@ class AgnoPersonalAgent(Agent):
                     PubmedTools(),
                 ]
                 tools.extend(all_tools)
-                logger.info(f"Added {len(all_tools)} built-in tools")
+                logger.info("Added %d built-in tools", len(all_tools))
             else:
                 logger.info("alltools=False, only memory tools will be available")
 
@@ -524,15 +519,13 @@ class AgnoPersonalAgent(Agent):
 
             # Display splash screen if enabled
             if SHOW_SPLASH_SCREEN:
-                import importlib.metadata
-
                 agent_info = self.get_agent_info()
                 agent_version = importlib.metadata.version("personal-agent")
                 display_splash_screen(agent_info, agent_version)
 
             return True
 
-        except Exception as e:
+        except (RuntimeError, ValueError, ConnectionError, OSError) as e:
             logger.error("Failed to initialize AgnoPersonalAgent: %s", e, exc_info=True)
             return False
 
@@ -566,33 +559,32 @@ class AgnoPersonalAgent(Agent):
         if stream:
             # Return the stream directly for proper RunResponse handling
             return run_result
-        else:
-            # When stream=False, arun() returns a single RunResponse, not an iterator
-            self._last_response = run_result
-            content_parts = []
-            self._collected_tool_calls = []
+        # When stream=False, arun() returns a single RunResponse, not an iterator
+        self._last_response = run_result
+        content_parts = []
+        self._collected_tool_calls = []
 
-            # Extract content from the RunResponse
-            if hasattr(run_result, "content") and run_result.content:
-                content_parts.append(run_result.content)
+        # Extract content from the RunResponse
+        if hasattr(run_result, "content") and run_result.content:
+            content_parts.append(run_result.content)
 
-            # Join all content parts
-            content = "".join(content_parts)
+        # Join all content parts
+        content = "".join(content_parts)
 
-            # Extract tool calls from the final run_response using the proper pattern
-            if self.run_response and self.run_response.messages:
-                for message in self.run_response.messages:
-                    if message.role == "assistant" and message.tool_calls:
-                        self._collected_tool_calls.extend(message.tool_calls)
-                        if self.debug:
-                            logger.debug(f"Tool calls found: {message.tool_calls}")
+        # Extract tool calls from the final run_response using the proper pattern
+        if self.run_response and self.run_response.messages:
+            for message in self.run_response.messages:
+                if message.role == "assistant" and message.tool_calls:
+                    self._collected_tool_calls.extend(message.tool_calls)
+                    if self.debug:
+                        logger.debug("Tool calls found: %s", message.tool_calls)
 
-            if add_thought_callback:
-                add_thought_callback("✅ Agent execution complete.")
+        if add_thought_callback:
+            add_thought_callback("✅ Agent execution complete.")
 
-            # Validate and return content
-            validated_content = self._validate_response_content(content, query)
-            return validated_content
+        # Validate and return content
+        validated_content = self._validate_response_content(content, query)
+        return validated_content
 
     def get_last_tool_calls(self) -> List[Any]:
         """Get tool calls from the last agent run.
@@ -644,8 +636,6 @@ class AgnoPersonalAgent(Agent):
                     print(f"Tool calls: {message.tool_calls}")
                 print("---" * 5, "Metrics", "---" * 5)
                 if hasattr(message, "metrics") and message.metrics:
-                    from pprint import pprint
-
                     pprint(message.metrics)
                 else:
                     print("No metrics available for this message")
@@ -661,10 +651,8 @@ class AgnoPersonalAgent(Agent):
         Returns:
             Validated and potentially fixed content
         """
-        import re
-
         if not content or not content.strip():
-            logger.warning(f"Empty response for query: {query[:50]}...")
+            logger.warning("Empty response for query: %s...", query[:50])
 
             # Try to extract from response object attributes if available
             if self._last_response:
@@ -672,14 +660,13 @@ class AgnoPersonalAgent(Agent):
                     if hasattr(self._last_response, attr):
                         alt_content = getattr(self._last_response, attr)
                         if alt_content and str(alt_content).strip():
-                            logger.debug(f"Recovered content from {attr} attribute")
+                            logger.debug("Recovered content from %s attribute", attr)
                             return str(alt_content)
 
             # Generate a simple fallback based on query
             if any(greeting in query.lower() for greeting in ["hello", "hi", "hey"]):
                 return f"Hello {self.user_id}!"
-            else:
-                return "I'm here to help! What would you like to know?"
+            return "I'm here to help! What would you like to know?"
 
         return content
 
@@ -742,13 +729,14 @@ class AgnoPersonalAgent(Agent):
         if kwargs:
             invalid_params = ", ".join(kwargs.keys())
             raise ValueError(
-                f"❌ ERROR: list_all_memories() does NOT accept parameters.\n"
+                "❌ ERROR: list_all_memories() does NOT accept parameters.\n"
                 f"Invalid parameters passed: {invalid_params}\n"
-                f"✅ Correct usage: list_all_memories() with NO parameters\n"
-                f"❌ Wrong usage: list_all_memories(query=...), list_all_memories(limit=...)\n"
-                f"\n"
-                f"If you need to SEARCH for specific memories, use query_memory(query, limit) instead.\n"
-                f"If you need detailed information, use get_all_memories() instead."
+                "✅ Correct usage: list_all_memories() with NO parameters\n"
+                "❌ Wrong usage: list_all_memories(query=...), "
+                "list_all_memories(limit=...)\n\n"
+                "If you need to SEARCH for specific memories, use "
+                "query_memory(query, limit) instead.\n"
+                "If you need detailed information, use get_all_memories() instead."
             )
 
         from ..tools.memory_functions import list_all_memories
@@ -780,13 +768,14 @@ class AgnoPersonalAgent(Agent):
         if kwargs:
             invalid_params = ", ".join(kwargs.keys())
             raise ValueError(
-                f"❌ ERROR: get_all_memories() does NOT accept parameters.\n"
+                "❌ ERROR: get_all_memories() does NOT accept parameters.\n"
                 f"Invalid parameters passed: {invalid_params}\n"
-                f"✅ Correct usage: get_all_memories() with NO parameters\n"
-                f"❌ Wrong usage: get_all_memories(query=...), get_all_memories(limit=...)\n"
-                f"\n"
-                f"If you need to SEARCH for specific memories, use query_memory(query, limit) instead.\n"
-                f"If you need a quick list, use list_all_memories() instead (faster)."
+                "✅ Correct usage: get_all_memories() with NO parameters\n"
+                "❌ Wrong usage: get_all_memories(query=...), "
+                "get_all_memories(limit=...)\n\n"
+                "If you need to SEARCH for specific memories, use "
+                "query_memory(query, limit) instead.\n"
+                "If you need a quick list, use list_all_memories() instead (faster)."
             )
 
         from ..tools.memory_functions import get_all_memories
@@ -980,7 +969,7 @@ class AgnoPersonalAgent(Agent):
             final_url = f"{url}/query"
 
             logger.debug(
-                f"Querying LightRAG at {final_url} with params: {query_params}"
+                "Querying LightRAG at %s with params: %s", final_url, query_params
             )
 
             async with aiohttp.ClientSession() as session:
@@ -999,22 +988,23 @@ class AgnoPersonalAgent(Agent):
                             content = str(result)
 
                         if content and content.strip():
-                            logger.info(f"LightRAG query successful: {query[:50]}...")
+                            logger.info("LightRAG query successful: %s...", query[:50])
                             return content
-                        else:
-                            return f"🔍 No relevant knowledge found for '{query}'. Try different keywords or add more knowledge to your base."
-                    else:
-                        error_text = await response.text()
-                        logger.warning(
-                            f"LightRAG query failed with status {response.status}: {error_text}"
-                        )
-                        return f"❌ Error querying knowledge base (status {response.status}): {error_text}"
+                        return ("🔍 No relevant knowledge found for '{query}'. "
+                               "Try different keywords or add more knowledge to your base.")
+                    error_text = await response.text()
+                    logger.warning(
+                        "LightRAG query failed with status %s: %s",
+                        response.status, error_text
+                    )
+                    return ("❌ Error querying knowledge base "
+                           f"(status {response.status}): {error_text}")
 
         except aiohttp.ClientError as e:
-            logger.error(f"Error connecting to LightRAG server: {e}")
+            logger.error("Error connecting to LightRAG server: %s", e)
             return f"❌ Error connecting to knowledge base server: {str(e)}"
-        except Exception as e:
-            logger.error(f"Error querying LightRAG knowledge base: {e}")
+        except (ValueError, KeyError) as e:
+            logger.error("Error querying LightRAG knowledge base: %s", e)
             return f"❌ Error querying knowledge base: {str(e)}"
 
     def get_agent_info(self) -> Dict[str, Any]:
@@ -1050,7 +1040,7 @@ class AgnoPersonalAgent(Agent):
 
                 # Clean up docstring for display
                 if tool_doc:
-                    tool_doc = tool_doc.strip().split("\n")[0]  # First line only
+                    tool_doc = tool_doc.strip().split("\n", 1)[0]  # First line only
 
                 # Classify tool type
                 if tool_name.startswith("use_") and "_server" in tool_name:
@@ -1238,7 +1228,7 @@ class AgnoPersonalAgent(Agent):
 
             logger.debug("AgnoPersonalAgent cleanup completed successfully")
 
-        except Exception as e:
+        except (AttributeError, RuntimeError, OSError) as e:
             logger.warning("Error during AgnoPersonalAgent cleanup: %s", e)
 
     def sync_cleanup(self) -> None:
@@ -1277,7 +1267,7 @@ class AgnoPersonalAgent(Agent):
 
             logger.debug("Synchronous cleanup completed successfully")
 
-        except Exception as e:
+        except (AttributeError, RuntimeError, OSError) as e:
             logger.warning("Error during synchronous cleanup: %s", e)
 
     @classmethod
@@ -1329,8 +1319,6 @@ def create_simple_personal_agent(
     Returns:
         Tuple of (Agent instance, knowledge_base) or (Agent, None) if no knowledge
     """
-    from agno.knowledge.combined import CombinedKnowledgeBase
-
     config = get_config()
 
     # Use overrides or fall back to central config

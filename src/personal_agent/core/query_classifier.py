@@ -67,10 +67,14 @@ class QueryClassifier:
         r"^list\s+(my\s+)?memories",  # list memories, list my memories
         r"^show\s+(all\s+)?memories",  # show memories, show all memories
         r"^show\s+(my\s+)?memories",  # show memories, show my memories
+        r"^display\s+(all\s+)?memories",  # display memories, display all memories
+        r"^display\s+(my\s+)?memories",  # display memories, display my memories
         r"^what\s+memories",  # what memories
         r"^my\s+memories",  # my memories
         r"^all\s+my\s+memories",  # all my memories
         r"^memories\s+list",  # memories list
+        r"^get\s+(all\s+)?memories",  # get memories, get all memories
+        r"^get\s+(my\s+)?memories",  # get memories, get my memories
     ]
 
     # Default regex patterns for memory search queries
