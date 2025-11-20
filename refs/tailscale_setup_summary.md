@@ -22,7 +22,7 @@ We configured **Tailscale** on your Mac Mini (`tesla`) so you can securely acces
   ```bash
   sudo tailscale up --ssh
   ```
-- Result: `tesla` is visible in your tailnet and reachable by Tailscale IP (`100.100.248.61`).
+- Result: `tesla` is visible in your tailnet and reachable by Tailscale IP (`100.115.62.30`).
 
 ---
 
@@ -42,14 +42,14 @@ We configured **Tailscale** on your Mac Mini (`tesla`) so you can securely acces
 - Tailnet domain: `tail19187e.ts.net` (can be renamed to something cleaner).  
 - Hostname for Mac Mini:
   ```
-  100.100.248.61
+  100.115.62.30
   ```
 
 ---
 
 ### 5. DNS Resolution Issue
-- `dig @100.100.100.100 100.100.248.61` worked (MagicDNS functional).  
-- But `ping 100.100.248.61` failed → macOS/iPhone weren’t using Tailscale DNS.  
+- `dig @100.100.100.100 100.115.62.30` worked (MagicDNS functional).  
+- But `ping 100.115.62.30` failed → macOS/iPhone weren’t using Tailscale DNS.  
 - Cause: **Override local DNS** is a Premium feature (greyed out on Free plan).
 
 ---
@@ -69,23 +69,23 @@ We configured **Tailscale** on your Mac Mini (`tesla`) so you can securely acces
 2. Add `100.100.100.100`.  
 3. Toggle Airplane mode to refresh.
 
-Result: `100.100.248.61` resolves correctly.
+Result: `100.115.62.30` resolves correctly.
 
 ---
 
 ### 7. Access Methods
 - **SSH**:
   ```bash
-  ssh egs@100.100.248.61
+  ssh egs@100.115.62.30
   ```
 - **Web app** (example Streamlit):
   ```
-  http://100.100.248.61:8501
+  http://100.115.62.30:8501
   ```
 - **Fallback (by IP)**:
   ```
-  ssh egs@100.100.248.61
-  http://100.100.248.61:8501
+  ssh egs@100.115.62.30
+  http://100.115.62.30:8501
   ```
 
 ---
@@ -119,7 +119,7 @@ Result: `100.100.248.61` resolves correctly.
 
 ## ✅ Final State
 - `tesla` auto-joins Tailscale at boot (`brew services`).  
-- Reachable securely via `100.100.248.61` (or IP).  
+- Reachable securely via `100.115.62.30` (or IP).  
 - Accessible from iPhone and Kepler with manual DNS override.  
 - SSH hardened (keys only, no passwords).  
 - Web apps reachable inside tailnet without public exposure.

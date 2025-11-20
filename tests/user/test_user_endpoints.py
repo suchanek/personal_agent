@@ -19,7 +19,7 @@ if src_path not in sys.path:
     sys.path.insert(0, str(src_path))
 
 
-def test_list_users(base_url="http://100.100.248.61:8002"):
+def test_list_users(base_url="http://100.115.62.30:8002"):
     """Test GET /api/v1/users endpoint."""
     print("🧑 Testing GET /api/v1/users")
 
@@ -59,7 +59,7 @@ def test_list_users(base_url="http://100.100.248.61:8002"):
         return False
 
 
-def test_switch_user(base_url="http://100.100.248.61:8002"):
+def test_switch_user(base_url="http://100.115.62.30:8002"):
     """Test POST /api/v1/users/switch endpoint."""
     print("\n🔄 Testing POST /api/v1/users/switch")
 
@@ -121,7 +121,7 @@ def main():
     print("Personal Agent User Endpoints Test")
     print("=" * 40)
 
-    base_url = "http://100.100.248.61:8002"
+    base_url = "http://100.115.62.30:8002"
 
     # Test 1: List users
     list_ok = test_list_users(base_url)

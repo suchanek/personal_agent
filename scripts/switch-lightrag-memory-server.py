@@ -29,9 +29,9 @@ CONFIG = {
         "EMBEDDING_BINDING_HOST": "http://host.docker.internal:11434",
     },
     "remote": {
-        "OLLAMA_URL": "http://100.100.248.61:11434",
+        "OLLAMA_URL": "http://100.115.62.30:11434",
         "OLLAMA_DOCKER_URL": "http://host.docker.internal:11434",
-        "EMBEDDING_BINDING_HOST": "http://100.100.248.61:11434",
+        "EMBEDDING_BINDING_HOST": "http://100.115.62.30:11434",
     },
 }
 
@@ -198,7 +198,7 @@ def main():
         choices=["local", "remote", "status"],
         help=(
             "local   - Switch to local Ollama server (host.docker.internal)\n"
-            "remote  - Switch to remote Ollama server (100.100.248.61)\n"
+            "remote  - Switch to remote Ollama server (100.115.62.30)\n"
             "status  - Show the current configuration and service status"
         ),
     )

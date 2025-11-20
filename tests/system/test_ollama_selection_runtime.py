@@ -80,7 +80,7 @@ def test_ollama_selection_runtime():
     output = run_command_with_timeout(cmd)
 
     # Verify the remote Ollama message is in the output
-    if "Using remote Ollama at: http://100.100.248.61:11434" in output:
+    if "Using remote Ollama at: http://100.115.62.30:11434" in output:
         print(
             "\n✅ Successfully verified remote Ollama is used with --remote-ollama flag"
         )

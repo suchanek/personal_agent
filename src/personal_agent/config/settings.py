@@ -126,8 +126,8 @@ USE_WEAVIATE = get_env_bool("USE_WEAVIATE", False)
 
 INSTRUCTION_LEVEL = get_env_var("INSTRUCTION_LEVEL", "CONCISE")
 OLLAMA_URL = get_env_var("OLLAMA_URL", "http://localhost:11434")
-REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://100.100.248.61:11434")
-REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234")
+REMOTE_OLLAMA_URL = get_env_var("REMOTE_OLLAMA_URL", "http://100.115.62.30:11434")
+REMOTE_LMSTUDIO_URL = get_env_var("REMOTE_LMSTUDIO_URL", "http://100.115.62.30:1234")
 
 # LMStudio URL configuration - defaults to localhost LMStudio, can be overridden in .env
 LMSTUDIO_URL = get_env_var("LMSTUDIO_URL", "http://localhost:1234/v1")

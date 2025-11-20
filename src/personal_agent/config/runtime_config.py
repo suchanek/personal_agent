@@ -153,11 +153,11 @@ class PersonalAgentConfig:
             # Service URLs
             self._ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
             self._remote_ollama_url = os.getenv(
-                "REMOTE_OLLAMA_URL", "http://100.100.248.61:11434"
+                "REMOTE_OLLAMA_URL", "http://100.115.62.30:11434"
             )
             self._lmstudio_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234")
             self._remote_lmstudio_url = os.getenv(
-                "REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234"
+                "REMOTE_LMSTUDIO_URL", "http://100.115.62.30:1234"
             )
             self._openai_url = "https://api.openai.com/v1"
             self._lightrag_url = os.getenv("LIGHTRAG_URL", "http://localhost:9621")

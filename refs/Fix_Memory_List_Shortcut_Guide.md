@@ -50,7 +50,7 @@ Get Value for "memories" in Contents of URL
 
 ### Complete Fixed Workflow:
 
-1. **Get Contents of URL**: `http://100.100.248.61:8001/api/v1/memory/list`
+1. **Get Contents of URL**: `http://100.115.62.30:8001/api/v1/memory/list`
 2. **Get Value** for `"success"` in `Contents of URL`
 3. **If** `success` equals `true`
 4. **Get Value** for `"memories"` in `Contents of URL`

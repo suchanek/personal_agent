@@ -57,7 +57,7 @@ if [ -f ".env" ]; then
     
     if [[ "$current_url" == *"host.docker.internal"* ]]; then
         echo -e "  Mode: ${GREEN}LOCAL${NC}"
-    elif [[ "$current_url" == *"100.100.248.61"* ]]; then
+    elif [[ "$current_url" == *"100.115.62.30"* ]]; then
         echo -e "  Mode: ${GREEN}REMOTE${NC}"
     else
         echo -e "  Mode: ${YELLOW}CUSTOM${NC}"

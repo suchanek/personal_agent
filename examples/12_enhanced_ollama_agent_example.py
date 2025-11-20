@@ -55,14 +55,14 @@ class EnhancedOllamaAgent:
         # Create anti-duplicate memory
         self.memory = create_anti_duplicate_memory(
             db=self.memory_db,
-            model=Ollama(id=model_name, host="http://100.100.248.61:11434"),
+            model=Ollama(id=model_name, host="http://100.115.62.30:11434"),
             similarity_threshold=similarity_threshold,
             debug_mode=debug_mode,
         )
 
         # Create the agent
         self.agent = Agent(
-            model=Ollama(id=model_name, host="http://100.100.248.61:11434"),
+            model=Ollama(id=model_name, host="http://100.115.62.30:11434"),
             user_id=user_id,
             memory=self.memory,
             enable_user_memories=True,

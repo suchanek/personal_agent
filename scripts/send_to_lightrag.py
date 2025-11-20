@@ -107,8 +107,8 @@ def main():
     parser.add_argument("file_path", help="The path to the file to send.")
     parser.add_argument(
         "--remote-host",
-        default="100.100.248.61",
-        help="Optional: The hostname or IP address of the remote server for SCP transfer (default: 100.100.248.61).",
+        default="100.115.62.30",
+        help="Optional: The hostname or IP address of the remote server for SCP transfer (default: 100.115.62.30).",
     )
     parser.add_argument(
         "--remote-user",
@@ -122,8 +122,8 @@ def main():
     )
     parser.add_argument(
         "--remote-lightrag-url",
-        default="http://100.100.248.61:9621",
-        help="Optional: The URL of the remote LightRAG server API to trigger rescan (default: http://100.100.248.61:9621).",
+        default="http://100.115.62.30:9621",
+        help="Optional: The URL of the remote LightRAG server API to trigger rescan (default: http://100.115.62.30:9621).",
     )
     args = parser.parse_args()
 

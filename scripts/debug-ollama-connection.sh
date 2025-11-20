@@ -93,7 +93,7 @@ if [ $# -eq 0 ]; then
     echo -e "${BLUE}Usage: $0 <ollama-url>${NC}"
     echo "Examples:"
     echo "  $0 http://host.docker.internal:11434"
-    echo "  $0 http://100.100.248.61:11434"
+    echo "  $0 http://100.115.62.30:11434"
     echo "  $0 http://localhost:11434"
     exit 1
 fi

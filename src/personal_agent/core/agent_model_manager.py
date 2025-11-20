@@ -95,7 +95,7 @@ class AgentModelManager:
             if use_remote:
                 # Use remote LM Studio URL from settings
                 base_url = getattr(
-                    settings, "REMOTE_LMSTUDIO_URL", "http://100.100.248.61:1234"
+                    settings, "REMOTE_LMSTUDIO_URL", "http://100.115.62.30:1234"
                 )
                 logger.info("🌐 Using REMOTE LM Studio URL: %s", base_url)
             else:
@@ -142,7 +142,7 @@ class AgentModelManager:
             if use_remote:
                 # Use remote Ollama URL from settings
                 host_url = getattr(
-                    settings, "REMOTE_OLLAMA_URL", "http://100.100.248.61:11434"
+                    settings, "REMOTE_OLLAMA_URL", "http://100.115.62.30:11434"
                 )
                 logger.info("🌐 Using REMOTE Ollama URL: %s", host_url)
             else:

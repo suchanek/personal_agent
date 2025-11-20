@@ -16,7 +16,7 @@ We have decided to implement **Tailscale** as the solution for creating a secure
 1.  **Installation**: Tailscale was installed on the primary server (Mac Mini, hostname: `tesla`), the development machine (MacBook, hostname: `kepler`), and a mobile device (iPhone).
 2.  **Service Activation**: The Tailscale daemon (`tailscaled`) is configured to run as a service at boot on the server, ensuring the connection is always available.
 3.  **SSH Access**: Tailscale's built-in SSH functionality (`tailscale up --ssh`) was enabled, allowing direct, secure shell access to the server using its tailnet hostname.
-4.  **MagicDNS**: Tailscale's MagicDNS provides human-readable hostnames (e.g., `100.100.248.61`) for all devices in the tailnet, simplifying access to web services.
+4.  **MagicDNS**: Tailscale's MagicDNS provides human-readable hostnames (e.g., `100.115.62.30`) for all devices in the tailnet, simplifying access to web services.
 5.  **DNS Workaround**: Due to limitations in the free plan, a manual DNS override was configured on client devices (macOS, iPhone) to point to Tailscale's DNS server (`100.100.100.100`), enabling resolution of MagicDNS hostnames.
 6.  **Security Hardening**: Standard SSH security practices were enforced on the server, including disabling password-based authentication in favor of public key authentication.
 
