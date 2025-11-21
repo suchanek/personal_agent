@@ -297,11 +297,13 @@ class PersonalAgentFilesystemTools(Toolkit):
             if directory_lower in ["current directory", "current dir", "here", "this directory", "."]:
                 directory = "."
             elif directory_lower in ["home", "home directory", "home dir"]:
-                directory = "~"
-            
-            # Expand directory shortcuts
+                # Use patient's isolated home directory, not system user's home
+                directory = config.user_home_dir
+
+            # Expand directory shortcuts (only for system home ~, use config.user_home_dir instead)
             if directory.startswith("~/"):
-                directory = os.path.expanduser(directory)
+                # Replace ~ with user_home_dir for multi-user isolation
+                directory = directory.replace("~", config.user_home_dir, 1)
             elif directory.startswith("./") or directory == ".":
                 directory = os.path.abspath(directory)
 

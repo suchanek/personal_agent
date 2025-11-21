@@ -51,22 +51,23 @@ Both [`PersonalAgentFilesystemTools.create_and_save_file`](src/personal_agent/to
 - "home directory"
 - "home dir"
 
-### 2. Configuration Enhancement (Recommended Future Work)
+### 2. Configuration Enhancement (✅ Completed)
 
-Add a new property to [`PersonalAgentConfig`](src/personal_agent/config/runtime_config.py:107):
+Added a new property to [`PersonalAgentConfig`](src/personal_agent/config/runtime_config.py:695):
 
 ```python
 @property
 def user_home_dir(self) -> str:
     """Get the user-specific home directory (patient's isolated home).
-    
+
     This is distinct from home_dir which points to the system user's home.
     In a multi-user context, this ensures patient data isolation.
-    
+
     Returns:
         str: Path to user's isolated home directory
     """
-    return self.user_storage_dir  # /Users/Shared/.../agno/patient123/
+    with self._config_lock:
+        return self.user_storage_dir  # /Users/Shared/.../agno/patient123/
 ```
 
 ### 3. Documentation of Directory Semantics
@@ -82,16 +83,24 @@ The system now distinguishes between:
 
 ### Files Modified
 
-1. **`src/personal_agent/tools/personal_agent_tools.py`** (lines 294-300)
+1. **`src/personal_agent/config/runtime_config.py`**
+   - Added `user_home_dir` property at line 695
+   - Updated `ConfigSnapshot` dataclass to include `user_home_dir` field
+   - Updated `snapshot()` method to include `user_home_dir`
+   - Updated `to_dict()` method to export `user_home_dir`
+   - Enhanced `home_dir` property docstring to clarify it's for system-level operations
+
+2. **`src/personal_agent/tools/personal_agent_tools.py`** (lines 295-306)
    - Added natural language normalization in `create_and_save_file`
    - Maps "current directory" phrases to `.`
-   - Maps "home" phrases to `.` (temporary - should use `config.user_storage_dir`)
-   - Fixed type hint: `variable_to_return: str | None = None`
+   - Maps "home" phrases to `config.user_home_dir` (✅ Updated)
+   - Replaces `~` expansion with `config.user_home_dir` for multi-user isolation
 
-2. **`src/personal_agent/tools/filesystem.py`** (lines 352-365)
+3. **`src/personal_agent/tools/filesystem.py`** (lines 351-375)
    - Added path normalization for MCP-based file operations
    - Handles both directory and full path normalization
-   - Maps natural language to proper path shortcuts
+   - Maps "home" phrases to `config.user_home_dir` (✅ Updated)
+   - Replaces `~` expansion with `config.user_home_dir` for multi-user isolation
 
 3. **`FILESYSTEM_TOOLS_FIX.md`** (created)
    - Comprehensive documentation of the bug and fix
@@ -109,14 +118,13 @@ The system now distinguishes between:
 
 ### Negative
 
-- **Incomplete Solution**: The current fix maps "home" to `.` rather than the proper `user_storage_dir`
-- **Requires Follow-up**: Need to add `user_home_dir` property to `PersonalAgentConfig`
 - **Documentation Needed**: Users and developers need to understand the directory semantics
+- **Testing Required**: Need to verify the changes work correctly across all use cases
 
 ### Risks and Mitigations
 
 **Risk**: Using raw `~` expansion in multi-user context
-- **Mitigation**: Normalize "home" references to `config.user_storage_dir` instead of `~`
+- **Mitigation**: ✅ COMPLETED - All "home" references now map to `config.user_home_dir` instead of `~`
 
 **Risk**: Confusion between system home and patient home
 - **Mitigation**: Clear documentation and distinct property names (`home_dir` vs `user_home_dir`)
@@ -126,11 +134,12 @@ The system now distinguishes between:
 
 ## Future Work
 
-1. **Add `user_home_dir` property** to `PersonalAgentConfig` class
-2. **Update filesystem tools** to use `config.user_home_dir` instead of `~` for "home" normalization
+1. ~~**Add `user_home_dir` property** to `PersonalAgentConfig` class~~ ✅ COMPLETED
+2. ~~**Update filesystem tools** to use `config.user_home_dir` instead of `~` for "home" normalization~~ ✅ COMPLETED
 3. **Audit codebase** for raw `~` usage and replace with config-based paths
 4. **Add validation** to ensure patient files never escape their isolated directory
 5. **Document** the multi-user directory architecture in developer guides
+6. **Add unit tests** to verify natural language normalization and multi-user isolation
 
 ## Related ADRs
 
@@ -159,25 +168,38 @@ create_and_save_file(filename="monkey_poem.txt", directory="current directory")
 ### Normalization Logic
 
 ```python
-# In personal_agent_tools.py (lines 294-300)
+# In personal_agent_tools.py (lines 295-306)
 directory_lower = directory.lower().strip()
 if directory_lower in ["current directory", "current dir", "here", "this directory", "."]:
     directory = "."
 elif directory_lower in ["home", "home directory", "home dir"]:
-    directory = "~"  # TODO: Should be config.user_storage_dir
+    # Use patient's isolated home directory, not system user's home
+    directory = config.user_home_dir
 
-# In filesystem.py (lines 352-365)
+# Expand directory shortcuts (only for system home ~, use config.user_home_dir instead)
+if directory.startswith("~/"):
+    # Replace ~ with user_home_dir for multi-user isolation
+    directory = directory.replace("~", config.user_home_dir, 1)
+
+# In filesystem.py (lines 351-375)
+config = get_config()
+
 if "/" in file_path or "\\" in file_path:
     dir_part = os.path.dirname(file_path)
     file_part = os.path.basename(file_path)
-    
+
     dir_lower = dir_part.lower().strip()
     if dir_lower in ["current directory", "current dir", "here", "this directory"]:
         dir_part = "."
     elif dir_lower in ["home", "home directory", "home dir"]:
-        dir_part = "~"  # TODO: Should be config.user_storage_dir
-    
+        # Use patient's isolated home directory, not system user's home
+        dir_part = config.user_home_dir
+
     file_path = os.path.join(dir_part, file_part) if dir_part else file_part
+
+# Expand ~ to user_home_dir for multi-user isolation
+if file_path.startswith("~/"):
+    file_path = file_path.replace("~", config.user_home_dir, 1)
 ```
 
 ## Validation
@@ -208,6 +230,6 @@ For existing deployments with the literal `current directory/` folder:
 
 ---
 
-**Resolution Status:** ✅ PARTIAL - Natural language normalization implemented, `user_home_dir` property pending
-**Impact:** 🔧 CRITICAL BUG FIX - Prevents literal directory creation
-**Security:** ⚠️ FOLLOW-UP REQUIRED - Need to replace `~` with `user_storage_dir` for proper multi-user isolation
+**Resolution Status:** ✅ COMPLETE - Natural language normalization implemented, `user_home_dir` property added and integrated
+**Impact:** 🔧 CRITICAL BUG FIX - Prevents literal directory creation and ensures proper multi-user data isolation
+**Security:** ✅ RESOLVED - All `~` expansions now use `config.user_home_dir` for proper multi-user isolation

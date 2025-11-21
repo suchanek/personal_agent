@@ -84,6 +84,7 @@ class ConfigSnapshot:
     enable_memory: bool
     seed: Optional[int]
     home_dir: str
+    user_home_dir: str
     instruction_level: str
     user_storage_dir: str
     user_knowledge_dir: str
@@ -683,9 +684,26 @@ class PersonalAgentConfig:
 
     @property
     def home_dir(self) -> str:
-        """Get the home directory."""
+        """Get the system user's home directory (e.g., /Users/egs).
+
+        This is for system-level operations only. For patient data,
+        use user_home_dir instead.
+        """
         with self._config_lock:
             return self._home_dir
+
+    @property
+    def user_home_dir(self) -> str:
+        """Get the user-specific home directory (patient's isolated home).
+
+        This is distinct from home_dir which points to the system user's home.
+        In a multi-user context, this ensures patient data isolation.
+
+        Returns:
+            str: Path to user's isolated home directory
+        """
+        with self._config_lock:
+            return self.user_storage_dir
 
     @property
     def instruction_level(self) -> "InstructionLevel":
@@ -795,6 +813,7 @@ class PersonalAgentConfig:
                 enable_memory=self._enable_memory,
                 seed=self._seed,
                 home_dir=self._home_dir,
+                user_home_dir=self.user_home_dir,
                 instruction_level=self._instruction_level,
                 user_storage_dir=self.user_storage_dir,
                 user_knowledge_dir=self.user_knowledge_dir,
@@ -872,6 +891,7 @@ class PersonalAgentConfig:
             "enable_memory": snapshot.enable_memory,
             "seed": snapshot.seed,
             "home_dir": snapshot.home_dir,
+            "user_home_dir": snapshot.user_home_dir,
             "instruction_level": snapshot.instruction_level,
             "user_storage_dir": snapshot.user_storage_dir,
             "user_knowledge_dir": snapshot.user_knowledge_dir,

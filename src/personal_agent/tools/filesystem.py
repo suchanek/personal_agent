@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from langchain.tools import tool
 
 from ..config import DATA_DIR, HOME_DIR, USER_DATA_DIR, USE_MCP, USE_WEAVIATE
+from ..config.runtime_config import get_config
 
 if TYPE_CHECKING:
     from ..core.mcp_client import SimpleMCPClient
@@ -347,28 +348,31 @@ def create_and_save_file(
         return "MCP is disabled, cannot create file."
 
     try:
+        config = get_config()
+
         # Store original path for logging
         original_path = file_path
-        
+
         # Normalize natural language path references
         # Extract directory and filename if path contains common phrases
         if "/" in file_path or "\\" in file_path:
             dir_part = os.path.dirname(file_path)
             file_part = os.path.basename(file_path)
-            
+
             # Normalize directory part
             dir_lower = dir_part.lower().strip()
             if dir_lower in ["current directory", "current dir", "here", "this directory"]:
                 dir_part = "."
             elif dir_lower in ["home", "home directory", "home dir"]:
-                dir_part = "~"
-            
+                # Use patient's isolated home directory, not system user's home
+                dir_part = config.user_home_dir
+
             # Reconstruct path
             file_path = os.path.join(dir_part, file_part) if dir_part else file_part
 
-        # Expand ~ to actual home directory
+        # Expand ~ to user_home_dir for multi-user isolation
         if file_path.startswith("~/"):
-            file_path = os.path.expanduser(file_path)
+            file_path = file_path.replace("~", config.user_home_dir, 1)
 
         # Get directory path
         dir_path = os.path.dirname(file_path)

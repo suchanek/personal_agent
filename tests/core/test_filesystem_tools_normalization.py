@@ -345,19 +345,30 @@ class TestPathExpansionSecurity(unittest.TestCase):
         self.created_files.append(expected_path)
 
     def test_tilde_slash_expansion(self):
-        """Test that ~/ is properly expanded."""
+        """Test that ~/ is properly expanded to user_home_dir (not system home)."""
+        from personal_agent.config.runtime_config import get_config
+        config = get_config()
+
         result = self.tools.create_and_save_file(
             filename="test_tilde.txt",
             content="test",
             directory="~/"
         )
-        
+
         self.assertIn("Successfully", result)
-        
-        # File should be in user's home directory
-        expected_path = os.path.join(os.path.expanduser("~"), "test_tilde.txt")
-        self.assertTrue(os.path.exists(expected_path))
+
+        # File should be in user's home directory (patient's isolated home)
+        # NOT in system home directory
+        expected_path = os.path.join(config.user_home_dir, "test_tilde.txt")
+        self.assertTrue(os.path.exists(expected_path),
+            f"File should exist at {expected_path} (user_home_dir)")
         self.created_files.append(expected_path)
+
+        # Verify it's NOT in system home
+        system_home_path = os.path.join(os.path.expanduser("~"), "test_tilde.txt")
+        if system_home_path != expected_path:  # Only check if they're different
+            self.assertFalse(os.path.exists(system_home_path),
+                "File should NOT be in system home directory")
 
     def test_security_check_prevents_escape(self):
         """Test that security checks prevent directory traversal."""
