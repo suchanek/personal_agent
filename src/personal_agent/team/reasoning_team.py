@@ -101,6 +101,7 @@ import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
 from textwrap import dedent
 from typing import Optional
 
@@ -126,16 +127,7 @@ from personal_agent.team.team_instructions import TeamAgentInstructions
 try:
     # Try relative imports first (when used as a module)
     from ..cli.command_parser import CommandParser
-    from ..config.settings import (
-        HOME_DIR,
-        LLM_MODEL,
-        LMSTUDIO_URL,
-        OLLAMA_URL,
-        OPENAI_URL,
-        PROVIDER,
-        REMOTE_LMSTUDIO_URL,
-        REMOTE_OLLAMA_URL,
-    )
+    from ..config.settings import HOME_DIR, LLM_MODEL
     from ..config.user_id_mgr import get_userid
     from ..core.agent_model_manager import AgentModelManager
     from ..core.agno_agent import AgnoPersonalAgent
@@ -151,16 +143,7 @@ except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
     from personal_agent.cli.command_parser import CommandParser
-    from personal_agent.config.settings import (
-        HOME_DIR,
-        LLM_MODEL,
-        LMSTUDIO_URL,
-        OLLAMA_URL,
-        OPENAI_URL,
-        PROVIDER,
-        REMOTE_LMSTUDIO_URL,
-        REMOTE_OLLAMA_URL,
-    )
+    from personal_agent.config.settings import HOME_DIR, LLM_MODEL
     from personal_agent.config.user_id_mgr import get_userid
     from personal_agent.core.agent_model_manager import AgentModelManager
     from personal_agent.core.agno_agent import AgnoPersonalAgent
@@ -587,6 +570,11 @@ def create_agents(
     :param debug: Enable debug mode
     :param instruction_level: Instruction sophistication level for all agents
     """
+    try:
+        from ..config.runtime_config import get_config
+    except ImportError:
+        from personal_agent.config.runtime_config import get_config
+
     model = AgentModelManager.create_model_from_config()
 
     # Web search agent using Ollama
@@ -685,7 +673,9 @@ def create_agents(
         role="Create and Execute Python code",
         tools=[
             PythonTools(
-                base_dir=HOME_DIR,  # Use user home directory as base with string
+                base_dir=Path(
+                    get_config().user_data_dir
+                ),  # Dynamically get user data directory as Path
                 save_and_run=True,
                 run_files=True,
                 read_files=True,
@@ -705,12 +695,7 @@ def create_agents(
         model=model,
         role="Read and write files in the system",
         tools=[
-            FileTools(
-                base_dir=HOME_DIR,  # Use user home directory as base with string
-                save_files=True,
-                list_files=True,
-                search_files=True,
-            )
+            PersonalAgentFilesystemTools()
         ],
         instructions=TeamAgentInstructions.get_file_agent_instructions(
             instruction_level
@@ -722,10 +707,7 @@ def create_agents(
     return (
         web_agent,
         system_agent,
-        finance_agent,
         medical_agent,
-        image_agent,
-        python_agent,
         file_agent,
     )
 
@@ -773,7 +755,7 @@ def create_personalized_instructions(agent, base_instructions: list) -> list:
 
 
 async def create_memory_agent(
-    user_id: str = None,
+    user_id: Optional[str] = None,
     debug: bool = False,
     use_remote: bool = False,
     recreate: bool = False,
@@ -803,7 +785,6 @@ async def create_memory_agent(
     # Create AgnoPersonalAgent with the new simplified constructor.
     # The agent will pull its provider, model, etc., from the central config.
     # We only need to pass overrides or operational flags.
-    from ..core.agent_instruction_manager import InstructionLevel
 
     memory_agent = AgnoPersonalAgent(
         enable_memory=True,
@@ -820,18 +801,13 @@ async def create_memory_agent(
     # Wait for initialization to complete
     await memory_agent._ensure_initialized()
 
-    # Create personalized instructions using the user's name if available
-    personalized_instructions = create_personalized_instructions(
-        memory_agent, _memory_specific_instructions
-    )
-    # memory_agent.instructions = personalized_instructions
 
     logger.info("✅ Memory agent created with STANDARD instructions")
     return memory_agent
 
 
 async def create_memory_writer_agent(
-    user_id: str = None,
+    user_id: Optional[str] = None,
     debug: bool = False,
     use_remote: bool = False,
     recreate: bool = False,
@@ -909,10 +885,7 @@ async def create_team(
     (
         web_agent,
         system_agent,
-        finance_agent,
         medical_agent,
-        image_agent,
-        python_agent,
         file_agent,
     ) = agents
 
@@ -928,10 +901,7 @@ async def create_team(
             memory_agent,  # Memory agent with your managers
             web_agent,
             system_agent,  # SystemAgent for shell commands
-            finance_agent,
-            image_agent,  # Image creation agent
             medical_agent,
-            python_agent,
             file_agent,
         ],
         instructions=[
@@ -958,11 +928,7 @@ async def create_team(
             "SIMPLE DELEGATION RULES:",
             "- Memory/personal info → Personal AI Agent (ONE call only per task)",
             "- Web searches → Web Agent",
-            "- Financial data → Finance Agent",
-            "- Math/calculations → Calculator Agent",
-            "- Images → Image Agent",
-            "- Code/Python → Python Agent",
-            "- Files → File System Agent",
+            "- Reading and Writing Files → File System Agent",
             "- System commands → SystemAgent",
             "- Medical info → Medical Agent",
             "",
@@ -1187,6 +1153,7 @@ async def main(
     console.print(f"🔍 DEBUG: OLLAMA_URL={settings.OLLAMA_URL}")
     console.print(f"🔍 DEBUG: REMOTE_OLLAMA_URL={settings.REMOTE_OLLAMA_URL}")
 
+    team = None
     try:
         # Create the team
         team = await create_team(
@@ -1202,7 +1169,11 @@ async def main(
             for member in team.members:
                 member_name = getattr(member, "name", "Unknown")
                 logger.debug("🔍 Checking member: %s", member_name)
-                if hasattr(member, "name") and "Personal-Agent" in member.name:
+                if (
+                    hasattr(member, "name")
+                    and member.name
+                    and "Personal-Agent" in member.name
+                ):
                     memory_agent = member
                     logger.info("✅ Found memory agent: %s", member.name)
                     break

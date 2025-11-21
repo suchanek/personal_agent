@@ -14,12 +14,13 @@ from agno.tools import Toolkit
 from agno.utils.log import log_debug
 
 from ..config import DATA_DIR, HOME_DIR
+from ..config.runtime_config import get_config
 from ..utils import setup_logging
 
 logger = setup_logging(__name__)
-
+config = get_config()
 # Global allowed directories for security checks
-ALLOWED_DIRS = [HOME_DIR, DATA_DIR, "/tmp", ".", "/"]
+ALLOWED_DIRS = [config.home_dir, config.user_data_dir, "/tmp", ".", "/"]
 
 
 class PersonalAgentFilesystemTools(Toolkit):
@@ -41,7 +42,7 @@ class PersonalAgentFilesystemTools(Toolkit):
         list_directory: bool = True,
         create_and_save_file: bool = True,
         intelligent_file_search: bool = True,
-        base_dir: str = str(Path(HOME_DIR)),
+        base_dir: str = config.home_dir,
         **kwargs,
     ):
         tools: List[Any] = []
@@ -208,7 +209,7 @@ class PersonalAgentFilesystemTools(Toolkit):
             )
             return f"Error writing file: {str(e)}"
 
-    def list_directory(self, directory_path: str = HOME_DIR) -> str:
+    def list_directory(self, directory_path: str = config.home_dir) -> str:
         """List contents of a directory.
 
         Args:
@@ -276,7 +277,7 @@ class PersonalAgentFilesystemTools(Toolkit):
         content: str,
         directory: str = "./",
         overwrite: bool = True,
-        variable_to_return: str = None,
+        variable_to_return: str | None = None,
     ) -> str:
         """Create a new file with content in specified directory.
 
@@ -291,10 +292,17 @@ class PersonalAgentFilesystemTools(Toolkit):
             Success message with full path or error message.
         """
         try:
+            # Normalize natural language directory references
+            directory_lower = directory.lower().strip()
+            if directory_lower in ["current directory", "current dir", "here", "this directory", "."]:
+                directory = "."
+            elif directory_lower in ["home", "home directory", "home dir"]:
+                directory = "~"
+            
             # Expand directory shortcuts
             if directory.startswith("~/"):
                 directory = os.path.expanduser(directory)
-            elif directory.startswith("./"):
+            elif directory.startswith("./") or directory == ".":
                 directory = os.path.abspath(directory)
 
             # Create full file path

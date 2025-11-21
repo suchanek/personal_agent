@@ -1,0 +1,32 @@
+fix: normalize natural language directory references in filesystem tools
+
+Fixed critical bug where natural language directory references like "current
+directory" were interpreted literally as directory names instead of path
+shortcuts. When asked to save a file to "current directory", the system
+would create a directory named "current directory/" instead of using the
+actual current working directory.
+
+Changes:
+- Added natural language normalization to PersonalAgentFilesystemTools
+- Added normalization to MCP-based filesystem tools
+- Normalize "current directory"/"here"/"this directory" → "."
+- Normalize "home"/"home directory" → "~"
+- Fixed type hint: variable_to_return: str | None = None
+- Added comprehensive test suite with 19 test classes
+- Created ADR-101 documenting multi-user directory architecture
+- Added FILESYSTEM_TOOLS_FIX.md technical summary
+
+Files modified:
+- src/personal_agent/tools/personal_agent_tools.py (lines 280, 294-300)
+- src/personal_agent/tools/filesystem.py (lines 352-365)
+- tests/core/test_filesystem_tools_normalization.py (new, comprehensive)
+- tests/tools/test_personal_agent_tools.py (new, general coverage)
+- refs/adr/101-user-home-directory-normalization.md (new)
+- FILESYSTEM_TOOLS_FIX.md (new)
+- CHANGELOG.md (v0.8.79.dev entry)
+
+This fix ensures filesystem tools correctly interpret natural language
+directory references, preventing accidental literal directory creation
+and improving user experience with file operations.
+
+See ADR-101 and FILESYSTEM_TOOLS_FIX.md for complete details.

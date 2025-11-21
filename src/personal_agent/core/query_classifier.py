@@ -29,6 +29,7 @@ class QueryIntent(Enum):
     MEMORY_SEARCH = "memory_search"
     KNOWLEDGE_SEARCH = "knowledge_search"
     GENERAL = "general"
+    MULTI_STEP = "multi_step"
 
 
 @dataclass
@@ -125,8 +126,12 @@ class QueryClassifier:
 
     def _compile_patterns(self):
         """Compile regex patterns for better performance."""
-        self.compiled_memory_list = [re.compile(p, re.IGNORECASE) for p in self.memory_list_patterns]
-        self.compiled_memory_search = [re.compile(p, re.IGNORECASE) for p in self.memory_search_patterns]
+        self.compiled_memory_list = [
+            re.compile(p, re.IGNORECASE) for p in self.memory_list_patterns
+        ]
+        self.compiled_memory_search = [
+            re.compile(p, re.IGNORECASE) for p in self.memory_search_patterns
+        ]
 
     def classify(self, query: str) -> ClassifierResult:
         """Classify a query into an intent category.
@@ -161,7 +166,9 @@ class QueryClassifier:
             )
 
         # Strategy 3: Check for memory search intent
-        matched_pattern = self._matches_patterns(query_lower, self.compiled_memory_search)
+        matched_pattern = self._matches_patterns(
+            query_lower, self.compiled_memory_search
+        )
         if matched_pattern:
             return ClassifierResult(
                 intent=QueryIntent.MEMORY_SEARCH,
@@ -186,7 +193,10 @@ class QueryClassifier:
         result = self.classify(query)
 
         # Use fast path for high-confidence memory list queries
-        if result.intent == QueryIntent.MEMORY_LIST and result.confidence >= self.confidence_threshold:
+        if (
+            result.intent == QueryIntent.MEMORY_LIST
+            and result.confidence >= self.confidence_threshold
+        ):
             return True
 
         return False
@@ -200,7 +210,9 @@ class QueryClassifier:
         return any(connector in query for connector in self.COMPOUND_CONNECTORS)
 
     @staticmethod
-    def _matches_patterns(query: str, compiled_patterns: List[re.Pattern]) -> Optional[str]:
+    def _matches_patterns(
+        query: str, compiled_patterns: List[re.Pattern]
+    ) -> Optional[str]:
         """Check if query matches any compiled pattern.
 
         :param query: Query string to check

@@ -51,10 +51,10 @@ Last revision: 2025-08-14 20:09:59
 """
 
 import asyncio
-from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Union
 import importlib.metadata
+from pathlib import Path
 from pprint import pprint
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import aiohttp
 from agno.agent import Agent, RunResponse
@@ -74,9 +74,7 @@ from ..tools.knowledge_tools import KnowledgeTools
 
 # PersagMemoryTools is no longer used - memory functions are now standalone
 # from ..tools.persag_memory_tools import PersagMemoryTools
-from ..tools.personal_agent_tools import (
-    PersonalAgentFilesystemTools,
-)
+from ..tools.personal_agent_tools import PersonalAgentFilesystemTools
 from ..utils import setup_logging
 from ..utils.splash_screen import display_splash_screen
 from .agent_instruction_manager import AgentInstructionManager, InstructionLevel
@@ -429,21 +427,21 @@ class AgnoPersonalAgent(Agent):
                 all_tools = [
                     DuckDuckGoTools(),
                     # CalculatorTools(enable_all=True),
-                    YFinanceTools(
-                        stock_price=True,
-                        company_info=True,
-                        stock_fundamentals=True,
-                        key_financial_ratios=True,
-                        analyst_recommendations=True,
-                    ),
-                    PythonTools(
-                        base_dir=Path("/tmp"),
-                        run_code=True,
-                        list_files=True,
-                        run_files=True,
-                        read_files=True,
-                        uv_pip_install=True,
-                    ),
+                    # YFinanceTools(
+                    #    stock_price=True,
+                    #    company_info=True,
+                    #    stock_fundamentals=True,
+                    #   key_financial_ratios=True,
+                    #   analyst_recommendations=True,
+                    # ),
+                    # PythonTools(
+                    #    base_dir=Path("/tmp"),
+                    #    run_code=True,
+                    #    list_files=True,
+                    #    run_files=True,
+                    #    read_files=True,
+                    #    uv_pip_install=True,
+                    # ),
                     ShellTools(base_dir=Path(config.home_dir)),
                     PersonalAgentFilesystemTools(),
                     PubmedTools(),
@@ -990,15 +988,20 @@ class AgnoPersonalAgent(Agent):
                         if content and content.strip():
                             logger.info("LightRAG query successful: %s...", query[:50])
                             return content
-                        return ("🔍 No relevant knowledge found for '{query}'. "
-                               "Try different keywords or add more knowledge to your base.")
+                        return (
+                            "🔍 No relevant knowledge found for '{query}'. "
+                            "Try different keywords or add more knowledge to your base."
+                        )
                     error_text = await response.text()
                     logger.warning(
                         "LightRAG query failed with status %s: %s",
-                        response.status, error_text
+                        response.status,
+                        error_text,
                     )
-                    return ("❌ Error querying knowledge base "
-                           f"(status {response.status}): {error_text}")
+                    return (
+                        "❌ Error querying knowledge base "
+                        f"(status {response.status}): {error_text}"
+                    )
 
         except aiohttp.ClientError as e:
             logger.error("Error connecting to LightRAG server: %s", e)

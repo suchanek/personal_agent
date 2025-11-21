@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.8.79.dev] - 2025-11-21
+
+### Fixed
+- **Filesystem Tools Natural Language Normalization**: Fixed critical bug where natural language directory references like "current directory" were interpreted literally as directory names instead of path shortcuts. The filesystem tools now normalize common phrases: "current directory"/"current dir"/"here"/"this directory" → `.` (current working directory), and "home"/"home directory"/"home dir" → `~` (user home). This prevents accidental creation of literal directories named "current directory" and improves user experience with natural language file operations. Implemented in both [`PersonalAgentFilesystemTools.create_and_save_file`](src/personal_agent/tools/personal_agent_tools.py:294-300) and MCP-based [`create_and_save_file`](src/personal_agent/tools/filesystem.py:352-365). See [ADR-101](./refs/adr/101-user-home-directory-normalization.md) for architectural details and [FILESYSTEM_TOOLS_FIX.md](./FILESYSTEM_TOOLS_FIX.md) for technical summary.
+
+### Added
+- **Comprehensive Filesystem Tools Test Suite**: Added extensive test coverage for filesystem tools including normalization behavior, multi-user context safety, path expansion security, edge cases, and regression prevention. New test files: [`test_filesystem_tools_normalization.py`](tests/core/test_filesystem_tools_normalization.py) with 19 test classes covering all aspects of the fix, and [`test_personal_agent_tools.py`](tests/tools/test_personal_agent_tools.py) for general filesystem and system tools functionality.
+
+### Changed
+- **Type Hint Correction**: Fixed type hint in [`PersonalAgentFilesystemTools.create_and_save_file`](src/personal_agent/tools/personal_agent_tools.py:280) from `variable_to_return: str = None` to `variable_to_return: str | None = None` for proper Python 3.10+ union type syntax.
+
 ## [v0.8.78.dev] - 2025-11-20
 
 ### Fixed

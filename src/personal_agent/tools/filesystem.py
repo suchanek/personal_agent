@@ -349,6 +349,22 @@ def create_and_save_file(
     try:
         # Store original path for logging
         original_path = file_path
+        
+        # Normalize natural language path references
+        # Extract directory and filename if path contains common phrases
+        if "/" in file_path or "\\" in file_path:
+            dir_part = os.path.dirname(file_path)
+            file_part = os.path.basename(file_path)
+            
+            # Normalize directory part
+            dir_lower = dir_part.lower().strip()
+            if dir_lower in ["current directory", "current dir", "here", "this directory"]:
+                dir_part = "."
+            elif dir_lower in ["home", "home directory", "home dir"]:
+                dir_part = "~"
+            
+            # Reconstruct path
+            file_path = os.path.join(dir_part, file_part) if dir_part else file_part
 
         # Expand ~ to actual home directory
         if file_path.startswith("~/"):
