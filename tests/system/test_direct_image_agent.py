@@ -7,11 +7,14 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from personal_agent.team.reasoning_team import create_image_agent
 
+@pytest.mark.asyncio
 async def test_direct_image_agent():
     """Test the Image Agent directly."""
     print("🧪 Testing Image Agent directly...")
@@ -46,6 +49,12 @@ async def test_direct_image_agent():
         import traceback
         traceback.print_exc()
 
+@pytest.mark.asyncio
+async def main():
+    """Run the test asynchronously."""
+    await test_direct_image_agent()
+
+
 if __name__ == "__main__":
     print("🚀 Starting direct Image Agent test...")
-    asyncio.run(test_direct_image_agent())
+    asyncio.run(main())

@@ -16,6 +16,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -23,6 +25,7 @@ from personal_agent.core.agent_memory_manager import AgentMemoryManager
 from personal_agent.core.user_model import User
 
 
+@pytest.mark.asyncio
 async def test_enhanced_memory_retrieval():
     """Test that enhanced fields are preserved through all retrieval methods."""
 

@@ -7,6 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -14,6 +16,7 @@ add_src_to_path()
 from personal_agent.core.agno_agent import create_agno_agent
 
 
+@pytest.mark.asyncio
 async def test_agent_finance_tools():
     """Test the agent with working finance tools."""
     print("🚀 Testing Agent with Working Finance Tools")
@@ -37,21 +40,25 @@ async def test_agent_finance_tools():
         print("\n📊 Testing finance tool usage...")
         print("Query: 'call your yfinance tool with argument NVDA'")
 
-        response = await agent.run("call your yfinance tool with argument NVDA")
+        # Set stream=False to get a string response
+        response = await agent.run("call your yfinance tool with argument NVDA", stream=False)
 
         print(f"\n📋 Agent Response:")
         print(f"{response}")
 
         # Check if tools were called
         print(f"\n🔍 Debug Info:")
-        print(f"- Agent has {len(agent.agent.tools)} tools")
-        print(f"- Debug mode: {agent.debug}")
+        if agent.tools:
+            print(f"- Agent has {len(agent.tools)} tools")
+            print(f"- Debug mode: {agent.debug}")
 
-        # List available tools
-        print(f"\n🛠️ Available Tools:")
-        for i, tool in enumerate(agent.agent.tools, 1):
-            tool_name = getattr(tool, "__name__", str(type(tool).__name__))
-            print(f"  {i}. {tool_name}")
+            # List available tools
+            print(f"\n🛠️ Available Tools:")
+            for i, tool in enumerate(agent.tools, 1):
+                tool_name = getattr(tool, "__name__", str(type(tool).__name__))
+                print(f"  {i}. {tool_name}")
+        else:
+            print("- No tools available")
 
         await agent.cleanup()
 
@@ -62,6 +69,7 @@ async def test_agent_finance_tools():
         traceback.print_exc()
 
 
+@pytest.mark.asyncio
 async def main():
     """Main test function."""
     await test_agent_finance_tools()

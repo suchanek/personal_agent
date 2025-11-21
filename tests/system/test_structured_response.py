@@ -12,6 +12,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -139,6 +141,7 @@ def test_instruction_enhancement():
     print("✅ Instruction enhancement validation passed!")
 
 
+@pytest.mark.asyncio
 async def test_real_ollama_model():
     """Test with actual Ollama model calls."""
     print("\n🤖 Testing Real Ollama Model")
@@ -239,6 +242,7 @@ async def test_real_ollama_model():
         traceback.print_exc()
 
 
+@pytest.mark.asyncio
 async def test_integration_example():
     """Demonstrate how the structured response would work in practice."""
     print("\n🚀 Integration Example (Simulated)")

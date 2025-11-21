@@ -11,12 +11,15 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 
+@pytest.mark.asyncio
 async def test_memory_query_behavior():
     """Test that the agent immediately queries memory when asked about personal info."""
     print("🧪 Testing Memory Query Fix")

@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch, mock_open
 import sys
+import os
 
 def _add_src_to_syspath():
     # Ensure 'personal_agent' package is importable in src/ layout
@@ -18,45 +19,60 @@ def _add_src_to_syspath():
 
 _add_src_to_syspath()
 
-from src.personal_agent.core.persag_manager import PersagManager, get_userid, get_persag_manager
+from personal_agent.core.persag_manager import PersagManager, get_userid, get_persag_manager
 
 
 class TestPersagManager:
     
     def test_initialize_persag_directory(self):
-        """Test ~/.persag directory initialization"""
+        """Test ~/.persagent directory initialization"""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('pathlib.Path.home', return_value=Path(temp_dir)):
-                manager = PersagManager()
-                success, message = manager.initialize_persag_directory()
-                
-                assert success
-                assert manager.persag_dir.exists()
-                assert manager.userid_file.exists()
-                assert "successfully" in message.lower()
+            temp_path = Path(temp_dir)
+            persag_dir = temp_path / '.persagent'
+            
+            with patch.dict(os.environ, {'PERSAG_HOME': str(persag_dir)}):
+                with patch('personal_agent.config.settings.PERSAG_HOME', persag_dir):
+                    with patch('personal_agent.core.persag_manager.PERSAG_HOME', persag_dir):
+                        manager = PersagManager()
+                        success, message = manager.initialize_persag_directory()
+                        
+                        assert success
+                        assert manager.persag_dir.exists()
+                        assert manager.userid_file.exists()
+                        assert "successfully" in message.lower()
     
     def test_get_userid(self):
         """Test user ID retrieval"""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('pathlib.Path.home', return_value=Path(temp_dir)):
-                manager = PersagManager()
-                manager.persag_dir.mkdir(exist_ok=True)
-                
-                # Write test user ID
-                with open(manager.userid_file, 'w') as f:
-                    f.write('USER_ID="test_user"\n')
-                
-                assert manager.get_userid() == "test_user"
+            temp_path = Path(temp_dir)
+            persag_dir = temp_path / '.persagent'
+            persag_dir.mkdir(exist_ok=True)
+            userid_file = persag_dir / 'env.userid'
+            
+            # Write test user ID
+            with open(userid_file, 'w') as f:
+                f.write('USER_ID="test_user"\n')
+            
+            with patch.dict(os.environ, {'PERSAG_HOME': str(persag_dir)}):
+                with patch('personal_agent.config.settings.PERSAG_HOME', persag_dir):
+                    with patch('personal_agent.core.persag_manager.PERSAG_HOME', persag_dir):
+                        manager = PersagManager()
+                        assert manager.get_userid() == "test_user"
     
     def test_set_userid(self):
         """Test user ID setting"""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('pathlib.Path.home', return_value=Path(temp_dir)):
-                manager = PersagManager()
-                
-                success = manager.set_userid("new_user")
-                assert success
-                assert manager.get_userid() == "new_user"
+            temp_path = Path(temp_dir)
+            persag_dir = temp_path / '.persagent'
+            
+            with patch.dict(os.environ, {'PERSAG_HOME': str(persag_dir)}):
+                with patch('personal_agent.config.settings.PERSAG_HOME', persag_dir):
+                    with patch('personal_agent.core.persag_manager.PERSAG_HOME', persag_dir):
+                        manager = PersagManager()
+                        
+                        success = manager.set_userid("new_user")
+                        assert success
+                        assert manager.get_userid() == "new_user"
     
     def test_migrate_docker_directories(self):
         """Test docker directory migration"""
@@ -93,37 +109,48 @@ class TestPersagManager:
                 assert config["lightrag_memory_server"]["env_file"] == "env.memory_server"
     
     def test_validate_persag_structure_empty(self):
-        """Test validation of empty ~/.persag structure"""
+        """Test validation of empty ~/.persagent structure"""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('pathlib.Path.home', return_value=Path(temp_dir)):
-                manager = PersagManager()
-                is_valid, message = manager.validate_persag_structure()
-                
-                assert not is_valid
-                assert "does not exist" in message
+            temp_path = Path(temp_dir)
+            persag_dir = temp_path / '.persagent'
+            
+            with patch.dict(os.environ, {'PERSAG_HOME': str(persag_dir)}):
+                with patch('personal_agent.config.settings.PERSAG_HOME', persag_dir):
+                    with patch('personal_agent.core.persag_manager.PERSAG_HOME', persag_dir):
+                        manager = PersagManager()
+                        is_valid, message = manager.validate_persag_structure()
+                        
+                        assert not is_valid
+                        assert "does not exist" in message or "missing" in message
     
     def test_validate_persag_structure_complete(self):
-        """Test validation of complete ~/.persag structure"""
+        """Test validation of complete ~/.persagent structure"""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('pathlib.Path.home', return_value=Path(temp_dir)):
-                manager = PersagManager()
-                
-                # Create complete structure
-                manager.persag_dir.mkdir()
-                manager.userid_file.write_text('USER_ID="test_user"')
-                
-                # Create docker directories
-                for name in ["lightrag_server", "lightrag_memory_server"]:
-                    docker_dir = manager.persag_dir / name
-                    docker_dir.mkdir()
-                    env_file = "env.server" if name == "lightrag_server" else "env.memory_server"
-                    (docker_dir / env_file).write_text("USER_ID=test_user")
-                    (docker_dir / "docker-compose.yml").write_text("version: '3'")
-                
-                is_valid, message = manager.validate_persag_structure()
-                
-                # This might still fail due to default_user check, but structure should be there
-                assert "structure is valid" in message or "Invalid or default user ID" in message
+            temp_path = Path(temp_dir)
+            persag_dir = temp_path / '.persagent'
+            persag_dir.mkdir(exist_ok=True)
+            
+            with patch.dict(os.environ, {'PERSAG_HOME': str(persag_dir)}):
+                with patch('personal_agent.config.settings.PERSAG_HOME', persag_dir):
+                    with patch('personal_agent.core.persag_manager.PERSAG_HOME', persag_dir):
+                        manager = PersagManager()
+                        
+                        # Create complete structure
+                        manager.userid_file.write_text('USER_ID="test_user"')
+                        (persag_dir / '.env').write_text('USER_ID="test_user"')
+                        
+                        # Create docker directories
+                        for name in ["lightrag_server", "lightrag_memory_server"]:
+                            docker_dir = persag_dir / name
+                            docker_dir.mkdir()
+                            env_file = "env.server" if name == "lightrag_server" else "env.memory_server"
+                            (docker_dir / env_file).write_text("USER_ID=test_user")
+                            (docker_dir / "docker-compose.yml").write_text("version: '3'")
+                        
+                        is_valid, message = manager.validate_persag_structure()
+                        
+                        # Should be valid now with proper user_id
+                        assert is_valid or "structure is valid" in message
 
 
 class TestGlobalFunctions:
@@ -138,14 +165,32 @@ class TestGlobalFunctions:
     def test_get_userid_function(self):
         """Test global get_userid function"""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('pathlib.Path.home', return_value=Path(temp_dir)):
-                # Initialize persag directory
-                manager = get_persag_manager()
-                manager.set_userid("global_test_user")
-                
-                # Test global function
-                user_id = get_userid()
-                assert user_id == "global_test_user"
+            temp_path = Path(temp_dir)
+            persag_dir = temp_path / '.persagent'
+            persag_dir.mkdir(exist_ok=True)
+            
+            with patch.dict(os.environ, {'PERSAG_HOME': str(persag_dir)}):
+                with patch('personal_agent.config.settings.PERSAG_HOME', persag_dir):
+                    with patch('personal_agent.core.persag_manager.PERSAG_HOME', persag_dir):
+                        # Reset the singleton to force re-initialization with our test path
+                        import personal_agent.core.persag_manager as pm_module
+                        pm_module._persag_manager = None
+                        
+                        # Initialize persag directory and set user
+                        manager = get_persag_manager()
+                        success = manager.set_userid("global_test_user")
+                        assert success, "Failed to set user ID"
+                        
+                        # Verify the file was written
+                        userid_file = persag_dir / 'env.userid'
+                        assert userid_file.exists(), "env.userid file not created"
+                        
+                        # Test global function - it should read from the file we just created
+                        user_id = get_userid()
+                        assert user_id == "global_test_user"
+                        
+                        # Clean up singleton for other tests
+                        pm_module._persag_manager = None
 
 
 if __name__ == "__main__":

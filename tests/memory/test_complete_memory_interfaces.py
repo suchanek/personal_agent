@@ -20,12 +20,15 @@ import asyncio
 import sys
 import os
 
+import pytest
+
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 
+@pytest.mark.asyncio
 async def test_memory_interfaces():
     """Test all memory function interfaces."""
     print("🧪 Testing AgnoPersonalAgent Memory Function Interfaces")

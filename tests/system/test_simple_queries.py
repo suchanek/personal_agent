@@ -7,6 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 def _add_src_to_syspath():
     # Ensure 'personal_agent' package is importable in src/ layout
     repo_root = Path(__file__).resolve().parents[1]
@@ -19,6 +21,7 @@ _add_src_to_syspath()
 from personal_agent.core import create_simple_personal_agent, load_agent_knowledge
 
 
+@pytest.mark.asyncio
 async def test_simple_queries():
     """Test simple knowledge search queries without special characters."""
     # Create agent
@@ -45,5 +48,11 @@ async def test_simple_queries():
         print("-" * 50)
 
 
+@pytest.mark.asyncio
+async def main():
+    """Run the test asynchronously."""
+    await test_simple_queries()
+
+
 if __name__ == "__main__":
-    asyncio.run(test_simple_queries())
+    asyncio.run(main())

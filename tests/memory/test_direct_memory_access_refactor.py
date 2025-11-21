@@ -11,6 +11,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -23,6 +25,7 @@ from personal_agent.utils import setup_logging
 logger = setup_logging(__name__)
 
 
+@pytest.mark.asyncio
 async def test_direct_memory_access():
     """Test the refactored direct memory access functionality."""
     print("🧪 Testing Direct Memory Access Refactoring")
@@ -162,6 +165,7 @@ async def test_direct_memory_access():
             await agent.cleanup()
 
 
+@pytest.mark.asyncio
 async def test_memory_tool_functions():
     """Test individual memory tool functions directly."""
     print("\n🔧 Testing Individual Memory Tool Functions")

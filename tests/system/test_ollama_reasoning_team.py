@@ -9,12 +9,15 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from examples.teams.reasoning_team import create_team
 
 
+@pytest.mark.asyncio
 async def test_team():
     """Test the Ollama reasoning team with various queries."""
 
@@ -90,6 +93,7 @@ async def test_team():
         traceback.print_exc()
 
 
+@pytest.mark.asyncio
 async def test_memory_persistence():
     """Test that memory persists across team instances."""
 
@@ -119,6 +123,7 @@ async def test_memory_persistence():
         print(f"❌ Memory persistence test failed: {str(e)}")
 
 
+@pytest.mark.asyncio
 async def main():
     """Main test function."""
 

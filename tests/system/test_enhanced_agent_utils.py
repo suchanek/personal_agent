@@ -7,6 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -19,13 +21,14 @@ from src.personal_agent.streamlit.utils.agent_utils import (
 from src.personal_agent.team.reasoning_team import create_image_agent
 
 
+@pytest.mark.asyncio
 async def test_enhanced_agent_utils():
     """Test the enhanced agent utilities functions."""
     print("🧪 TESTING ENHANCED AGENT UTILS")
     print("=" * 40)
     
     # Create image agent
-    image_agent = create_image_agent(debug=False, use_remote=False)
+    image_agent = create_image_agent(debug=False)
     prompt = "Create an image of a robot drinking coffee"
     
     print(f"Prompt: '{prompt}'")

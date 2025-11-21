@@ -18,6 +18,11 @@ class TestCognitiveStateConfidence:
     """Test that cognitive state is properly mapped to confidence scores."""
 
     @pytest.fixture
+    def anyio_backend(self):
+        """Force asyncio backend only."""
+        return "asyncio"
+
+    @pytest.fixture
     def mock_agno_memory(self):
         """Create mock Agno memory system."""
         mock_mem = MagicMock()

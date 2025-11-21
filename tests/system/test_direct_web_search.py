@@ -7,6 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -14,6 +16,7 @@ add_src_to_path()
 from agno.tools.duckduckgo import DuckDuckGoTools
 
 
+@pytest.mark.asyncio
 async def test_direct_duckduckgo():
     """Test DuckDuckGo search directly."""
     
@@ -65,5 +68,11 @@ async def test_direct_duckduckgo():
         print(f"\n❌ ERROR with regular search: {e}")
 
 
+@pytest.mark.asyncio
+async def main():
+    """Run the test asynchronously."""
+    await test_direct_duckduckgo()
+
+
 if __name__ == "__main__":
-    asyncio.run(test_direct_duckduckgo())
+    asyncio.run(main())

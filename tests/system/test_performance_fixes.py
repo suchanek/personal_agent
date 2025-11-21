@@ -4,6 +4,7 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -44,6 +45,7 @@ class PerformanceTimer:
         return self.timings.get(name, {}).get("duration", 0)
 
 
+@pytest.mark.asyncio
 async def test_performance_fixes():
     """
     Test the performance fixes for AgnoPersonalAgent memory queries

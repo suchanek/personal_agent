@@ -10,12 +10,15 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 
 
+@pytest.mark.asyncio
 async def test_streamlit_memory_search():
     """Test the memory search functionality that was fixed in the Streamlit app."""
     print("🧪 Testing Streamlit Memory Search Fix")

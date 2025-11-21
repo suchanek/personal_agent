@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -100,6 +102,7 @@ async def wait_for_pipeline_clear(max_wait_seconds: int = 60, check_interval: in
     return False
 
 
+@pytest.mark.asyncio
 async def test_dual_storage_enum_status():
     """Test the new enum-based memory storage status system with full dual storage."""
     print("🧪 Testing Dual Storage Enum-Based Memory Status System")

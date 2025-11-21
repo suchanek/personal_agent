@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Iterator
 
+import pytest
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -18,6 +20,7 @@ from rich.pretty import pprint
 from personal_agent.team.reasoning_team import create_image_agent
 
 
+@pytest.mark.asyncio
 async def test_streaming_chunks():
     """Test streaming response chunks to find the missing final response."""
     print("🔍 TESTING STREAMING RESPONSE CHUNKS")
@@ -122,6 +125,7 @@ async def test_streaming_chunks():
         traceback.print_exc()
 
 
+@pytest.mark.asyncio
 async def main():
     """Main test function."""
     print("🚀 STREAMING CHUNKS ANALYSIS")

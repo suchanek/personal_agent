@@ -9,6 +9,8 @@ as the primary method, with agentic retrieval as a last resort.
 import sys
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -20,6 +22,7 @@ from personal_agent.core.agno_agent import AgnoPersonalAgent
 USER_ID = get_user_id()
 
 
+@pytest.mark.asyncio
 async def test_refactored_agent_memory():
     """Test the refactored agent memory system with new priority order."""
     print("🧪 Testing Refactored AgnoPersonalAgent Memory System")
@@ -99,6 +102,7 @@ async def test_refactored_agent_memory():
     return True
 
 
+@pytest.mark.asyncio
 async def test_memory_search_priority():
     """Test that the memory search follows the correct priority order."""
     print("\n🎯 Testing Memory Search Priority Order")
@@ -164,6 +168,7 @@ async def test_memory_search_priority():
     return True
 
 
+@pytest.mark.asyncio
 async def main():
     """Main test function."""
     print("🔧 AgnoPersonalAgent Refactored Memory Test")

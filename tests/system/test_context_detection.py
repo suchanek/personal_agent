@@ -10,6 +10,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -35,6 +37,7 @@ def print_section(title: str):
     print(f" {title}")
     print(f"{'-'*40}")
 
+@pytest.mark.asyncio
 async def test_context_detection():
     """Test the context size detection system."""
     

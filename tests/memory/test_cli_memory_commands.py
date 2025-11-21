@@ -11,6 +11,8 @@ import os
 import sys
 from typing import Dict, List, Optional, Tuple
 
+import pytest
+
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -141,6 +143,7 @@ async def verify_memory_in_sqlite(agent: AgnoPersonalAgent, content: str) -> boo
         return False
 
 
+@pytest.mark.asyncio
 async def run_tests():
     """Run tests for CLI memory commands."""
     logger.info("Initializing agent for testing...")

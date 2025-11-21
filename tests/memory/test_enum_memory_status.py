@@ -7,6 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -18,6 +20,7 @@ from personal_agent.core.semantic_memory_manager import (
 from agno.memory.v2.db.sqlite import SqliteMemoryDb
 
 
+@pytest.mark.asyncio
 async def test_enum_memory_status():
     """Test the new enum-based memory storage status system."""
     print("🧪 Testing Enum-Based Memory Storage Status System")

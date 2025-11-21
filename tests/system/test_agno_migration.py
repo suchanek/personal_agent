@@ -7,6 +7,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 from personal_agent.utils import add_src_to_path
 
 add_src_to_path()
@@ -14,6 +16,7 @@ add_src_to_path()
 from personal_agent.core.agno_agent import create_agno_agent
 
 
+@pytest.mark.asyncio
 async def test_agno_agent():
     """Test basic Agno agent functionality."""
     print("🧪 Testing Agno Agent Migration")

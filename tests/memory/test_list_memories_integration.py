@@ -10,6 +10,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -17,6 +19,7 @@ from personal_agent.core.agno_agent import AgnoPersonalAgent
 from personal_agent.tools.streamlit_helpers import StreamlitMemoryHelper
 
 
+@pytest.mark.asyncio
 async def test_list_memories_integration():
     """Test that list_memories method works correctly."""
     print("🧪 Testing list_memories integration...")

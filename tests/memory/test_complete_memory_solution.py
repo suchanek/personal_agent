@@ -10,6 +10,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add src to path - go up one level from memory_tests to project root, then into src
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -29,6 +31,7 @@ from personal_agent.core.agno_agent import AgnoPersonalAgent
 USER_ID = "test_user"
 
 
+@pytest.mark.asyncio
 async def test_memory_functionality():
     """Test complete memory functionality with the enhanced agent."""
     console = Console()

@@ -7,12 +7,15 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from personal_agent.core.agno_agent import AgnoPersonalAgent
 from personal_agent.config import LLM_MODEL, OLLAMA_URL, AGNO_STORAGE_DIR, AGNO_KNOWLEDGE_DIR
 
+@pytest.mark.asyncio
 async def test_memory_functions():
     """Test that all memory functions are accessible on AgnoPersonalAgent."""
     

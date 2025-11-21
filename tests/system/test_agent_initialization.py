@@ -5,6 +5,8 @@ import asyncio
 import logging
 from pathlib import Path
 
+import pytest
+
 from src.personal_agent.config import DATA_DIR, LLM_MODEL
 from src.personal_agent.core.agno_agent import AgnoPersonalAgent
 
@@ -45,6 +47,7 @@ Project Context:
         print(f"Sample knowledge file already exists: {sample_file}")
 
 
+@pytest.mark.asyncio
 async def test_agent_initialization():
     """Test agent initialization with memory and knowledge base."""
     print("🔄 Testing Agent Initialization...")
@@ -59,12 +62,8 @@ async def test_agent_initialization():
     # Initialize agent
     print("🚀 Initializing AgnoPersonalAgent...")
     agent = AgnoPersonalAgent(
-        model_provider="ollama",
-        model_name=LLM_MODEL,
         enable_memory=True,
         enable_mcp=False,
-        storage_dir=f"{DATA_DIR}/agno",
-        knowledge_dir=f"{DATA_DIR}/knowledge",
         debug=True,  # Enable debug to see tool calls
     )
 
@@ -128,6 +127,7 @@ async def test_agent_initialization():
     return True
 
 
+@pytest.mark.asyncio
 async def main():
     """Run the test asynchronously."""
     await test_agent_initialization()
