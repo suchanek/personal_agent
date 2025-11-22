@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.9.02dev] - 2025-11-22
+
+### Added
+- **Enhanced Knowledge Search with Relevance Filtering**: Implemented `EnhancedLanceDb` and `EnhancedCombinedKnowledgeBase` classes in [`agno_storage.py`](src/personal_agent/core/agno_storage.py) to preserve relevance scores from LanceDB search results and support similarity threshold filtering. Agno's base `LanceDb` class was discarding `_distance` scores from vector search results, making it impossible to filter out irrelevant results. The enhanced classes now preserve these scores in `Document.meta_data` and provide a `similarity_threshold` parameter for filtering. Comprehensive test script [`test_knowledge_search.py`](test_knowledge_search.py) validates the fix. See [`KNOWLEDGE_SEARCH_FIX_SUMMARY.md`](KNOWLEDGE_SEARCH_FIX_SUMMARY.md) for complete technical details.
+
+### Changed
+- **Pure Vector Search for Better Semantic Discrimination**: Switched all knowledge bases from `SearchType.hybrid` to `SearchType.vector` in [`agno_storage.py`](src/personal_agent/core/agno_storage.py:355-410). Hybrid search was returning similar low scores (~0.016) for both relevant and irrelevant queries, making filtering ineffective. Pure vector search provides excellent discrimination with distance scores that clearly separate good matches (0.3-0.5) from poor matches (1.0+). Testing shows "machine learning" queries return distance=0.36 while irrelevant "snoopy" queries return distance=1.09+, allowing effective filtering with threshold=0.8. This resolves the critical issue where knowledge search was returning everything regardless of relevance.
+
+### Fixed
+- **Knowledge Search Returning Irrelevant Results**: Fixed critical bug where searching for "snoopy" returned completely unrelated documents like "wacka wacka" and "hello". Root cause was twofold: (1) Agno's `LanceDb._build_search_results()` was discarding `_distance` scores from LanceDB search results, and (2) hybrid search scoring was not discriminating well between relevant and irrelevant content. Solution implements enhanced wrapper classes that preserve scores and switched to pure vector search for better semantic discrimination. With `similarity_threshold=0.8`, irrelevant results are now properly filtered out while good matches are retained.
+
 ## [v0.8.79.dev] - 2025-11-21
 
 ### Added

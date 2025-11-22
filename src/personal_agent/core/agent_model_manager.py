@@ -309,28 +309,43 @@ class AgentModelManager:
         return manager.create_model(use_remote=use_remote)
 
     @classmethod
-    def create_model_from_config(cls) -> Union[OpenAIChat, Ollama, LMStudio]:
+    def create_model_from_config(cls, role: str = "leader") -> Union[OpenAIChat, Ollama, LMStudio]:
         """Create a model using the global PersonalAgentConfig.
 
         This is the recommended way to create models as it ensures
         consistency with the centralized configuration.
 
+        Args:
+            role: Model role - "leader" for coordinator/reasoning, "worker" for tool calling
+
         Returns:
             Configured model instance based on global config
 
         Example:
-            model = AgentModelManager.create_model_from_config()
+            leader_model = AgentModelManager.create_model_from_config(role="leader")
+            worker_model = AgentModelManager.create_model_from_config(role="worker")
         """
         config = get_config()
-        logger.info(
-            "Creating model from config: provider=%s, model=%s",
-            config.provider,
-            config.model,
-        )
+
+        # Select model based on role
+        if role == "worker":
+            model_name = config.worker_model
+            logger.info(
+                "Creating WORKER model from config: provider=%s, model=%s",
+                config.provider,
+                model_name,
+            )
+        else:  # leader
+            model_name = config.model
+            logger.info(
+                "Creating LEADER model from config: provider=%s, model=%s",
+                config.provider,
+                model_name,
+            )
 
         return cls.create_model_for_provider(
             provider=config.provider,
-            model_name=config.model,
+            model_name=model_name,
             use_remote=config.use_remote,
             base_url=None,  # Let create_model_for_provider use config URLs
         )

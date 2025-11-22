@@ -70,6 +70,7 @@ class ConfigSnapshot:
     user_id: str
     provider: str
     model: str
+    worker_model: str
     ollama_url: str
     remote_ollama_url: str
     lmstudio_url: str
@@ -150,6 +151,8 @@ class PersonalAgentConfig:
             self._model = os.getenv(
                 "LLM_MODEL", self._get_default_model(self._provider)
             )
+            # Worker model for tool-calling agents (defaults to llama3.1:8b for ollama)
+            self._worker_model = os.getenv("WORKER_MODEL", "llama3.1:8b")
 
             # Service URLs
             self._ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -212,10 +215,11 @@ class PersonalAgentConfig:
             self._extra: Dict[str, Any] = {}
 
         logger.info(
-            "PersonalAgentConfig initialized: user=%s, provider=%s, model=%s",
+            "PersonalAgentConfig initialized: user=%s, provider=%s, leader_model=%s, worker_model=%s",
             self._user_id,
             self._provider,
             self._model,
+            self._worker_model,
         )
 
     @classmethod
@@ -378,7 +382,7 @@ class PersonalAgentConfig:
             return self._model
 
     def set_model(self, model: str):
-        """Set the current model name.
+        """Set the current model name (leader model).
 
         :param model: Model name
         """
@@ -388,6 +392,24 @@ class PersonalAgentConfig:
             os.environ["LLM_MODEL"] = model
             logger.info("Model changed: %s -> %s", old_value, model)
             self._notify_callbacks("model", old_value, model)
+
+    @property
+    def worker_model(self) -> str:
+        """Get the worker model name (for tool-calling agents)."""
+        with self._config_lock:
+            return self._worker_model
+
+    def set_worker_model(self, model: str):
+        """Set the worker model name (for tool-calling agents).
+
+        :param model: Worker model name
+        """
+        with self._config_lock:
+            old_value = self._worker_model
+            self._worker_model = model
+            os.environ["WORKER_MODEL"] = model
+            logger.info("Worker model changed: %s -> %s", old_value, model)
+            self._notify_callbacks("worker_model", old_value, model)
 
     # ========== Service URLs ==========
 
@@ -799,6 +821,7 @@ class PersonalAgentConfig:
                 user_id=self._user_id,
                 provider=self._provider,
                 model=self._model,
+                worker_model=self._worker_model,
                 ollama_url=self._ollama_url,
                 remote_ollama_url=self._remote_ollama_url,
                 lmstudio_url=self._lmstudio_url,
@@ -845,6 +868,7 @@ class PersonalAgentConfig:
             self._user_id = snapshot.user_id
             self._provider = snapshot.provider
             self._model = snapshot.model
+            self._worker_model = snapshot.worker_model
             self._debug_mode = snapshot.debug_mode
             self._use_remote = snapshot.use_remote
             self._use_mcp = snapshot.use_mcp
@@ -877,6 +901,7 @@ class PersonalAgentConfig:
             "user_id": snapshot.user_id,
             "provider": snapshot.provider,
             "model": snapshot.model,
+            "worker_model": snapshot.worker_model,
             "ollama_url": snapshot.ollama_url,
             "remote_ollama_url": snapshot.remote_ollama_url,
             "lmstudio_url": snapshot.lmstudio_url,

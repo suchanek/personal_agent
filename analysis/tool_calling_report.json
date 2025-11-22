@@ -1,0 +1,834 @@
+{
+  "test_date": "2025-11-21T21:09:28.931787",
+  "total_models_tested": 14,
+  "models": [
+    {
+      "model_name": "llama32-tools:latest",
+      "test_date": "2025-11-21T21:07:46.818780",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": false,
+      "tool_calls_parseable": false,
+      "double_call_issue": false,
+      "average_response_time": 1.052,
+      "total_tokens_used": 757,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "llama32-tools:latest",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": true,
+          "response_content": "<tool_call>\n{\"name\": \"add_numbers\", \"arguments\": {\"a\": 5, \"b\": 7}}\n</tool_call>",
+          "response_time_seconds": 1.109,
+          "input_tokens": 350,
+          "output_tokens": 31,
+          "total_tokens": 381,
+          "error": null,
+          "raw_tool_calls": null
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "llama32-tools:latest",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": true,
+          "response_content": "<tool_call>\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"San Francisco\"}}\n</tool_call>",
+          "response_time_seconds": 0.995,
+          "input_tokens": 350,
+          "output_tokens": 26,
+          "total_tokens": 376,
+          "error": null,
+          "raw_tool_calls": null
+        }
+      ],
+      "overall_status": "BROKEN",
+      "notes": "Tool calls generated but not parsed correctly"
+    },
+    {
+      "model_name": "llama3.1:8b",
+      "test_date": "2025-11-21T21:07:53.254615",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 1.787,
+      "total_tokens_used": 758,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "llama3.1:8b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The result of 5 + 7 is 12.",
+          "response_time_seconds": 1.618,
+          "input_tokens": 332,
+          "output_tokens": 36,
+          "total_tokens": 368,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "llama3.1:8b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "<|python_tag|><additional_information>\n- The response provided is based on generic information and may not reflect the current or actual weather conditions.\n</additional_information>",
+          "response_time_seconds": 1.955,
+          "input_tokens": 342,
+          "output_tokens": 48,
+          "total_tokens": 390,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly"
+    },
+    {
+      "model_name": "llama3.2:3b",
+      "test_date": "2025-11-21T21:07:59.634892",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": false,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 0.829,
+      "total_tokens_used": 625,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "llama3.2:3b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The answer to 5 + 7 is 12.",
+          "response_time_seconds": 0.938,
+          "input_tokens": 330,
+          "output_tokens": 36,
+          "total_tokens": 366,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": \"5\", \"b\": \"7\"}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "llama3.2:3b",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "```json\n{\"name\": \"get_weather\", \"parameters\": {\"city\": \"San Francisco\"}}\n```",
+          "response_time_seconds": 0.721,
+          "input_tokens": 237,
+          "output_tokens": 22,
+          "total_tokens": 259,
+          "error": null,
+          "raw_tool_calls": null
+        }
+      ],
+      "overall_status": "PARTIAL",
+      "notes": "Some queries work, others don't"
+    },
+    {
+      "model_name": "hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF:latest",
+      "test_date": "2025-11-21T21:08:03.882918",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": false,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 0.515,
+      "total_tokens_used": 534,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF:latest",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "```\n{\n  \"name\": \"add_numbers\",\n  \"parameters\": {\n    \"a\": 5,\n    \"b\": 7\n  }\n}\n```",
+          "response_time_seconds": 0.593,
+          "input_tokens": 239,
+          "output_tokens": 35,
+          "total_tokens": 274,
+          "error": null,
+          "raw_tool_calls": null
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF:latest",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "```\n{\"name\": \"get_weather\", \"parameters\": {\"city\": \"San Francisco\"}}\n```",
+          "response_time_seconds": 0.438,
+          "input_tokens": 239,
+          "output_tokens": 21,
+          "total_tokens": 260,
+          "error": null,
+          "raw_tool_calls": null
+        }
+      ],
+      "overall_status": "PARTIAL",
+      "notes": "Some queries work, others don't"
+    },
+    {
+      "model_name": "qwen3:latest",
+      "test_date": "2025-11-21T21:08:26.798507",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": true,
+      "average_response_time": 9.036,
+      "total_tokens_used": 1974,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "qwen3:latest",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The sum of 5 and 7 is **12**.",
+          "response_time_seconds": 7.75,
+          "input_tokens": 470,
+          "output_tokens": 320,
+          "total_tokens": 790,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "qwen3:latest",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 2,
+          "double_call_detected": true,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is currently sunny with a temperature of 72\u00b0F. It looks like a mild and pleasant day\u2014perfect for outdoor activities! \ud83c\udf1e",
+          "response_time_seconds": 10.322,
+          "input_tokens": 759,
+          "output_tokens": 425,
+          "total_tokens": 1184,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            },
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly (but has double-call issue)"
+    },
+    {
+      "model_name": "qwen3:8b",
+      "test_date": "2025-11-21T21:08:44.071656",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 7.252,
+      "total_tokens_used": 1546,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "qwen3:8b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The sum of 5 and 7 is **12**.",
+          "response_time_seconds": 8.323,
+          "input_tokens": 470,
+          "output_tokens": 345,
+          "total_tokens": 815,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "qwen3:8b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is currently **sunny** with a temperature of **72\u00b0F**. It looks like a pleasant day! \ud83c\udf1e",
+          "response_time_seconds": 6.181,
+          "input_tokens": 480,
+          "output_tokens": 251,
+          "total_tokens": 731,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly"
+    },
+    {
+      "model_name": "qwen3:4b",
+      "test_date": "2025-11-21T21:08:54.760668",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 3.811,
+      "total_tokens_used": 1394,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "qwen3:4b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The sum of 5 and 7 is **12**.",
+          "response_time_seconds": 3.759,
+          "input_tokens": 470,
+          "output_tokens": 218,
+          "total_tokens": 688,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "qwen3:4b",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is sunny with a temperature of 72\u00b0F. \ud83c\udf24\ufe0f\u2600\ufe0f",
+          "response_time_seconds": 3.862,
+          "input_tokens": 480,
+          "output_tokens": 226,
+          "total_tokens": 706,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly"
+    },
+    {
+      "model_name": "qwen3:1.7B",
+      "test_date": "2025-11-21T21:09:02.889758",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": true,
+      "average_response_time": 2.887,
+      "total_tokens_used": 1785,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "qwen3:1.7B",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The result of adding 5 and 7 is $\\boxed{12}$.",
+          "response_time_seconds": 2.66,
+          "input_tokens": 470,
+          "output_tokens": 258,
+          "total_tokens": 728,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "qwen3:1.7B",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 2,
+          "double_call_detected": true,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is sunny and 72\u00b0F.",
+          "response_time_seconds": 3.114,
+          "input_tokens": 759,
+          "output_tokens": 298,
+          "total_tokens": 1057,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            },
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly (but has double-call issue)"
+    },
+    {
+      "model_name": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K",
+      "test_date": "2025-11-21T21:09:07.089022",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 1.008,
+      "total_tokens_used": 1013,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "5 + 7 = 12.",
+          "response_time_seconds": 1.016,
+          "input_tokens": 466,
+          "output_tokens": 36,
+          "total_tokens": 502,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q6_K",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is sunny and 72\u00b0F.",
+          "response_time_seconds": 1.001,
+          "input_tokens": 476,
+          "output_tokens": 35,
+          "total_tokens": 511,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly"
+    },
+    {
+      "model_name": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
+      "test_date": "2025-11-21T21:09:10.284370",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": false,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 0.677,
+      "total_tokens_used": 746,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "5 + 7 = 12.",
+          "response_time_seconds": 0.436,
+          "input_tokens": 225,
+          "output_tokens": 10,
+          "total_tokens": 235,
+          "error": null,
+          "raw_tool_calls": null
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is sunny and 72\u00b0F.",
+          "response_time_seconds": 0.918,
+          "input_tokens": 476,
+          "output_tokens": 35,
+          "total_tokens": 511,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "PARTIAL",
+      "notes": "Some queries work, others don't"
+    },
+    {
+      "model_name": "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:Q6_K",
+      "test_date": "2025-11-21T21:09:10.481112",
+      "total_queries": 2,
+      "successful_queries": 0,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 0.051,
+      "total_tokens_used": 0,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:Q6_K",
+          "success": false,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "",
+          "response_time_seconds": 0.05222797393798828,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "error": "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:Q6_K does not support tools (status code: 400)",
+          "raw_tool_calls": null
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:Q6_K",
+          "success": false,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "",
+          "response_time_seconds": 0.04888176918029785,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "error": "hf.co/unsloth/Qwen3-4B-Thinking-2507-GGUF:Q6_K does not support tools (status code: 400)",
+          "raw_tool_calls": null
+        }
+      ],
+      "overall_status": "ERROR",
+      "notes": "Model failed to respond to queries"
+    },
+    {
+      "model_name": "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest",
+      "test_date": "2025-11-21T21:09:16.917463",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": false,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 0.989,
+      "total_tokens_used": 505,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "<tool_calls>\n{\"name\": \"add_numbers\", \"arguments\": {\"a\": 5, \"b\": 7}}\n</tool_calls>",
+          "response_time_seconds": 1.079,
+          "input_tokens": 225,
+          "output_tokens": 31,
+          "total_tokens": 256,
+          "error": null,
+          "raw_tool_calls": null
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "hf.co/qwen/qwen2.5-coder-7b-instruct-gguf:latest",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "<response>\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"San Francisco\"}}\n</response>",
+          "response_time_seconds": 0.899,
+          "input_tokens": 225,
+          "output_tokens": 24,
+          "total_tokens": 249,
+          "error": null,
+          "raw_tool_calls": null
+        }
+      ],
+      "overall_status": "PARTIAL",
+      "notes": "Some queries work, others don't"
+    },
+    {
+      "model_name": "qwen2.5-coder:3b",
+      "test_date": "2025-11-21T21:09:21.025846",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": false,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 0.566,
+      "total_tokens_used": 505,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "qwen2.5-coder:3b",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "{\"name\":\"add_numbers\",\"arguments\":{\"a\":5,\"b\":7}}",
+          "response_time_seconds": 0.574,
+          "input_tokens": 235,
+          "output_tokens": 17,
+          "total_tokens": 252,
+          "error": null,
+          "raw_tool_calls": null
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "qwen2.5-coder:3b",
+          "success": true,
+          "tool_calls_detected": false,
+          "tool_calls_executed": false,
+          "tool_call_count": 0,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "{\"name\": \"get_weather\", \"arguments\": {\"city\": \"San Francisco\"}}",
+          "response_time_seconds": 0.557,
+          "input_tokens": 235,
+          "output_tokens": 18,
+          "total_tokens": 253,
+          "error": null,
+          "raw_tool_calls": null
+        }
+      ],
+      "overall_status": "PARTIAL",
+      "notes": "Some queries work, others don't"
+    },
+    {
+      "model_name": "myaniu/qwen2.5-1m:latest",
+      "test_date": "2025-11-21T21:09:28.931710",
+      "total_queries": 2,
+      "successful_queries": 2,
+      "tool_calling_works": true,
+      "tool_calls_parseable": true,
+      "double_call_issue": false,
+      "average_response_time": 1.439,
+      "total_tokens_used": 1031,
+      "test_results": [
+        {
+          "query": "What is 5 + 7?",
+          "model_name": "myaniu/qwen2.5-1m:latest",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The result of 5 + 7 is 12.",
+          "response_time_seconds": 1.446,
+          "input_tokens": 471,
+          "output_tokens": 40,
+          "total_tokens": 511,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "add_numbers",
+                "arguments": "{\"a\": 5, \"b\": 7}"
+              }
+            }
+          ]
+        },
+        {
+          "query": "What's the weather in San Francisco?",
+          "model_name": "myaniu/qwen2.5-1m:latest",
+          "success": true,
+          "tool_calls_detected": true,
+          "tool_calls_executed": true,
+          "tool_call_count": 1,
+          "double_call_detected": false,
+          "unparsed_tool_calls": false,
+          "response_content": "The weather in San Francisco is currently sunny with a temperature of 72\u00b0F.",
+          "response_time_seconds": 1.432,
+          "input_tokens": 481,
+          "output_tokens": 39,
+          "total_tokens": 520,
+          "error": null,
+          "raw_tool_calls": [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "overall_status": "WORKING",
+      "notes": "Tool calling works correctly"
+    }
+  ]
+}

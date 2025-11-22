@@ -505,19 +505,27 @@ Conclusion about {topic}."""
 
 
 def create_writer_agent(
-    debug: bool = False, instruction_level: InstructionLevel = InstructionLevel.CONCISE
+    debug: bool = False,
+    instruction_level: InstructionLevel = InstructionLevel.CONCISE,
+    model=None
 ) -> Agent:
     """Create a specialized writing agent.
 
     :param debug: Enable debug mode
     :param instruction_level: Instruction sophistication level
+    :param model: Optional model to use (if None, uses config model)
     :return: Configured writing agent
     """
     writing_tools = WritingTools()
+
+    # Use provided model or fall back to config (leader model for writer)
+    if model is None:
+        model = AgentModelManager.create_model_from_config(role="leader")
+
     agent = Agent(
         name="Writer Agent",
         role="Create written content in the requested tone and style",
-        model=AgentModelManager.create_model_from_config(),
+        model=model,
         debug_mode=debug,
         tools=[writing_tools],  # Use the instance, not the class
         instructions=TeamAgentInstructions.get_writer_agent_instructions(
@@ -532,18 +540,25 @@ def create_writer_agent(
 
 
 def create_image_agent(
-    debug: bool = False, instruction_level: InstructionLevel = InstructionLevel.CONCISE
+    debug: bool = False,
+    instruction_level: InstructionLevel = InstructionLevel.CONCISE,
+    model=None
 ) -> Agent:
     """Create a specialized image creation agent using DALL-E with enhanced error handling.
 
     :param debug: Enable debug mode
     :param instruction_level: Instruction sophistication level
+    :param model: Optional model to use (if None, uses config model)
     :return: Configured image creation agent
     """
+    # Use provided model or fall back to config (leader model for image generation)
+    if model is None:
+        model = AgentModelManager.create_model_from_config(role="leader")
+
     agent = Agent(
         name="Image Agent",
         role="Create images using DALL-E based on text descriptions with comprehensive error handling",
-        model=AgentModelManager.create_model_from_config(),
+        model=model,
         debug_mode=debug,  # Always enable debug mode for better error tracking
         tools=[
             DalleTools(model="dall-e-3", size="1792x1024", quality="hd", style="vivid"),
@@ -567,6 +582,11 @@ def create_agents(
 ):
     """Create all agents with the correct remote/local configuration.
 
+    Uses hybrid model strategy via PersonalAgentConfig:
+    - Worker agents use config.worker_model (default: llama3.1:8b) for fast, reliable tool calling
+    - Team coordinator uses config.model for reasoning/delegation
+    - Both models respect config settings for remote/local URLs and parameters
+
     :param debug: Enable debug mode
     :param instruction_level: Instruction sophistication level for all agents
     """
@@ -575,13 +595,26 @@ def create_agents(
     except ImportError:
         from personal_agent.config.runtime_config import get_config
 
-    model = AgentModelManager.create_model_from_config()
+    config = get_config()
 
-    # Web search agent using Ollama
+    # HYBRID STRATEGY: Use worker model from config for fast, reliable tool calling
+    # This properly integrates with the config system and respects model parameters
+    logger.info(
+        "🔧 Creating WORKER agents with model from config: %s",
+        config.worker_model
+    )
+
+    # Use AgentModelManager to create worker model - this ensures proper configuration
+    # including context size, temperature, and role mapping fixes
+    worker_model = AgentModelManager.create_model_from_config(role="worker")
+
+    logger.info("✅ Worker model created: %s", config.worker_model)
+
+    # Web search agent using worker model from config
     web_agent = Agent(
         name="Web Agent",
         role="Search the web for information",
-        model=model,
+        model=worker_model,
         tools=[DuckDuckGoTools()],
         instructions=TeamAgentInstructions.get_web_agent_instructions(
             instruction_level
@@ -590,11 +623,11 @@ def create_agents(
         debug_mode=debug,
     )
 
-    # System agent using PersonalAgentSystemTools
+    # System agent using worker model from config
     system_agent = Agent(
         name="SystemAgent",
         role="Execute system commands and shell operations",
-        model=model,
+        model=worker_model,
         tools=[PersonalAgentSystemTools(shell_command=True)],
         instructions=TeamAgentInstructions.get_system_agent_instructions(
             instruction_level
@@ -603,11 +636,11 @@ def create_agents(
         debug_mode=debug,
     )
 
-    # Finance agent using Ollama
+    # Finance agent using worker model from config
     finance_agent = Agent(
         name="Finance Agent",
         role="Get financial data",
-        model=model,
+        model=worker_model,
         tools=[
             YFinanceTools(
                 stock_price=True,
@@ -623,11 +656,11 @@ def create_agents(
         debug_mode=debug,
     )
 
-    # Medical agent that can search PubMed
+    # Medical agent using worker model from config
     medical_agent = Agent(
         name="Medical Agent",
         role="Search pubmed for medical information",
-        model=model,
+        model=worker_model,
         description="You are an AI agent that search PubMed for medical information.",
         tools=[PubmedTools()],
         instructions=TeamAgentInstructions.get_medical_agent_instructions(
@@ -637,16 +670,20 @@ def create_agents(
         debug_mode=debug,
     )
 
-    # Writer agent using Ollama
-    writer_agent = create_writer_agent(debug=debug, instruction_level=instruction_level)
+    # Writer agent using worker model from config - NOT CURRENTLY USED IN TEAM
+    writer_agent = create_writer_agent(
+        debug=debug, instruction_level=instruction_level, model=worker_model
+    )
 
-    # Image agent using DALL-E
-    image_agent = create_image_agent(debug=debug, instruction_level=instruction_level)
+    # Image agent using worker model from config - NOT CURRENTLY USED IN TEAM
+    image_agent = create_image_agent(
+        debug=debug, instruction_level=instruction_level, model=worker_model
+    )
 
-    # Calculator agent using Ollama
+    # Calculator agent using worker model from config
     calculator_agent = Agent(
         name="Calculator Agent",
-        model=model,
+        model=worker_model,
         role="Calculate mathematical expressions",
         tools=[
             CalculatorTools(
@@ -667,9 +704,10 @@ def create_agents(
         debug_mode=debug,
     )
 
+    # Python agent using worker model from config
     python_agent = Agent(
         name="Python Agent",
-        model=model,
+        model=worker_model,
         role="Create and Execute Python code",
         tools=[
             PythonTools(
@@ -690,9 +728,10 @@ def create_agents(
         debug_mode=debug,
     )
 
+    # File agent using worker model from config
     file_agent = Agent(
         name="File System Agent",
-        model=model,
+        model=worker_model,
         role="Read and write files in the system",
         tools=[
             PersonalAgentFilesystemTools()
@@ -889,10 +928,17 @@ async def create_team(
         file_agent,
     ) = agents
 
+    # HYBRID STRATEGY: Team coordinator uses thinking model from config
+    logger.info(
+        "🔧 Creating COORDINATOR with model from config: %s (%s)",
+        config.model,
+        config.provider
+    )
+
     agent_team = Team(
         name="Personal Agent Team",
         mode="coordinate",
-        model=AgentModelManager.create_model_from_config(),
+        model=AgentModelManager.create_model_from_config(role="leader"),  # Uses thinking model from config
         memory=None,
         tools=[
             # ReasoningTools(add_instructions=True, add_few_shot=True),

@@ -69,7 +69,8 @@ def output_json():
         "runtime_configuration": {
             "user_id": snapshot.user_id,
             "provider": snapshot.provider,
-            "model": snapshot.model,
+            "leader_model": snapshot.model,
+            "worker_model": snapshot.worker_model,
             "agent_mode": snapshot.agent_mode,
             "debug_mode": snapshot.debug_mode,
             "use_remote": snapshot.use_remote,
@@ -108,7 +109,8 @@ def output_json():
         },
         "ai_storage": {
             "storage_backend": snapshot.storage_backend,
-            "llm_model": snapshot.model,
+            "leader_model": snapshot.model,
+            "worker_model": snapshot.worker_model,
             "user_id": snapshot.user_id,
             "seed": snapshot.seed,
         },
@@ -514,7 +516,8 @@ def print_config_colored():
     print(f"  {GREEN}✓{RESET} Using centralized configuration system")
     print(f"  {BOLD}Current User:{RESET} {CYAN}{snapshot.user_id}{RESET}")
     print(f"  {BOLD}Provider:{RESET} {CYAN}{snapshot.provider}{RESET}")
-    print(f"  {BOLD}Model:{RESET} {CYAN}{snapshot.model}{RESET}")
+    print(f"  {BOLD}Leader Model (Coordinator):{RESET} {CYAN}{snapshot.model}{RESET}")
+    print(f"  {BOLD}Worker Model (Tool Agents):{RESET} {CYAN}{snapshot.worker_model}{RESET}")
     print(f"  {BOLD}Agent Mode:{RESET} {CYAN}{snapshot.agent_mode}{RESET}")
     print(
         f"  {BOLD}Debug Mode:{RESET} {GREEN}✓{RESET}"
@@ -621,7 +624,8 @@ def print_config_colored():
             "title": f"{BLUE}{BOLD}🤖 AI & Storage Configuration{RESET}",
             "items": [
                 ("Storage Backend", snapshot.storage_backend),
-                ("LLM Model", snapshot.model),
+                ("Leader Model (Coordinator)", snapshot.model),
+                ("Worker Model (Tool Agents)", snapshot.worker_model),
                 ("User ID", snapshot.user_id),
                 ("Random Seed", str(snapshot.seed) if snapshot.seed else "None"),
             ],
@@ -748,7 +752,8 @@ def print_config_no_color():
     print("  ✓ Using centralized configuration system")
     print(f"  Current User: {snapshot.user_id}")
     print(f"  Provider: {snapshot.provider}")
-    print(f"  Model: {snapshot.model}")
+    print(f"  Leader Model (Coordinator): {snapshot.model}")
+    print(f"  Worker Model (Tool Agents): {snapshot.worker_model}")
     print(f"  Agent Mode: {snapshot.agent_mode}")
     print(f"  Debug Mode: {'✓' if snapshot.debug_mode else '✗'}")
 
@@ -834,7 +839,8 @@ def print_config_no_color():
             "title": "🤖 AI & Storage Configuration",
             "items": [
                 ("Storage Backend", snapshot.storage_backend),
-                ("LLM Model", snapshot.model),
+                ("Leader Model (Coordinator)", snapshot.model),
+                ("Worker Model (Tool Agents)", snapshot.worker_model),
                 ("User ID", snapshot.user_id),
                 ("Random Seed", str(snapshot.seed) if snapshot.seed else "None"),
             ],

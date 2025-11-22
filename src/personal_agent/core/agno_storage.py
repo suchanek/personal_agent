@@ -33,10 +33,12 @@ Removed redundant functions (v0.5.3):
 - load_pdf_knowledge(), load_pdf_knowledge_async(): Redundant PDF-only functions
 """
 
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional, Union
 
 import aiohttp
+from agno.document import Document
 from agno.embedder.ollama import OllamaEmbedder
 from agno.knowledge.arxiv import ArxivKnowledgeBase
 from agno.knowledge.combined import CombinedKnowledgeBase
@@ -72,6 +74,153 @@ except ImportError:
     from personal_agent.utils import setup_logging
 
 logger = setup_logging(__name__, level=LOG_LEVEL)
+
+
+class EnhancedCombinedKnowledgeBase(CombinedKnowledgeBase):
+    """Enhanced CombinedKnowledgeBase that supports similarity_threshold filtering.
+
+    This wrapper extends Agno's CombinedKnowledgeBase to pass through
+    similarity_threshold parameter to EnhancedLanceDb instances.
+    """
+
+    def search(
+        self,
+        query: str,
+        num_documents: Optional[int] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        similarity_threshold: Optional[float] = None
+    ) -> List[Document]:
+        """Enhanced search with similarity threshold support.
+
+        :param query: Search query string
+        :param num_documents: Maximum number of results (0 = no limit)
+        :param filters: Optional filters to apply
+        :param similarity_threshold: Maximum distance threshold for results
+        :return: List of matching documents
+        """
+        if self.vector_db is None:
+            return []
+
+        _num_documents = num_documents if num_documents is not None else self.num_documents
+
+        # If vector_db is EnhancedLanceDb, pass similarity_threshold
+        if isinstance(self.vector_db, EnhancedLanceDb):
+            return self.vector_db.search(
+                query=query,
+                limit=_num_documents,
+                filters=filters,
+                similarity_threshold=similarity_threshold
+            )
+        else:
+            # Fall back to parent behavior for non-enhanced vector DBs
+            return self.vector_db.search(query=query, limit=_num_documents, filters=filters)
+
+
+class EnhancedLanceDb(LanceDb):
+    """Enhanced LanceDb that preserves relevance scores and supports similarity filtering.
+
+    This wrapper extends Agno's LanceDb to:
+    1. Preserve _distance scores from LanceDB in Document.meta_data
+    2. Support similarity_threshold filtering (lower distance = better match)
+    3. Support limit=0 to return ALL results (no limit)
+    4. Maintain backward compatibility with original LanceDb
+    """
+
+    def _build_search_results(self, results) -> List[Document]:
+        """Override to preserve _distance scores from LanceDB.
+
+        :param results: Pandas DataFrame from LanceDB search
+        :return: List of Documents with _distance preserved in meta_data
+        """
+        from agno.utils.log import logger
+
+        search_results: List[Document] = []
+        try:
+            for idx, item in results.iterrows():
+                payload = json.loads(item["payload"])
+                meta_data = payload.get("meta_data", {}) or {}
+
+                # CRITICAL FIX: Preserve the relevance/distance score from LanceDB
+                # _relevance_score: Higher = better match (hybrid search)
+                # _distance: Lower = better match (vector search, typical range 0.0-2.0)
+                if "_relevance_score" in item:
+                    meta_data["_relevance_score"] = float(item["_relevance_score"])
+                elif "_distance" in item:
+                    meta_data["_distance"] = float(item["_distance"])
+                elif "score" in item:  # Fallback to 'score' if available
+                    meta_data["_relevance_score"] = float(item["score"])
+
+                search_results.append(
+                    Document(
+                        name=payload["name"],
+                        meta_data=meta_data,
+                        content=payload["content"],
+                        embedder=self.embedder,
+                        embedding=item["vector"],
+                        usage=payload.get("usage"),
+                    )
+                )
+        except Exception as e:
+            logger.error(f"Error building search results: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return search_results
+
+    def search(
+        self,
+        query: str,
+        limit: int = 5,
+        filters: Optional[Dict[str, Any]] = None,
+        similarity_threshold: Optional[float] = None
+    ) -> List[Document]:
+        """Enhanced search with similarity threshold filtering.
+
+        :param query: Search query string
+        :param limit: Maximum number of results (0 = no limit, return all)
+        :param filters: Metadata filters
+        :param similarity_threshold: Similarity threshold for filtering results.
+                                     - For vector search (_distance): Max distance (0.0-2.0, lower=better).
+                                       Typical: 0.5=strict, 0.8=moderate, 1.0=loose
+                                     - For hybrid search (_relevance_score): Min score (higher=better)
+        :return: List of Documents with _distance or _relevance_score in meta_data
+        """
+        # If limit is 0, get a large number and filter later
+        search_limit = limit if limit > 0 else 1000
+
+        # Call parent search (which will use our overridden _build_search_results)
+        results = super().search(query=query, limit=search_limit, filters=filters)
+
+        # Apply similarity threshold filter if specified
+        if similarity_threshold is not None and results:
+            filtered_results = []
+            for doc in results:
+                if not doc.meta_data:
+                    continue
+
+                # Handle both relevance_score (higher=better) and distance (lower=better)
+                if "_relevance_score" in doc.meta_data:
+                    relevance = doc.meta_data["_relevance_score"]
+                    # For relevance scores, keep if >= threshold
+                    if relevance >= similarity_threshold:
+                        filtered_results.append(doc)
+                elif "_distance" in doc.meta_data:
+                    distance = doc.meta_data["_distance"]
+                    # For distance scores, keep if <= threshold
+                    if distance <= similarity_threshold:
+                        filtered_results.append(doc)
+
+            logger.debug(
+                f"Filtered {len(results)} results to {len(filtered_results)} "
+                f"using similarity_threshold={similarity_threshold}"
+            )
+            results = filtered_results
+
+        # Apply limit if specified (after filtering)
+        if limit > 0:
+            results = results[:limit]
+
+        return results
 
 
 def create_agno_storage(storage_dir: str = None) -> SqliteStorage:
@@ -164,13 +313,13 @@ def create_agno_memory(storage_dir: str = None, debug_mode: bool = False) -> Mem
 
 def create_combined_knowledge_base(
     storage_dir: str = None, knowledge_dir: str = None, db_url: SqliteStorage = None
-) -> Optional[CombinedKnowledgeBase]:
+) -> Optional[EnhancedCombinedKnowledgeBase]:
     """Create a combined knowledge base with text and PDF sources (synchronous creation).
 
     :param storage_dir: Directory for storage files (defaults to DATA_DIR/agno)
     :param knowledge_dir: Directory containing knowledge files to load (defaults to DATA_DIR/knowledge)
     :param db_url: SqliteStorage for the database
-    :return: Configured CombinedKnowledgeBase instance or None if no knowledge found
+    :return: Configured EnhancedCombinedKnowledgeBase instance or None if no knowledge found
     """
     if storage_dir is None:
         storage_dir = f"{DATA_DIR}/agno"
@@ -203,10 +352,10 @@ def create_combined_knowledge_base(
 
     # Create text knowledge base if text files exist
     if text_files:
-        text_vector_db = LanceDb(
+        text_vector_db = EnhancedLanceDb(
             uri=str(storage_path / "lancedb"),
             table_name="text_knowledge",
-            search_type=SearchType.hybrid,
+            search_type=SearchType.vector,  # Pure vector search for better semantic discrimination
             embedder=embedder,
         )
 
@@ -221,10 +370,10 @@ def create_combined_knowledge_base(
     # Create PDF knowledge base if PDF files exist
     if pdf_files:
         try:
-            pdf_vector_db = LanceDb(
+            pdf_vector_db = EnhancedLanceDb(
                 uri=str(storage_path / "lancedb"),
                 table_name="pdf_knowledge",
-                search_type=SearchType.hybrid,
+                search_type=SearchType.vector,  # Pure vector search for better semantic discrimination
                 embedder=embedder,
             )
 
@@ -240,10 +389,10 @@ def create_combined_knowledge_base(
             logger.warning("Consider removing or repairing corrupted PDF files like 'allosteric.pdf'")
 
     # Create a knowledge base with the ArXiv documents
-    arxiv_vector_db = LanceDb(
+    arxiv_vector_db = EnhancedLanceDb(
         uri=str(storage_path / "lancedb"),
         table_name="arxive_knowledge",
-        search_type=SearchType.hybrid,
+        search_type=SearchType.vector,  # Pure vector search for better semantic discrimination
         embedder=embedder,
     )
     arxive_kb = ArxivKnowledgeBase(vector_db=arxiv_vector_db)
@@ -257,14 +406,14 @@ def create_combined_knowledge_base(
 
     # Create combined knowledge base
     if knowledge_sources:
-        combined_vector_db = LanceDb(
+        combined_vector_db = EnhancedLanceDb(
             uri=str(storage_path / "lancedb"),
             table_name="combined_knowledge",
-            search_type=SearchType.hybrid,
+            search_type=SearchType.vector,  # Pure vector search for better semantic discrimination
             embedder=embedder,
         )
 
-        combined_kb = CombinedKnowledgeBase(
+        combined_kb = EnhancedCombinedKnowledgeBase(
             sources=knowledge_sources,
             vector_db=combined_vector_db,
         )
@@ -282,11 +431,11 @@ def create_combined_knowledge_base(
 
 
 async def load_combined_knowledge_base(
-    knowledge_base: CombinedKnowledgeBase, recreate: bool = False
+    knowledge_base: Union[CombinedKnowledgeBase, EnhancedCombinedKnowledgeBase], recreate: bool = False
 ) -> None:
     """Load combined knowledge base content (async loading).
 
-    :param knowledge_base: CombinedKnowledgeBase instance to load
+    :param knowledge_base: CombinedKnowledgeBase or EnhancedCombinedKnowledgeBase instance to load
     :param recreate: Whether to recreate the knowledge base from scratch
     """
     if recreate:
