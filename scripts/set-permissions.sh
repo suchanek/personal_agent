@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-DEFAULT_GROUP="pagent"
+DEFAULT_GROUP="persagent"
 DEFAULT_DIR="/Users/Shared/personal_agent_data"
 
 GROUP="${1:-$DEFAULT_GROUP}"

@@ -951,8 +951,6 @@ setup_lightrag_directories() {
         # Create the directories if they don't exist
         mkdir -p "${lightrag_server_dir}"
         mkdir -p "${lightrag_memory_dir}"
-        
-        # Set proper ownership to agent user
 
         # Copy template configurations from repo if they exist and directories are empty
         if [[ -d "${INSTALL_DIR}/lightrag_server" && ! "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
@@ -975,26 +973,73 @@ setup_lightrag_directories() {
         else
             log "[WOULD CREATE] ${lightrag_server_dir}"
         fi
-        
+
         if [[ -d "${lightrag_memory_dir}" ]]; then
             log "[EXISTS] ${lightrag_memory_dir}"
         else
             log "[WOULD CREATE] ${lightrag_memory_dir}"
         fi
-        
+
         # Check if copy would happen
         if [[ -d "${INSTALL_DIR}/lightrag_server" && ! "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
             log "[WOULD COPY] LightRAG server configuration templates"
         elif [[ -d "${lightrag_server_dir}" && "$(ls -A "${lightrag_server_dir}" 2>/dev/null)" ]]; then
             log "[SKIP] LightRAG server templates (directory not empty)"
         fi
-        
+
         if [[ -d "${INSTALL_DIR}/lightrag_memory_server" && ! "$(ls -A "${lightrag_memory_dir}" 2>/dev/null)" ]]; then
             log "[WOULD COPY] LightRAG memory server configuration templates"
         elif [[ -d "${lightrag_memory_dir}" && "$(ls -A "${lightrag_memory_dir}" 2>/dev/null)" ]]; then
             log "[SKIP] LightRAG memory server templates (directory not empty)"
         fi
     fi
+}
+
+################################################################################
+# Set Shared Data Directory Permissions (Multi-User Support)
+################################################################################
+
+set_shared_data_permissions() {
+    # This function ensures /Users/Shared/personal_agent_data is group-writable and ACL'd for multi-user access
+    local shared_dir="/Users/Shared/personal_agent_data"
+    local shared_group="persagent"
+    local users=("${AGENT_USER}")
+
+    log "Configuring shared data directory permissions for multi-user support..."
+
+    if ! $DRY_RUN; then
+        # 1. Ensure directory exists
+        mkdir -p "$shared_dir"
+
+        # 2. Ensure group exists
+        if dseditgroup -o check "$shared_group" >/dev/null 2>&1; then
+            log_success "Group '$shared_group' already exists."
+        else
+            log "Creating group '$shared_group'..."
+            sudo dseditgroup -o create "$shared_group"
+            log_success "Group '$shared_group' created."
+        fi
+
+        # 3. Add current user to group
+        if id "$AGENT_USER" >/dev/null 2>&1; then
+            sudo dseditgroup -o edit -a "$AGENT_USER" -t user "$shared_group"
+            log_success "Added user '$AGENT_USER' to group '$shared_group'"
+        fi
+
+        # 4. Set directory ownership to root:group
+        sudo chown -R "root:$shared_group" "$shared_dir"
+
+        # 5. Set permissions (setgid, 2775)
+        sudo chmod -R 2775 "$shared_dir"
+
+        # 6. Apply ACL for group RW access, inheritable
+        sudo chmod -R +a "group:$shared_group allow read,write,append,delete,add_file,add_subdirectory,file_inherit,directory_inherit" "$shared_dir"
+
+        log_success "Shared data directory permissions configured for $shared_dir"
+    else
+        log "[WOULD CONFIGURE] shared data directory permissions for $shared_dir (group: $shared_group, user: $AGENT_USER)"
+    fi
+}
 }
 
 ################################################################################
@@ -1337,6 +1382,7 @@ main() {
     pull_ollama_models
     pull_lightrag_images
     setup_lightrag_directories
+    set_shared_data_permissions
     set_permissions
     health_checks
     print_instructions
